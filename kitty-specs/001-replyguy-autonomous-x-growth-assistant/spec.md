@@ -135,6 +135,16 @@ A founder wants to manually evaluate a specific tweet's viral potential and rele
 - What happens when two loops try to post at the same time? The agent must serialize posting actions to avoid race conditions and respect rate limits.
 - What happens when the OAuth tokens expire? The agent must detect expired tokens, attempt to refresh them, and prompt the user to re-authenticate if refresh fails.
 
+## Clarifications
+
+### Session 2026-02-21
+
+- Q: What does the user see while the agent runs? → A: Quiet by default (errors only) with `--verbose` for full structured logs, plus an optional periodic status summary (configurable interval, off by default).
+- Q: How are OAuth tokens and API keys stored locally? → A: Default plaintext file with strict filesystem permissions (`~/.replyguy/tokens.json`, chmod 600) for maximum compatibility (servers, Raspberry Pi, containers). Optional OS keychain integration (macOS Keychain, Windows Credential Manager, Linux Secret Service) when available.
+- Q: What X API tier is required? → A: Design for Basic tier but degrade gracefully on Free. Free tier: mentions + posting only (discovery loop disabled). Basic tier: full functionality (search + discovery). API capability auto-detected at startup so the agent adapts to the user's tier.
+- Q: Does the SQLite database grow unbounded? → A: Configurable retention with automatic cleanup. Default 90 days, configurable in config.toml. Periodic background job prunes old discovered tweets, action logs, and metrics records. Never deletes rate limit counters or recent replies/posts needed for deduplication.
+- Q: What is explicitly out of scope for v1? → A: No web UI, no multi-account support, no DM automation, no analytics dashboard, no scheduled content calendar, no reply-to-reply conversations (only direct mentions and top-level discovered tweets).
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -161,6 +171,14 @@ A founder wants to manually evaluate a specific tweet's viral potential and rele
 - **FR-020**: System MUST support configurable callback host and port for the local browser callback auth mode via `auth.callback_host` and `auth.callback_port` in `config.toml`.
 - **FR-021**: System MUST provide sensible defaults for all configurable values so that users only need to supply credentials and a business profile to get started.
 - **FR-022**: System MUST shut down gracefully on termination signals, completing in-progress actions and saving state.
+- **FR-023**: System MUST default to quiet output (errors only) during `replyguy run`, with a `--verbose` flag that enables full structured logging (debug/info/warn/error levels).
+- **FR-024**: System MUST support an optional periodic status summary (e.g., replies sent, tweets scored, next cycle time) at a configurable interval, disabled by default.
+- **FR-025**: System MUST store OAuth tokens and API keys in a local file (`~/.replyguy/tokens.json`) with strict filesystem permissions (mode 600) by default.
+- **FR-026**: System SHOULD support optional OS keychain integration (macOS Keychain, Windows Credential Manager, Linux Secret Service) as an alternative credential storage backend, selectable via configuration.
+- **FR-027**: System MUST auto-detect the user's X API tier at startup and adapt available features accordingly: Free tier enables mentions monitoring, posting, and threads only; Basic tier (or higher) enables full functionality including keyword search and the discovery loop.
+- **FR-028**: System MUST inform the user at startup which API tier was detected and which loops are enabled or disabled as a result.
+- **FR-029**: System MUST automatically prune old discovered tweets, action logs, and metrics records beyond a configurable retention period (default: 90 days).
+- **FR-030**: System MUST NOT delete rate limit counters or recent reply/post records required for deduplication during cleanup.
 
 ### Key Entities
 
@@ -187,9 +205,18 @@ A founder wants to manually evaluate a specific tweet's viral potential and rele
 - **SC-009**: The agent compiles and runs on macOS, Linux, and Windows from a single codebase.
 - **SC-010**: All configuration is driven by `config.toml` with documented defaults, requiring only credentials and business profile as mandatory inputs.
 
+## Out of Scope (v1)
+
+- **Web UI** — ReplyGuy is CLI-only; no browser-based dashboard or management interface.
+- **Multi-account support** — The agent operates a single X account per configuration.
+- **DM automation** — No reading, sending, or responding to direct messages.
+- **Analytics dashboard** — No built-in reporting, charts, or engagement analytics.
+- **Scheduled content calendar** — No queue management or pre-planned posting schedule; content is generated on-demand by the automation loops.
+- **Reply-to-reply conversations** — The agent only engages with direct mentions and top-level discovered tweets. It does not follow up on replies to its own replies or participate in threaded conversations.
+
 ## Assumptions
 
-- Users have an approved X API v2 developer account with access to tweet search, mentions, posting, and thread endpoints.
+- Users have an approved X API v2 developer account. Basic tier ($100/mo) is recommended for full functionality; Free tier is supported with reduced capabilities (no discovery loop).
 - Users have an API key for at least one supported LLM provider (OpenAI, Anthropic, or a running Ollama instance).
 - The X API v2 rate limits are sufficient for the default safety limits (20 replies/day, 4 tweets/day).
 - SQLite is adequate for local persistence needs; no multi-user or networked database access is required.
