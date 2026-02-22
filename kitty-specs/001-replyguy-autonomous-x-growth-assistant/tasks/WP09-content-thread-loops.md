@@ -1,14 +1,17 @@
 ---
 work_package_id: WP09
 title: Content + Thread Loops
-lane: planned
+lane: "doing"
 dependencies:
 - WP05
+base_branch: 001-replyguy-autonomous-x-growth-assistant-WP01
+base_commit: 54b47b462601a1e58d0222f08ae0a65ca3068a1d
+created_at: '2026-02-22T01:32:09.855785+00:00'
 subtasks: [T044, T045, T046, T047, T048, T049]
 phase: Phase 2 - Extended Features
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "88017"
 review_status: ''
 reviewed_by: ''
 history:
