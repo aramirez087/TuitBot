@@ -52,12 +52,12 @@
 **Estimated prompt size**: ~450 lines
 
 ### Included Subtasks
-- [ ] T007 Initialize database with SQLx pool, WAL mode, and `sqlx::migrate!()`
-- [ ] T008 Create initial migration schema in `migrations/20260221000000_initial_schema.sql`
-- [ ] T009 [P] Implement discovered tweets CRUD in `crates/replyguy-core/src/storage/tweets.rs`
-- [ ] T010 [P] Implement replies sent CRUD in `crates/replyguy-core/src/storage/replies.rs`
-- [ ] T011 [P] Implement original tweets + threads CRUD in `crates/replyguy-core/src/storage/threads.rs`
-- [ ] T012 [P] Implement action log operations in `crates/replyguy-core/src/storage/action_log.rs`
+- [x] T007 Initialize database with SQLx pool, WAL mode, and `sqlx::migrate!()`
+- [x] T008 Create initial migration schema in `migrations/20260221000000_initial_schema.sql`
+- [x] T009 [P] Implement discovered tweets CRUD in `crates/replyguy-core/src/storage/tweets.rs`
+- [x] T010 [P] Implement replies sent CRUD in `crates/replyguy-core/src/storage/replies.rs`
+- [x] T011 [P] Implement original tweets + threads CRUD in `crates/replyguy-core/src/storage/threads.rs`
+- [x] T012 [P] Implement action log operations in `crates/replyguy-core/src/storage/action_log.rs`
 
 ### Implementation Notes
 - Pool: 4 max connections, `busy_timeout(5s)`, `optimize_on_close(true)`
