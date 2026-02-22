@@ -13,6 +13,12 @@ use tracing_subscriber::EnvFilter;
 #[command(name = "replyguy")]
 #[command(version)]
 #[command(about = "Autonomous X growth assistant")]
+#[command(after_help = "\
+Quick start:
+  1. replyguy init     — interactive setup wizard
+  2. replyguy auth     — authenticate with X
+  3. replyguy test     — validate configuration
+  4. replyguy run      — start the agent")]
 struct Cli {
     /// Path to config.toml
     #[arg(short = 'c', long, default_value = "~/.replyguy/config.toml")]
@@ -32,6 +38,8 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Commands {
+    /// Set up configuration (interactive wizard)
+    Init(commands::InitArgs),
     /// Start the autonomous agent
     Run(commands::RunArgs),
     /// Authenticate with X API
@@ -76,11 +84,21 @@ async fn main() -> anyhow::Result<()> {
         .compact()
         .init();
 
+    // Handle `init` before config loading (config may not exist yet).
+    if let Commands::Init(args) = cli.command {
+        return commands::init::execute(args.force, args.non_interactive).await;
+    }
+
     // Load configuration.
-    let config = Config::load(Some(&cli.config))
-        .map_err(|e| anyhow::anyhow!("Failed to load configuration: {e}"))?;
+    let config = Config::load(Some(&cli.config)).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to load configuration: {e}\n\
+             Hint: Run 'replyguy init' to create a default configuration file."
+        )
+    })?;
 
     match cli.command {
+        Commands::Init(_) => unreachable!(),
         Commands::Run(args) => {
             commands::run::execute(&config, args.status_interval).await?;
         }

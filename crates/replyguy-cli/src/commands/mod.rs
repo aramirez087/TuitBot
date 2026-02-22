@@ -3,10 +3,23 @@
 /// Each subcommand struct defines its flags and arguments
 /// matching the CLI interface contract.
 pub mod auth;
+pub mod init;
 pub mod run;
 pub mod test;
 
 use clap::Args;
+
+/// Arguments for the `init` subcommand.
+#[derive(Debug, Args)]
+pub struct InitArgs {
+    /// Overwrite existing config file
+    #[arg(long)]
+    pub force: bool,
+
+    /// Skip interactive wizard and copy template config
+    #[arg(long)]
+    pub non_interactive: bool,
+}
 
 /// Arguments for the `run` subcommand.
 #[derive(Debug, Args)]

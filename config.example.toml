@@ -29,8 +29,8 @@ client_id = "your-client-id-here"
 
 # --- Authentication Settings ---
 [auth]
-# Auth mode: "manual" (paste code from browser) or "local_callback" (auto-detect via local server).
-mode = "manual"
+# Auth mode: "local_callback" (auto-catch via local server) or "manual" (paste code from browser).
+mode = "local_callback"
 
 # Host for the local callback server (used in local_callback mode).
 callback_host = "127.0.0.1"
@@ -46,29 +46,45 @@ callback_port = 8080
 product_name = "Docklet"
 
 # REQUIRED: One-line description of your product.
-product_description = "Docker-based serverless platform for indie hackers"
+product_description = "Floating command strip for macOS — media controls, clipboard, AirDrop, timers, and more"
 
 # Optional: URL to your product website.
-product_url = "https://docklet.dev"
+product_url = "https://getdocklet.app"
 
 # REQUIRED: Who is your target audience?
-target_audience = "indie hackers and solo developers who deploy side-projects"
+target_audience = "Mac power users, developers, and productivity enthusiasts"
 
 # REQUIRED: Keywords for tweet discovery (at least 1).
 # ReplyGuy searches for tweets containing these keywords.
-product_keywords = ["docker deploy", "serverless hosting", "side-project deploy"]
+product_keywords = ["macos productivity", "mac menu bar", "mac clipboard manager"]
 
 # Optional: Competitor keywords for discovery.
-competitor_keywords = ["heroku alternative", "vercel pricing", "railway deploy"]
+competitor_keywords = ["notchnook alternative", "dynamic island mac", "bartender mac"]
 
 # REQUIRED: Topics for original content generation (at least 1).
 # ReplyGuy creates educational tweets and threads on these topics.
 industry_topics = [
-    "Docker deployment best practices",
-    "Serverless architecture for startups",
-    "Developer experience optimization",
-    "Side-project infrastructure",
+    "Mac productivity tips",
+    "macOS power user workflows",
+    "Building native Swift apps",
+    "Indie Mac app development",
 ]
+
+# Optional: Describe your brand's voice and personality.
+# This shapes how all generated content sounds.
+# Example: "Friendly technical expert. Casual tone, occasionally witty,
+# explains complex topics simply. Sounds like a knowledgeable friend."
+# brand_voice = "your brand voice description here"
+
+# Optional: Specific guidelines for how replies should feel.
+# Example: "Lead with genuine help. Ask follow-up questions. Only mention
+# our product if directly relevant. Never be pushy or salesy."
+# reply_style = "your reply style guidelines here"
+
+# Optional: Specific guidelines for original tweets and threads.
+# Example: "Share practical tips with real examples. Prefer 'here's what I
+# learned' framing over lecturing. End threads with actionable takeaways."
+# content_style = "your content style guidelines here"
 
 # --- Scoring Engine ---
 # Controls how tweets are scored for reply-worthiness (0-100 scale).
@@ -91,21 +107,22 @@ engagement_rate_max = 25.0
 
 # --- Safety Limits ---
 # Prevent aggressive posting that could trigger account restrictions.
+# Conservative defaults — better to under-post than get flagged.
 [limits]
 # Maximum replies per day.
-max_replies_per_day = 20
+max_replies_per_day = 15
 
 # Maximum original tweets per day.
-max_tweets_per_day = 4
+max_tweets_per_day = 3
 
 # Maximum threads per week.
 max_threads_per_week = 1
 
 # Minimum delay between any two actions (seconds).
-min_action_delay_seconds = 30
+min_action_delay_seconds = 45
 
 # Maximum delay between any two actions (seconds).
-max_action_delay_seconds = 120
+max_action_delay_seconds = 180
 
 # --- Automation Intervals ---
 # How often each loop runs. Shorter intervals use more API quota.
@@ -114,10 +131,10 @@ max_action_delay_seconds = 120
 mentions_check_seconds = 300
 
 # Seconds between discovery searches.
-discovery_search_seconds = 600
+discovery_search_seconds = 900
 
 # Minimum seconds between content tweets.
-content_post_window_seconds = 14400
+content_post_window_seconds = 18000
 
 # Minimum seconds between thread posts.
 thread_interval_seconds = 604800
@@ -150,4 +167,4 @@ retention_days = 90
 [logging]
 # Seconds between periodic status summaries (0 = disabled).
 # When enabled, prints action counts and loop health.
-status_interval_seconds = 0
+status_interval_seconds = 3600

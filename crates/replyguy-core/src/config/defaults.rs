@@ -8,7 +8,7 @@ use super::{AuthConfig, IntervalsConfig, LimitsConfig, ScoringConfig, StorageCon
 impl Default for AuthConfig {
     fn default() -> Self {
         Self {
-            mode: "manual".to_string(),
+            mode: "local_callback".to_string(),
             callback_host: "127.0.0.1".to_string(),
             callback_port: 8080,
         }
@@ -30,11 +30,11 @@ impl Default for ScoringConfig {
 impl Default for LimitsConfig {
     fn default() -> Self {
         Self {
-            max_replies_per_day: 20,
-            max_tweets_per_day: 4,
+            max_replies_per_day: 15,
+            max_tweets_per_day: 3,
             max_threads_per_week: 1,
-            min_action_delay_seconds: 30,
-            max_action_delay_seconds: 120,
+            min_action_delay_seconds: 45,
+            max_action_delay_seconds: 180,
         }
     }
 }
@@ -43,8 +43,8 @@ impl Default for IntervalsConfig {
     fn default() -> Self {
         Self {
             mentions_check_seconds: 300,
-            discovery_search_seconds: 600,
-            content_post_window_seconds: 14400,
+            discovery_search_seconds: 900,
+            content_post_window_seconds: 18000,
             thread_interval_seconds: 604800,
         }
     }

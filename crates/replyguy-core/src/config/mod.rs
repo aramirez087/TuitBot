@@ -112,6 +112,18 @@ pub struct BusinessProfile {
     /// Topics for content generation.
     #[serde(default)]
     pub industry_topics: Vec<String>,
+
+    /// Brand voice / personality description for all generated content.
+    #[serde(default)]
+    pub brand_voice: Option<String>,
+
+    /// Style guidelines specific to replies.
+    #[serde(default)]
+    pub reply_style: Option<String>,
+
+    /// Style guidelines specific to original tweets and threads.
+    #[serde(default)]
+    pub content_style: Option<String>,
 }
 
 /// Scoring engine weights and threshold.
@@ -225,7 +237,7 @@ pub struct LoggingConfig {
 // --- Default value functions for serde ---
 
 fn default_auth_mode() -> String {
-    "manual".to_string()
+    "local_callback".to_string()
 }
 fn default_callback_host() -> String {
     "127.0.0.1".to_string()
@@ -249,28 +261,28 @@ fn default_engagement_rate_max() -> f32 {
     25.0
 }
 fn default_max_replies_per_day() -> u32 {
-    20
+    15
 }
 fn default_max_tweets_per_day() -> u32 {
-    4
+    3
 }
 fn default_max_threads_per_week() -> u32 {
     1
 }
 fn default_min_action_delay_seconds() -> u64 {
-    30
+    45
 }
 fn default_max_action_delay_seconds() -> u64 {
-    120
+    180
 }
 fn default_mentions_check_seconds() -> u64 {
     300
 }
 fn default_discovery_search_seconds() -> u64 {
-    600
+    900
 }
 fn default_content_post_window_seconds() -> u64 {
-    14400
+    18000
 }
 fn default_thread_interval_seconds() -> u64 {
     604800
@@ -486,6 +498,15 @@ impl Config {
         if let Ok(val) = env::var("REPLYGUY_BUSINESS__INDUSTRY_TOPICS") {
             self.business.industry_topics = split_csv(&val);
         }
+        if let Ok(val) = env::var("REPLYGUY_BUSINESS__BRAND_VOICE") {
+            self.business.brand_voice = Some(val);
+        }
+        if let Ok(val) = env::var("REPLYGUY_BUSINESS__REPLY_STYLE") {
+            self.business.reply_style = Some(val);
+        }
+        if let Ok(val) = env::var("REPLYGUY_BUSINESS__CONTENT_STYLE") {
+            self.business.content_style = Some(val);
+        }
 
         // Scoring
         if let Ok(val) = env::var("REPLYGUY_SCORING__THRESHOLD") {
@@ -649,10 +670,10 @@ threshold = 80
 client_id = "test"
 "#;
         let config: Config = toml::from_str(toml_str).expect("valid TOML");
-        assert_eq!(config.auth.mode, "manual");
+        assert_eq!(config.auth.mode, "local_callback");
         assert_eq!(config.auth.callback_port, 8080);
         assert_eq!(config.scoring.threshold, 70);
-        assert_eq!(config.limits.max_replies_per_day, 20);
+        assert_eq!(config.limits.max_replies_per_day, 15);
         assert_eq!(config.intervals.mentions_check_seconds, 300);
         assert_eq!(config.storage.db_path, "~/.replyguy/replyguy.db");
         assert_eq!(config.storage.retention_days, 90);

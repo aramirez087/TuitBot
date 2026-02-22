@@ -37,18 +37,27 @@ impl ContentGenerator {
     ) -> Result<String, LlmError> {
         let product_url = self.business.product_url.as_deref().unwrap_or("");
 
+        let voice_section = match &self.business.brand_voice {
+            Some(v) if !v.is_empty() => format!("\nVoice & personality: {v}"),
+            _ => String::new(),
+        };
+        let reply_section = match &self.business.reply_style {
+            Some(s) if !s.is_empty() => format!("\nReply style: {s}"),
+            _ => "\nReply style: Be conversational and helpful, not salesy. Sound like a real person, not a bot.".to_string(),
+        };
+
         let system = format!(
             "You are a helpful community member who uses {} ({}).\n\
              Your target audience is: {}.\n\
-             Product URL: {}\n\n\
+             Product URL: {}\
+             {voice_section}\
+             {reply_section}\n\n\
              Rules:\n\
              - Write a reply to the tweet below.\n\
              - Maximum 3 sentences.\n\
-             - Be conversational and helpful, not salesy.\n\
              - Only mention {} if it is genuinely relevant to the tweet's topic.\n\
              - Do not use hashtags.\n\
-             - Do not use emojis excessively.\n\
-             - Sound like a real person, not a bot.",
+             - Do not use emojis excessively.",
             self.business.product_name,
             self.business.product_description,
             self.business.target_audience,
@@ -93,13 +102,23 @@ impl ContentGenerator {
     ///
     /// The tweet will be informative, engaging, and under 280 characters.
     pub async fn generate_tweet(&self, topic: &str) -> Result<String, LlmError> {
+        let voice_section = match &self.business.brand_voice {
+            Some(v) if !v.is_empty() => format!("\nVoice & personality: {v}"),
+            _ => String::new(),
+        };
+        let content_section = match &self.business.content_style {
+            Some(s) if !s.is_empty() => format!("\nContent style: {s}"),
+            _ => "\nContent style: Be informative and engaging.".to_string(),
+        };
+
         let system = format!(
             "You are {}'s social media voice. {}.\n\
-             Your audience: {}.\n\n\
+             Your audience: {}.\
+             {voice_section}\
+             {content_section}\n\n\
              Rules:\n\
              - Write a single educational tweet about the topic below.\n\
              - Maximum 280 characters.\n\
-             - Be informative and engaging.\n\
              - Do not use hashtags.\n\
              - Do not mention {} directly unless it is central to the topic.",
             self.business.product_name,
@@ -145,16 +164,26 @@ impl ContentGenerator {
     /// Each tweet in the thread will be under 280 characters.
     /// Retries up to 2 times if the LLM produces malformed output.
     pub async fn generate_thread(&self, topic: &str) -> Result<Vec<String>, LlmError> {
+        let voice_section = match &self.business.brand_voice {
+            Some(v) if !v.is_empty() => format!("\nVoice & personality: {v}"),
+            _ => String::new(),
+        };
+        let content_section = match &self.business.content_style {
+            Some(s) if !s.is_empty() => format!("\nContent style: {s}"),
+            _ => "\nContent style: Be informative, not promotional.".to_string(),
+        };
+
         let system = format!(
             "You are {}'s social media voice. {}.\n\
-             Your audience: {}.\n\n\
+             Your audience: {}.\
+             {voice_section}\
+             {content_section}\n\n\
              Rules:\n\
              - Write an educational thread of 5 to 8 tweets about the topic below.\n\
              - Separate each tweet with a line containing only \"---\".\n\
              - Each tweet must be under 280 characters.\n\
              - The first tweet should hook the reader.\n\
              - The last tweet should include a call to action or summary.\n\
-             - Be informative, not promotional.\n\
              - Do not use hashtags.",
             self.business.product_name,
             self.business.product_description,
@@ -352,6 +381,9 @@ mod tests {
             product_keywords: vec!["test".to_string()],
             competitor_keywords: vec![],
             industry_topics: vec!["testing".to_string()],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
         }
     }
 

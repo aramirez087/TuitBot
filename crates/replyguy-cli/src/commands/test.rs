@@ -44,11 +44,11 @@ impl std::fmt::Display for CheckResult {
     }
 }
 
-/// Execute the `replyguy test` command.
+/// Run all diagnostic checks and print results.
 ///
-/// Runs all diagnostic checks and reports results. Returns exit code 0
-/// if all checks pass, exit code 1 if any check fails.
-pub async fn execute(config: &Config, config_path: &str) -> anyhow::Result<()> {
+/// Returns `true` if all checks pass, `false` if any fail.
+/// Does **not** call `process::exit` — callers decide what to do on failure.
+pub async fn run_checks(config: &Config, config_path: &str) -> bool {
     let results = vec![
         check_config(config, config_path),
         check_business_profile(config),
@@ -70,9 +70,19 @@ pub async fn execute(config: &Config, config_path: &str) -> anyhow::Result<()> {
     } else {
         let failed = results.iter().filter(|r| !r.passed).count();
         eprintln!("{failed} check(s) failed.");
-        std::process::exit(1);
     }
 
+    all_passed
+}
+
+/// Execute the `replyguy test` command.
+///
+/// Runs all diagnostic checks and reports results. Exits with code 1
+/// if any check fails.
+pub async fn execute(config: &Config, config_path: &str) -> anyhow::Result<()> {
+    if !run_checks(config, config_path).await {
+        std::process::exit(1);
+    }
     Ok(())
 }
 

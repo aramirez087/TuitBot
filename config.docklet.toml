@@ -1,0 +1,138 @@
+# =============================================================================
+# ReplyGuy Configuration — Docklet (@getdocklet)
+# =============================================================================
+# "Your Mac's missing layer" — a floating command strip for macOS.
+# This config is tuned for organic growth on X. Every reply should feel
+# like a helpful Mac-nerd friend chiming in, not a brand account selling.
+# =============================================================================
+
+# --- X API Credentials ---
+[x_api]
+client_id = "YOUR_CLIENT_ID"
+# client_secret = "YOUR_CLIENT_SECRET"
+
+# --- Authentication Settings ---
+[auth]
+mode = "local_callback"
+callback_host = "127.0.0.1"
+callback_port = 8080
+
+# --- Business Profile ---
+[business]
+product_name = "Docklet"
+product_description = "A floating command strip for macOS — media controls, clipboard history, AirDrop, timers, live sports, and a developer SDK, all in one persistent bar at the top of your screen"
+product_url = "https://getdocklet.app"
+target_audience = "Mac power users, developers, productivity nerds, and anyone tired of switching apps for 1-second tasks"
+
+# --- Discovery Keywords ---
+# These are the search terms ReplyGuy uses to find tweets worth replying to.
+# Mix product-adjacent pain points, competitor names, and ecosystem terms.
+product_keywords = [
+    # Direct pain points Docklet solves
+    "macos productivity",
+    "mac menu bar",
+    "mac dock alternative",
+    "macos notch",
+    "mac clipboard manager",
+    "mac media controls",
+    "airdrop slow",
+    "mac app switching",
+    "mac window management",
+    "mac focus timer",
+    "pomodoro mac",
+    # Developer-facing
+    "macos menubar app",
+    "swift macos app",
+    "macos notification api",
+    "desktop notifications macos",
+    # General frustration triggers
+    "switching apps annoying",
+    "mac workflow",
+    "mac setup 2025",
+    "mac tips",
+]
+
+# Competitor and alternative keywords
+competitor_keywords = [
+    "notchnook",
+    "notchnook alternative",
+    "bartender mac",
+    "ice menu bar",
+    "one switch mac",
+    "dynamic island mac",
+    "island mac app",
+    "macbook notch app",
+    "raycast",
+]
+
+# --- Content Topics ---
+# Topics for original tweets and educational threads.
+# Mix actionable tips, behind-the-scenes dev insights, and Mac culture.
+industry_topics = [
+    "Mac productivity tips most people don't know",
+    "Why the macOS menu bar is underused real estate",
+    "Building native Swift apps — lessons and tradeoffs",
+    "Clipboard managers and why every Mac user needs one",
+    "The case for one-time pricing in indie Mac apps",
+    "How to reduce context switching on macOS",
+    "macOS power user workflows",
+    "AirDrop tips and tricks for fast file sharing",
+    "Why Pomodoro works for deep focus (and how to not overthink it)",
+    "Designing for the Mac notch — constraints breed creativity",
+    "Indie dev shipping speed — how small teams move fast",
+    "What makes a great macOS utility app",
+    "Live sports scores on your desktop — why it matters more than you think",
+    "Building a developer SDK that people actually want to use",
+    "macOS Sequoia and the future of the Mac desktop",
+]
+
+# --- Brand Voice ---
+# This is the DNA of every word the bot writes.
+brand_voice = "Confident but not cocky. Punchy, concise sentences — more Hemingway than marketing blog. Speaks like a fellow Mac nerd who genuinely loves this stuff, not a brand account. Uses casual language, occasional dry wit, and real-world examples. Never sounds corporate. Prefers fragments and em-dashes over long compound sentences. Thinks in benefits, not features. Treats the reader as smart and busy."
+
+# How replies should feel — this is the most important setting for growth.
+reply_style = "Lead with genuine value — answer the question, share a tip, or validate the frustration FIRST. Be the most helpful person in the thread. Only mention Docklet if it directly solves the problem being discussed, and even then keep it casual ('I built something for exactly this' or 'this is literally why Docklet exists'). Never say 'check out' or 'you should try'. Ask follow-up questions when someone shares an interesting workflow. Use 1-2 sentences max. Match the energy of the original tweet — if they're frustrated, empathize; if they're excited, match it."
+
+# How original tweets and threads should read.
+content_style = "Share genuinely useful Mac tips and productivity insights. Frame things as 'here's what I found' or 'TIL' rather than lecturing. Use the 'one actionable takeaway per tweet' rule. Threads should hook with a relatable problem or surprising stat, deliver real value in the middle, and end with a takeaway (not a CTA for Docklet). Occasionally share behind-the-scenes indie dev stories — shipping fast, design decisions, performance wins. Be the account people follow for Mac tips, not for product updates."
+
+# --- Scoring Engine ---
+# Tuned for quality over quantity. Higher threshold = fewer but better replies.
+# We want to reply to tweets where we can add genuine value.
+[scoring]
+threshold = 65
+keyword_relevance_max = 40.0
+follower_count_max = 15.0
+recency_max = 20.0
+engagement_rate_max = 25.0
+
+# --- Safety Limits ---
+# Conservative limits to stay human-like. Better to under-post than get flagged.
+[limits]
+max_replies_per_day = 15
+max_tweets_per_day = 3
+max_threads_per_week = 1
+min_action_delay_seconds = 45
+max_action_delay_seconds = 180
+
+# --- Automation Intervals ---
+[intervals]
+mentions_check_seconds = 300
+discovery_search_seconds = 900
+content_post_window_seconds = 18000
+thread_interval_seconds = 604800
+
+# --- LLM Provider ---
+[llm]
+provider = "anthropic"
+api_key = "YOUR_ANTHROPIC_API_KEY"
+model = "claude-sonnet-4-6"
+
+# --- Data Storage ---
+[storage]
+db_path = "~/.replyguy/replyguy.db"
+retention_days = 90
+
+# --- Logging ---
+[logging]
+status_interval_seconds = 3600
