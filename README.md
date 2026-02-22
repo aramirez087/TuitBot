@@ -434,7 +434,7 @@ Releases are fully automated in GitHub Actions and follow a release-PR model:
 1. Every push to `main` runs `.github/workflows/release.yml`.
 2. `release-plz` keeps a release PR open with version/changelog updates (`CHANGELOG.md`).
 3. Merging that release PR triggers:
-   * Tag + GitHub release (`vX.Y.Z`)
+   * Tag + GitHub release (`tuitbot-cli-vX.Y.Z`)
    * Cross-platform binary builds (`linux`, `macOS Intel`, `macOS Apple Silicon`, `windows`)
    * Asset uploads + `SHA256SUMS` checksum file
 
