@@ -256,6 +256,8 @@ tuitbot tick --output json --dry-run    # Safe testing
 tuitbot tick --output json              # Production
 ```
 
+**OpenClaw plugin:** For native tool integration, install the plugin from `plugins/openclaw-tuitbot/`. It bridges Tuitbot's MCP tools into OpenClaw tool registrations so agents can call them directly without shell parsing. Approval mode is automatically enabled when the plugin is loaded (see [OpenClaw auto-detection](#view-advanced-environment-variables)).
+
 > **Choosing a cadence:** Tuitbot's built-in rate limits and safety checks mean you can tick aggressively (every 15-30 minutes) without worry. Loops that have nothing to do (e.g., content posted too recently) will report `skipped` and exit instantly. A tick with nothing to do takes <2 seconds.
 
 ---
@@ -269,6 +271,7 @@ You don't have to run the full un-supervised agent. Tuitbot has granular command
 tuitbot run                   # Start as long-running daemon
 tuitbot tick                  # Run all loops once and exit
 tuitbot tick --dry-run        # See what would happen, post nothing
+tuitbot tick --require-approval  # Queue posts for human review
 tuitbot tick --loops discovery,content  # Run only specific loops
 
 # Individual actions
@@ -347,7 +350,10 @@ export TUITBOT_X_API__CLIENT_ID="your-client-id"
 export TUITBOT_LLM__API_KEY="sk-your-openai-key"
 export TUITBOT_LIMITS__MAX_REPLIES_PER_DAY=10
 export TUITBOT_BUSINESS__PRODUCT_KEYWORDS="rust, cli tools, productivity"
+export TUITBOT_APPROVAL_MODE=true  # Force approval mode via env var
 ```
+
+**OpenClaw auto-detection:** When any `OPENCLAW_*` environment variable is present, `approval_mode` is automatically enabled for safety. Set `TUITBOT_APPROVAL_MODE=false` to explicitly opt out.
 </details>
 
 ---
@@ -446,7 +452,7 @@ Optional but recommended: set a `RELEASE_PLZ_TOKEN` (PAT) secret so workflows al
 
 ## AI Assistant Integration
 
-Tuitbot ships with a built-in **MCP (Model Context Protocol) server**, making it a first-class tool for AI agents like Claude Code, Cursor, and any MCP-compatible client.
+Tuitbot ships with a built-in **MCP (Model Context Protocol) server**, making it a first-class tool for AI agents like Claude Code, Cursor, and any MCP-compatible client. For OpenClaw agents, a dedicated **plugin** (`plugins/openclaw-tuitbot/`) bridges MCP tools into native OpenClaw tool registrations with automatic approval-mode safety.
 
 ### MCP Server (Recommended)
 
