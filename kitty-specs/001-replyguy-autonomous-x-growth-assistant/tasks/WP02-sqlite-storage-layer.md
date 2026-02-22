@@ -1,7 +1,7 @@
 ---
 work_package_id: WP02
 title: SQLite Storage Layer
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP01
 base_branch: 001-replyguy-autonomous-x-growth-assistant-WP01
@@ -477,3 +477,4 @@ The CLI command updates both frontmatter and activity log automatically.
 
 For large features, organize prompts under `tasks/` to keep bundles grouped while maintaining lexical ordering.
 - 2026-02-22T00:34:49Z – claude-opus – shell_pid=45659 – lane=doing – Assigned agent via workflow command
+- 2026-02-22T00:38:59Z – claude-opus – shell_pid=45659 – lane=for_review – Ready for review: SQLite storage layer with all 7 tables, CRUD for all entities, transactional thread inserts, 51 tests pass, clippy and fmt clean.
