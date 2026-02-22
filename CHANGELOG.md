@@ -7,3 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0](https://github.com/aramirez087/TuitBot/releases/tag/v0.1.0) - 2026-02-22
+
+### Added
+
+- Add `tick` command for single execution of automation loops via external schedulers and refactor runtime dependencies.
+- introduce tuitbot-mcp crate implementing a multi-tool control plane server with various management tools and CLI integration.
+- Implement slot-based scheduling for content and threads with configurable preferred times and per-day overrides.
+- add JSON output for settings and approve commands, and introduce non-interactive approval options.
+
+### Other
+
+- modularize the settings command by splitting its logic into dedicated sub-modules.
+- Remove extensive project scaffolding, update core automation loops and CLI commands, and introduce a new scheduling module.
+- Renaming to tuitbot
+
