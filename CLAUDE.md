@@ -81,7 +81,7 @@ Additional rules:
 - **Trait-based testing**: All external services (`XApiClient`, `LlmProvider`) are behind `async_trait` traits. Tests use trait-based mocks + `wiremock` for HTTP fixtures.
 - **Error handling**: `thiserror` in core library (typed enums per domain), `anyhow` in CLI binary.
 - **LLM providers**: Thin reqwest wrappers — `openai_compat` serves both OpenAI and Ollama via compatible API, `anthropic` uses native Messages API.
-- **Config layering**: CLI flags > env vars (`REPLYGUY_X_API__CLIENT_ID`) > `config.toml` > built-in defaults. The `init` subcommand is handled before config loading since the file may not exist yet.
+- **Config layering**: CLI flags > env vars (`REPLYGUY_X_API__CLIENT_ID`) > `config.toml` > built-in defaults. The `init`, `upgrade`, and `settings` subcommands are handled before general config loading since they manage their own config lifecycle.
 - **Automation runtime**: `Runtime` struct spawns tokio tasks sharing a `CancellationToken`. Graceful shutdown on SIGTERM/Ctrl+C with 30s timeout. Six concurrent loops: discovery, mentions, content, threads, target monitoring, analytics.
 - **Content frameworks**: `ReplyArchetype` (weighted random), `TweetFormat` (avoid-recent), `ThreadStructure` (random). Each provides prompt fragments injected into LLM generation. Persona opinions/experiences/content pillars enrich prompts.
 - **Analytics feedback loop**: Hourly follower snapshots, 24h engagement measurement on posted content, performance scoring formula `(likes*3 + replies*5 + retweets*4) / max(impressions,1) * 1000`, epsilon-greedy topic selection (80% exploit / 20% explore).

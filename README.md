@@ -126,7 +126,7 @@ The wizard walks you through 4 sections. Defaults are shown in `[brackets]` — 
 - Reply style — how should replies feel? (e.g., "Lead with genuine help. Only mention our product if directly relevant.")
 - Content style — how should tweets/threads sound? (e.g., "Share practical tips with real examples.")
 
-> **Tip**: If you skip these, ReplyGuy uses sensible defaults ("be conversational and helpful, not salesy"). You can always edit them later in `~/.replyguy/config.toml`.
+> **Tip**: If you skip these, ReplyGuy uses sensible defaults ("be conversational and helpful, not salesy"). You can always edit them later with `replyguy settings`.
 
 **Section 4 — AI Provider:**
 - Choose your provider: `openai` (default), `anthropic`, or `ollama`
@@ -208,6 +208,10 @@ You don't have to run the full agent. ReplyGuy also has commands for doing thing
 | `replyguy score <tweet_id>` | Score a specific tweet to see if ReplyGuy would reply to it |
 | `replyguy stats` | Show analytics dashboard — follower trend, top topics, engagement rates |
 | `replyguy approve` | Review and approve queued posts (when `approval_mode = true`) |
+| `replyguy settings` | Interactive settings editor — change any config value without editing TOML |
+| `replyguy settings --show` | Pretty-print your current configuration (secrets masked) |
+| `replyguy settings --set scoring.threshold=80` | Change a single setting directly (scriptable) |
+| `replyguy settings scoring` | Jump straight to a specific category (product, voice, persona, ai, x, targets, limits, scoring, timing, approval, storage) |
 | `replyguy upgrade` | Detect and configure new features added since your last setup |
 | `replyguy upgrade --non-interactive` | Same as above, but apply default values without prompting |
 
@@ -219,7 +223,7 @@ The `--dry-run` flag is great for testing. It shows you exactly what ReplyGuy wo
 
 ## Configuration Reference
 
-Your config lives at `~/.replyguy/config.toml`. The wizard creates it for you, but you can edit it anytime with any text editor. Here's every section explained in plain English.
+Your config lives at `~/.replyguy/config.toml`. The wizard creates it for you. To change settings, either run `replyguy settings` for an interactive editor, use `replyguy settings --set KEY=VALUE` for quick changes, or edit the file directly with any text editor. Here's every section explained in plain English.
 
 ### X API Credentials
 
