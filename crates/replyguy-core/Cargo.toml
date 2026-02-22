@@ -19,3 +19,6 @@ chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
 async-trait = "0.1"
 dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"

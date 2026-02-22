@@ -4,6 +4,7 @@
 /// error types, and shared types used by the CLI binary.
 pub mod config;
 pub mod error;
+pub mod storage;
 
 pub use error::*;
 
