@@ -1,7 +1,7 @@
 ---
 work_package_id: WP06
 title: Scoring Engine
-lane: "doing"
+lane: "for_review"
 dependencies:
 - WP01
 base_branch: 001-replyguy-autonomous-x-growth-assistant-WP01
@@ -385,3 +385,4 @@ The CLI command updates both frontmatter and activity log automatically.
 
 For large features, organize prompts under `tasks/` to keep bundles grouped while maintaining lexical ordering.
 - 2026-02-22T01:07:48Z – claude-opus – shell_pid=70426 – lane=doing – Assigned agent via workflow command
+- 2026-02-22T01:13:36Z – claude-opus – shell_pid=70426 – lane=for_review – Ready for review: Scoring engine with 4 signals (keyword relevance, follower count, recency, engagement rate), ScoringEngine combiner, TweetData/TweetScore types, formatting helpers, Display impl. 74 tests pass, clippy clean, fmt clean. T032 (CLI score command) deferred to WP10 CLI integration.
