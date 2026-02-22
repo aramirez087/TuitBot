@@ -3,6 +3,7 @@
 /// Entry point for the tuitbot binary. Parses CLI arguments,
 /// initializes logging, and dispatches to subcommand handlers.
 mod commands;
+mod deps;
 
 use std::io::IsTerminal;
 
@@ -75,6 +76,8 @@ enum Commands {
     Approve(commands::ApproveArgs),
     /// Configure new features added since last setup
     Upgrade(commands::UpgradeArgs),
+    /// Run each enabled loop once and exit (for external schedulers)
+    Tick(commands::TickArgs),
     /// MCP server for AI agent integration
     Mcp(commands::McpArgs),
 }
@@ -141,6 +144,9 @@ async fn main() -> anyhow::Result<()> {
         },
         Commands::Run(args) => {
             commands::run::execute(&config, args.status_interval).await?;
+        }
+        Commands::Tick(args) => {
+            commands::tick::execute(&config, args, output_format).await?;
         }
         Commands::Auth(args) => {
             commands::auth::execute(&config, args.mode.as_deref()).await?;

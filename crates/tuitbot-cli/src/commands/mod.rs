@@ -10,6 +10,7 @@ pub mod run;
 pub mod settings;
 pub mod stats;
 pub mod test;
+pub mod tick;
 pub mod upgrade;
 
 use clap::Args;
@@ -171,6 +172,23 @@ pub struct UpgradeArgs {
     /// Skip interactive prompts and apply default values for new features
     #[arg(long)]
     pub non_interactive: bool,
+}
+
+/// Arguments for the `tick` subcommand.
+#[derive(Debug, Args)]
+pub struct TickArgs {
+    /// Run all loops but don't post anything
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Skip active-hours schedule check
+    #[arg(long)]
+    pub ignore_schedule: bool,
+
+    /// Comma-separated loops to run (default: all enabled)
+    /// Options: discovery, mentions, content, thread, target, analytics
+    #[arg(long, value_delimiter = ',')]
+    pub loops: Option<Vec<String>>,
 }
 
 /// Arguments for the `mcp` subcommand.

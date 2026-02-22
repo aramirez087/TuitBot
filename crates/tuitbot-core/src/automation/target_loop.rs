@@ -252,7 +252,7 @@ impl TargetLoop {
     }
 
     /// Run a single iteration across all target accounts.
-    async fn run_iteration(&self) -> Result<Vec<TargetResult>, LoopError> {
+    pub async fn run_iteration(&self) -> Result<Vec<TargetResult>, LoopError> {
         let mut all_results = Vec::new();
 
         // Check daily limit

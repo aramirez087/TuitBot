@@ -7,191 +7,49 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tuitbot_core::automation::adapters::{
-    AnalyticsStorageAdapter, ApprovalQueueAdapter, ContentSafetyAdapter, ContentStorageAdapter,
-    LlmReplyAdapter, LlmThreadAdapter, LlmTweetAdapter, PostSenderAdapter, SafetyAdapter,
-    ScoringAdapter, StatusQuerierAdapter, StorageAdapter, TargetStorageAdapter, TopicScorerAdapter,
-    XApiMentionsAdapter, XApiPostExecutorAdapter, XApiProfileAdapter, XApiSearchAdapter,
-    XApiTargetAdapter, XApiThreadPosterAdapter,
-};
 use tuitbot_core::automation::{
-    create_posting_queue, run_posting_queue_with_approval, schedule::ActiveSchedule,
-    scheduler_from_config, status_reporter::run_status_reporter, AnalyticsLoop, ContentLoop,
-    DiscoveryLoop, MentionsLoop, Runtime, TargetLoop, TargetLoopConfig, ThreadLoop,
+    run_posting_queue_with_approval, scheduler_from_config, status_reporter::run_status_reporter,
+    AnalyticsLoop, ContentLoop, DiscoveryLoop, MentionsLoop, PostExecutor, Runtime, TargetLoop,
+    ThreadLoop,
 };
 use tuitbot_core::config::Config;
-use tuitbot_core::content::ContentGenerator;
-use tuitbot_core::llm::factory::create_provider;
-use tuitbot_core::safety::SafetyGuard;
-use tuitbot_core::scoring::ScoringEngine;
-use tuitbot_core::startup::{
-    expand_tilde, format_startup_banner, load_tokens_from_file, ApiTier, TierCapabilities,
-};
-use tuitbot_core::storage;
-use tuitbot_core::x_api::tier::{self, detect_tier};
-use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
+use tuitbot_core::startup::format_startup_banner;
+
+use crate::deps::RuntimeDeps;
 
 /// Execute the `tuitbot run` command.
 ///
 /// Startup sequence:
-/// 1. Validate database path
-/// 2. Load and verify OAuth tokens
-/// 3. Detect API tier by probing the search endpoint
-/// 4. Apply status_interval override
-/// 5. Print startup banner
-/// 6. Initialize database
-/// 7. Initialize rate limits
-/// 8. Create LLM provider and content generator
-/// 9. Create scoring engine and safety guard
-/// 10. Create posting queue and adapters
-/// 11. Spawn automation loops based on tier
-/// 12. Run until shutdown
+/// 1. Initialize all shared dependencies via `RuntimeDeps`
+/// 2. Print startup banner
+/// 3. Spawn automation loops based on tier
+/// 4. Run until shutdown
 pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()> {
-    // 1. Validate database path.
-    let db_path = expand_tilde(&config.storage.db_path);
-    tracing::info!(path = %db_path.display(), "Database path configured");
+    // 1. Initialize all shared dependencies.
+    let mut deps = RuntimeDeps::init(config, false).await?;
 
-    // 2. Load OAuth tokens.
-    let tokens = load_tokens_from_file().map_err(|e| anyhow::anyhow!("{e}"))?;
-
-    if tokens.is_expired() {
-        anyhow::bail!("Authentication expired. Run `tuitbot auth` to re-authenticate.");
-    }
-    tracing::info!(
-        expires_in = %tokens.format_expiry(),
-        "OAuth tokens loaded"
-    );
-
-    // 3. Determine API tier by probing the search endpoint.
-    let x_client = XApiHttpClient::new(tokens.access_token.clone());
-    let detected = detect_tier(&x_client)
-        .await
-        .map_err(|e| anyhow::anyhow!("Tier detection failed: {e}"))?;
-    let tier = match detected {
-        tier::ApiTier::Free => ApiTier::Free,
-        tier::ApiTier::Basic => ApiTier::Basic,
-        tier::ApiTier::Pro => ApiTier::Pro,
-    };
-    let capabilities = TierCapabilities::for_tier(tier);
-    tracing::info!(tier = %tier, "{}", capabilities.format_status());
-
-    // 4. Apply status_interval override.
+    // 2. Apply status_interval override.
     let effective_interval = if status_interval > 0 {
         status_interval
     } else {
         config.logging.status_interval_seconds
     };
 
-    // 5. Print startup banner (always visible, even in default mode).
-    let banner = format_startup_banner(tier, &capabilities, effective_interval);
+    // 3. Print startup banner (always visible, even in default mode).
+    let banner = format_startup_banner(deps.tier, &deps.capabilities, effective_interval);
     eprintln!("{banner}");
 
-    // 6. Initialize database.
-    let pool = storage::init_db(&config.storage.db_path)
-        .await
-        .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
-    tracing::info!("Database initialized");
-
-    // 7. Initialize rate limits.
-    storage::rate_limits::init_rate_limits(&pool, &config.limits, &config.intervals)
-        .await
-        .map_err(|e| anyhow::anyhow!("Rate limit initialization failed: {e}"))?;
-    tracing::info!("Rate limits initialized");
-
-    // 8. Create LLM provider and content generator.
-    let provider = create_provider(&config.llm)
-        .map_err(|e| anyhow::anyhow!("LLM provider creation failed: {e}"))?;
-    let content_gen = Arc::new(ContentGenerator::new(provider, config.business.clone()));
-    tracing::info!("LLM provider and content generator initialized");
-
-    // 9. Create scoring engine and safety guard.
-    let keywords: Vec<String> = config
-        .business
-        .product_keywords
-        .iter()
-        .chain(config.business.competitor_keywords.iter())
-        .cloned()
-        .collect();
-    let scoring_engine = Arc::new(ScoringEngine::new(config.scoring.clone(), keywords.clone()));
-    let safety_guard = Arc::new(SafetyGuard::new(pool.clone()));
-    tracing::info!("Scoring engine and safety guard initialized");
-
-    // 10. Get own user ID for mentions and target loops.
-    let x_client = Arc::new(x_client);
-    let me = x_client
-        .get_me()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to get authenticated user: {e}"))?;
-    let own_user_id = me.id.clone();
-    tracing::info!(user = %me.username, user_id = %own_user_id, "Authenticated as");
-
-    // 11. Create posting queue.
-    let (post_tx, post_rx) = create_posting_queue();
-
-    // 12. Create adapter structs.
-    let searcher: Arc<XApiSearchAdapter> = Arc::new(XApiSearchAdapter::new(x_client.clone()));
-    let mentions_fetcher: Arc<XApiMentionsAdapter> = Arc::new(XApiMentionsAdapter::new(
-        x_client.clone(),
-        own_user_id.clone(),
-    ));
-    let target_adapter: Arc<XApiTargetAdapter> = Arc::new(XApiTargetAdapter::new(x_client.clone()));
-    let profile_adapter: Arc<XApiProfileAdapter> =
-        Arc::new(XApiProfileAdapter::new(x_client.clone()));
-    let post_executor: Arc<XApiPostExecutorAdapter> =
-        Arc::new(XApiPostExecutorAdapter::new(x_client.clone()));
-    let thread_poster: Arc<XApiThreadPosterAdapter> =
-        Arc::new(XApiThreadPosterAdapter::new(x_client.clone()));
-
-    let reply_gen: Arc<LlmReplyAdapter> = Arc::new(LlmReplyAdapter::new(content_gen.clone()));
-    let tweet_gen: Arc<LlmTweetAdapter> = Arc::new(LlmTweetAdapter::new(content_gen.clone()));
-    let thread_gen: Arc<LlmThreadAdapter> = Arc::new(LlmThreadAdapter::new(content_gen.clone()));
-
-    let scorer: Arc<ScoringAdapter> = Arc::new(ScoringAdapter::new(scoring_engine));
-    let safety: Arc<SafetyAdapter> =
-        Arc::new(SafetyAdapter::new(safety_guard.clone(), pool.clone()));
-    let content_safety: Arc<ContentSafetyAdapter> =
-        Arc::new(ContentSafetyAdapter::new(safety_guard));
-
-    let loop_storage: Arc<StorageAdapter> = Arc::new(StorageAdapter::new(pool.clone()));
-    let content_storage: Arc<ContentStorageAdapter> =
-        Arc::new(ContentStorageAdapter::new(pool.clone(), post_tx.clone()));
-    let target_storage: Arc<TargetStorageAdapter> =
-        Arc::new(TargetStorageAdapter::new(pool.clone()));
-    let analytics_storage: Arc<AnalyticsStorageAdapter> =
-        Arc::new(AnalyticsStorageAdapter::new(pool.clone()));
-    let topic_scorer: Arc<TopicScorerAdapter> = Arc::new(TopicScorerAdapter::new(pool.clone()));
-    let post_sender: Arc<PostSenderAdapter> = Arc::new(PostSenderAdapter::new(post_tx));
-    let status_querier: Arc<StatusQuerierAdapter> =
-        Arc::new(StatusQuerierAdapter::new(pool.clone()));
-
-    // Approval queue (only if approval mode is enabled).
-    let approval_queue: Option<Arc<dyn tuitbot_core::automation::ApprovalQueue>> =
-        if config.approval_mode {
-            Some(Arc::new(ApprovalQueueAdapter::new(pool.clone())))
-        } else {
-            None
-        };
-
-    // 13. Create runtime and spawn tasks.
+    // 4. Create runtime and spawn tasks.
     let mut runtime = Runtime::new();
     let min_delay = Duration::from_secs(config.limits.min_action_delay_seconds);
     let max_delay = Duration::from_secs(config.limits.max_action_delay_seconds);
 
-    // Parse active hours schedule (if configured).
-    let active_schedule: Option<Arc<ActiveSchedule>> =
-        ActiveSchedule::from_config(&config.schedule).map(|s| {
-            tracing::info!(
-                timezone = %config.schedule.timezone,
-                hours = format!("{}-{}", config.schedule.active_hours_start, config.schedule.active_hours_end),
-                "Active hours schedule configured"
-            );
-            Arc::new(s)
-        });
-
     // Spawn posting queue consumer.
     let cancel = runtime.cancel_token();
+    let post_rx = deps.post_rx.take().expect("post_rx not yet consumed");
     runtime.spawn("posting-queue", {
-        let executor = post_executor as Arc<dyn tuitbot_core::automation::PostExecutor>;
+        let executor = deps.post_executor.clone() as Arc<dyn PostExecutor>;
+        let approval_queue = deps.approval_queue.clone();
         async move {
             run_posting_queue_with_approval(
                 post_rx,
@@ -208,14 +66,14 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
     // --- Content loop (all tiers) ---
     {
         let content_loop = ContentLoop::new(
-            tweet_gen,
-            content_safety.clone(),
-            content_storage.clone(),
+            deps.tweet_gen.clone(),
+            deps.content_safety.clone(),
+            deps.content_storage.clone(),
             config.business.industry_topics.clone(),
             config.intervals.content_post_window_seconds,
             false,
         )
-        .with_topic_scorer(topic_scorer);
+        .with_topic_scorer(deps.topic_scorer.clone());
 
         let cancel = runtime.cancel_token();
         let scheduler = scheduler_from_config(
@@ -223,7 +81,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             config.limits.min_action_delay_seconds,
             config.limits.max_action_delay_seconds,
         );
-        let schedule = active_schedule.clone();
+        let schedule = deps.active_schedule.clone();
         runtime.spawn("content-loop", async move {
             content_loop.run(cancel, scheduler, schedule).await;
         });
@@ -232,10 +90,10 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
     // --- Thread loop (all tiers) ---
     {
         let thread_loop = ThreadLoop::new(
-            thread_gen,
-            content_safety,
-            content_storage,
-            thread_poster,
+            deps.thread_gen.clone(),
+            deps.content_safety.clone(),
+            deps.content_storage.clone(),
+            deps.thread_poster.clone(),
             config.business.industry_topics.clone(),
             config.intervals.thread_interval_seconds,
             false,
@@ -247,23 +105,23 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             config.limits.min_action_delay_seconds,
             config.limits.max_action_delay_seconds,
         );
-        let schedule = active_schedule.clone();
+        let schedule = deps.active_schedule.clone();
         runtime.spawn("thread-loop", async move {
             thread_loop.run(cancel, scheduler, schedule).await;
         });
     }
 
     // --- Tier-gated loops (Basic/Pro only) ---
-    if capabilities.discovery {
+    if deps.capabilities.discovery {
         // Discovery loop
         let discovery_loop = DiscoveryLoop::new(
-            searcher,
-            scorer,
-            reply_gen.clone(),
-            safety.clone(),
-            loop_storage.clone(),
-            post_sender.clone(),
-            keywords,
+            deps.searcher.clone(),
+            deps.scorer.clone(),
+            deps.reply_gen.clone(),
+            deps.safety.clone(),
+            deps.loop_storage.clone(),
+            deps.post_sender.clone(),
+            deps.keywords.clone(),
             config.scoring.threshold as f32,
             false,
         );
@@ -274,19 +132,19 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             config.limits.min_action_delay_seconds,
             config.limits.max_action_delay_seconds,
         );
-        let schedule = active_schedule.clone();
+        let schedule = deps.active_schedule.clone();
         runtime.spawn("discovery-loop", async move {
             discovery_loop.run(cancel, scheduler, schedule).await;
         });
     }
 
-    if capabilities.mentions {
+    if deps.capabilities.mentions {
         // Mentions loop
         let mentions_loop = MentionsLoop::new(
-            mentions_fetcher,
-            reply_gen.clone(),
-            safety.clone(),
-            post_sender.clone(),
+            deps.mentions_fetcher.clone(),
+            deps.reply_gen.clone(),
+            deps.safety.clone(),
+            deps.post_sender.clone(),
             false,
         );
 
@@ -296,8 +154,8 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             config.limits.min_action_delay_seconds,
             config.limits.max_action_delay_seconds,
         );
-        let schedule = active_schedule.clone();
-        let storage_clone = loop_storage.clone();
+        let schedule = deps.active_schedule.clone();
+        let storage_clone = deps.loop_storage.clone();
         runtime.spawn("mentions-loop", async move {
             mentions_loop
                 .run(cancel, scheduler, schedule, storage_clone)
@@ -305,23 +163,14 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         });
 
         // Target loop
-        let target_config = TargetLoopConfig {
-            accounts: config.targets.accounts.clone(),
-            max_target_replies_per_day: config.targets.max_target_replies_per_day,
-            auto_follow: config.targets.auto_follow,
-            follow_warmup_days: config.targets.follow_warmup_days,
-            own_user_id,
-            dry_run: false,
-        };
-
         let target_loop = TargetLoop::new(
-            target_adapter.clone(),
-            target_adapter,
-            reply_gen,
-            safety,
-            target_storage,
-            post_sender,
-            target_config,
+            deps.target_adapter.clone(),
+            deps.target_adapter.clone(),
+            deps.reply_gen.clone(),
+            deps.safety.clone(),
+            deps.target_storage.clone(),
+            deps.post_sender.clone(),
+            deps.target_loop_config.clone(),
         );
 
         let cancel = runtime.cancel_token();
@@ -330,14 +179,17 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             config.limits.min_action_delay_seconds,
             config.limits.max_action_delay_seconds,
         );
-        let schedule = active_schedule.clone();
+        let schedule = deps.active_schedule.clone();
         runtime.spawn("target-loop", async move {
             target_loop.run(cancel, scheduler, schedule).await;
         });
 
-        // Analytics loop (no schedule gate — analytics runs 24/7)
-        let analytics_loop =
-            AnalyticsLoop::new(profile_adapter.clone(), profile_adapter, analytics_storage);
+        // Analytics loop (no schedule gate -- analytics runs 24/7)
+        let analytics_loop = AnalyticsLoop::new(
+            deps.profile_adapter.clone(),
+            deps.profile_adapter.clone(),
+            deps.analytics_storage.clone(),
+        );
 
         let cancel = runtime.cancel_token();
         let scheduler = scheduler_from_config(3600, 0, 0);
@@ -350,6 +202,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
     if effective_interval > 0 {
         let scheduler = scheduler_from_config(effective_interval, 0, 0);
         let cancel = runtime.cancel_token();
+        let status_querier = deps.status_querier.clone();
         runtime.spawn("status-reporter", async move {
             run_status_reporter(status_querier, scheduler, cancel).await;
         });
@@ -360,7 +213,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         "All automation loops spawned, running until shutdown"
     );
 
-    // 14. Run until shutdown signal.
+    // 5. Run until shutdown signal.
     runtime.run_until_shutdown().await;
 
     tracing::info!("Shutdown complete.");
