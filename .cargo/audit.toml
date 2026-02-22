@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    # sqlx-mysql is not used by this project (SQLite-only), and the advisory has no fixed upgrade.
+    "RUSTSEC-2023-0071",
+]

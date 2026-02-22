@@ -215,18 +215,12 @@ fn print_welcome_banner() {
         dim.apply_to("This wizard will create your configuration in 4 steps.")
     );
     eprintln!();
-    eprintln!(
-        "{}",
-        dim.apply_to("You'll need:")
-    );
+    eprintln!("{}", dim.apply_to("You'll need:"));
     eprintln!(
         "{}",
         dim.apply_to("  - X API credentials (https://developer.x.com)")
     );
-    eprintln!(
-        "{}",
-        dim.apply_to("  - Your product/business details")
-    );
+    eprintln!("{}", dim.apply_to("  - Your product/business details"));
     eprintln!(
         "{}",
         dim.apply_to("  - An LLM API key (OpenAI, Anthropic, or Ollama)")
@@ -262,9 +256,7 @@ fn step_x_api() -> Result<WizardResult> {
         .interact()?;
 
     let client_secret = if has_secret {
-        let secret: String = Input::new()
-            .with_prompt("Client Secret")
-            .interact_text()?;
+        let secret: String = Input::new().with_prompt("Client Secret").interact_text()?;
         Some(secret)
     } else {
         None
@@ -489,7 +481,10 @@ fn print_summary(result: &WizardResult) {
         result.product_url.as_deref().unwrap_or("(none)")
     );
     eprintln!("  Audience:          {}", result.target_audience);
-    eprintln!("  Keywords:          {}", result.product_keywords.join(", "));
+    eprintln!(
+        "  Keywords:          {}",
+        result.product_keywords.join(", ")
+    );
     eprintln!("  Topics:            {}", result.industry_topics.join(", "));
 
     eprintln!();
@@ -597,12 +592,15 @@ fn render_config_toml(r: &WizardResult) -> String {
 
     let brand_voice_line = match &r.brand_voice {
         Some(v) => format!("brand_voice = \"{}\"", escape_toml(v)),
-        None => "# brand_voice = \"Friendly technical expert. Casual, occasionally witty.\"".to_string(),
+        None => {
+            "# brand_voice = \"Friendly technical expert. Casual, occasionally witty.\"".to_string()
+        }
     };
 
     let reply_style_line = match &r.reply_style {
         Some(s) => format!("reply_style = \"{}\"", escape_toml(s)),
-        None => "# reply_style = \"Lead with genuine help. Only mention our product if relevant.\"".to_string(),
+        None => "# reply_style = \"Lead with genuine help. Only mention our product if relevant.\""
+            .to_string(),
     };
 
     let content_style_line = match &r.content_style {
@@ -734,10 +732,7 @@ mod tests {
 
     #[test]
     fn parse_csv_basic() {
-        assert_eq!(
-            parse_csv("rust, cli, tools"),
-            vec!["rust", "cli", "tools"]
-        );
+        assert_eq!(parse_csv("rust, cli, tools"), vec!["rust", "cli", "tools"]);
     }
 
     #[test]
@@ -901,15 +896,9 @@ mod tests {
             target_audience: "devs".to_string(),
             product_keywords: vec!["test".to_string()],
             industry_topics: vec!["topic".to_string()],
-            brand_voice: Some(
-                "Friendly technical expert. Casual, occasionally witty.".to_string(),
-            ),
-            reply_style: Some(
-                "Lead with genuine help. Ask follow-up questions.".to_string(),
-            ),
-            content_style: Some(
-                "Share practical tips with real examples.".to_string(),
-            ),
+            brand_voice: Some("Friendly technical expert. Casual, occasionally witty.".to_string()),
+            reply_style: Some("Lead with genuine help. Ask follow-up questions.".to_string()),
+            content_style: Some("Share practical tips with real examples.".to_string()),
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
