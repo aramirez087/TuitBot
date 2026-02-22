@@ -1,7 +1,7 @@
 ---
 work_package_id: WP01
 title: Project Foundation + Configuration
-lane: "doing"
+lane: "for_review"
 dependencies: []
 base_branch: main
 base_commit: 1c81600044b3605a8b3d395b41f5b5948763e94c
@@ -458,3 +458,4 @@ The CLI command updates both frontmatter and activity log automatically.
 
 For large features, organize prompts under `tasks/` to keep bundles grouped while maintaining lexical ordering.
 - 2026-02-22T00:22:11Z – claude-opus – shell_pid=35288 – lane=doing – Assigned agent via workflow command
+- 2026-02-22T00:28:50Z – claude-opus – shell_pid=35288 – lane=for_review – Ready for review: Cargo workspace, error types, config system with layered loading/validation, CLI skeleton with all 8 subcommands. 28 tests pass, clippy clean, fmt clean.
