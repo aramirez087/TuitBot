@@ -213,11 +213,11 @@
 **Estimated prompt size**: ~350 lines
 
 ### Included Subtasks
-- [ ] T033 Implement scheduler module in `crates/replyguy-core/src/automation/scheduler.rs`
-- [ ] T034 Implement runtime orchestrator in `crates/replyguy-core/src/automation/mod.rs`
-- [ ] T035 Implement graceful shutdown with signal handling and cancellation tokens
-- [ ] T036 [P] Implement posting queue (serialized posting, rate-limit aware)
-- [ ] T037 [P] Implement periodic status summary (configurable interval, stats collection)
+- [x] T033 Implement scheduler module in `crates/replyguy-core/src/automation/scheduler.rs`
+- [x] T034 Implement runtime orchestrator in `crates/replyguy-core/src/automation/mod.rs`
+- [x] T035 Implement graceful shutdown with signal handling and cancellation tokens
+- [x] T036 [P] Implement posting queue (serialized posting, rate-limit aware)
+- [x] T037 [P] Implement periodic status summary (configurable interval, stats collection)
 
 ### Implementation Notes
 - Scheduler: `tokio::time::interval` with randomized jitter added to each tick
