@@ -8,6 +8,8 @@ use super::loop_helpers::{
     ConsecutiveErrorTracker, LoopError, LoopTweet, MentionsFetcher, PostSender, ReplyGenerator,
     SafetyChecker,
 };
+use super::schedule::{schedule_gate, ActiveSchedule};
+use super::scheduler::LoopScheduler;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -58,7 +60,8 @@ impl MentionsLoop {
     pub async fn run(
         &self,
         cancel: CancellationToken,
-        interval: Duration,
+        scheduler: LoopScheduler,
+        schedule: Option<Arc<ActiveSchedule>>,
         storage: Arc<dyn super::loop_helpers::LoopStorage>,
     ) {
         tracing::info!(dry_run = self.dry_run, "Mentions loop started");
@@ -81,6 +84,10 @@ impl MentionsLoop {
 
         loop {
             if cancel.is_cancelled() {
+                break;
+            }
+
+            if !schedule_gate(&schedule, &cancel).await {
                 break;
             }
 
@@ -147,7 +154,7 @@ impl MentionsLoop {
             // Wait for next iteration
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {},
+                _ = scheduler.tick() => {},
             }
         }
 

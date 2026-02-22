@@ -9,6 +9,8 @@
 use super::loop_helpers::{
     ConsecutiveErrorTracker, LoopError, LoopTweet, PostSender, ReplyGenerator, SafetyChecker,
 };
+use super::schedule::{schedule_gate, ActiveSchedule};
+use super::scheduler::LoopScheduler;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -167,7 +169,12 @@ impl TargetLoop {
     }
 
     /// Run the continuous target monitoring loop until cancellation.
-    pub async fn run(&self, cancel: CancellationToken, interval: Duration) {
+    pub async fn run(
+        &self,
+        cancel: CancellationToken,
+        scheduler: LoopScheduler,
+        schedule: Option<Arc<ActiveSchedule>>,
+    ) {
         tracing::info!(
             dry_run = self.config.dry_run,
             accounts = self.config.accounts.len(),
@@ -185,6 +192,10 @@ impl TargetLoop {
 
         loop {
             if cancel.is_cancelled() {
+                break;
+            }
+
+            if !schedule_gate(&schedule, &cancel).await {
                 break;
             }
 
@@ -233,7 +244,7 @@ impl TargetLoop {
 
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {},
+                _ = scheduler.tick() => {},
             }
         }
 

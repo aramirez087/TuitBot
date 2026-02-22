@@ -1,11 +1,11 @@
-//! Implementation of the `replyguy test` command.
+//! Implementation of the `tuitbot test` command.
 //!
 //! Validates configuration, credentials, and connectivity before
 //! running the agent. Each check runs independently -- a failure
 //! in one does not skip others.
 
-use replyguy_core::config::Config;
-use replyguy_core::startup::{expand_tilde, load_tokens_from_file};
+use tuitbot_core::config::Config;
+use tuitbot_core::startup::{expand_tilde, load_tokens_from_file};
 
 /// A single diagnostic check result.
 struct CheckResult {
@@ -75,7 +75,7 @@ pub async fn run_checks(config: &Config, config_path: &str) -> bool {
     all_passed
 }
 
-/// Execute the `replyguy test` command.
+/// Execute the `tuitbot test` command.
 ///
 /// Runs all diagnostic checks and reports results. Exits with code 1
 /// if any check fails.
@@ -129,7 +129,7 @@ fn check_auth() -> CheckResult {
             if tokens.is_expired() {
                 CheckResult::fail(
                     "X API auth",
-                    "token expired, run `replyguy auth` to re-authenticate",
+                    "token expired, run `tuitbot auth` to re-authenticate",
                 )
             } else {
                 CheckResult::ok(
@@ -138,7 +138,7 @@ fn check_auth() -> CheckResult {
                 )
             }
         }
-        Err(_) => CheckResult::fail("X API auth", "no tokens found, run `replyguy auth` first"),
+        Err(_) => CheckResult::fail("X API auth", "no tokens found, run `tuitbot auth` first"),
     }
 }
 

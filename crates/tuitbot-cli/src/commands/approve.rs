@@ -1,13 +1,13 @@
-//! Implementation of the `replyguy approve` command.
+//! Implementation of the `tuitbot approve` command.
 //!
 //! Interactive review of queued posts when approval_mode is enabled.
 //! Shows pending items one at a time and allows approve/reject/skip.
 
-use replyguy_core::config::Config;
-use replyguy_core::storage;
 use std::io::{self, BufRead, Write};
+use tuitbot_core::config::Config;
+use tuitbot_core::storage;
 
-/// Execute the `replyguy approve` command.
+/// Execute the `tuitbot approve` command.
 pub async fn execute(config: &Config) -> anyhow::Result<()> {
     if !config.approval_mode {
         eprintln!("Approval mode is not enabled.");

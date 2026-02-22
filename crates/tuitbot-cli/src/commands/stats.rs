@@ -1,17 +1,17 @@
-//! Implementation of the `replyguy stats` command.
+//! Implementation of the `tuitbot stats` command.
 //!
 //! Displays analytics dashboard: follower trend, top-performing topics,
 //! engagement rates, and weekly volume.
 
-use replyguy_core::config::Config;
-use replyguy_core::storage;
+use tuitbot_core::config::Config;
+use tuitbot_core::storage;
 
-/// Execute the `replyguy stats` command.
+/// Execute the `tuitbot stats` command.
 pub async fn execute(config: &Config) -> anyhow::Result<()> {
     let pool = storage::init_db(&config.storage.db_path).await?;
 
     eprintln!();
-    eprintln!("=== ReplyGuy Analytics ===");
+    eprintln!("=== Tuitbot Analytics ===");
     eprintln!();
 
     // 1. Follower trend (7 days)

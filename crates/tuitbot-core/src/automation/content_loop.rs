@@ -5,10 +5,11 @@
 //! content. Rotates through configured topics to avoid repetition.
 
 use super::loop_helpers::{ContentSafety, ContentStorage, TopicScorer, TweetGenerator};
+use super::schedule::{schedule_gate, ActiveSchedule};
+use super::scheduler::LoopScheduler;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 /// Fraction of the time to exploit top-performing topics (vs. explore random ones).
@@ -71,7 +72,12 @@ impl ContentLoop {
     }
 
     /// Run the continuous content loop until cancellation.
-    pub async fn run(&self, cancel: CancellationToken, interval: Duration) {
+    pub async fn run(
+        &self,
+        cancel: CancellationToken,
+        scheduler: LoopScheduler,
+        schedule: Option<Arc<ActiveSchedule>>,
+    ) {
         tracing::info!(
             dry_run = self.dry_run,
             topics = self.topics.len(),
@@ -94,6 +100,10 @@ impl ContentLoop {
 
         loop {
             if cancel.is_cancelled() {
+                break;
+            }
+
+            if !schedule_gate(&schedule, &cancel).await {
                 break;
             }
 
@@ -133,14 +143,14 @@ impl ContentLoop {
 
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {},
+                _ = scheduler.tick() => {},
             }
         }
 
         tracing::info!("Content loop stopped");
     }
 
-    /// Run a single content generation (for CLI `replyguy post` command).
+    /// Run a single content generation (for CLI `tuitbot post` command).
     ///
     /// If `topic` is provided, uses that topic. Otherwise picks a random
     /// topic from the configured list.

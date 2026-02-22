@@ -21,6 +21,7 @@ pub mod discovery_loop;
 pub mod loop_helpers;
 pub mod mentions_loop;
 pub mod posting_queue;
+pub mod schedule;
 pub mod scheduler;
 pub mod status_reporter;
 pub mod target_loop;
@@ -42,6 +43,7 @@ pub use posting_queue::{
     create_posting_queue, run_posting_queue_with_approval, ApprovalQueue, PostAction, PostExecutor,
     QUEUE_CAPACITY,
 };
+pub use schedule::{schedule_gate, ActiveSchedule};
 pub use scheduler::{scheduler_from_config, LoopScheduler};
 pub use status_reporter::{ActionCounts, StatusQuerier};
 pub use target_loop::{
@@ -135,7 +137,7 @@ impl Runtime {
 
     /// Block until a shutdown signal is received, then gracefully stop all tasks.
     ///
-    /// This is the typical entry point for the `replyguy run` command:
+    /// This is the typical entry point for the `tuitbot run` command:
     /// 1. Spawn all tasks.
     /// 2. Call `run_until_shutdown()` to block until Ctrl+C / SIGTERM.
     /// 3. All tasks are stopped and awaited.

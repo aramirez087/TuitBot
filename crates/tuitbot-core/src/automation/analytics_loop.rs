@@ -7,6 +7,7 @@
 //! 4. Alert on significant follower drops.
 
 use super::loop_helpers::ConsecutiveErrorTracker;
+use super::scheduler::LoopScheduler;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -157,7 +158,7 @@ impl AnalyticsLoop {
     }
 
     /// Run the continuous analytics loop until cancellation.
-    pub async fn run(&self, cancel: CancellationToken, interval: Duration) {
+    pub async fn run(&self, cancel: CancellationToken, scheduler: LoopScheduler) {
         tracing::info!("Analytics loop started");
 
         let mut error_tracker = ConsecutiveErrorTracker::new(5, Duration::from_secs(600));
@@ -198,7 +199,7 @@ impl AnalyticsLoop {
 
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {},
+                _ = scheduler.tick() => {},
             }
         }
 

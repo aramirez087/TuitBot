@@ -1,9 +1,9 @@
 [package]
-name = "replyguy-core"
+name = "tuitbot-core"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
-description = "Core library for ReplyGuy autonomous X growth assistant"
+description = "Core library for Tuitbot autonomous X growth assistant"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -16,6 +16,7 @@ tracing = "0.1"
 oauth2 = "4"
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 rand = "0.8"
 async-trait = "0.1"
 dirs = "5"

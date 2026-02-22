@@ -1,4 +1,4 @@
-/// CLI subcommand argument definitions and implementations for ReplyGuy.
+/// CLI subcommand argument definitions and implementations for Tuitbot.
 ///
 /// Each subcommand struct defines its flags and arguments
 /// matching the CLI interface contract.

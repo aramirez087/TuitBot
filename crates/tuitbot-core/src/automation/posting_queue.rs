@@ -5,6 +5,7 @@
 //! globally. A single consumer task processes actions sequentially with
 //! configurable delays between posts.
 
+use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -116,15 +117,18 @@ pub async fn run_posting_queue(
     min_delay: Duration,
     cancel: CancellationToken,
 ) {
-    run_posting_queue_with_approval(receiver, executor, None, min_delay, cancel).await;
+    run_posting_queue_with_approval(receiver, executor, None, min_delay, min_delay, cancel).await;
 }
 
 /// Run the posting queue consumer loop with optional approval mode.
+///
+/// Delay between posts is randomized uniformly in `[min_delay, max_delay]`.
 pub async fn run_posting_queue_with_approval(
     mut receiver: mpsc::Receiver<PostAction>,
     executor: Arc<dyn PostExecutor>,
     approval_queue: Option<Arc<dyn ApprovalQueue>>,
     min_delay: Duration,
+    max_delay: Duration,
     cancel: CancellationToken,
 ) {
     tracing::info!("Posting queue consumer started");
@@ -149,8 +153,9 @@ pub async fn run_posting_queue_with_approval(
 
         execute_or_queue(action, &executor, &approval_queue).await;
 
-        if !min_delay.is_zero() {
-            tokio::time::sleep(min_delay).await;
+        let delay = randomized_delay(min_delay, max_delay);
+        if !delay.is_zero() {
+            tokio::time::sleep(delay).await;
         }
     }
 
@@ -272,6 +277,16 @@ async fn execute_and_respond(action: PostAction, executor: &Arc<dyn PostExecutor
         // Ignore send error (receiver may have been dropped).
         let _ = tx.send(result);
     }
+}
+
+/// Compute a randomized delay between `min` and `max`.
+fn randomized_delay(min: Duration, max: Duration) -> Duration {
+    if min >= max || min.is_zero() && max.is_zero() {
+        return min;
+    }
+    let min_ms = min.as_millis() as u64;
+    let max_ms = max.as_millis() as u64;
+    Duration::from_millis(rand::thread_rng().gen_range(min_ms..=max_ms))
 }
 
 #[cfg(test)]
@@ -632,6 +647,7 @@ mod tests {
                 exec_clone,
                 Some(approval_clone),
                 Duration::ZERO,
+                Duration::ZERO,
                 cancel_clone,
             )
             .await;
@@ -674,6 +690,7 @@ mod tests {
                 rx,
                 exec_clone,
                 Some(approval_clone),
+                Duration::ZERO,
                 Duration::ZERO,
                 cancel_clone,
             )

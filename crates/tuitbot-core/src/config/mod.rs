@@ -1,9 +1,9 @@
-//! Configuration management for ReplyGuy.
+//! Configuration management for Tuitbot.
 //!
 //! Supports three-layer configuration loading:
 //! 1. Built-in defaults
-//! 2. TOML config file (`~/.replyguy/config.toml`)
-//! 3. Environment variable overrides (`REPLYGUY_` prefix)
+//! 2. TOML config file (`~/.tuitbot/config.toml`)
+//! 3. Environment variable overrides (`TUITBOT_` prefix)
 //!
 //! CLI flag overrides are applied by the binary crate after loading.
 
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::path::PathBuf;
 
-/// Top-level configuration for the ReplyGuy agent.
+/// Top-level configuration for the Tuitbot agent.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Config {
     /// X API credentials.
@@ -60,6 +60,10 @@ pub struct Config {
     /// Logging and observability settings.
     #[serde(default)]
     pub logging: LoggingConfig,
+
+    /// Active hours schedule for posting.
+    #[serde(default)]
+    pub schedule: ScheduleConfig,
 }
 
 /// X API credentials.
@@ -301,6 +305,58 @@ pub struct LoggingConfig {
     pub status_interval_seconds: u64,
 }
 
+/// Active hours schedule configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ScheduleConfig {
+    /// IANA timezone name (e.g. "America/New_York", "UTC").
+    #[serde(default = "default_timezone")]
+    pub timezone: String,
+
+    /// Hour of day (0-23) when active posting window starts.
+    #[serde(default = "default_active_hours_start")]
+    pub active_hours_start: u8,
+
+    /// Hour of day (0-23) when active posting window ends.
+    #[serde(default = "default_active_hours_end")]
+    pub active_hours_end: u8,
+
+    /// Days of the week when posting is active (e.g. ["Mon", "Tue", ...]).
+    #[serde(default = "default_active_days")]
+    pub active_days: Vec<String>,
+}
+
+impl Default for ScheduleConfig {
+    fn default() -> Self {
+        Self {
+            timezone: default_timezone(),
+            active_hours_start: default_active_hours_start(),
+            active_hours_end: default_active_hours_end(),
+            active_days: default_active_days(),
+        }
+    }
+}
+
+fn default_timezone() -> String {
+    "UTC".to_string()
+}
+fn default_active_hours_start() -> u8 {
+    8
+}
+fn default_active_hours_end() -> u8 {
+    22
+}
+fn default_active_days() -> Vec<String> {
+    vec![
+        "Mon".to_string(),
+        "Tue".to_string(),
+        "Wed".to_string(),
+        "Thu".to_string(),
+        "Fri".to_string(),
+        "Sat".to_string(),
+        "Sun".to_string(),
+    ]
+}
+
 // --- Default value functions for serde ---
 
 fn default_auth_mode() -> String {
@@ -375,7 +431,7 @@ fn default_product_mention_ratio() -> f32 {
     0.2
 }
 fn default_db_path() -> String {
-    "~/.replyguy/replyguy.db".to_string()
+    "~/.tuitbot/tuitbot.db".to_string()
 }
 fn default_retention_days() -> u32 {
     90
@@ -385,7 +441,7 @@ impl Config {
     /// Load configuration from a TOML file with environment variable overrides.
     ///
     /// The loading sequence:
-    /// 1. Determine config file path (argument > `REPLYGUY_CONFIG` env var > default)
+    /// 1. Determine config file path (argument > `TUITBOT_CONFIG` env var > default)
     /// 2. Parse TOML file (or use defaults if default path doesn't exist)
     /// 3. Apply environment variable overrides
     pub fn load(config_path: Option<&str>) -> Result<Config, ConfigError> {
@@ -516,6 +572,44 @@ impl Config {
             });
         }
 
+        // Validate schedule
+        if self.schedule.active_hours_start > 23 {
+            errors.push(ConfigError::InvalidValue {
+                field: "schedule.active_hours_start".to_string(),
+                message: "must be between 0 and 23".to_string(),
+            });
+        }
+        if self.schedule.active_hours_end > 23 {
+            errors.push(ConfigError::InvalidValue {
+                field: "schedule.active_hours_end".to_string(),
+                message: "must be between 0 and 23".to_string(),
+            });
+        }
+        if !self.schedule.timezone.is_empty()
+            && self.schedule.timezone.parse::<chrono_tz::Tz>().is_err()
+        {
+            errors.push(ConfigError::InvalidValue {
+                field: "schedule.timezone".to_string(),
+                message: format!(
+                    "'{}' is not a valid IANA timezone name",
+                    self.schedule.timezone
+                ),
+            });
+        }
+        let valid_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        for day in &self.schedule.active_days {
+            if !valid_days.contains(&day.as_str()) {
+                errors.push(ConfigError::InvalidValue {
+                    field: "schedule.active_days".to_string(),
+                    message: format!(
+                        "'{}' is not a valid day abbreviation (use Mon, Tue, Wed, Thu, Fri, Sat, Sun)",
+                        day
+                    ),
+                });
+                break;
+            }
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -532,169 +626,184 @@ impl Config {
             return (expand_tilde(path), true);
         }
 
-        if let Ok(env_path) = env::var("REPLYGUY_CONFIG") {
+        if let Ok(env_path) = env::var("TUITBOT_CONFIG") {
             return (expand_tilde(&env_path), true);
         }
 
-        (expand_tilde("~/.replyguy/config.toml"), false)
+        (expand_tilde("~/.tuitbot/config.toml"), false)
     }
 
     /// Apply environment variable overrides to the configuration.
     ///
-    /// Environment variables use the `REPLYGUY_` prefix with double underscores
-    /// separating nested keys (e.g., `REPLYGUY_LLM__API_KEY`).
+    /// Environment variables use the `TUITBOT_` prefix with double underscores
+    /// separating nested keys (e.g., `TUITBOT_LLM__API_KEY`).
     fn apply_env_overrides(&mut self) -> Result<(), ConfigError> {
         // X API
-        if let Ok(val) = env::var("REPLYGUY_X_API__CLIENT_ID") {
+        if let Ok(val) = env::var("TUITBOT_X_API__CLIENT_ID") {
             self.x_api.client_id = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_X_API__CLIENT_SECRET") {
+        if let Ok(val) = env::var("TUITBOT_X_API__CLIENT_SECRET") {
             self.x_api.client_secret = Some(val);
         }
 
         // Auth
-        if let Ok(val) = env::var("REPLYGUY_AUTH__MODE") {
+        if let Ok(val) = env::var("TUITBOT_AUTH__MODE") {
             self.auth.mode = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_AUTH__CALLBACK_HOST") {
+        if let Ok(val) = env::var("TUITBOT_AUTH__CALLBACK_HOST") {
             self.auth.callback_host = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_AUTH__CALLBACK_PORT") {
-            self.auth.callback_port = parse_env_u16("REPLYGUY_AUTH__CALLBACK_PORT", &val)?;
+        if let Ok(val) = env::var("TUITBOT_AUTH__CALLBACK_PORT") {
+            self.auth.callback_port = parse_env_u16("TUITBOT_AUTH__CALLBACK_PORT", &val)?;
         }
 
         // Business
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__PRODUCT_NAME") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__PRODUCT_NAME") {
             self.business.product_name = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__PRODUCT_DESCRIPTION") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__PRODUCT_DESCRIPTION") {
             self.business.product_description = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__PRODUCT_URL") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__PRODUCT_URL") {
             self.business.product_url = Some(val);
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__TARGET_AUDIENCE") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__TARGET_AUDIENCE") {
             self.business.target_audience = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__PRODUCT_KEYWORDS") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__PRODUCT_KEYWORDS") {
             self.business.product_keywords = split_csv(&val);
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__COMPETITOR_KEYWORDS") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__COMPETITOR_KEYWORDS") {
             self.business.competitor_keywords = split_csv(&val);
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__INDUSTRY_TOPICS") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__INDUSTRY_TOPICS") {
             self.business.industry_topics = split_csv(&val);
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__BRAND_VOICE") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__BRAND_VOICE") {
             self.business.brand_voice = Some(val);
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__REPLY_STYLE") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__REPLY_STYLE") {
             self.business.reply_style = Some(val);
         }
-        if let Ok(val) = env::var("REPLYGUY_BUSINESS__CONTENT_STYLE") {
+        if let Ok(val) = env::var("TUITBOT_BUSINESS__CONTENT_STYLE") {
             self.business.content_style = Some(val);
         }
 
         // Scoring
-        if let Ok(val) = env::var("REPLYGUY_SCORING__THRESHOLD") {
-            self.scoring.threshold = parse_env_u32("REPLYGUY_SCORING__THRESHOLD", &val)?;
+        if let Ok(val) = env::var("TUITBOT_SCORING__THRESHOLD") {
+            self.scoring.threshold = parse_env_u32("TUITBOT_SCORING__THRESHOLD", &val)?;
         }
 
-        if let Ok(val) = env::var("REPLYGUY_SCORING__REPLY_COUNT_MAX") {
-            self.scoring.reply_count_max =
-                parse_env_f32("REPLYGUY_SCORING__REPLY_COUNT_MAX", &val)?;
+        if let Ok(val) = env::var("TUITBOT_SCORING__REPLY_COUNT_MAX") {
+            self.scoring.reply_count_max = parse_env_f32("TUITBOT_SCORING__REPLY_COUNT_MAX", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_SCORING__CONTENT_TYPE_MAX") {
+        if let Ok(val) = env::var("TUITBOT_SCORING__CONTENT_TYPE_MAX") {
             self.scoring.content_type_max =
-                parse_env_f32("REPLYGUY_SCORING__CONTENT_TYPE_MAX", &val)?;
+                parse_env_f32("TUITBOT_SCORING__CONTENT_TYPE_MAX", &val)?;
         }
 
         // Limits
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__MAX_REPLIES_PER_DAY") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__MAX_REPLIES_PER_DAY") {
             self.limits.max_replies_per_day =
-                parse_env_u32("REPLYGUY_LIMITS__MAX_REPLIES_PER_DAY", &val)?;
+                parse_env_u32("TUITBOT_LIMITS__MAX_REPLIES_PER_DAY", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__MAX_TWEETS_PER_DAY") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__MAX_TWEETS_PER_DAY") {
             self.limits.max_tweets_per_day =
-                parse_env_u32("REPLYGUY_LIMITS__MAX_TWEETS_PER_DAY", &val)?;
+                parse_env_u32("TUITBOT_LIMITS__MAX_TWEETS_PER_DAY", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__MAX_THREADS_PER_WEEK") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__MAX_THREADS_PER_WEEK") {
             self.limits.max_threads_per_week =
-                parse_env_u32("REPLYGUY_LIMITS__MAX_THREADS_PER_WEEK", &val)?;
+                parse_env_u32("TUITBOT_LIMITS__MAX_THREADS_PER_WEEK", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__MIN_ACTION_DELAY_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__MIN_ACTION_DELAY_SECONDS") {
             self.limits.min_action_delay_seconds =
-                parse_env_u64("REPLYGUY_LIMITS__MIN_ACTION_DELAY_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_LIMITS__MIN_ACTION_DELAY_SECONDS", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__MAX_ACTION_DELAY_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__MAX_ACTION_DELAY_SECONDS") {
             self.limits.max_action_delay_seconds =
-                parse_env_u64("REPLYGUY_LIMITS__MAX_ACTION_DELAY_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_LIMITS__MAX_ACTION_DELAY_SECONDS", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__MAX_REPLIES_PER_AUTHOR_PER_DAY") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__MAX_REPLIES_PER_AUTHOR_PER_DAY") {
             self.limits.max_replies_per_author_per_day =
-                parse_env_u32("REPLYGUY_LIMITS__MAX_REPLIES_PER_AUTHOR_PER_DAY", &val)?;
+                parse_env_u32("TUITBOT_LIMITS__MAX_REPLIES_PER_AUTHOR_PER_DAY", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__BANNED_PHRASES") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__BANNED_PHRASES") {
             self.limits.banned_phrases = split_csv(&val);
         }
-        if let Ok(val) = env::var("REPLYGUY_LIMITS__PRODUCT_MENTION_RATIO") {
+        if let Ok(val) = env::var("TUITBOT_LIMITS__PRODUCT_MENTION_RATIO") {
             self.limits.product_mention_ratio =
-                parse_env_f32("REPLYGUY_LIMITS__PRODUCT_MENTION_RATIO", &val)?;
+                parse_env_f32("TUITBOT_LIMITS__PRODUCT_MENTION_RATIO", &val)?;
         }
 
         // Intervals
-        if let Ok(val) = env::var("REPLYGUY_INTERVALS__MENTIONS_CHECK_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_INTERVALS__MENTIONS_CHECK_SECONDS") {
             self.intervals.mentions_check_seconds =
-                parse_env_u64("REPLYGUY_INTERVALS__MENTIONS_CHECK_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_INTERVALS__MENTIONS_CHECK_SECONDS", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_INTERVALS__DISCOVERY_SEARCH_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_INTERVALS__DISCOVERY_SEARCH_SECONDS") {
             self.intervals.discovery_search_seconds =
-                parse_env_u64("REPLYGUY_INTERVALS__DISCOVERY_SEARCH_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_INTERVALS__DISCOVERY_SEARCH_SECONDS", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_INTERVALS__CONTENT_POST_WINDOW_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_INTERVALS__CONTENT_POST_WINDOW_SECONDS") {
             self.intervals.content_post_window_seconds =
-                parse_env_u64("REPLYGUY_INTERVALS__CONTENT_POST_WINDOW_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_INTERVALS__CONTENT_POST_WINDOW_SECONDS", &val)?;
         }
-        if let Ok(val) = env::var("REPLYGUY_INTERVALS__THREAD_INTERVAL_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_INTERVALS__THREAD_INTERVAL_SECONDS") {
             self.intervals.thread_interval_seconds =
-                parse_env_u64("REPLYGUY_INTERVALS__THREAD_INTERVAL_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_INTERVALS__THREAD_INTERVAL_SECONDS", &val)?;
         }
 
         // Targets
-        if let Ok(val) = env::var("REPLYGUY_TARGETS__ACCOUNTS") {
+        if let Ok(val) = env::var("TUITBOT_TARGETS__ACCOUNTS") {
             self.targets.accounts = split_csv(&val);
         }
-        if let Ok(val) = env::var("REPLYGUY_TARGETS__MAX_TARGET_REPLIES_PER_DAY") {
+        if let Ok(val) = env::var("TUITBOT_TARGETS__MAX_TARGET_REPLIES_PER_DAY") {
             self.targets.max_target_replies_per_day =
-                parse_env_u32("REPLYGUY_TARGETS__MAX_TARGET_REPLIES_PER_DAY", &val)?;
+                parse_env_u32("TUITBOT_TARGETS__MAX_TARGET_REPLIES_PER_DAY", &val)?;
         }
 
         // LLM
-        if let Ok(val) = env::var("REPLYGUY_LLM__PROVIDER") {
+        if let Ok(val) = env::var("TUITBOT_LLM__PROVIDER") {
             self.llm.provider = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_LLM__API_KEY") {
+        if let Ok(val) = env::var("TUITBOT_LLM__API_KEY") {
             self.llm.api_key = Some(val);
         }
-        if let Ok(val) = env::var("REPLYGUY_LLM__MODEL") {
+        if let Ok(val) = env::var("TUITBOT_LLM__MODEL") {
             self.llm.model = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_LLM__BASE_URL") {
+        if let Ok(val) = env::var("TUITBOT_LLM__BASE_URL") {
             self.llm.base_url = Some(val);
         }
 
         // Storage
-        if let Ok(val) = env::var("REPLYGUY_STORAGE__DB_PATH") {
+        if let Ok(val) = env::var("TUITBOT_STORAGE__DB_PATH") {
             self.storage.db_path = val;
         }
-        if let Ok(val) = env::var("REPLYGUY_STORAGE__RETENTION_DAYS") {
-            self.storage.retention_days = parse_env_u32("REPLYGUY_STORAGE__RETENTION_DAYS", &val)?;
+        if let Ok(val) = env::var("TUITBOT_STORAGE__RETENTION_DAYS") {
+            self.storage.retention_days = parse_env_u32("TUITBOT_STORAGE__RETENTION_DAYS", &val)?;
         }
 
         // Logging
-        if let Ok(val) = env::var("REPLYGUY_LOGGING__STATUS_INTERVAL_SECONDS") {
+        if let Ok(val) = env::var("TUITBOT_LOGGING__STATUS_INTERVAL_SECONDS") {
             self.logging.status_interval_seconds =
-                parse_env_u64("REPLYGUY_LOGGING__STATUS_INTERVAL_SECONDS", &val)?;
+                parse_env_u64("TUITBOT_LOGGING__STATUS_INTERVAL_SECONDS", &val)?;
+        }
+
+        // Schedule
+        if let Ok(val) = env::var("TUITBOT_SCHEDULE__TIMEZONE") {
+            self.schedule.timezone = val;
+        }
+        if let Ok(val) = env::var("TUITBOT_SCHEDULE__ACTIVE_HOURS_START") {
+            self.schedule.active_hours_start =
+                parse_env_u8("TUITBOT_SCHEDULE__ACTIVE_HOURS_START", &val)?;
+        }
+        if let Ok(val) = env::var("TUITBOT_SCHEDULE__ACTIVE_HOURS_END") {
+            self.schedule.active_hours_end =
+                parse_env_u8("TUITBOT_SCHEDULE__ACTIVE_HOURS_END", &val)?;
+        }
+        if let Ok(val) = env::var("TUITBOT_SCHEDULE__ACTIVE_DAYS") {
+            self.schedule.active_days = split_csv(&val);
         }
 
         Ok(())
@@ -755,6 +864,14 @@ fn parse_env_u64(var_name: &str, val: &str) -> Result<u64, ConfigError> {
     })
 }
 
+/// Parse an environment variable value as `u8`.
+fn parse_env_u8(var_name: &str, val: &str) -> Result<u8, ConfigError> {
+    val.parse::<u8>().map_err(|_| ConfigError::InvalidValue {
+        field: var_name.to_string(),
+        message: format!("'{val}' is not a valid u8"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -799,7 +916,7 @@ client_id = "test"
         assert_eq!(config.scoring.threshold, 60);
         assert_eq!(config.limits.max_replies_per_day, 5);
         assert_eq!(config.intervals.mentions_check_seconds, 300);
-        assert_eq!(config.storage.db_path, "~/.replyguy/replyguy.db");
+        assert_eq!(config.storage.db_path, "~/.tuitbot/tuitbot.db");
         assert_eq!(config.storage.retention_days, 90);
         assert_eq!(config.logging.status_interval_seconds, 0);
     }
@@ -807,43 +924,43 @@ client_id = "test"
     #[test]
     fn env_var_override_string() {
         // Use a unique env var prefix to avoid test interference
-        env::set_var("REPLYGUY_LLM__PROVIDER", "anthropic");
+        env::set_var("TUITBOT_LLM__PROVIDER", "anthropic");
         let mut config = Config::default();
         config.apply_env_overrides().expect("env override");
         assert_eq!(config.llm.provider, "anthropic");
-        env::remove_var("REPLYGUY_LLM__PROVIDER");
+        env::remove_var("TUITBOT_LLM__PROVIDER");
     }
 
     #[test]
     fn env_var_override_numeric() {
-        env::set_var("REPLYGUY_SCORING__THRESHOLD", "85");
+        env::set_var("TUITBOT_SCORING__THRESHOLD", "85");
         let mut config = Config::default();
         config.apply_env_overrides().expect("env override");
         assert_eq!(config.scoring.threshold, 85);
-        env::remove_var("REPLYGUY_SCORING__THRESHOLD");
+        env::remove_var("TUITBOT_SCORING__THRESHOLD");
     }
 
     #[test]
     fn env_var_override_csv() {
-        env::set_var("REPLYGUY_BUSINESS__PRODUCT_KEYWORDS", "rust, cli, tools");
+        env::set_var("TUITBOT_BUSINESS__PRODUCT_KEYWORDS", "rust, cli, tools");
         let mut config = Config::default();
         config.apply_env_overrides().expect("env override");
         assert_eq!(
             config.business.product_keywords,
             vec!["rust", "cli", "tools"]
         );
-        env::remove_var("REPLYGUY_BUSINESS__PRODUCT_KEYWORDS");
+        env::remove_var("TUITBOT_BUSINESS__PRODUCT_KEYWORDS");
     }
 
     #[test]
     fn env_var_invalid_numeric_returns_error() {
         // Test the parse function directly to avoid env var race conditions
         // with other tests that call apply_env_overrides()
-        let result = parse_env_u32("REPLYGUY_SCORING__THRESHOLD", "not_a_number");
+        let result = parse_env_u32("TUITBOT_SCORING__THRESHOLD", "not_a_number");
         assert!(result.is_err());
         match result.unwrap_err() {
             ConfigError::InvalidValue { field, .. } => {
-                assert_eq!(field, "REPLYGUY_SCORING__THRESHOLD");
+                assert_eq!(field, "TUITBOT_SCORING__THRESHOLD");
             }
             other => panic!("expected InvalidValue, got: {other}"),
         }
@@ -952,7 +1069,7 @@ client_id = "test"
 
     #[test]
     fn expand_tilde_works() {
-        let expanded = expand_tilde("~/.replyguy/config.toml");
+        let expanded = expand_tilde("~/.tuitbot/config.toml");
         assert!(!expanded.to_string_lossy().starts_with('~'));
     }
 

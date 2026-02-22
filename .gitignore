@@ -8,8 +8,8 @@ Cargo.lock
 *.db-wal
 *.db-shm
 
-# ReplyGuy credentials & local state
-.replyguy/
+# Tuitbot credentials & local state
+.tuitbot/
 tokens.json
 
 # Environment / secrets

@@ -1,4 +1,4 @@
--- Initial schema for ReplyGuy storage layer
+-- Initial schema for Tuitbot storage layer
 -- All tables match data-model.md exactly
 
 -- Discovered tweets from X search

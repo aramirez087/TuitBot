@@ -1,4 +1,4 @@
-/// `replyguy upgrade` — detect and configure new features in an existing config.
+/// `tuitbot upgrade` — detect and configure new features in an existing config.
 ///
 /// Parses the raw TOML file to find missing feature groups, then offers an
 /// interactive mini-wizard to configure only the missing features. Uses
@@ -151,7 +151,7 @@ pub async fn execute(non_interactive: bool, config_path_str: &str) -> Result<()>
 
     if !config_path.exists() {
         bail!(
-            "Config file not found: {}\nRun 'replyguy init' first.",
+            "Config file not found: {}\nRun 'tuitbot init' first.",
             config_path.display()
         );
     }
@@ -176,7 +176,7 @@ pub async fn execute(non_interactive: bool, config_path_str: &str) -> Result<()>
     run_upgrade_wizard(&config_path, &missing)
 }
 
-/// Check for missing features before `replyguy run` and offer to configure.
+/// Check for missing features before `tuitbot run` and offer to configure.
 pub async fn check_before_run(config_path_str: &str) -> Result<()> {
     let config_path = expand_tilde(config_path_str);
 
@@ -210,7 +210,7 @@ pub async fn check_before_run(config_path_str: &str) -> Result<()> {
     if !configure_now {
         eprintln!(
             "{}",
-            dim.apply_to("Tip: Run 'replyguy upgrade' any time to configure new features.")
+            dim.apply_to("Tip: Run 'tuitbot upgrade' any time to configure new features.")
         );
         eprintln!();
         return Ok(());
@@ -444,7 +444,7 @@ fn patch_approval_mode(doc: &mut DocumentMut, approval_mode: bool) {
 
     if let Some(mut key) = doc.key_mut("approval_mode") {
         key.leaf_decor_mut().set_prefix(
-            "# Queue posts for review before posting (use `replyguy approve` to review).\n",
+            "# Queue posts for review before posting (use `tuitbot approve` to review).\n",
         );
     }
 }
@@ -486,7 +486,7 @@ mod tests {
 
     const OLD_CONFIG: &str = r#"
 # =============================================================================
-# ReplyGuy Configuration — Docklet (@getdocklet)
+# Tuitbot Configuration — Docklet (@getdocklet)
 # =============================================================================
 
 # --- X API Credentials ---
@@ -543,7 +543,7 @@ model = "claude-sonnet-4-6"
 
 # --- Data Storage ---
 [storage]
-db_path = "~/.replyguy/replyguy.db"
+db_path = "~/.tuitbot/tuitbot.db"
 retention_days = 90
 
 # --- Logging ---
@@ -614,7 +614,7 @@ provider = "ollama"
 model = "llama3.2"
 
 [storage]
-db_path = "~/.replyguy/replyguy.db"
+db_path = "~/.tuitbot/tuitbot.db"
 
 [logging]
 status_interval_seconds = 0
@@ -707,7 +707,7 @@ max_replies_per_day = 10
         );
 
         // New keys are present and parseable
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&result).expect("patched config should parse");
 
         assert_eq!(config.business.persona_opinions, vec!["Rust is great"]);
@@ -759,7 +759,7 @@ industry_topics = ["topic"]
         patch_config(tmp.path(), &[UpgradeGroup::Persona], &answers).unwrap();
 
         let result = fs::read_to_string(tmp.path()).unwrap();
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&result).expect("patched config should parse");
 
         assert_eq!(config.business.persona_opinions, vec!["opinion1"]);
@@ -792,7 +792,7 @@ product_name = "App"
         patch_config(tmp.path(), &[UpgradeGroup::Targets], &answers).unwrap();
 
         let result = fs::read_to_string(tmp.path()).unwrap();
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&result).expect("patched config should parse");
 
         assert_eq!(config.targets.accounts, vec!["levelsio", "naval"]);
@@ -821,7 +821,7 @@ client_id = "test"
         patch_config(tmp.path(), &[UpgradeGroup::ApprovalMode], &answers).unwrap();
 
         let result = fs::read_to_string(tmp.path()).unwrap();
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&result).expect("patched config should parse");
 
         assert!(config.approval_mode);
@@ -849,7 +849,7 @@ max_replies_per_author_per_day = 2
         patch_config(tmp.path(), &[UpgradeGroup::EnhancedLimits], &answers).unwrap();
 
         let result = fs::read_to_string(tmp.path()).unwrap();
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&result).expect("patched config should parse");
 
         // Existing value preserved (not overwritten)

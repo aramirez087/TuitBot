@@ -1,4 +1,4 @@
-//! Startup types and helpers for ReplyGuy CLI commands.
+//! Startup types and helpers for Tuitbot CLI commands.
 //!
 //! Provides API tier detection types, OAuth token management,
 //! PKCE authentication helpers, startup banner formatting, and
@@ -24,7 +24,7 @@ pub const X_TOKEN_URL: &str = "https://api.twitter.com/2/oauth2/token";
 /// X API users/me endpoint for credential verification.
 pub const X_USERS_ME_URL: &str = "https://api.twitter.com/2/users/me";
 
-/// OAuth scopes required by ReplyGuy.
+/// OAuth scopes required by Tuitbot.
 pub const OAUTH_SCOPES: &str = "tweet.read tweet.write users.read offline.access";
 
 // ============================================================================
@@ -114,7 +114,7 @@ impl TierCapabilities {
 // Stored Tokens
 // ============================================================================
 
-/// OAuth tokens persisted to disk at `~/.replyguy/tokens.json`.
+/// OAuth tokens persisted to disk at `~/.tuitbot/tokens.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredTokens {
     /// OAuth 2.0 access token.
@@ -173,11 +173,11 @@ pub enum StartupError {
     Config(String),
 
     /// No tokens found -- user needs to authenticate first.
-    #[error("authentication required: run `replyguy auth` first")]
+    #[error("authentication required: run `tuitbot auth` first")]
     AuthRequired,
 
     /// Tokens are expired and need re-authentication.
-    #[error("authentication expired: run `replyguy auth` to re-authenticate")]
+    #[error("authentication expired: run `tuitbot auth` to re-authenticate")]
     AuthExpired,
 
     /// Token refresh attempt failed.
@@ -209,14 +209,14 @@ pub enum StartupError {
 // Token File I/O
 // ============================================================================
 
-/// Default directory for ReplyGuy data files (`~/.replyguy/`).
+/// Default directory for Tuitbot data files (`~/.tuitbot/`).
 pub fn data_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".replyguy")
+        .join(".tuitbot")
 }
 
-/// Path to the token storage file (`~/.replyguy/tokens.json`).
+/// Path to the token storage file (`~/.tuitbot/tokens.json`).
 pub fn token_file_path() -> PathBuf {
     data_dir().join("tokens.json")
 }
@@ -237,7 +237,7 @@ pub fn load_tokens_from_file() -> Result<StoredTokens, StartupError> {
 
 /// Save OAuth tokens to the default file path with secure permissions.
 ///
-/// Creates the `~/.replyguy/` directory if it does not exist.
+/// Creates the `~/.tuitbot/` directory if it does not exist.
 /// On Unix, sets file permissions to 0600 (owner read/write only).
 pub fn save_tokens_to_file(tokens: &StoredTokens) -> Result<(), StartupError> {
     let dir = data_dir();
@@ -457,7 +457,7 @@ pub fn format_startup_banner(
         "disabled".to_string()
     };
     format!(
-        "ReplyGuy v{version}\n\
+        "Tuitbot v{version}\n\
          Tier: {tier} | Loops: {loops}\n\
          Status summary: {status}\n\
          Press Ctrl+C to stop.",
@@ -701,7 +701,7 @@ mod tests {
         let err = StartupError::AuthRequired;
         assert_eq!(
             err.to_string(),
-            "authentication required: run `replyguy auth` first"
+            "authentication required: run `tuitbot auth` first"
         );
 
         let err = StartupError::AuthExpired;
@@ -803,7 +803,7 @@ mod tests {
     fn startup_banner_free_tier() {
         let caps = TierCapabilities::for_tier(ApiTier::Free);
         let banner = format_startup_banner(ApiTier::Free, &caps, 300);
-        assert!(banner.contains("ReplyGuy v"));
+        assert!(banner.contains("Tuitbot v"));
         assert!(banner.contains("Tier: Free"));
         assert!(!banner.contains("mentions"));
         assert!(banner.contains("content"));
@@ -832,7 +832,7 @@ mod tests {
 
     #[test]
     fn expand_tilde_works() {
-        let expanded = expand_tilde("~/.replyguy/config.toml");
+        let expanded = expand_tilde("~/.tuitbot/config.toml");
         assert!(!expanded.to_string_lossy().starts_with('~'));
     }
 
@@ -845,13 +845,13 @@ mod tests {
     #[test]
     fn data_dir_under_home() {
         let dir = data_dir();
-        assert!(dir.to_string_lossy().contains(".replyguy"));
+        assert!(dir.to_string_lossy().contains(".tuitbot"));
     }
 
     #[test]
     fn token_file_path_under_data_dir() {
         let path = token_file_path();
         assert!(path.to_string_lossy().contains("tokens.json"));
-        assert!(path.to_string_lossy().contains(".replyguy"));
+        assert!(path.to_string_lossy().contains(".tuitbot"));
     }
 }

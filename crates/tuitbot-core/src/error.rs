@@ -1,4 +1,4 @@
-//! Error types for the ReplyGuy core library.
+//! Error types for the Tuitbot core library.
 //!
 //! Each module has its own error enum to provide clear error boundaries.
 //! The library uses `thiserror` for structured, typed errors.
@@ -192,11 +192,11 @@ mod tests {
     #[test]
     fn config_error_file_not_found_message() {
         let err = ConfigError::FileNotFound {
-            path: "/home/user/.replyguy/config.toml".to_string(),
+            path: "/home/user/.tuitbot/config.toml".to_string(),
         };
         assert_eq!(
             err.to_string(),
-            "config file not found: /home/user/.replyguy/config.toml"
+            "config file not found: /home/user/.tuitbot/config.toml"
         );
     }
 

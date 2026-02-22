@@ -5,6 +5,8 @@
 //! reply chain order must be maintained (each tweet replies to the previous).
 
 use super::loop_helpers::{ContentLoopError, ContentSafety, ContentStorage, ThreadPoster};
+use super::schedule::{schedule_gate, ActiveSchedule};
+use super::scheduler::LoopScheduler;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use std::sync::Arc;
@@ -91,7 +93,12 @@ impl ThreadLoop {
     }
 
     /// Run the continuous thread loop until cancellation.
-    pub async fn run(&self, cancel: CancellationToken, interval: Duration) {
+    pub async fn run(
+        &self,
+        cancel: CancellationToken,
+        scheduler: LoopScheduler,
+        schedule: Option<Arc<ActiveSchedule>>,
+    ) {
         tracing::info!(
             dry_run = self.dry_run,
             topics = self.topics.len(),
@@ -114,6 +121,10 @@ impl ThreadLoop {
 
         loop {
             if cancel.is_cancelled() {
+                break;
+            }
+
+            if !schedule_gate(&schedule, &cancel).await {
                 break;
             }
 
@@ -164,14 +175,14 @@ impl ThreadLoop {
 
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {},
+                _ = scheduler.tick() => {},
             }
         }
 
         tracing::info!("Thread loop stopped");
     }
 
-    /// Run a single thread generation (for CLI `replyguy thread` command).
+    /// Run a single thread generation (for CLI `tuitbot thread` command).
     ///
     /// If `topic` is provided, uses that topic. Otherwise picks a random one.
     /// If `count` is provided, generates exactly that many tweets (clamped 2-15).

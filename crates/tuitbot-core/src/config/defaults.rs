@@ -63,7 +63,7 @@ impl Default for IntervalsConfig {
 impl Default for StorageConfig {
     fn default() -> Self {
         Self {
-            db_path: "~/.replyguy/replyguy.db".to_string(),
+            db_path: "~/.tuitbot/tuitbot.db".to_string(),
             retention_days: 90,
         }
     }

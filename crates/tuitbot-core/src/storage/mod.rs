@@ -1,4 +1,4 @@
-//! SQLite storage layer for ReplyGuy.
+//! SQLite storage layer for Tuitbot.
 //!
 //! Provides database initialization, connection pooling, and CRUD operations
 //! for all persistent entities. Uses SQLx with WAL mode for concurrent access.

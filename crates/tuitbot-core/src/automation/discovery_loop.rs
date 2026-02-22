@@ -9,6 +9,8 @@ use super::loop_helpers::{
     ConsecutiveErrorTracker, LoopError, LoopStorage, LoopTweet, PostSender, ReplyGenerator,
     SafetyChecker, TweetScorer, TweetSearcher,
 };
+use super::schedule::{schedule_gate, ActiveSchedule};
+use super::scheduler::LoopScheduler;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -89,7 +91,12 @@ impl DiscoveryLoop {
     /// Run the continuous discovery loop until cancellation.
     ///
     /// Rotates through keywords across iterations to distribute API usage.
-    pub async fn run(&self, cancel: CancellationToken, interval: Duration) {
+    pub async fn run(
+        &self,
+        cancel: CancellationToken,
+        scheduler: LoopScheduler,
+        schedule: Option<Arc<ActiveSchedule>>,
+    ) {
         tracing::info!(
             dry_run = self.dry_run,
             keywords = self.keywords.len(),
@@ -108,6 +115,10 @@ impl DiscoveryLoop {
 
         loop {
             if cancel.is_cancelled() {
+                break;
+            }
+
+            if !schedule_gate(&schedule, &cancel).await {
                 break;
             }
 
@@ -163,7 +174,7 @@ impl DiscoveryLoop {
 
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = tokio::time::sleep(interval) => {},
+                _ = scheduler.tick() => {},
             }
         }
 
@@ -172,7 +183,7 @@ impl DiscoveryLoop {
 
     /// Run a single-shot discovery across all keywords.
     ///
-    /// Used by the CLI `replyguy discover` command. Searches all keywords
+    /// Used by the CLI `tuitbot discover` command. Searches all keywords
     /// (not rotating) and returns all results sorted by score descending.
     pub async fn run_once(
         &self,

@@ -1,18 +1,18 @@
 # =============================================================================
-# ReplyGuy Configuration
+# Tuitbot Configuration
 # =============================================================================
 #
-# ReplyGuy is an autonomous X (Twitter) growth assistant for founders
+# Tuitbot is an autonomous X (Twitter) growth assistant for founders
 # and indie hackers.
 #
 # Setup:
-#   1. Copy this file to ~/.replyguy/config.toml
+#   1. Copy this file to ~/.tuitbot/config.toml
 #   2. Fill in your X API credentials (get them at https://developer.x.com)
 #   3. Add your LLM provider API key
 #   4. Customize the business profile for your product
-#   5. Run: replyguy auth
-#   6. Run: replyguy test
-#   7. Run: replyguy run
+#   5. Run: tuitbot auth
+#   6. Run: tuitbot test
+#   7. Run: tuitbot run
 #
 # All fields shown here use their default values unless marked REQUIRED.
 # Uncommented fields with placeholder values must be filled in.
@@ -20,7 +20,7 @@
 
 # --- Approval Mode ---
 # When enabled, posts are queued for human review instead of posting automatically.
-# Use `replyguy approve` to review and approve queued items.
+# Use `tuitbot approve` to review and approve queued items.
 # approval_mode = false
 
 # --- X API Credentials ---
@@ -44,7 +44,7 @@ callback_host = "127.0.0.1"
 callback_port = 8080
 
 # --- Business Profile ---
-# Describe your product so ReplyGuy can find relevant conversations
+# Describe your product so Tuitbot can find relevant conversations
 # and generate on-brand content.
 [business]
 # REQUIRED: Your product name.
@@ -60,14 +60,14 @@ product_url = "https://getdocklet.app"
 target_audience = "Mac power users, developers, and productivity enthusiasts"
 
 # REQUIRED: Keywords for tweet discovery (at least 1).
-# ReplyGuy searches for tweets containing these keywords.
+# Tuitbot searches for tweets containing these keywords.
 product_keywords = ["macos productivity", "mac menu bar", "mac clipboard manager"]
 
 # Optional: Competitor keywords for discovery.
 competitor_keywords = ["notchnook alternative", "dynamic island mac", "bartender mac"]
 
 # REQUIRED: Topics for original content generation (at least 1).
-# ReplyGuy creates educational tweets and threads on these topics.
+# Tuitbot creates educational tweets and threads on these topics.
 industry_topics = [
     "Mac productivity tips",
     "macOS power user workflows",
@@ -141,9 +141,11 @@ max_tweets_per_day = 6
 max_threads_per_week = 1
 
 # Minimum delay between any two actions (seconds).
+# Also controls the minimum jitter added to all loop intervals.
 min_action_delay_seconds = 45
 
 # Maximum delay between any two actions (seconds).
+# Also controls the maximum jitter added to all loop intervals.
 max_action_delay_seconds = 180
 
 # Maximum replies to the same author per day (prevents harassment patterns).
@@ -208,7 +210,7 @@ follow_warmup_days = 3
 # --- Data Storage ---
 [storage]
 # Path to the SQLite database file.
-db_path = "~/.replyguy/replyguy.db"
+db_path = "~/.tuitbot/tuitbot.db"
 
 # Number of days to retain data (0 = keep forever).
 retention_days = 90
@@ -218,3 +220,19 @@ retention_days = 90
 # Seconds between periodic status summaries (0 = disabled).
 # When enabled, prints action counts and loop health.
 status_interval_seconds = 3600
+
+# --- Active Hours Schedule ---
+# The bot sleeps outside these hours, preventing 3 AM posts.
+# Wrapping ranges are supported (e.g. start=22, end=6 for night owls).
+[schedule]
+# IANA timezone name. Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+timezone = "UTC"
+
+# Hour (0-23) when the bot becomes active.
+active_hours_start = 8
+
+# Hour (0-23) when the bot goes to sleep.
+active_hours_end = 22
+
+# Days of the week the bot is active. Use 3-letter abbreviations.
+active_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]

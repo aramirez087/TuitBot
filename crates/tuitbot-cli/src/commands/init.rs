@@ -1,4 +1,4 @@
-/// `replyguy init` — interactive setup wizard or template copy.
+/// `tuitbot init` — interactive setup wizard or template copy.
 ///
 /// Walks new users through X API credentials, business profile, and LLM
 /// provider configuration in three guided steps. Falls back to copying
@@ -14,8 +14,8 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use console::Style;
 use dialoguer::{Confirm, Input, Select};
-use replyguy_core::config::Config;
-use replyguy_core::startup::data_dir;
+use tuitbot_core::config::Config;
+use tuitbot_core::startup::data_dir;
 
 use super::{auth, run, test};
 
@@ -47,6 +47,11 @@ struct WizardResult {
     auto_follow: bool,
     // Approval mode
     approval_mode: bool,
+    // Schedule
+    timezone: String,
+    active_hours_start: u8,
+    active_hours_end: u8,
+    active_days: Vec<String>,
     // LLM
     llm_provider: String,
     llm_api_key: Option<String>,
@@ -94,9 +99,9 @@ fn write_template(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
         "  1. Edit {} with your X API and LLM credentials",
         config_path.display()
     );
-    eprintln!("  2. replyguy auth    — authenticate with X");
-    eprintln!("  3. replyguy test    — validate configuration");
-    eprintln!("  4. replyguy run     — start the agent");
+    eprintln!("  2. tuitbot auth    — authenticate with X");
+    eprintln!("  3. tuitbot test    — validate configuration");
+    eprintln!("  4. tuitbot run     — start the agent");
 
     Ok(())
 }
@@ -134,6 +139,10 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
         // Step 7
         ..step_approval_mode(result)?
     };
+    let result = WizardResult {
+        // Step 8
+        ..step_schedule(result)?
+    };
 
     print_summary(&result);
 
@@ -168,9 +177,9 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
 
     if !do_auth {
         print_remaining_steps(&[
-            "replyguy auth    — authenticate with X",
-            "replyguy test    — validate configuration",
-            "replyguy run     — start the agent",
+            "tuitbot auth    — authenticate with X",
+            "tuitbot test    — validate configuration",
+            "tuitbot run     — start the agent",
         ]);
         return Ok(());
     }
@@ -178,9 +187,9 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
     if let Err(e) = auth::execute(&config, None).await {
         eprintln!("\nAuth failed: {e:#}");
         print_remaining_steps(&[
-            "replyguy auth    — retry authentication",
-            "replyguy test    — validate configuration",
-            "replyguy run     — start the agent",
+            "tuitbot auth    — retry authentication",
+            "tuitbot test    — validate configuration",
+            "tuitbot run     — start the agent",
         ]);
         return Ok(());
     }
@@ -193,8 +202,8 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
 
     if !do_test {
         print_remaining_steps(&[
-            "replyguy test    — validate configuration",
-            "replyguy run     — start the agent",
+            "tuitbot test    — validate configuration",
+            "tuitbot run     — start the agent",
         ]);
         return Ok(());
     }
@@ -203,8 +212,8 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
     if !all_passed {
         eprintln!("Fix the issues above, then:");
         print_remaining_steps(&[
-            "replyguy test    — re-validate configuration",
-            "replyguy run     — start the agent",
+            "tuitbot test    — re-validate configuration",
+            "tuitbot run     — start the agent",
         ]);
         return Ok(());
     }
@@ -216,7 +225,7 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
         .interact()?;
 
     if !do_run {
-        print_remaining_steps(&["replyguy run     — start the agent"]);
+        print_remaining_steps(&["tuitbot run     — start the agent"]);
         return Ok(());
     }
 
@@ -230,10 +239,10 @@ fn print_welcome_banner() {
     let dim = Style::new().dim();
 
     eprintln!();
-    eprintln!("{}", bold.apply_to("Welcome to ReplyGuy Setup"));
+    eprintln!("{}", bold.apply_to("Welcome to Tuitbot Setup"));
     eprintln!(
         "{}",
-        dim.apply_to("This wizard will create your configuration in 7 steps.")
+        dim.apply_to("This wizard will create your configuration in 8 steps.")
     );
     eprintln!();
     eprintln!("{}", dim.apply_to("You'll need:"));
@@ -254,10 +263,10 @@ fn print_welcome_banner() {
     eprintln!();
 }
 
-/// Step 1/7: X API credentials.
+/// Step 1/8: X API credentials.
 fn step_x_api() -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 1/7: X API Credentials"));
+    eprintln!("{}", bold.apply_to("Step 1/8: X API Credentials"));
     eprintln!();
 
     let client_id: String = Input::new()
@@ -303,6 +312,18 @@ fn step_x_api() -> Result<WizardResult> {
         target_accounts: vec![],
         auto_follow: false,
         approval_mode: false,
+        timezone: "UTC".to_string(),
+        active_hours_start: 8,
+        active_hours_end: 22,
+        active_days: vec![
+            "Mon".to_string(),
+            "Tue".to_string(),
+            "Wed".to_string(),
+            "Thu".to_string(),
+            "Fri".to_string(),
+            "Sat".to_string(),
+            "Sun".to_string(),
+        ],
         llm_provider: String::new(),
         llm_api_key: None,
         llm_model: String::new(),
@@ -310,10 +331,10 @@ fn step_x_api() -> Result<WizardResult> {
     })
 }
 
-/// Step 2/7: Business profile.
+/// Step 2/8: Business profile.
 fn step_business_profile(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 2/7: Business Profile"));
+    eprintln!("{}", bold.apply_to("Step 2/8: Business Profile"));
     eprintln!();
 
     let product_name: String = Input::new()
@@ -379,11 +400,11 @@ fn step_business_profile(prev: WizardResult) -> Result<WizardResult> {
     })
 }
 
-/// Step 3/7: Brand voice and style.
+/// Step 3/8: Brand voice and style.
 fn step_brand_voice(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
     let dim = Style::new().dim();
-    eprintln!("{}", bold.apply_to("Step 3/7: Brand Voice & Style"));
+    eprintln!("{}", bold.apply_to("Step 3/8: Brand Voice & Style"));
     eprintln!(
         "{}",
         dim.apply_to("These shape how the bot sounds when it replies and posts.")
@@ -419,10 +440,10 @@ fn step_brand_voice(prev: WizardResult) -> Result<WizardResult> {
     })
 }
 
-/// Step 4/7: LLM provider.
+/// Step 4/8: LLM provider.
 fn step_llm_provider(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 4/7: LLM Provider"));
+    eprintln!("{}", bold.apply_to("Step 4/8: LLM Provider"));
     eprintln!();
 
     let providers = &["openai", "anthropic", "ollama"];
@@ -482,11 +503,11 @@ fn step_llm_provider(prev: WizardResult) -> Result<WizardResult> {
     })
 }
 
-/// Step 5/7: Persona (optional).
+/// Step 5/8: Persona (optional).
 fn step_persona(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
     let dim = Style::new().dim();
-    eprintln!("{}", bold.apply_to("Step 5/7: Persona (optional)"));
+    eprintln!("{}", bold.apply_to("Step 5/8: Persona (optional)"));
     eprintln!(
         "{}",
         dim.apply_to("Strong opinions, experiences, and pillars make content more authentic.")
@@ -534,11 +555,11 @@ pub(crate) fn prompt_persona() -> Result<(Vec<String>, Vec<String>, Vec<String>)
     ))
 }
 
-/// Step 6/7: Target Accounts (optional).
+/// Step 6/8: Target Accounts (optional).
 fn step_target_accounts(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
     let dim = Style::new().dim();
-    eprintln!("{}", bold.apply_to("Step 6/7: Target Accounts (optional)"));
+    eprintln!("{}", bold.apply_to("Step 6/8: Target Accounts (optional)"));
     eprintln!(
         "{}",
         dim.apply_to("Monitor specific accounts and reply to their conversations.")
@@ -581,10 +602,10 @@ pub(crate) fn prompt_target_accounts() -> Result<(Vec<String>, bool)> {
     Ok((accounts, auto_follow))
 }
 
-/// Step 7/7: Approval Mode.
+/// Step 7/8: Approval Mode.
 fn step_approval_mode(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 7/7: Approval Mode"));
+    eprintln!("{}", bold.apply_to("Step 7/8: Approval Mode"));
     eprintln!();
 
     let approval_mode = prompt_approval_mode()?;
@@ -605,6 +626,94 @@ pub(crate) fn prompt_approval_mode() -> Result<bool> {
     eprintln!();
 
     Ok(approval_mode)
+}
+
+/// Step 8/8: Active Hours Schedule.
+fn step_schedule(prev: WizardResult) -> Result<WizardResult> {
+    let bold = Style::new().bold();
+    let dim = Style::new().dim();
+    eprintln!("{}", bold.apply_to("Step 8/8: Active Hours Schedule"));
+    eprintln!(
+        "{}",
+        dim.apply_to("Configure when the bot is active. Outside these hours it sleeps.")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("Press Enter to accept defaults (UTC, 8 AM – 10 PM, every day).")
+    );
+    eprintln!();
+
+    let timezone: String = Input::new()
+        .with_prompt("Timezone (IANA name, e.g. America/New_York)")
+        .default("UTC".to_string())
+        .validate_with(|input: &String| -> std::result::Result<(), String> {
+            input
+                .trim()
+                .parse::<chrono_tz::Tz>()
+                .map(|_| ())
+                .map_err(|_| format!("Unknown timezone: {input}. Use IANA names like America/New_York, Europe/London, Asia/Tokyo."))
+        })
+        .interact_text()?;
+
+    let start_raw: String = Input::new()
+        .with_prompt("Active hours start (0-23)")
+        .default("8".to_string())
+        .validate_with(|input: &String| -> std::result::Result<(), &str> {
+            input
+                .trim()
+                .parse::<u8>()
+                .ok()
+                .filter(|&h| h <= 23)
+                .map(|_| ())
+                .ok_or("Must be 0-23")
+        })
+        .interact_text()?;
+    let active_hours_start: u8 = start_raw.trim().parse().unwrap_or(8);
+
+    let end_raw: String = Input::new()
+        .with_prompt("Active hours end (0-23)")
+        .default("22".to_string())
+        .validate_with(|input: &String| -> std::result::Result<(), &str> {
+            input
+                .trim()
+                .parse::<u8>()
+                .ok()
+                .filter(|&h| h <= 23)
+                .map(|_| ())
+                .ok_or("Must be 0-23")
+        })
+        .interact_text()?;
+    let active_hours_end: u8 = end_raw.trim().parse().unwrap_or(22);
+
+    let all_days = &["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let use_all_days = Confirm::new()
+        .with_prompt("Active every day of the week?")
+        .default(true)
+        .interact()?;
+
+    let active_days: Vec<String> = if use_all_days {
+        all_days.iter().map(|d| d.to_string()).collect()
+    } else {
+        let selections = dialoguer::MultiSelect::new()
+            .with_prompt("Select active days")
+            .items(all_days)
+            .defaults(&[true, true, true, true, true, false, false])
+            .interact()?;
+        selections
+            .iter()
+            .map(|&i| all_days[i].to_string())
+            .collect()
+    };
+
+    eprintln!();
+
+    Ok(WizardResult {
+        timezone: timezone.trim().to_string(),
+        active_hours_start,
+        active_hours_end,
+        active_days,
+        ..prev
+    })
 }
 
 /// Collect enhanced safety limit fields interactively.
@@ -724,6 +833,14 @@ fn print_summary(result: &WizardResult) {
         "  Approval Mode:     {}",
         if result.approval_mode { "yes" } else { "no" }
     );
+
+    eprintln!();
+    eprintln!("  Timezone:          {}", result.timezone);
+    eprintln!(
+        "  Active Hours:      {}:00 – {}:00",
+        result.active_hours_start, result.active_hours_end
+    );
+    eprintln!("  Active Days:       {}", result.active_days.join(", "));
 
     eprintln!();
     eprintln!("  LLM Provider:      {}", result.llm_provider);
@@ -890,14 +1007,14 @@ fn render_config_toml(r: &WizardResult) -> String {
 
     format!(
         r#"# =============================================================================
-# ReplyGuy Configuration
+# Tuitbot Configuration
 # =============================================================================
-# Generated by `replyguy init` setup wizard.
+# Generated by `tuitbot init` setup wizard.
 # Edit this file to tune scoring, limits, and intervals.
-# Docs: https://github.com/your-org/replyguy
+# Docs: https://github.com/your-org/tuitbot
 # =============================================================================
 
-# Queue posts for review before posting (use `replyguy approve` to review).
+# Queue posts for review before posting (use `tuitbot approve` to review).
 approval_mode = {approval_mode}
 
 # --- X API Credentials ---
@@ -914,7 +1031,7 @@ callback_host = "127.0.0.1"
 callback_port = 8080
 
 # --- Business Profile ---
-# Describe your product so ReplyGuy can find relevant conversations
+# Describe your product so Tuitbot can find relevant conversations
 # and generate on-brand content.
 [business]
 product_name = "{product_name}"
@@ -922,7 +1039,7 @@ product_description = "{product_description}"
 {product_url_line}
 target_audience = "{target_audience}"
 
-# Keywords for tweet discovery (ReplyGuy searches for tweets containing these).
+# Keywords for tweet discovery (Tuitbot searches for tweets containing these).
 product_keywords = {product_keywords}
 
 # Optional: competitor keywords for discovery.
@@ -983,13 +1100,21 @@ model = "{llm_model}"
 
 # --- Data Storage ---
 [storage]
-db_path = "~/.replyguy/replyguy.db"
+db_path = "~/.tuitbot/tuitbot.db"
 retention_days = 90
 
 # --- Logging ---
 [logging]
 # Seconds between periodic status summaries (0 = disabled).
 status_interval_seconds = 0
+
+# --- Active Hours Schedule ---
+# The bot sleeps outside these hours. Wrapping ranges (e.g. 22-06) are supported.
+[schedule]
+timezone = "{timezone}"
+active_hours_start = {active_hours_start}
+active_hours_end = {active_hours_end}
+active_days = {active_days}
 "#,
         approval_mode = r.approval_mode,
         client_id = escape_toml(&r.client_id),
@@ -1011,6 +1136,10 @@ status_interval_seconds = 0
         api_key_line = api_key_line,
         llm_model = escape_toml(&r.llm_model),
         base_url_line = base_url_line,
+        timezone = escape_toml(&r.timezone),
+        active_hours_start = r.active_hours_start,
+        active_hours_end = r.active_hours_end,
+        active_days = format_toml_array(&r.active_days),
     )
 }
 
@@ -1084,12 +1213,24 @@ mod tests {
             llm_api_key: Some("sk-test-key".to_string()),
             llm_model: "gpt-4o-mini".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
 
         // Must parse as valid TOML
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         // Roundtrip: verify key fields survive
@@ -1137,10 +1278,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: Some("http://localhost:11434/v1".to_string()),
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert_eq!(config.llm.provider, "ollama");
@@ -1179,10 +1332,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("TOML with special chars should parse");
 
         assert_eq!(config.x_api.client_id, "id-with-\"quotes\"");
@@ -1215,10 +1380,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert_eq!(
@@ -1259,10 +1436,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         // When None, lines are commented out → deserialized as None
@@ -1295,10 +1484,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert_eq!(
@@ -1339,10 +1540,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert_eq!(config.targets.accounts, vec!["elonmusk", "levelsio"]);
@@ -1373,10 +1586,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert!(config.approval_mode);
@@ -1406,10 +1631,22 @@ mod tests {
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
             llm_base_url: None,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".into(),
+                "Tue".into(),
+                "Wed".into(),
+                "Thu".into(),
+                "Fri".into(),
+                "Sat".into(),
+                "Sun".into(),
+            ],
         };
 
         let toml_str = render_config_toml(&result);
-        let config: replyguy_core::config::Config =
+        let config: tuitbot_core::config::Config =
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert_eq!(config.limits.max_replies_per_day, 5);

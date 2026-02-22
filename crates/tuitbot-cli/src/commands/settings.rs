@@ -1,10 +1,10 @@
-/// `replyguy settings` — interactive configuration editor.
+/// `tuitbot settings` — interactive configuration editor.
 ///
 /// Modes:
-/// - `replyguy settings`              — interactive category menu
-/// - `replyguy settings --show`       — pretty-print current config
-/// - `replyguy settings --set K=V`    — direct one-shot set
-/// - `replyguy settings <category>`   — jump to a specific category
+/// - `tuitbot settings`              — interactive category menu
+/// - `tuitbot settings --show`       — pretty-print current config
+/// - `tuitbot settings --set K=V`    — direct one-shot set
+/// - `tuitbot settings <category>`   — jump to a specific category
 use std::fs;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use console::Style;
 use dialoguer::{Confirm, Input, MultiSelect, Select};
-use replyguy_core::config::Config;
+use tuitbot_core::config::Config;
 
 use super::SettingsArgs;
 
@@ -21,7 +21,7 @@ pub async fn execute(args: SettingsArgs, config_path: &str) -> Result<()> {
     let expanded = expand_tilde(config_path);
     if !expanded.exists() {
         bail!(
-            "Config file not found: {}\nRun 'replyguy init' first.",
+            "Config file not found: {}\nRun 'tuitbot init' first.",
             expanded.display()
         );
     }
@@ -29,7 +29,7 @@ pub async fn execute(args: SettingsArgs, config_path: &str) -> Result<()> {
     let config = Config::load(Some(config_path)).map_err(|e| {
         anyhow::anyhow!(
             "Failed to load configuration: {e}\n\
-             Hint: Run 'replyguy init' to create a default configuration file."
+             Hint: Run 'tuitbot init' to create a default configuration file."
         )
     })?;
 
@@ -65,10 +65,11 @@ pub async fn execute(args: SettingsArgs, config_path: &str) -> Result<()> {
             "scoring" => edit_category_scoring(&mut config, tracker)?,
             "timing" | "intervals" => edit_category_timing(&mut config, tracker)?,
             "approval" => edit_category_approval(&mut config, tracker)?,
+            "schedule" | "hours" => edit_category_schedule(&mut config, tracker)?,
             "storage" | "logging" => edit_category_storage(&mut config, tracker)?,
             other => bail!(
                 "Unknown category: {other}\n\
-                 Valid categories: product, voice, persona, ai, x, targets, limits, scoring, timing, approval, storage"
+                 Valid categories: product, voice, persona, ai, x, targets, limits, scoring, timing, approval, schedule, storage"
             ),
         }
         if !tracker.changes.is_empty() {
@@ -93,7 +94,7 @@ fn show_config(config: &Config) {
     let dim = Style::new().dim();
 
     eprintln!();
-    eprintln!("{}", bold.apply_to("ReplyGuy Configuration"));
+    eprintln!("{}", bold.apply_to("Tuitbot Configuration"));
     eprintln!("{}", dim.apply_to("══════════════════════"));
 
     // Product
@@ -307,6 +308,19 @@ fn show_config(config: &Config) {
     eprintln!(
         "  Enabled:             {}",
         if config.approval_mode { "yes" } else { "no" }
+    );
+
+    // Schedule
+    eprintln!();
+    eprintln!("{}", bold.apply_to("Schedule"));
+    eprintln!("  Timezone:            {}", config.schedule.timezone);
+    eprintln!(
+        "  Active hours:        {}:00 – {}:00",
+        config.schedule.active_hours_start, config.schedule.active_hours_end
+    );
+    eprintln!(
+        "  Active days:         {}",
+        format_list(&config.schedule.active_days)
     );
 
     // Storage & Logging
@@ -769,9 +783,50 @@ fn set_direct(config: &mut Config, kv: &str, config_path: &Path) -> Result<()> {
             config.logging.status_interval_seconds = v;
         }
 
+        // Schedule
+        "schedule.timezone" => {
+            value
+                .trim()
+                .parse::<chrono_tz::Tz>()
+                .map_err(|_| anyhow::anyhow!("Unknown timezone: {value}"))?;
+            tracker.record("schedule", "timezone", &config.schedule.timezone, value);
+            config.schedule.timezone = value.to_string();
+        }
+        "schedule.active_hours_start" => {
+            let v: u8 = value.parse().context("must be 0-23")?;
+            if v > 23 {
+                bail!("active_hours_start must be 0-23");
+            }
+            tracker.record(
+                "schedule",
+                "active_hours_start",
+                &config.schedule.active_hours_start.to_string(),
+                value,
+            );
+            config.schedule.active_hours_start = v;
+        }
+        "schedule.active_hours_end" => {
+            let v: u8 = value.parse().context("must be 0-23")?;
+            if v > 23 {
+                bail!("active_hours_end must be 0-23");
+            }
+            tracker.record(
+                "schedule",
+                "active_hours_end",
+                &config.schedule.active_hours_end.to_string(),
+                value,
+            );
+            config.schedule.active_hours_end = v;
+        }
+        "schedule.active_days" => {
+            let old = config.schedule.active_days.join(", ");
+            config.schedule.active_days = parse_csv(value);
+            tracker.record("schedule", "active_days", &old, value);
+        }
+
         _ => bail!(
             "Unknown setting: {key}\n\
-             Use 'replyguy settings --show' to see all available settings."
+             Use 'tuitbot settings --show' to see all available settings."
         ),
     }
 
@@ -807,7 +862,7 @@ fn interactive_menu(config: &mut Config, config_path: &Path) -> Result<()> {
 
     loop {
         eprintln!();
-        eprintln!("{}", bold.apply_to("ReplyGuy Settings"));
+        eprintln!("{}", bold.apply_to("Tuitbot Settings"));
         eprintln!("{}", dim.apply_to("─────────────────"));
         eprintln!();
 
@@ -822,6 +877,7 @@ fn interactive_menu(config: &mut Config, config_path: &Path) -> Result<()> {
             "Scoring             — how picky the bot is about which tweets to reply to",
             "Timing              — how often the bot checks for new tweets",
             "Approval Mode       — review posts before they go live",
+            "Schedule            — timezone, active hours, active days",
             "Storage & Logging   — database path, data retention",
             "Save & Exit",
         ];
@@ -843,8 +899,9 @@ fn interactive_menu(config: &mut Config, config_path: &Path) -> Result<()> {
             7 => edit_category_scoring(config, &mut tracker)?,
             8 => edit_category_timing(config, &mut tracker)?,
             9 => edit_category_approval(config, &mut tracker)?,
-            10 => edit_category_storage(config, &mut tracker)?,
-            11 => break, // Save & Exit
+            10 => edit_category_schedule(config, &mut tracker)?,
+            11 => edit_category_storage(config, &mut tracker)?,
+            12 => break, // Save & Exit
             _ => unreachable!(),
         }
     }
@@ -1753,6 +1810,84 @@ fn edit_category_approval(config: &mut Config, tracker: &mut ChangeTracker) -> R
     Ok(())
 }
 
+fn edit_category_schedule(config: &mut Config, tracker: &mut ChangeTracker) -> Result<()> {
+    let bold = Style::new().bold();
+    let dim = Style::new().dim();
+
+    eprintln!();
+    eprintln!("{}", bold.apply_to("Schedule"));
+    eprintln!("{}", dim.apply_to("────────"));
+
+    let fields = &[
+        format!("Timezone:      {}", config.schedule.timezone),
+        format!("Hours start:   {}:00", config.schedule.active_hours_start),
+        format!("Hours end:     {}:00", config.schedule.active_hours_end),
+        format!(
+            "Active days:   {}",
+            format_list(&config.schedule.active_days)
+        ),
+        "Back to categories".to_string(),
+    ];
+
+    let selection = Select::new()
+        .with_prompt("Which field to change?")
+        .items(fields)
+        .default(0)
+        .interact()?;
+
+    match selection {
+        0 => {
+            let new_val: String = Input::new()
+                .with_prompt("Timezone (IANA name)")
+                .default(config.schedule.timezone.clone())
+                .validate_with(|input: &String| -> std::result::Result<(), String> {
+                    input
+                        .trim()
+                        .parse::<chrono_tz::Tz>()
+                        .map(|_| ())
+                        .map_err(|_| format!("Unknown timezone: {input}"))
+                })
+                .interact_text()?;
+            let new_val = new_val.trim().to_string();
+            tracker.record("schedule", "timezone", &config.schedule.timezone, &new_val);
+            config.schedule.timezone = new_val;
+        }
+        1 => {
+            let new_val = edit_u8(
+                "Active hours start (0-23)",
+                config.schedule.active_hours_start,
+            )?;
+            tracker.record(
+                "schedule",
+                "active_hours_start",
+                &config.schedule.active_hours_start.to_string(),
+                &new_val.to_string(),
+            );
+            config.schedule.active_hours_start = new_val;
+        }
+        2 => {
+            let new_val = edit_u8("Active hours end (0-23)", config.schedule.active_hours_end)?;
+            tracker.record(
+                "schedule",
+                "active_hours_end",
+                &config.schedule.active_hours_end.to_string(),
+                &new_val.to_string(),
+            );
+            config.schedule.active_hours_end = new_val;
+        }
+        3 => {
+            let new_val = edit_list("Active days", &config.schedule.active_days)?;
+            let old_display = config.schedule.active_days.join(", ");
+            let new_display = new_val.join(", ");
+            tracker.record("schedule", "active_days", &old_display, &new_display);
+            config.schedule.active_days = new_val;
+        }
+        _ => {} // Back
+    }
+
+    Ok(())
+}
+
 fn edit_category_storage(config: &mut Config, tracker: &mut ChangeTracker) -> Result<()> {
     let bold = Style::new().bold();
     let dim = Style::new().dim();
@@ -1959,6 +2094,23 @@ fn edit_u64(label: &str, current: u64, help: Option<&str>) -> Result<u64> {
     Ok(val.trim().parse().unwrap())
 }
 
+fn edit_u8(label: &str, current: u8) -> Result<u8> {
+    let val: String = Input::new()
+        .with_prompt(label)
+        .default(current.to_string())
+        .validate_with(|input: &String| -> std::result::Result<(), String> {
+            input
+                .trim()
+                .parse::<u8>()
+                .ok()
+                .filter(|&v| v <= 23)
+                .map(|_| ())
+                .ok_or_else(|| "Must be 0-23".to_string())
+        })
+        .interact_text()?;
+    Ok(val.trim().parse().unwrap())
+}
+
 fn edit_f32(label: &str, current: f32, help: Option<&str>) -> Result<f32> {
     if let Some(h) = help {
         let dim = Style::new().dim();
@@ -2158,14 +2310,14 @@ fn render_config(config: &Config) -> String {
 
     format!(
         r#"# =============================================================================
-# ReplyGuy Configuration
+# Tuitbot Configuration
 # =============================================================================
-# Generated by `replyguy settings`.
+# Generated by `tuitbot settings`.
 # Edit this file to tune scoring, limits, and intervals.
-# Docs: https://github.com/your-org/replyguy
+# Docs: https://github.com/your-org/tuitbot
 # =============================================================================
 
-# Queue posts for review before posting (use `replyguy approve` to review).
+# Queue posts for review before posting (use `tuitbot approve` to review).
 approval_mode = {approval_mode}
 
 # --- X API Credentials ---
@@ -2182,7 +2334,7 @@ callback_host = "{callback_host}"
 callback_port = {callback_port}
 
 # --- Business Profile ---
-# Describe your product so ReplyGuy can find relevant conversations
+# Describe your product so Tuitbot can find relevant conversations
 # and generate on-brand content.
 [business]
 product_name = "{product_name}"
@@ -2190,7 +2342,7 @@ product_description = "{product_description}"
 {product_url_line}
 target_audience = "{target_audience}"
 
-# Keywords for tweet discovery (ReplyGuy searches for tweets containing these).
+# Keywords for tweet discovery (Tuitbot searches for tweets containing these).
 product_keywords = {product_keywords}
 
 # Optional: competitor keywords for discovery.
@@ -2260,6 +2412,14 @@ retention_days = {retention_days}
 [logging]
 # Seconds between periodic status summaries (0 = disabled).
 status_interval_seconds = {status_interval_seconds}
+
+# --- Active Hours Schedule ---
+# The bot sleeps outside these hours. Wrapping ranges (e.g. 22-06) are supported.
+[schedule]
+timezone = "{timezone}"
+active_hours_start = {active_hours_start}
+active_hours_end = {active_hours_end}
+active_days = {active_days}
 "#,
         approval_mode = config.approval_mode,
         client_id = escape_toml(&config.x_api.client_id),
@@ -2307,6 +2467,10 @@ status_interval_seconds = {status_interval_seconds}
         db_path = escape_toml(&config.storage.db_path),
         retention_days = config.storage.retention_days,
         status_interval_seconds = config.logging.status_interval_seconds,
+        timezone = escape_toml(&config.schedule.timezone),
+        active_hours_start = config.schedule.active_hours_start,
+        active_hours_end = config.schedule.active_hours_end,
+        active_days = format_toml_array(&config.schedule.active_days),
     )
 }
 

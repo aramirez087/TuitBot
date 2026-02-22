@@ -1,17 +1,17 @@
-//! Implementation of the `replyguy auth` command.
+//! Implementation of the `tuitbot auth` command.
 //!
 //! Walks the user through the OAuth 2.0 PKCE authentication flow
 //! with the X API. Supports both manual code-entry and local
 //! callback server modes.
 
-use replyguy_core::config::Config;
-use replyguy_core::startup::{
+use std::io::Write;
+use tuitbot_core::config::Config;
+use tuitbot_core::startup::{
     build_auth_url, build_redirect_uri, exchange_auth_code, extract_auth_code, generate_pkce,
     save_tokens_to_file, token_file_path, verify_credentials,
 };
-use std::io::Write;
 
-/// Execute the `replyguy auth` command.
+/// Execute the `tuitbot auth` command.
 ///
 /// Determines the auth mode from the CLI flag or config, runs the
 /// appropriate PKCE flow, saves tokens, and verifies credentials.
@@ -20,7 +20,7 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
     if config.x_api.client_id.is_empty() {
         anyhow::bail!(
             "X API client_id not configured.\n\
-             Set it in your config file under [x_api] or via REPLYGUY_X_API__CLIENT_ID env var.\n\
+             Set it in your config file under [x_api] or via TUITBOT_X_API__CLIENT_ID env var.\n\
              Get your client_id from https://developer.x.com/en/portal/dashboard"
         );
     }

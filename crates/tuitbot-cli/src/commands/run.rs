@@ -1,4 +1,4 @@
-//! Implementation of the `replyguy run` command.
+//! Implementation of the `tuitbot run` command.
 //!
 //! The main entry point for autonomous operation. Initializes all
 //! dependencies, detects API tier, creates adapter structs, spawns
@@ -7,31 +7,31 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use replyguy_core::automation::adapters::{
+use tuitbot_core::automation::adapters::{
     AnalyticsStorageAdapter, ApprovalQueueAdapter, ContentSafetyAdapter, ContentStorageAdapter,
     LlmReplyAdapter, LlmThreadAdapter, LlmTweetAdapter, PostSenderAdapter, SafetyAdapter,
     ScoringAdapter, StatusQuerierAdapter, StorageAdapter, TargetStorageAdapter, TopicScorerAdapter,
     XApiMentionsAdapter, XApiPostExecutorAdapter, XApiProfileAdapter, XApiSearchAdapter,
     XApiTargetAdapter, XApiThreadPosterAdapter,
 };
-use replyguy_core::automation::{
-    create_posting_queue, run_posting_queue_with_approval, scheduler_from_config,
-    status_reporter::run_status_reporter, AnalyticsLoop, ContentLoop, DiscoveryLoop, MentionsLoop,
-    Runtime, TargetLoop, TargetLoopConfig, ThreadLoop,
+use tuitbot_core::automation::{
+    create_posting_queue, run_posting_queue_with_approval, schedule::ActiveSchedule,
+    scheduler_from_config, status_reporter::run_status_reporter, AnalyticsLoop, ContentLoop,
+    DiscoveryLoop, MentionsLoop, Runtime, TargetLoop, TargetLoopConfig, ThreadLoop,
 };
-use replyguy_core::config::Config;
-use replyguy_core::content::ContentGenerator;
-use replyguy_core::llm::factory::create_provider;
-use replyguy_core::safety::SafetyGuard;
-use replyguy_core::scoring::ScoringEngine;
-use replyguy_core::startup::{
+use tuitbot_core::config::Config;
+use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::llm::factory::create_provider;
+use tuitbot_core::safety::SafetyGuard;
+use tuitbot_core::scoring::ScoringEngine;
+use tuitbot_core::startup::{
     expand_tilde, format_startup_banner, load_tokens_from_file, ApiTier, TierCapabilities,
 };
-use replyguy_core::storage;
-use replyguy_core::x_api::tier::{self, detect_tier};
-use replyguy_core::x_api::{XApiClient, XApiHttpClient};
+use tuitbot_core::storage;
+use tuitbot_core::x_api::tier::{self, detect_tier};
+use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
-/// Execute the `replyguy run` command.
+/// Execute the `tuitbot run` command.
 ///
 /// Startup sequence:
 /// 1. Validate database path
@@ -55,7 +55,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
     let tokens = load_tokens_from_file().map_err(|e| anyhow::anyhow!("{e}"))?;
 
     if tokens.is_expired() {
-        anyhow::bail!("Authentication expired. Run `replyguy auth` to re-authenticate.");
+        anyhow::bail!("Authentication expired. Run `tuitbot auth` to re-authenticate.");
     }
     tracing::info!(
         expires_in = %tokens.format_expiry(),
@@ -165,7 +165,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         Arc::new(StatusQuerierAdapter::new(pool.clone()));
 
     // Approval queue (only if approval mode is enabled).
-    let approval_queue: Option<Arc<dyn replyguy_core::automation::ApprovalQueue>> =
+    let approval_queue: Option<Arc<dyn tuitbot_core::automation::ApprovalQueue>> =
         if config.approval_mode {
             Some(Arc::new(ApprovalQueueAdapter::new(pool.clone())))
         } else {
@@ -175,14 +175,33 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
     // 13. Create runtime and spawn tasks.
     let mut runtime = Runtime::new();
     let min_delay = Duration::from_secs(config.limits.min_action_delay_seconds);
+    let max_delay = Duration::from_secs(config.limits.max_action_delay_seconds);
+
+    // Parse active hours schedule (if configured).
+    let active_schedule: Option<Arc<ActiveSchedule>> =
+        ActiveSchedule::from_config(&config.schedule).map(|s| {
+            tracing::info!(
+                timezone = %config.schedule.timezone,
+                hours = format!("{}-{}", config.schedule.active_hours_start, config.schedule.active_hours_end),
+                "Active hours schedule configured"
+            );
+            Arc::new(s)
+        });
 
     // Spawn posting queue consumer.
     let cancel = runtime.cancel_token();
     runtime.spawn("posting-queue", {
-        let executor = post_executor as Arc<dyn replyguy_core::automation::PostExecutor>;
+        let executor = post_executor as Arc<dyn tuitbot_core::automation::PostExecutor>;
         async move {
-            run_posting_queue_with_approval(post_rx, executor, approval_queue, min_delay, cancel)
-                .await;
+            run_posting_queue_with_approval(
+                post_rx,
+                executor,
+                approval_queue,
+                min_delay,
+                max_delay,
+                cancel,
+            )
+            .await;
         }
     });
 
@@ -199,9 +218,14 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         .with_topic_scorer(topic_scorer);
 
         let cancel = runtime.cancel_token();
-        let interval = Duration::from_secs(config.intervals.content_post_window_seconds);
+        let scheduler = scheduler_from_config(
+            config.intervals.content_post_window_seconds,
+            config.limits.min_action_delay_seconds,
+            config.limits.max_action_delay_seconds,
+        );
+        let schedule = active_schedule.clone();
         runtime.spawn("content-loop", async move {
-            content_loop.run(cancel, interval).await;
+            content_loop.run(cancel, scheduler, schedule).await;
         });
     }
 
@@ -218,9 +242,14 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         );
 
         let cancel = runtime.cancel_token();
-        let interval = Duration::from_secs(config.intervals.thread_interval_seconds);
+        let scheduler = scheduler_from_config(
+            config.intervals.thread_interval_seconds,
+            config.limits.min_action_delay_seconds,
+            config.limits.max_action_delay_seconds,
+        );
+        let schedule = active_schedule.clone();
         runtime.spawn("thread-loop", async move {
-            thread_loop.run(cancel, interval).await;
+            thread_loop.run(cancel, scheduler, schedule).await;
         });
     }
 
@@ -240,9 +269,14 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         );
 
         let cancel = runtime.cancel_token();
-        let interval = Duration::from_secs(config.intervals.discovery_search_seconds);
+        let scheduler = scheduler_from_config(
+            config.intervals.discovery_search_seconds,
+            config.limits.min_action_delay_seconds,
+            config.limits.max_action_delay_seconds,
+        );
+        let schedule = active_schedule.clone();
         runtime.spawn("discovery-loop", async move {
-            discovery_loop.run(cancel, interval).await;
+            discovery_loop.run(cancel, scheduler, schedule).await;
         });
     }
 
@@ -257,10 +291,17 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         );
 
         let cancel = runtime.cancel_token();
-        let interval = Duration::from_secs(config.intervals.mentions_check_seconds);
+        let scheduler = scheduler_from_config(
+            config.intervals.mentions_check_seconds,
+            config.limits.min_action_delay_seconds,
+            config.limits.max_action_delay_seconds,
+        );
+        let schedule = active_schedule.clone();
         let storage_clone = loop_storage.clone();
         runtime.spawn("mentions-loop", async move {
-            mentions_loop.run(cancel, interval, storage_clone).await;
+            mentions_loop
+                .run(cancel, scheduler, schedule, storage_clone)
+                .await;
         });
 
         // Target loop
@@ -284,19 +325,24 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         );
 
         let cancel = runtime.cancel_token();
-        let interval = Duration::from_secs(config.intervals.mentions_check_seconds);
+        let scheduler = scheduler_from_config(
+            config.intervals.mentions_check_seconds,
+            config.limits.min_action_delay_seconds,
+            config.limits.max_action_delay_seconds,
+        );
+        let schedule = active_schedule.clone();
         runtime.spawn("target-loop", async move {
-            target_loop.run(cancel, interval).await;
+            target_loop.run(cancel, scheduler, schedule).await;
         });
 
-        // Analytics loop
+        // Analytics loop (no schedule gate — analytics runs 24/7)
         let analytics_loop =
             AnalyticsLoop::new(profile_adapter.clone(), profile_adapter, analytics_storage);
 
         let cancel = runtime.cancel_token();
-        let interval = Duration::from_secs(3600); // hourly
+        let scheduler = scheduler_from_config(3600, 0, 0);
         runtime.spawn("analytics-loop", async move {
-            analytics_loop.run(cancel, interval).await;
+            analytics_loop.run(cancel, scheduler).await;
         });
     }
 

@@ -1,33 +1,33 @@
-/// ReplyGuy CLI - Autonomous X growth assistant.
+/// Tuitbot CLI - Autonomous X growth assistant.
 ///
-/// Entry point for the replyguy binary. Parses CLI arguments,
+/// Entry point for the tuitbot binary. Parses CLI arguments,
 /// initializes logging, and dispatches to subcommand handlers.
 mod commands;
 
 use std::io::IsTerminal;
 
 use clap::Parser;
-use replyguy_core::config::Config;
 use tracing_subscriber::EnvFilter;
+use tuitbot_core::config::Config;
 
 /// Autonomous X growth assistant
 #[derive(Parser)]
-#[command(name = "replyguy")]
+#[command(name = "tuitbot")]
 #[command(version)]
 #[command(about = "Autonomous X growth assistant")]
 #[command(after_help = "\
 Quick start:
-  1. replyguy init     — interactive setup wizard
-  2. replyguy auth     — authenticate with X
-  3. replyguy test     — validate configuration
-  4. replyguy run      — start the agent")]
+  1. tuitbot init     — interactive setup wizard
+  2. tuitbot auth     — authenticate with X
+  3. tuitbot test     — validate configuration
+  4. tuitbot run      — start the agent")]
 struct Cli {
     /// Path to config.toml
     #[arg(
         short = 'c',
         long,
         global = true,
-        default_value = "~/.replyguy/config.toml"
+        default_value = "~/.tuitbot/config.toml"
     )]
     config: String,
 
@@ -86,11 +86,11 @@ async fn main() -> anyhow::Result<()> {
     let filter = if std::env::var("RUST_LOG").is_ok() {
         EnvFilter::from_default_env()
     } else if cli.verbose {
-        EnvFilter::new("replyguy=debug,replyguy_core=debug,info")
+        EnvFilter::new("tuitbot=debug,tuitbot_core=debug,info")
     } else if cli.quiet {
         EnvFilter::new("error")
     } else {
-        EnvFilter::new("replyguy=info,replyguy_core=info,warn")
+        EnvFilter::new("tuitbot=info,tuitbot_core=info,warn")
     };
 
     tracing_subscriber::fmt()
@@ -115,7 +115,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::load(Some(&cli.config)).map_err(|e| {
         anyhow::anyhow!(
             "Failed to load configuration: {e}\n\
-             Hint: Run 'replyguy init' to create a default configuration file."
+             Hint: Run 'tuitbot init' to create a default configuration file."
         )
     })?;
 
