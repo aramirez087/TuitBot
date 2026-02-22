@@ -119,6 +119,11 @@ impl RuntimeDeps {
             .map_err(|e| anyhow::anyhow!("Rate limit initialization failed: {e}"))?;
         tracing::info!("Rate limits initialized");
 
+        // 5b. Persist detected tier for MCP tools.
+        storage::cursors::set_cursor(&pool, "api_tier", &tier.to_string())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to persist API tier: {e}"))?;
+
         // 6. Create LLM provider and content generator.
         let provider = create_provider(&config.llm)
             .map_err(|e| anyhow::anyhow!("LLM provider creation failed: {e}"))?;

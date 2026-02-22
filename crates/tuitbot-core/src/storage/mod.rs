@@ -8,6 +8,7 @@ pub mod analytics;
 pub mod approval_queue;
 pub mod author_interactions;
 pub mod cleanup;
+pub mod cursors;
 pub mod rate_limits;
 pub mod replies;
 pub mod target_accounts;

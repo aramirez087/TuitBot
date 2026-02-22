@@ -346,6 +346,22 @@ impl TuitbotMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
+    // --- Capabilities ---
+
+    /// Get current capabilities, tier info, rate-limit remaining, and safe recommended max actions.
+    /// Use this before taking actions to know what's available and how many actions are safe.
+    #[tool]
+    async fn get_capabilities(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        let llm_available = self.state.llm_provider.is_some();
+        let result = tools::capabilities::get_capabilities(
+            &self.state.pool,
+            &self.state.config,
+            llm_available,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
     // --- Configuration & Health ---
 
     /// Get current Tuitbot configuration (secrets are redacted).

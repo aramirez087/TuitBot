@@ -1025,10 +1025,11 @@ client_id = "{client_id}"
 
 # --- Authentication Settings ---
 [auth]
-# Auth mode: "local_callback" (auto-catch via local server) or "manual" (paste code from browser).
-mode = "local_callback"
-callback_host = "127.0.0.1"
-callback_port = 8080
+# Auth mode: "manual" (paste code from browser — works on VPS/headless)
+# or "local_callback" (auto-catch via local server — requires a desktop browser).
+mode = "manual"
+# callback_host = "127.0.0.1"
+# callback_port = 8080
 
 # --- Business Profile ---
 # Describe your product so Tuitbot can find relevant conversations

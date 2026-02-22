@@ -5,6 +5,7 @@
 pub mod actions;
 pub mod analytics;
 pub mod approval;
+pub mod capabilities;
 pub mod config;
 pub mod content;
 pub mod discovery;

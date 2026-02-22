@@ -6,10 +6,13 @@ description: >
   replies/tweets/threads, monitors target accounts, and tracks analytics.
   Supports human-in-the-loop approval mode.
 version: 0.1.0
+homepage: https://github.com/aramirez087/tuitbot
 metadata:
   openclaw:
+    skillKey: tuitbot
     requires:
       bins: [tuitbot]
+      env: [TUITBOT_X_API__CLIENT_ID]
     primaryEnv: TUITBOT_LLM__API_KEY
     emoji: "\U0001F916"
 ---
@@ -75,10 +78,12 @@ export TUITBOT_X_API__CLIENT_ID="your-client-id"
 ### 3. Authenticate with X
 
 ```bash
-tuitbot auth --mode manual
+tuitbot auth
 ```
 
-> **Note:** This step requires the user to visit a URL and paste back an authorization code. It cannot be fully automated.
+This prints a URL. The user opens it in any browser (laptop, phone), authorizes, then pastes back the callback URL. Works on headless servers and VPS — no local browser needed. Tokens are saved to `~/.tuitbot/tokens.json`.
+
+> **Note:** This step requires user interaction (visit URL, paste code). It cannot be fully automated.
 
 ### 4. Validate setup
 
@@ -192,6 +197,7 @@ The server communicates via JSON-RPC 2.0 over stdin/stdout (newline-delimited).
 | **Scoring** | `score_tweet` (6-signal engine) |
 | **Approval Queue** | `list_pending_approvals`, `get_pending_count`, `approve_item`, `reject_item`, `approve_all` |
 | **Content Generation** | `generate_reply`, `generate_tweet`, `generate_thread` (requires LLM provider) |
+| **Capabilities** | `get_capabilities` (tier, rate limits, recommended max actions) |
 | **Config & Health** | `get_config`, `validate_config`, `health_check` |
 
 ### MCP vs CLI
@@ -280,6 +286,6 @@ Tuitbot ships with an OpenClaw plugin at `plugins/openclaw-tuitbot/` that bridge
 ## Limitations
 
 - **`tuitbot run` is long-running**: Start it as a background process. It does not return until stopped.
-- **`tuitbot auth` requires user interaction**: OAuth 2.0 PKCE flow requires the user to visit a URL and authorize. Cannot be fully automated.
+- **`tuitbot auth` requires user interaction**: OAuth 2.0 PKCE flow requires the user to visit a URL and paste back a code. Works on headless servers (VPS, SSH, OpenClaw) — no local browser needed — but cannot be fully automated.
 - **X API tier limits**: Discovery and replies require a paid X API tier or pay-per-use credits. Posting tweets/threads works on the Free tier.
 - **Rate limits**: The agent respects X API rate limits and configurable posting limits. It will not exceed them.

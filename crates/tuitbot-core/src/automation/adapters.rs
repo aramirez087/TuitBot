@@ -103,11 +103,6 @@ fn llm_to_content_error(e: LlmError) -> ContentLoopError {
     ContentLoopError::LlmFailure(e.to_string())
 }
 
-/// Map `sqlx::Error` to `LoopError`.
-fn sqlx_to_loop_error(e: sqlx::Error) -> LoopError {
-    LoopError::StorageError(e.to_string())
-}
-
 /// Map `sqlx::Error` to `ContentLoopError`.
 fn sqlx_to_content_error(e: sqlx::Error) -> ContentLoopError {
     ContentLoopError::StorageError(e.to_string())
@@ -596,25 +591,15 @@ impl StorageAdapter {
 #[async_trait::async_trait]
 impl LoopStorage for StorageAdapter {
     async fn get_cursor(&self, key: &str) -> Result<Option<String>, LoopError> {
-        let row: Option<(String,)> = sqlx::query_as("SELECT value FROM cursors WHERE key = ?1")
-            .bind(key)
-            .fetch_optional(&self.pool)
+        storage::cursors::get_cursor(&self.pool, key)
             .await
-            .map_err(sqlx_to_loop_error)?;
-        Ok(row.map(|(v,)| v))
+            .map_err(storage_to_loop_error)
     }
 
     async fn set_cursor(&self, key: &str, value: &str) -> Result<(), LoopError> {
-        sqlx::query(
-            "INSERT INTO cursors (key, value, updated_at) VALUES (?1, ?2, datetime('now'))
-             ON CONFLICT(key) DO UPDATE SET value = ?2, updated_at = datetime('now')",
-        )
-        .bind(key)
-        .bind(value)
-        .execute(&self.pool)
-        .await
-        .map_err(sqlx_to_loop_error)?;
-        Ok(())
+        storage::cursors::set_cursor(&self.pool, key, value)
+            .await
+            .map_err(storage_to_loop_error)
     }
 
     async fn tweet_exists(&self, tweet_id: &str) -> Result<bool, LoopError> {

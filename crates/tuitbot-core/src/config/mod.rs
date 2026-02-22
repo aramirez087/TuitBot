@@ -388,7 +388,7 @@ fn default_thread_preferred_time() -> String {
 // --- Default value functions for serde ---
 
 fn default_auth_mode() -> String {
-    "local_callback".to_string()
+    "manual".to_string()
 }
 fn default_callback_host() -> String {
     "127.0.0.1".to_string()
@@ -1092,7 +1092,7 @@ threshold = 80
 client_id = "test"
 "#;
         let config: Config = toml::from_str(toml_str).expect("valid TOML");
-        assert_eq!(config.auth.mode, "local_callback");
+        assert_eq!(config.auth.mode, "manual");
         assert_eq!(config.auth.callback_port, 8080);
         assert_eq!(config.scoring.threshold, 60);
         assert_eq!(config.limits.max_replies_per_day, 5);

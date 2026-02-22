@@ -8,7 +8,7 @@ use super::{AuthConfig, IntervalsConfig, LimitsConfig, ScoringConfig, StorageCon
 impl Default for AuthConfig {
     fn default() -> Self {
         Self {
-            mode: "local_callback".to_string(),
+            mode: "manual".to_string(),
             callback_host: "127.0.0.1".to_string(),
             callback_port: 8080,
         }

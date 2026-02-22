@@ -2,7 +2,8 @@
 //!
 //! Walks the user through the OAuth 2.0 PKCE authentication flow
 //! with the X API. Supports both manual code-entry and local
-//! callback server modes.
+//! callback server modes. Manual mode is the default and works
+//! on headless servers (VPS, SSH, OpenClaw).
 
 use std::io::Write;
 use tuitbot_core::config::Config;
@@ -42,8 +43,8 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
     let code = match mode {
         "local_callback" => {
             if is_headless_environment() {
-                eprintln!("SSH session detected — switching to manual authentication.\n");
-                run_manual_mode(&auth_url, true)?
+                eprintln!("Headless environment detected — using manual authentication.\n");
+                run_manual_mode(&auth_url)?
             } else {
                 run_callback_mode(
                     &auth_url,
@@ -53,7 +54,7 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
                 .await?
             }
         }
-        _ => run_manual_mode(&auth_url, false)?,
+        _ => run_manual_mode(&auth_url)?,
     };
 
     // 5. Exchange the authorization code for tokens.
@@ -85,27 +86,23 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
 
 /// Manual mode: print the authorization URL and prompt for the code.
 ///
-/// When `remote_redirect` is true (headless/SSH fallback), the instructions
-/// explain that the redirect page won't load and the user should copy the
-/// full URL from the browser's address bar.
-fn run_manual_mode(auth_url: &str, remote_redirect: bool) -> anyhow::Result<String> {
-    eprintln!("=== X API Authentication ===\n");
-    eprintln!("1. Open this URL in a browser on any device:\n");
-    eprintln!("   {auth_url}\n");
-    eprintln!("2. Authorize the application.");
+/// Designed as the primary headless-friendly auth flow. Works from any
+/// terminal — local, SSH, VPS, or OpenClaw. The user opens the URL on
+/// any device with a browser, authorizes, then copies the code back.
+fn run_manual_mode(auth_url: &str) -> anyhow::Result<String> {
+    let token_path = token_file_path();
 
-    if remote_redirect {
-        eprintln!(
-            "3. Your browser will redirect to a page that won't load — this is expected.\n   \
-             Copy the ENTIRE URL from your browser's address bar."
-        );
-        eprintln!("\nPaste the full callback URL or authorization code:");
-    } else {
-        eprintln!(
-            "3. After authorizing, your browser will redirect to a URL containing the code.\n\n\
-             Paste the authorization code (or the full callback URL):"
-        );
-    }
+    eprintln!("=== X API Authentication ===\n");
+    eprintln!("1. Open this URL in any browser (laptop, phone, etc.):\n");
+    eprintln!("   {auth_url}\n");
+    eprintln!("2. Log in to X and authorize the application.");
+    eprintln!(
+        "3. After authorizing, your browser will redirect to a page that\n   \
+         won't load — this is normal. Copy the ENTIRE URL from the address bar.\n   \
+         It looks like: http://127.0.0.1:8080/callback?code=...&state=..."
+    );
+    eprintln!("\nTokens will be saved to: {}\n", token_path.display());
+    eprintln!("Paste the full callback URL (or just the code):");
 
     eprint!("> ");
     std::io::stderr().flush().ok();
@@ -145,7 +142,7 @@ async fn run_callback_mode(auth_url: &str, host: &str, port: u16) -> anyhow::Res
              Falling back to manual authentication.\n"
         );
         drop(listener);
-        return run_manual_mode(auth_url, true);
+        return run_manual_mode(auth_url);
     }
 
     // Wait for the callback with a 120-second timeout.
@@ -157,7 +154,7 @@ async fn run_callback_mode(auth_url: &str, host: &str, port: u16) -> anyhow::Res
     .map_err(|_| {
         anyhow::anyhow!(
             "Timed out waiting for authorization callback (120s).\n\
-             Try using --mode manual instead."
+             Try again without --mode local_callback (manual mode is the default)."
         )
     })??;
 
@@ -218,13 +215,20 @@ async fn wait_for_callback(listener: &tokio::net::TcpListener) -> anyhow::Result
 
 /// Detect headless environments where a local callback server is unreachable.
 ///
-/// Returns `true` when running over SSH or when no display server is available
-/// on Linux (no X11 or Wayland).
+/// Returns `true` when running over SSH, inside OpenClaw, or when no display
+/// server is available on Linux (no X11 or Wayland).
 fn is_headless_environment() -> bool {
+    // SSH session.
     if std::env::var("SSH_CONNECTION").is_ok() || std::env::var("SSH_TTY").is_ok() {
         return true;
     }
 
+    // Running inside OpenClaw agent.
+    if std::env::vars().any(|(k, _)| k.starts_with("OPENCLAW_")) {
+        return true;
+    }
+
+    // Linux without a display server.
     #[cfg(target_os = "linux")]
     if std::env::var("DISPLAY").is_err() && std::env::var("WAYLAND_DISPLAY").is_err() {
         return true;
