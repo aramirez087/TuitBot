@@ -1,0 +1,153 @@
+# =============================================================================
+# ReplyGuy Configuration
+# =============================================================================
+#
+# ReplyGuy is an autonomous X (Twitter) growth assistant for founders
+# and indie hackers.
+#
+# Setup:
+#   1. Copy this file to ~/.replyguy/config.toml
+#   2. Fill in your X API credentials (get them at https://developer.x.com)
+#   3. Add your LLM provider API key
+#   4. Customize the business profile for your product
+#   5. Run: replyguy auth
+#   6. Run: replyguy test
+#   7. Run: replyguy run
+#
+# All fields shown here use their default values unless marked REQUIRED.
+# Uncommented fields with placeholder values must be filled in.
+# =============================================================================
+
+# --- X API Credentials ---
+# Get your credentials from https://developer.x.com/en/portal/dashboard
+[x_api]
+# REQUIRED: Your OAuth 2.0 client ID.
+client_id = "your-client-id-here"
+
+# Optional: Client secret (only needed for confidential clients).
+# client_secret = "your-client-secret-here"
+
+# --- Authentication Settings ---
+[auth]
+# Auth mode: "manual" (paste code from browser) or "local_callback" (auto-detect via local server).
+mode = "manual"
+
+# Host for the local callback server (used in local_callback mode).
+callback_host = "127.0.0.1"
+
+# Port for the local callback server.
+callback_port = 8080
+
+# --- Business Profile ---
+# Describe your product so ReplyGuy can find relevant conversations
+# and generate on-brand content.
+[business]
+# REQUIRED: Your product name.
+product_name = "Docklet"
+
+# REQUIRED: One-line description of your product.
+product_description = "Docker-based serverless platform for indie hackers"
+
+# Optional: URL to your product website.
+product_url = "https://docklet.dev"
+
+# REQUIRED: Who is your target audience?
+target_audience = "indie hackers and solo developers who deploy side-projects"
+
+# REQUIRED: Keywords for tweet discovery (at least 1).
+# ReplyGuy searches for tweets containing these keywords.
+product_keywords = ["docker deploy", "serverless hosting", "side-project deploy"]
+
+# Optional: Competitor keywords for discovery.
+competitor_keywords = ["heroku alternative", "vercel pricing", "railway deploy"]
+
+# REQUIRED: Topics for original content generation (at least 1).
+# ReplyGuy creates educational tweets and threads on these topics.
+industry_topics = [
+    "Docker deployment best practices",
+    "Serverless architecture for startups",
+    "Developer experience optimization",
+    "Side-project infrastructure",
+]
+
+# --- Scoring Engine ---
+# Controls how tweets are scored for reply-worthiness (0-100 scale).
+# Weights must sum to 100.
+[scoring]
+# Minimum score to trigger a reply (0-100).
+threshold = 70
+
+# Maximum points for keyword relevance.
+keyword_relevance_max = 40.0
+
+# Maximum points for author follower count.
+follower_count_max = 20.0
+
+# Maximum points for tweet recency.
+recency_max = 15.0
+
+# Maximum points for engagement rate (likes + retweets + replies).
+engagement_rate_max = 25.0
+
+# --- Safety Limits ---
+# Prevent aggressive posting that could trigger account restrictions.
+[limits]
+# Maximum replies per day.
+max_replies_per_day = 20
+
+# Maximum original tweets per day.
+max_tweets_per_day = 4
+
+# Maximum threads per week.
+max_threads_per_week = 1
+
+# Minimum delay between any two actions (seconds).
+min_action_delay_seconds = 30
+
+# Maximum delay between any two actions (seconds).
+max_action_delay_seconds = 120
+
+# --- Automation Intervals ---
+# How often each loop runs. Shorter intervals use more API quota.
+[intervals]
+# Seconds between mention checks.
+mentions_check_seconds = 300
+
+# Seconds between discovery searches.
+discovery_search_seconds = 600
+
+# Minimum seconds between content tweets.
+content_post_window_seconds = 14400
+
+# Minimum seconds between thread posts.
+thread_interval_seconds = 604800
+
+# --- LLM Provider ---
+# Configure the AI provider for content generation.
+# Supported: "openai", "anthropic", "ollama"
+[llm]
+# REQUIRED: LLM provider name.
+provider = "openai"
+
+# REQUIRED for openai/anthropic: API key.
+api_key = "your-api-key-here"
+
+# Model to use for content generation.
+model = "gpt-4o-mini"
+
+# Optional: Override the API base URL (useful for proxies or Ollama).
+# base_url = "http://localhost:11434/v1"
+
+# --- Data Storage ---
+[storage]
+# Path to the SQLite database file.
+db_path = "~/.replyguy/replyguy.db"
+
+# Number of days to retain data (0 = keep forever).
+retention_days = 90
+
+# --- Logging ---
+[logging]
+# Seconds between periodic status summaries (0 = disabled).
+# When enabled, prints action counts and loop health.
+status_interval_seconds = 0

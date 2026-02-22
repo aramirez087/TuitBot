@@ -5,6 +5,8 @@
 mod commands;
 
 use clap::Parser;
+use replyguy_core::config::Config;
+use tracing_subscriber::EnvFilter;
 
 /// Autonomous X growth assistant
 #[derive(Parser)]
@@ -52,41 +54,56 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // Initialize tracing subscriber based on verbosity flags
-    let log_level = if cli.quiet {
-        "error"
+    // Initialize tracing-subscriber.
+    //
+    // Priority: RUST_LOG env var > --verbose/--quiet flags > default (warn).
+    // - Default: warn level, compact format with timestamps.
+    // - Verbose (-v): debug level, includes module paths.
+    // - Quiet (-q): error level, minimal format.
+    let filter = if std::env::var("RUST_LOG").is_ok() {
+        EnvFilter::from_default_env()
     } else if cli.verbose {
-        "debug"
+        EnvFilter::new("debug")
+    } else if cli.quiet {
+        EnvFilter::new("error")
     } else {
-        "warn"
+        EnvFilter::new("warn")
     };
 
-    tracing_subscriber::fmt().with_env_filter(log_level).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(cli.verbose)
+        .compact()
+        .init();
+
+    // Load configuration.
+    let config = Config::load(Some(&cli.config))
+        .map_err(|e| anyhow::anyhow!("Failed to load configuration: {e}"))?;
 
     match cli.command {
-        Commands::Run(_args) => {
-            println!("run not implemented yet");
+        Commands::Run(args) => {
+            commands::run::execute(&config, args.status_interval).await?;
         }
-        Commands::Auth(_args) => {
-            println!("auth not implemented yet");
+        Commands::Auth(args) => {
+            commands::auth::execute(&config, args.mode.as_deref()).await?;
         }
         Commands::Test(_args) => {
-            println!("test not implemented yet");
+            commands::test::execute(&config, &cli.config).await?;
         }
         Commands::Discover(_args) => {
-            println!("discover not implemented yet");
+            eprintln!("discover: not yet available (requires WP08 merge)");
         }
         Commands::Mentions(_args) => {
-            println!("mentions not implemented yet");
+            eprintln!("mentions: not yet available (requires WP08 merge)");
         }
         Commands::Post(_args) => {
-            println!("post not implemented yet");
+            eprintln!("post: not yet available (requires WP09 merge)");
         }
         Commands::Thread(_args) => {
-            println!("thread not implemented yet");
+            eprintln!("thread: not yet available (requires WP09 merge)");
         }
         Commands::Score(_args) => {
-            println!("score not implemented yet");
+            eprintln!("score: not yet available (requires WP06 merge)");
         }
     }
 
