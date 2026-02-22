@@ -1,21 +1,24 @@
 ---
-work_package_id: "WP07"
-subtasks: ["T033", "T034", "T035", "T036", "T037"]
-title: "Automation Runtime + Scheduler"
-phase: "Phase 1 - Core Features"
-lane: "planned"
-assignee: ""
-agent: ""
-shell_pid: ""
-review_status: ""
-reviewed_by: ""
-dependencies: ["WP03"]
+work_package_id: WP07
+title: Automation Runtime + Scheduler
+lane: "doing"
+dependencies: [WP03]
+base_branch: 001-replyguy-autonomous-x-growth-assistant-WP01
+base_commit: 54b47b462601a1e58d0222f08ae0a65ca3068a1d
+created_at: '2026-02-22T01:14:12.994435+00:00'
+subtasks: [T033, T034, T035, T036, T037]
+phase: Phase 1 - Core Features
+assignee: ''
+agent: ''
+shell_pid: "75157"
+review_status: ''
+reviewed_by: ''
 history:
-  - timestamp: "2026-02-21T22:00:00Z"
-    lane: "planned"
-    agent: "system"
-    shell_pid: ""
-    action: "Prompt generated via /spec-kitty.tasks"
+- timestamp: '2026-02-21T22:00:00Z'
+  lane: planned
+  agent: system
+  shell_pid: ''
+  action: Prompt generated via /spec-kitty.tasks
 ---
 
 # Work Package Prompt: WP07 -- Automation Runtime + Scheduler
