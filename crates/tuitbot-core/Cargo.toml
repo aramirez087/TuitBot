@@ -25,6 +25,9 @@ base64 = "0.22"
 open = "5"
 tokio-util = "0.7.18"
 
+[features]
+test-helpers = []
+
 [dev-dependencies]
 tempfile = "3"
 wiremock = "0.6"

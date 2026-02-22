@@ -134,8 +134,11 @@ tuitbot stats                 # Show comprehensive analytics dashboard
 tuitbot discover --dry-run    # See what it WOULD do, without making network calls
 tuitbot score <tweet_id>      # Score a specific tweet through the engine
 tuitbot settings              # Open interactive settings setup editor
-tuitbot settings scoring      # Jump straight to scoring config categories 
+tuitbot settings scoring      # Jump straight to scoring config categories
 tuitbot approve               # Review queued posts (if approval_mode = true)
+
+# AI Agent Integration
+tuitbot mcp serve             # Start MCP server for AI agents (stdio transport)
 ```
 
 ---
@@ -255,15 +258,60 @@ launchctl load ~/Library/LaunchAgents/com.tuitbot.agent.plist
 
 ## 🤖 AI Assistant Integration
 
-Tuitbot can be used as a tool by AI assistants via the [OpenClaw](https://openclaw.dev) skill system or any agent framework that can invoke CLI commands.
+Tuitbot ships with a built-in **MCP (Model Context Protocol) server**, making it a first-class tool for AI agents like Claude Code, Cursor, and any MCP-compatible client.
+
+### MCP Server (Recommended)
+
+The MCP server exposes **22 structured tools** over stdio — no CLI parsing required. AI agents can natively discover and call Tuitbot operations with typed inputs and JSON outputs.
+
+**Setup** — add to your Claude Code settings (`~/.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "tuitbot": {
+      "command": "tuitbot",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+With a custom config path:
+
+```json
+{
+  "mcpServers": {
+    "tuitbot": {
+      "command": "tuitbot",
+      "args": ["-c", "/path/to/config.toml", "mcp", "serve"]
+    }
+  }
+}
+```
+
+**Available MCP Tools:**
+
+| Category | Tools |
+|---|---|
+| **Analytics** | `get_stats`, `get_follower_trend` |
+| **Action Log** | `get_action_log`, `get_action_counts` |
+| **Rate Limits** | `get_rate_limits` |
+| **Replies** | `get_recent_replies`, `get_reply_count_today` |
+| **Targets** | `list_target_accounts` |
+| **Discovery** | `list_unreplied_tweets` |
+| **Scoring** | `score_tweet` (6-signal engine) |
+| **Approval Queue** | `list_pending_approvals`, `get_pending_count`, `approve_item`, `reject_item`, `approve_all` |
+| **Content Generation** | `generate_reply`, `generate_tweet`, `generate_thread` (requires LLM provider) |
+| **Config & Health** | `get_config`, `validate_config`, `health_check` |
 
 ### OpenClaw Skill
 
 Tuitbot ships with a `SKILL.md` file that teaches OpenClaw-compatible assistants how to set up, configure, and operate the agent. Install it by pointing your assistant at this repository.
 
-### Machine-Readable Output
+### Machine-Readable CLI Output
 
-All read-only commands support `--output json` for structured output:
+All read-only commands also support `--output json` for structured output:
 
 ```bash
 tuitbot test --output json              # Validate setup

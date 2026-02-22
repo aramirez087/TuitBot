@@ -67,7 +67,7 @@ pub async fn init_db(db_path: &str) -> Result<DbPool, StorageError> {
 /// Initialize an in-memory SQLite database for testing.
 ///
 /// Uses a shared cache so multiple connections can access the same in-memory database.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 pub async fn init_test_db() -> Result<DbPool, StorageError> {
     let connect_options = SqliteConnectOptions::from_str("sqlite::memory:")
         .map_err(|e| StorageError::Connection { source: e })?

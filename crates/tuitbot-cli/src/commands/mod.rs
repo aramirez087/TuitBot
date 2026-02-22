@@ -5,6 +5,7 @@
 pub mod approve;
 pub mod auth;
 pub mod init;
+pub mod mcp;
 pub mod run;
 pub mod settings;
 pub mod stats;
@@ -170,4 +171,18 @@ pub struct UpgradeArgs {
     /// Skip interactive prompts and apply default values for new features
     #[arg(long)]
     pub non_interactive: bool,
+}
+
+/// Arguments for the `mcp` subcommand.
+#[derive(Debug, Args)]
+pub struct McpArgs {
+    #[command(subcommand)]
+    pub command: McpSubcommand,
+}
+
+/// MCP subcommands.
+#[derive(Debug, clap::Subcommand)]
+pub enum McpSubcommand {
+    /// Start the MCP server (stdio transport)
+    Serve,
 }

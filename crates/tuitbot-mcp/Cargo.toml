@@ -1,0 +1,21 @@
+[package]
+name = "tuitbot-mcp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "MCP server for Tuitbot autonomous X growth assistant"
+
+[dependencies]
+tuitbot-core = { path = "../tuitbot-core" }
+rmcp = { version = "0.16", features = ["server", "transport-io"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+anyhow = "1"
+async-trait = "0.1"
+
+[dev-dependencies]
+tuitbot-core = { path = "../tuitbot-core", features = ["test-helpers"] }

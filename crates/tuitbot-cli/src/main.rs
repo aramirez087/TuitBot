@@ -75,6 +75,8 @@ enum Commands {
     Approve(commands::ApproveArgs),
     /// Configure new features added since last setup
     Upgrade(commands::UpgradeArgs),
+    /// MCP server for AI agent integration
+    Mcp(commands::McpArgs),
 }
 
 #[tokio::main]
@@ -132,6 +134,11 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Init(_) | Commands::Upgrade(_) | Commands::Settings(_) => unreachable!(),
+        Commands::Mcp(args) => match args.command {
+            commands::McpSubcommand::Serve => {
+                commands::mcp::execute(&config).await?;
+            }
+        },
         Commands::Run(args) => {
             commands::run::execute(&config, args.status_interval).await?;
         }
