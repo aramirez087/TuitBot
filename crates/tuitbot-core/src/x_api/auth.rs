@@ -29,7 +29,14 @@ const AUTH_URL: &str = "https://x.com/i/oauth2/authorize";
 const TOKEN_URL: &str = "https://api.x.com/2/oauth2/token";
 
 /// Required OAuth scopes for the agent.
-const SCOPES: &[&str] = &["tweet.read", "tweet.write", "users.read", "offline.access"];
+const SCOPES: &[&str] = &[
+    "tweet.read",
+    "tweet.write",
+    "users.read",
+    "follows.read",
+    "follows.write",
+    "offline.access",
+];
 
 /// Pre-expiry refresh window in seconds.
 const REFRESH_WINDOW_SECS: i64 = 300;
@@ -268,14 +275,13 @@ pub async fn authenticate_manual(client_id: &str) -> Result<Tokens, XApiError> {
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
-    let (auth_url, csrf_state) = client
+    let mut auth_builder = client
         .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("tweet.read".to_string()))
-        .add_scope(Scope::new("tweet.write".to_string()))
-        .add_scope(Scope::new("users.read".to_string()))
-        .add_scope(Scope::new("offline.access".to_string()))
-        .set_pkce_challenge(pkce_challenge)
-        .url();
+        .set_pkce_challenge(pkce_challenge);
+    for scope in SCOPES {
+        auth_builder = auth_builder.add_scope(Scope::new(scope.to_string()));
+    }
+    let (auth_url, csrf_state) = auth_builder.url();
 
     println!("\n=== X API Authentication (Manual Mode) ===\n");
     println!("1. Open this URL in your browser:\n");
@@ -325,14 +331,13 @@ pub async fn authenticate_callback(
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
-    let (auth_url, csrf_state) = client
+    let mut auth_builder = client
         .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("tweet.read".to_string()))
-        .add_scope(Scope::new("tweet.write".to_string()))
-        .add_scope(Scope::new("users.read".to_string()))
-        .add_scope(Scope::new("offline.access".to_string()))
-        .set_pkce_challenge(pkce_challenge)
-        .url();
+        .set_pkce_challenge(pkce_challenge);
+    for scope in SCOPES {
+        auth_builder = auth_builder.add_scope(Scope::new(scope.to_string()));
+    }
+    let (auth_url, csrf_state) = auth_builder.url();
 
     // Start the temporary callback server
     let addr = format!("{host}:{port}");

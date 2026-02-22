@@ -284,6 +284,16 @@ impl TargetLoop {
                     all_results.extend(results);
                 }
                 Err(e) => {
+                    // AuthExpired is global — stop immediately instead of
+                    // failing N times with the same 401.
+                    if matches!(e, LoopError::AuthExpired) {
+                        tracing::error!(
+                            username = %username,
+                            "X API authentication expired, re-authenticate with `tuitbot init`"
+                        );
+                        return Err(e);
+                    }
+
                     tracing::warn!(
                         username = %username,
                         error = %e,
@@ -337,6 +347,11 @@ impl TargetLoop {
                             return Ok(Vec::new());
                         }
                         Err(e) => {
+                            // AuthExpired should propagate — no point fetching tweets either.
+                            if matches!(e, LoopError::AuthExpired) {
+                                return Err(e);
+                            }
+
                             // Follow failed (e.g. 403 on Basic tier). Log warning but
                             // continue to engagement — following is best-effort.
                             tracing::warn!(
@@ -561,6 +576,7 @@ fn truncate(s: &str, max_len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Mutex;
 
     // --- Mock implementations ---
@@ -952,5 +968,132 @@ mod tests {
     #[test]
     fn truncate_long_string() {
         assert_eq!(truncate("hello world", 5), "hello...");
+    }
+
+    // --- AuthExpired-aware mock ---
+
+    struct MockAuthExpiredUserManager {
+        lookup_count: AtomicU32,
+        error: LoopError,
+    }
+
+    impl MockAuthExpiredUserManager {
+        fn auth_expired() -> Self {
+            Self {
+                lookup_count: AtomicU32::new(0),
+                error: LoopError::AuthExpired,
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl TargetUserManager for MockAuthExpiredUserManager {
+        async fn lookup_user(&self, _username: &str) -> Result<(String, String), LoopError> {
+            self.lookup_count.fetch_add(1, Ordering::SeqCst);
+            Err(match &self.error {
+                LoopError::AuthExpired => LoopError::AuthExpired,
+                LoopError::Other(msg) => LoopError::Other(msg.clone()),
+                _ => unreachable!(),
+            })
+        }
+
+        async fn follow_user(
+            &self,
+            _source_user_id: &str,
+            _target_user_id: &str,
+        ) -> Result<(), LoopError> {
+            Ok(())
+        }
+    }
+
+    /// A user manager where the first lookup fails and the second succeeds.
+    struct MockPartialFailUserManager {
+        call_count: AtomicU32,
+    }
+
+    #[async_trait::async_trait]
+    impl TargetUserManager for MockPartialFailUserManager {
+        async fn lookup_user(&self, username: &str) -> Result<(String, String), LoopError> {
+            let n = self.call_count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                Err(LoopError::Other("transient failure".to_string()))
+            } else {
+                Ok((format!("uid_{username}"), username.to_string()))
+            }
+        }
+
+        async fn follow_user(
+            &self,
+            _source_user_id: &str,
+            _target_user_id: &str,
+        ) -> Result<(), LoopError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn auth_expired_stops_iteration() {
+        let user_mgr = Arc::new(MockAuthExpiredUserManager::auth_expired());
+        let storage = Arc::new(MockTargetStorage::new());
+        let poster = Arc::new(MockPoster::new());
+
+        let mut config = default_config();
+        config.accounts = vec![
+            "alice".to_string(),
+            "bob".to_string(),
+            "charlie".to_string(),
+        ];
+
+        let target_loop = TargetLoop::new(
+            Arc::new(MockFetcher { tweets: vec![] }),
+            user_mgr.clone(),
+            Arc::new(MockGenerator {
+                reply: "Great!".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            storage,
+            poster,
+            config,
+        );
+
+        let result = target_loop.run_iteration().await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), LoopError::AuthExpired));
+        // Only one lookup should have been attempted — the loop exits early.
+        assert_eq!(user_mgr.lookup_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn non_auth_error_continues_iteration() {
+        let user_mgr = Arc::new(MockPartialFailUserManager {
+            call_count: AtomicU32::new(0),
+        });
+        let storage = Arc::new(MockTargetStorage::new());
+        let poster = Arc::new(MockPoster::new());
+
+        let mut config = default_config();
+        config.accounts = vec!["alice".to_string(), "bob".to_string()];
+
+        let target_loop = TargetLoop::new(
+            Arc::new(MockFetcher {
+                tweets: vec![test_tweet("tw1", "bob")],
+            }),
+            user_mgr.clone(),
+            Arc::new(MockGenerator {
+                reply: "Nice!".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            storage,
+            poster.clone(),
+            config,
+        );
+
+        let results = target_loop.run_iteration().await.expect("should succeed");
+        // First account fails with Other, second succeeds — both should be attempted.
+        assert_eq!(user_mgr.call_count.load(Ordering::SeqCst), 2);
+        // Second account produces a reply.
+        assert_eq!(results.len(), 1);
+        assert!(matches!(results[0], TargetResult::Replied { .. }));
+        assert_eq!(poster.sent_count(), 1);
     }
 }
