@@ -83,33 +83,37 @@ pub enum XApiError {
 /// Errors from interacting with LLM providers (OpenAI, Anthropic, Ollama).
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {
-    /// Cannot reach the LLM endpoint.
-    #[error("LLM provider '{provider}' unreachable: {source}")]
-    ProviderUnreachable {
-        /// The name of the LLM provider.
-        provider: String,
-        /// The underlying HTTP client error.
-        #[source]
-        source: reqwest::Error,
+    /// HTTP request to the LLM endpoint failed.
+    #[error("LLM HTTP request failed: {0}")]
+    Request(#[from] reqwest::Error),
+
+    /// LLM API returned an error response.
+    #[error("LLM API error (status {status}): {message}")]
+    Api {
+        /// The HTTP status code.
+        status: u16,
+        /// The error message from the API.
+        message: String,
     },
 
     /// LLM provider rate limit hit.
-    #[error("LLM provider '{provider}' rate limited")]
+    #[error("LLM rate limited, retry after {retry_after_secs} seconds")]
     RateLimited {
-        /// The name of the LLM provider.
-        provider: String,
+        /// Seconds to wait before retrying.
+        retry_after_secs: u64,
     },
 
     /// LLM response could not be parsed.
-    #[error("failed to parse LLM response: {message}")]
-    ParseFailure {
-        /// Details about the parse failure.
-        message: String,
-    },
+    #[error("failed to parse LLM response: {0}")]
+    Parse(String),
 
     /// No LLM provider configured.
     #[error("no LLM provider configured")]
     NotConfigured,
+
+    /// Content generation failed after retries.
+    #[error("content generation failed: {0}")]
+    GenerationFailed(String),
 }
 
 /// Errors from SQLite storage operations.
@@ -230,19 +234,29 @@ mod tests {
     #[test]
     fn llm_error_rate_limited_message() {
         let err = LlmError::RateLimited {
-            provider: "openai".to_string(),
+            retry_after_secs: 30,
         };
-        assert_eq!(err.to_string(), "LLM provider 'openai' rate limited");
+        assert_eq!(err.to_string(), "LLM rate limited, retry after 30 seconds");
     }
 
     #[test]
     fn llm_error_parse_failure_message() {
-        let err = LlmError::ParseFailure {
-            message: "unexpected JSON structure".to_string(),
-        };
+        let err = LlmError::Parse("unexpected JSON structure".to_string());
         assert_eq!(
             err.to_string(),
             "failed to parse LLM response: unexpected JSON structure"
+        );
+    }
+
+    #[test]
+    fn llm_error_api_error_message() {
+        let err = LlmError::Api {
+            status: 401,
+            message: "Invalid API key".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "LLM API error (status 401): Invalid API key"
         );
     }
 
