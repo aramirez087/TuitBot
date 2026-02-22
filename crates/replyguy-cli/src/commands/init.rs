@@ -38,6 +38,15 @@ struct WizardResult {
     brand_voice: Option<String>,
     reply_style: Option<String>,
     content_style: Option<String>,
+    // Persona
+    persona_opinions: Vec<String>,
+    persona_experiences: Vec<String>,
+    content_pillars: Vec<String>,
+    // Target accounts
+    target_accounts: Vec<String>,
+    auto_follow: bool,
+    // Approval mode
+    approval_mode: bool,
     // LLM
     llm_provider: String,
     llm_api_key: Option<String>,
@@ -112,6 +121,18 @@ async fn run_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
     let result = WizardResult {
         // Step 4
         ..step_llm_provider(result)?
+    };
+    let result = WizardResult {
+        // Step 5
+        ..step_persona(result)?
+    };
+    let result = WizardResult {
+        // Step 6
+        ..step_target_accounts(result)?
+    };
+    let result = WizardResult {
+        // Step 7
+        ..step_approval_mode(result)?
     };
 
     print_summary(&result);
@@ -212,7 +233,7 @@ fn print_welcome_banner() {
     eprintln!("{}", bold.apply_to("Welcome to ReplyGuy Setup"));
     eprintln!(
         "{}",
-        dim.apply_to("This wizard will create your configuration in 4 steps.")
+        dim.apply_to("This wizard will create your configuration in 7 steps.")
     );
     eprintln!();
     eprintln!("{}", dim.apply_to("You'll need:"));
@@ -233,10 +254,10 @@ fn print_welcome_banner() {
     eprintln!();
 }
 
-/// Step 1/4: X API credentials.
+/// Step 1/7: X API credentials.
 fn step_x_api() -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 1/4: X API Credentials"));
+    eprintln!("{}", bold.apply_to("Step 1/7: X API Credentials"));
     eprintln!();
 
     let client_id: String = Input::new()
@@ -276,6 +297,12 @@ fn step_x_api() -> Result<WizardResult> {
         brand_voice: None,
         reply_style: None,
         content_style: None,
+        persona_opinions: vec![],
+        persona_experiences: vec![],
+        content_pillars: vec![],
+        target_accounts: vec![],
+        auto_follow: false,
+        approval_mode: false,
         llm_provider: String::new(),
         llm_api_key: None,
         llm_model: String::new(),
@@ -283,10 +310,10 @@ fn step_x_api() -> Result<WizardResult> {
     })
 }
 
-/// Step 2/4: Business profile.
+/// Step 2/7: Business profile.
 fn step_business_profile(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 2/4: Business Profile"));
+    eprintln!("{}", bold.apply_to("Step 2/7: Business Profile"));
     eprintln!();
 
     let product_name: String = Input::new()
@@ -352,11 +379,11 @@ fn step_business_profile(prev: WizardResult) -> Result<WizardResult> {
     })
 }
 
-/// Step 3/4: Brand voice and style.
+/// Step 3/7: Brand voice and style.
 fn step_brand_voice(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
     let dim = Style::new().dim();
-    eprintln!("{}", bold.apply_to("Step 3/4: Brand Voice & Style"));
+    eprintln!("{}", bold.apply_to("Step 3/7: Brand Voice & Style"));
     eprintln!(
         "{}",
         dim.apply_to("These shape how the bot sounds when it replies and posts.")
@@ -392,10 +419,10 @@ fn step_brand_voice(prev: WizardResult) -> Result<WizardResult> {
     })
 }
 
-/// Step 4/4: LLM provider.
+/// Step 4/7: LLM provider.
 fn step_llm_provider(prev: WizardResult) -> Result<WizardResult> {
     let bold = Style::new().bold();
-    eprintln!("{}", bold.apply_to("Step 4/4: LLM Provider"));
+    eprintln!("{}", bold.apply_to("Step 4/7: LLM Provider"));
     eprintln!();
 
     let providers = &["openai", "anthropic", "ollama"];
@@ -455,6 +482,104 @@ fn step_llm_provider(prev: WizardResult) -> Result<WizardResult> {
     })
 }
 
+/// Step 5/7: Persona (optional).
+fn step_persona(prev: WizardResult) -> Result<WizardResult> {
+    let bold = Style::new().bold();
+    let dim = Style::new().dim();
+    eprintln!("{}", bold.apply_to("Step 5/7: Persona (optional)"));
+    eprintln!(
+        "{}",
+        dim.apply_to("Strong opinions, experiences, and pillars make content more authentic.")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("All fields are optional — press Enter to skip.")
+    );
+    eprintln!();
+
+    let opinions_raw: String = Input::new()
+        .with_prompt("Strong opinions, comma-separated (Enter to skip)")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let experiences_raw: String = Input::new()
+        .with_prompt("Personal experiences, comma-separated (Enter to skip)")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let pillars_raw: String = Input::new()
+        .with_prompt("Core content topics, comma-separated (Enter to skip)")
+        .allow_empty(true)
+        .interact_text()?;
+
+    eprintln!();
+
+    Ok(WizardResult {
+        persona_opinions: parse_csv(&opinions_raw),
+        persona_experiences: parse_csv(&experiences_raw),
+        content_pillars: parse_csv(&pillars_raw),
+        ..prev
+    })
+}
+
+/// Step 6/7: Target Accounts (optional).
+fn step_target_accounts(prev: WizardResult) -> Result<WizardResult> {
+    let bold = Style::new().bold();
+    let dim = Style::new().dim();
+    eprintln!("{}", bold.apply_to("Step 6/7: Target Accounts (optional)"));
+    eprintln!(
+        "{}",
+        dim.apply_to("Monitor specific accounts and reply to their conversations.")
+    );
+    eprintln!();
+
+    let accounts_raw: String = Input::new()
+        .with_prompt("Accounts to monitor, comma-separated @usernames (Enter to skip)")
+        .allow_empty(true)
+        .interact_text()?;
+
+    let accounts: Vec<String> = parse_csv(&accounts_raw)
+        .into_iter()
+        .map(|a| a.trim_start_matches('@').to_string())
+        .collect();
+
+    let auto_follow = if !accounts.is_empty() {
+        Confirm::new()
+            .with_prompt("Auto-follow target accounts?")
+            .default(false)
+            .interact()?
+    } else {
+        false
+    };
+
+    eprintln!();
+
+    Ok(WizardResult {
+        target_accounts: accounts,
+        auto_follow,
+        ..prev
+    })
+}
+
+/// Step 7/7: Approval Mode.
+fn step_approval_mode(prev: WizardResult) -> Result<WizardResult> {
+    let bold = Style::new().bold();
+    eprintln!("{}", bold.apply_to("Step 7/7: Approval Mode"));
+    eprintln!();
+
+    let approval_mode = Confirm::new()
+        .with_prompt("Queue posts for review before posting?")
+        .default(false)
+        .interact()?;
+
+    eprintln!();
+
+    Ok(WizardResult {
+        approval_mode,
+        ..prev
+    })
+}
+
 /// Display a summary of all collected values.
 fn print_summary(result: &WizardResult) {
     let bold = Style::new().bold();
@@ -499,6 +624,52 @@ fn print_summary(result: &WizardResult) {
     eprintln!(
         "  Content Style:     {}",
         result.content_style.as_deref().unwrap_or("(default)")
+    );
+
+    eprintln!();
+    eprintln!(
+        "  Opinions:          {}",
+        if result.persona_opinions.is_empty() {
+            "(none)".to_string()
+        } else {
+            result.persona_opinions.join(", ")
+        }
+    );
+    eprintln!(
+        "  Experiences:       {}",
+        if result.persona_experiences.is_empty() {
+            "(none)".to_string()
+        } else {
+            result.persona_experiences.join(", ")
+        }
+    );
+    eprintln!(
+        "  Content Pillars:   {}",
+        if result.content_pillars.is_empty() {
+            "(none)".to_string()
+        } else {
+            result.content_pillars.join(", ")
+        }
+    );
+
+    eprintln!();
+    eprintln!(
+        "  Target Accounts:   {}",
+        if result.target_accounts.is_empty() {
+            "(none)".to_string()
+        } else {
+            result.target_accounts.join(", ")
+        }
+    );
+    if !result.target_accounts.is_empty() {
+        eprintln!(
+            "  Auto-follow:       {}",
+            if result.auto_follow { "yes" } else { "no" }
+        );
+    }
+    eprintln!(
+        "  Approval Mode:     {}",
+        if result.approval_mode { "yes" } else { "no" }
     );
 
     eprintln!();
@@ -608,6 +779,52 @@ fn render_config_toml(r: &WizardResult) -> String {
         None => "# content_style = \"Share practical tips with real examples.\"".to_string(),
     };
 
+    let persona_opinions_line = if r.persona_opinions.is_empty() {
+        "# persona_opinions = [\"Your strong opinion here\"]".to_string()
+    } else {
+        format!(
+            "persona_opinions = {}",
+            format_toml_array(&r.persona_opinions)
+        )
+    };
+
+    let persona_experiences_line = if r.persona_experiences.is_empty() {
+        "# persona_experiences = [\"Your personal experience here\"]".to_string()
+    } else {
+        format!(
+            "persona_experiences = {}",
+            format_toml_array(&r.persona_experiences)
+        )
+    };
+
+    let content_pillars_line = if r.content_pillars.is_empty() {
+        "# content_pillars = [\"Your core topic here\"]".to_string()
+    } else {
+        format!(
+            "content_pillars = {}",
+            format_toml_array(&r.content_pillars)
+        )
+    };
+
+    let targets_section = if r.target_accounts.is_empty() {
+        "# --- Target Accounts ---\n\
+         # Monitor specific accounts and reply to their conversations.\n\
+         # [targets]\n\
+         # accounts = [\"elonmusk\", \"levelsio\"]\n\
+         # auto_follow = false"
+            .to_string()
+    } else {
+        format!(
+            "# --- Target Accounts ---\n\
+             # Monitor specific accounts and reply to their conversations.\n\
+             [targets]\n\
+             accounts = {accounts}\n\
+             auto_follow = {auto_follow}",
+            accounts = format_toml_array(&r.target_accounts),
+            auto_follow = r.auto_follow,
+        )
+    };
+
     let api_key_line = match &r.llm_api_key {
         Some(key) => format!("api_key = \"{}\"", escape_toml(key)),
         None => "# api_key = \"your-api-key-here\"".to_string(),
@@ -626,6 +843,9 @@ fn render_config_toml(r: &WizardResult) -> String {
 # Edit this file to tune scoring, limits, and intervals.
 # Docs: https://github.com/your-org/replyguy
 # =============================================================================
+
+# Queue posts for review before posting (use `replyguy approve` to review).
+approval_mode = {approval_mode}
 
 # --- X API Credentials ---
 # Get your credentials from https://developer.x.com/en/portal/dashboard
@@ -663,6 +883,11 @@ industry_topics = {industry_topics}
 {reply_style_line}
 {content_style_line}
 
+# Persona — strong opinions, experiences, and pillars make content more authentic.
+{persona_opinions_line}
+{persona_experiences_line}
+{content_pillars_line}
+
 # --- Scoring Engine ---
 # Controls how tweets are scored for reply-worthiness (0-100 scale).
 # Weights should sum to ~100 for balanced scoring.
@@ -676,19 +901,24 @@ engagement_rate_max = 25.0
 # --- Safety Limits ---
 # Prevent aggressive posting that could trigger account restrictions.
 [limits]
-max_replies_per_day = 15
-max_tweets_per_day = 3
+max_replies_per_day = 5
+max_tweets_per_day = 6
 max_threads_per_week = 1
 min_action_delay_seconds = 45
 max_action_delay_seconds = 180
+max_replies_per_author_per_day = 1
+product_mention_ratio = 0.2
+banned_phrases = ["check out", "you should try", "I recommend", "link in bio"]
 
 # --- Automation Intervals ---
 # How often each loop runs. Shorter intervals use more API quota.
 [intervals]
 mentions_check_seconds = 300
 discovery_search_seconds = 900
-content_post_window_seconds = 18000
+content_post_window_seconds = 10800
 thread_interval_seconds = 604800
+
+{targets_section}
 
 # --- LLM Provider ---
 # Supported: "openai", "anthropic", "ollama"
@@ -706,8 +936,9 @@ retention_days = 90
 # --- Logging ---
 [logging]
 # Seconds between periodic status summaries (0 = disabled).
-status_interval_seconds = 3600
+status_interval_seconds = 0
 "#,
+        approval_mode = r.approval_mode,
         client_id = escape_toml(&r.client_id),
         client_secret_line = client_secret_line,
         product_name = escape_toml(&r.product_name),
@@ -719,6 +950,10 @@ status_interval_seconds = 3600
         brand_voice_line = brand_voice_line,
         reply_style_line = reply_style_line,
         content_style_line = content_style_line,
+        persona_opinions_line = persona_opinions_line,
+        persona_experiences_line = persona_experiences_line,
+        content_pillars_line = content_pillars_line,
+        targets_section = targets_section,
         llm_provider = escape_toml(&r.llm_provider),
         api_key_line = api_key_line,
         llm_model = escape_toml(&r.llm_model),
@@ -786,6 +1021,12 @@ mod tests {
             brand_voice: None,
             reply_style: None,
             content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
             llm_provider: "openai".to_string(),
             llm_api_key: Some("sk-test-key".to_string()),
             llm_model: "gpt-4o-mini".to_string(),
@@ -833,6 +1074,12 @@ mod tests {
             brand_voice: None,
             reply_style: None,
             content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
@@ -869,6 +1116,12 @@ mod tests {
             brand_voice: None,
             reply_style: None,
             content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
@@ -899,6 +1152,12 @@ mod tests {
             brand_voice: Some("Friendly technical expert. Casual, occasionally witty.".to_string()),
             reply_style: Some("Lead with genuine help. Ask follow-up questions.".to_string()),
             content_style: Some("Share practical tips with real examples.".to_string()),
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
@@ -937,6 +1196,12 @@ mod tests {
             brand_voice: None,
             reply_style: None,
             content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
             llm_model: "llama3.2".to_string(),
@@ -951,5 +1216,158 @@ mod tests {
         assert!(config.business.brand_voice.is_none());
         assert!(config.business.reply_style.is_none());
         assert!(config.business.content_style.is_none());
+    }
+
+    #[test]
+    fn render_config_toml_with_persona() {
+        let result = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: "desc".to_string(),
+            product_url: None,
+            target_audience: "devs".to_string(),
+            product_keywords: vec!["test".to_string()],
+            industry_topics: vec!["topic".to_string()],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec!["Rust is the future".to_string(), "TDD matters".to_string()],
+            persona_experiences: vec!["Built 3 startups".to_string()],
+            content_pillars: vec!["Developer tools".to_string(), "Productivity".to_string()],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: None,
+        };
+
+        let toml_str = render_config_toml(&result);
+        let config: replyguy_core::config::Config =
+            toml::from_str(&toml_str).expect("rendered TOML should parse");
+
+        assert_eq!(
+            config.business.persona_opinions,
+            vec!["Rust is the future", "TDD matters"]
+        );
+        assert_eq!(
+            config.business.persona_experiences,
+            vec!["Built 3 startups"]
+        );
+        assert_eq!(
+            config.business.content_pillars,
+            vec!["Developer tools", "Productivity"]
+        );
+    }
+
+    #[test]
+    fn render_config_toml_with_targets() {
+        let result = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: "desc".to_string(),
+            product_url: None,
+            target_audience: "devs".to_string(),
+            product_keywords: vec!["test".to_string()],
+            industry_topics: vec!["topic".to_string()],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec!["elonmusk".to_string(), "levelsio".to_string()],
+            auto_follow: true,
+            approval_mode: false,
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: None,
+        };
+
+        let toml_str = render_config_toml(&result);
+        let config: replyguy_core::config::Config =
+            toml::from_str(&toml_str).expect("rendered TOML should parse");
+
+        assert_eq!(config.targets.accounts, vec!["elonmusk", "levelsio"]);
+        assert!(config.targets.auto_follow);
+    }
+
+    #[test]
+    fn render_config_toml_with_approval_mode() {
+        let result = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: "desc".to_string(),
+            product_url: None,
+            target_audience: "devs".to_string(),
+            product_keywords: vec!["test".to_string()],
+            industry_topics: vec!["topic".to_string()],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: true,
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: None,
+        };
+
+        let toml_str = render_config_toml(&result);
+        let config: replyguy_core::config::Config =
+            toml::from_str(&toml_str).expect("rendered TOML should parse");
+
+        assert!(config.approval_mode);
+    }
+
+    #[test]
+    fn render_config_toml_updated_defaults() {
+        let result = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: "desc".to_string(),
+            product_url: None,
+            target_audience: "devs".to_string(),
+            product_keywords: vec!["test".to_string()],
+            industry_topics: vec!["topic".to_string()],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            auto_follow: false,
+            approval_mode: false,
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: None,
+        };
+
+        let toml_str = render_config_toml(&result);
+        let config: replyguy_core::config::Config =
+            toml::from_str(&toml_str).expect("rendered TOML should parse");
+
+        assert_eq!(config.limits.max_replies_per_day, 5);
+        assert_eq!(config.limits.max_tweets_per_day, 6);
+        assert_eq!(config.intervals.content_post_window_seconds, 10800);
+        assert_eq!(config.logging.status_interval_seconds, 0);
+        assert_eq!(config.limits.max_replies_per_author_per_day, 1);
+        assert!((config.limits.product_mention_ratio - 0.2).abs() < f32::EPSILON);
+        assert_eq!(
+            config.limits.banned_phrases,
+            vec!["check out", "you should try", "I recommend", "link in bio"]
+        );
     }
 }
