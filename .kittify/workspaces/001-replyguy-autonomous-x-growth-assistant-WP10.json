@@ -1,0 +1,14 @@
+{
+  "wp_id": "WP10",
+  "feature_slug": "001-replyguy-autonomous-x-growth-assistant",
+  "worktree_path": ".worktrees/001-replyguy-autonomous-x-growth-assistant-WP10",
+  "branch_name": "001-replyguy-autonomous-x-growth-assistant-WP10",
+  "base_branch": "001-replyguy-autonomous-x-growth-assistant-WP01",
+  "base_commit": "54b47b462601a1e58d0222f08ae0a65ca3068a1d",
+  "dependencies": [
+    "WP04"
+  ],
+  "created_at": "2026-02-22T01:41:04.570758+00:00",
+  "created_by": "implement-command",
+  "vcs_backend": "git"
+}

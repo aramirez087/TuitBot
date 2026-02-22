@@ -1,7 +1,11 @@
-/// CLI subcommand argument definitions for ReplyGuy.
+/// CLI subcommand argument definitions and implementations for ReplyGuy.
 ///
 /// Each subcommand struct defines its flags and arguments
 /// matching the CLI interface contract.
+pub mod auth;
+pub mod run;
+pub mod test;
+
 use clap::Args;
 
 /// Arguments for the `run` subcommand.

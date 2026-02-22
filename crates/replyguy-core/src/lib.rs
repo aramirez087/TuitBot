@@ -1,7 +1,7 @@
 /// Core library for the ReplyGuy autonomous X growth assistant.
 ///
 /// This crate contains all business logic including configuration management,
-/// error types, and shared types used by the CLI binary.
+/// error types, startup helpers, and shared types used by the CLI binary.
 pub mod automation;
 pub mod config;
 pub mod content;
@@ -9,6 +9,7 @@ pub mod error;
 pub mod llm;
 pub mod safety;
 pub mod scoring;
+pub mod startup;
 pub mod storage;
 pub mod x_api;
 
