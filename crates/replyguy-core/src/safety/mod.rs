@@ -300,10 +300,7 @@ impl SafetyGuard {
     }
 
     /// Check if a generated reply contains a banned phrase.
-    pub fn check_banned_phrases(
-        reply_text: &str,
-        banned: &[String],
-    ) -> Result<(), DenialReason> {
+    pub fn check_banned_phrases(reply_text: &str, banned: &[String]) -> Result<(), DenialReason> {
         if let Some(phrase) = contains_banned_phrase(reply_text, banned) {
             tracing::debug!(phrase = %phrase, "Action denied: banned phrase");
             return Err(DenialReason::BannedPhrase { phrase });
@@ -362,10 +359,7 @@ mod tests {
             min_action_delay_seconds: 30,
             max_action_delay_seconds: 120,
             max_replies_per_author_per_day: 1,
-            banned_phrases: vec![
-                "check out".to_string(),
-                "you should try".to_string(),
-            ],
+            banned_phrases: vec!["check out".to_string(), "you should try".to_string()],
             product_mention_ratio: 0.2,
         }
     }
@@ -646,7 +640,10 @@ mod tests {
     #[tokio::test]
     async fn safety_guard_check_author_limit_allows_first() {
         let (_pool, guard) = setup_guard().await;
-        let result = guard.check_author_limit("author_1", 1).await.expect("check");
+        let result = guard
+            .check_author_limit("author_1", 1)
+            .await
+            .expect("check");
         assert!(result.is_ok());
     }
 
@@ -658,7 +655,10 @@ mod tests {
             .await
             .expect("record");
 
-        let result = guard.check_author_limit("author_1", 1).await.expect("check");
+        let result = guard
+            .check_author_limit("author_1", 1)
+            .await
+            .expect("check");
         assert_eq!(result, Err(DenialReason::AuthorLimitReached));
     }
 

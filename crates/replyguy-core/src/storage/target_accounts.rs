@@ -37,23 +37,30 @@ pub async fn upsert_target_account(
     Ok(())
 }
 
-type TargetAccountRow = (String, String, Option<String>, Option<String>, i64, Option<String>, String);
+type TargetAccountRow = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    Option<String>,
+    String,
+);
 
 /// Get a target account by ID.
 pub async fn get_target_account(
     pool: &DbPool,
     account_id: &str,
 ) -> Result<Option<TargetAccount>, StorageError> {
-    let row: Option<TargetAccountRow> =
-        sqlx::query_as(
-            "SELECT account_id, username, followed_at, first_engagement_at, \
+    let row: Option<TargetAccountRow> = sqlx::query_as(
+        "SELECT account_id, username, followed_at, first_engagement_at, \
              total_replies_sent, last_reply_at, status \
              FROM target_accounts WHERE account_id = ?",
-        )
-        .bind(account_id)
-        .fetch_optional(pool)
-        .await
-        .map_err(|e| StorageError::Query { source: e })?;
+    )
+    .bind(account_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
 
     Ok(row.map(|r| TargetAccount {
         account_id: r.0,
@@ -67,18 +74,15 @@ pub async fn get_target_account(
 }
 
 /// Get all active target accounts.
-pub async fn get_active_target_accounts(
-    pool: &DbPool,
-) -> Result<Vec<TargetAccount>, StorageError> {
-    let rows: Vec<TargetAccountRow> =
-        sqlx::query_as(
-            "SELECT account_id, username, followed_at, first_engagement_at, \
+pub async fn get_active_target_accounts(pool: &DbPool) -> Result<Vec<TargetAccount>, StorageError> {
+    let rows: Vec<TargetAccountRow> = sqlx::query_as(
+        "SELECT account_id, username, followed_at, first_engagement_at, \
              total_replies_sent, last_reply_at, status \
              FROM target_accounts WHERE status = 'active'",
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| StorageError::Query { source: e })?;
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
 
     Ok(rows
         .into_iter()
@@ -96,13 +100,11 @@ pub async fn get_active_target_accounts(
 
 /// Record that we followed a target account.
 pub async fn record_follow(pool: &DbPool, account_id: &str) -> Result<(), StorageError> {
-    sqlx::query(
-        "UPDATE target_accounts SET followed_at = datetime('now') WHERE account_id = ?",
-    )
-    .bind(account_id)
-    .execute(pool)
-    .await
-    .map_err(|e| StorageError::Query { source: e })?;
+    sqlx::query("UPDATE target_accounts SET followed_at = datetime('now') WHERE account_id = ?")
+        .bind(account_id)
+        .execute(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
     Ok(())
 }
 
@@ -136,13 +138,11 @@ pub async fn count_target_replies_today(pool: &DbPool) -> Result<i64, StorageErr
 
 /// Check if a target tweet exists.
 pub async fn target_tweet_exists(pool: &DbPool, tweet_id: &str) -> Result<bool, StorageError> {
-    let row: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM target_tweets WHERE id = ?",
-    )
-    .bind(tweet_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| StorageError::Query { source: e })?;
+    let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM target_tweets WHERE id = ?")
+        .bind(tweet_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
     Ok(row.0 > 0)
 }
 
@@ -177,10 +177,7 @@ pub async fn store_target_tweet(
 }
 
 /// Mark a target tweet as replied to.
-pub async fn mark_target_tweet_replied(
-    pool: &DbPool,
-    tweet_id: &str,
-) -> Result<(), StorageError> {
+pub async fn mark_target_tweet_replied(pool: &DbPool, tweet_id: &str) -> Result<(), StorageError> {
     sqlx::query("UPDATE target_tweets SET replied_to = 1 WHERE id = ?")
         .bind(tweet_id)
         .execute(pool)
@@ -222,9 +219,7 @@ mod tests {
             .await
             .expect("upsert");
 
-        let accounts = get_active_target_accounts(&pool)
-            .await
-            .expect("get all");
+        let accounts = get_active_target_accounts(&pool).await.expect("get all");
         assert_eq!(accounts.len(), 2);
     }
 

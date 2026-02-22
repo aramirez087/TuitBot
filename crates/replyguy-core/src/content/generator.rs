@@ -105,8 +105,7 @@ impl ContentGenerator {
                  - Do NOT mention {} or any product. Just be genuinely helpful.\n\
                  - Do not use hashtags.\n\
                  - Do not use emojis excessively.",
-                self.business.target_audience,
-                self.business.product_name,
+                self.business.target_audience, self.business.product_name,
             )
         };
 

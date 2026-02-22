@@ -285,10 +285,16 @@ mod tests {
         }
         // All archetypes should appear at least once in 1000 samples
         for (i, count) in counts.iter().enumerate() {
-            assert!(*count > 0, "archetype index {i} never selected in 1000 samples");
+            assert!(
+                *count > 0,
+                "archetype index {i} never selected in 1000 samples"
+            );
         }
         // AgreeAndExpand should appear more often than RespectfulDisagree
-        assert!(counts[0] > counts[1], "AgreeAndExpand should be more frequent");
+        assert!(
+            counts[0] > counts[1],
+            "AgreeAndExpand should be more frequent"
+        );
     }
 
     #[test]
@@ -307,7 +313,10 @@ mod tests {
 
     #[test]
     fn reply_archetype_display() {
-        assert_eq!(ReplyArchetype::AgreeAndExpand.to_string(), "agree_and_expand");
+        assert_eq!(
+            ReplyArchetype::AgreeAndExpand.to_string(),
+            "agree_and_expand"
+        );
         assert_eq!(ReplyArchetype::AskQuestion.to_string(), "ask_question");
     }
 
@@ -363,7 +372,10 @@ mod tests {
 
     #[test]
     fn thread_structure_display() {
-        assert_eq!(ThreadStructure::Transformation.to_string(), "transformation");
+        assert_eq!(
+            ThreadStructure::Transformation.to_string(),
+            "transformation"
+        );
         assert_eq!(ThreadStructure::Framework.to_string(), "framework");
         assert_eq!(ThreadStructure::Mistakes.to_string(), "mistakes");
         assert_eq!(ThreadStructure::Analysis.to_string(), "analysis");

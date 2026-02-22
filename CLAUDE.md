@@ -33,6 +33,23 @@ cargo run -p replyguy-cli -- init        # run a subcommand via cargo
 cargo install --path crates/replyguy-cli # install binary as `replyguy`
 ```
 
+## Mandatory CI Parity Checklist (for agents)
+
+Before handing off any Rust code change, always run these commands locally and fix failures:
+
+```bash
+cargo fmt --all
+cargo fmt --all --check
+RUSTFLAGS="-D warnings" cargo test --workspace
+cargo clippy --workspace -- -D warnings
+```
+
+Additional rules:
+
+- Do not manually format Rust code and assume it is correct; always run `cargo fmt --all`.
+- Treat all warnings as release blockers (CI uses denied warnings).
+- Do not finish the task until the checklist passes.
+
 ## Architecture
 
 ### Workspace Layout

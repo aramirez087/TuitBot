@@ -6,7 +6,6 @@
 
 use super::loop_helpers::{ContentSafety, ContentStorage, TopicScorer, TweetGenerator};
 use rand::seq::SliceRandom;
-use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
@@ -203,9 +202,7 @@ impl ContentLoop {
         }
 
         // Pick a topic using epsilon-greedy if scorer is available
-        let topic = self
-            .pick_topic_epsilon_greedy(recent_topics, rng)
-            .await;
+        let topic = self.pick_topic_epsilon_greedy(recent_topics, rng).await;
 
         let result = self.generate_and_post(&topic).await;
 

@@ -107,8 +107,7 @@ impl ScoringEngine {
             self.config.engagement_rate_max,
         );
 
-        let reply_count =
-            signals::reply_count_score(tweet.replies, self.config.reply_count_max);
+        let reply_count = signals::reply_count_score(tweet.replies, self.config.reply_count_max);
 
         let content_type = signals::content_type_score(
             tweet.has_media,
@@ -116,13 +115,9 @@ impl ScoringEngine {
             self.config.content_type_max,
         );
 
-        let total = (keyword_relevance
-            + follower
-            + recency
-            + engagement
-            + reply_count
-            + content_type)
-            .clamp(0.0, 100.0);
+        let total =
+            (keyword_relevance + follower + recency + engagement + reply_count + content_type)
+                .clamp(0.0, 100.0);
         let meets_threshold = total >= self.config.threshold as f32;
 
         TweetScore {

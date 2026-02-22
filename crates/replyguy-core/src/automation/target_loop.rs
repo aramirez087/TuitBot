@@ -123,15 +123,9 @@ pub enum TargetResult {
         reply_text: String,
     },
     /// Tweet was skipped.
-    Skipped {
-        tweet_id: String,
-        reason: String,
-    },
+    Skipped { tweet_id: String, reason: String },
     /// Processing failed.
-    Failed {
-        tweet_id: String,
-        error: String,
-    },
+    Failed { tweet_id: String, error: String },
 }
 
 // ============================================================================
@@ -197,8 +191,14 @@ impl TargetLoop {
             match self.run_iteration().await {
                 Ok(results) => {
                     error_tracker.record_success();
-                    let replied = results.iter().filter(|r| matches!(r, TargetResult::Replied { .. })).count();
-                    let skipped = results.iter().filter(|r| matches!(r, TargetResult::Skipped { .. })).count();
+                    let replied = results
+                        .iter()
+                        .filter(|r| matches!(r, TargetResult::Replied { .. }))
+                        .count();
+                    let skipped = results
+                        .iter()
+                        .filter(|r| matches!(r, TargetResult::Skipped { .. }))
+                        .count();
                     if !results.is_empty() {
                         tracing::info!(
                             total = results.len(),
@@ -457,10 +457,7 @@ impl TargetLoop {
             }
 
             // Mark tweet as replied and update account stats
-            let _ = self
-                .storage
-                .mark_target_tweet_replied(&tweet.id)
-                .await;
+            let _ = self.storage.mark_target_tweet_replied(&tweet.id).await;
             let _ = self.storage.record_target_reply(account_id).await;
 
             let _ = self
@@ -732,7 +729,11 @@ mod tests {
     ) -> (TargetLoop, Arc<MockPoster>) {
         let poster = Arc::new(MockPoster::new());
         let user_mgr = Arc::new(MockUserManager {
-            users: vec![("alice".to_string(), "uid_alice".to_string(), "alice".to_string())],
+            users: vec![(
+                "alice".to_string(),
+                "uid_alice".to_string(),
+                "alice".to_string(),
+            )],
         });
         let target_loop = TargetLoop::new(
             Arc::new(MockFetcher { tweets }),

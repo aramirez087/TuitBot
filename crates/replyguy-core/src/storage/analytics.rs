@@ -181,10 +181,7 @@ pub async fn update_content_score(
 }
 
 /// Get top-performing topics ordered by average performance descending.
-pub async fn get_top_topics(
-    pool: &DbPool,
-    limit: u32,
-) -> Result<Vec<ContentScore>, StorageError> {
+pub async fn get_top_topics(pool: &DbPool, limit: u32) -> Result<Vec<ContentScore>, StorageError> {
     let rows: Vec<(String, String, i64, f64)> = sqlx::query_as(
         "SELECT topic, format, total_posts, avg_performance \
          FROM content_scores \
@@ -209,24 +206,22 @@ pub async fn get_top_topics(
 
 /// Get average reply engagement rate (avg performance_score across all measured replies).
 pub async fn get_avg_reply_engagement(pool: &DbPool) -> Result<f64, StorageError> {
-    let row: (f64,) = sqlx::query_as(
-        "SELECT COALESCE(AVG(performance_score), 0.0) FROM reply_performance",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| StorageError::Query { source: e })?;
+    let row: (f64,) =
+        sqlx::query_as("SELECT COALESCE(AVG(performance_score), 0.0) FROM reply_performance")
+            .fetch_one(pool)
+            .await
+            .map_err(|e| StorageError::Query { source: e })?;
 
     Ok(row.0)
 }
 
 /// Get average tweet engagement rate (avg performance_score across all measured tweets).
 pub async fn get_avg_tweet_engagement(pool: &DbPool) -> Result<f64, StorageError> {
-    let row: (f64,) = sqlx::query_as(
-        "SELECT COALESCE(AVG(performance_score), 0.0) FROM tweet_performance",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| StorageError::Query { source: e })?;
+    let row: (f64,) =
+        sqlx::query_as("SELECT COALESCE(AVG(performance_score), 0.0) FROM tweet_performance")
+            .fetch_one(pool)
+            .await
+            .map_err(|e| StorageError::Query { source: e })?;
 
     Ok(row.0)
 }

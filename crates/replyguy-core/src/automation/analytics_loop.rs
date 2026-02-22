@@ -254,7 +254,8 @@ impl AnalyticsLoop {
         for reply_id in &reply_ids {
             match self.engagement_fetcher.get_tweet_metrics(reply_id).await {
                 Ok(m) => {
-                    let score = compute_performance_score(m.likes, m.replies, m.retweets, m.impressions);
+                    let score =
+                        compute_performance_score(m.likes, m.replies, m.retweets, m.impressions);
                     let _ = self
                         .storage
                         .store_reply_performance(reply_id, m.likes, m.replies, m.impressions, score)
@@ -272,11 +273,17 @@ impl AnalyticsLoop {
         for tweet_id in &tweet_ids {
             match self.engagement_fetcher.get_tweet_metrics(tweet_id).await {
                 Ok(m) => {
-                    let score = compute_performance_score(m.likes, m.replies, m.retweets, m.impressions);
+                    let score =
+                        compute_performance_score(m.likes, m.replies, m.retweets, m.impressions);
                     let _ = self
                         .storage
                         .store_tweet_performance(
-                            tweet_id, m.likes, m.retweets, m.replies, m.impressions, score,
+                            tweet_id,
+                            m.likes,
+                            m.retweets,
+                            m.replies,
+                            m.impressions,
+                            score,
                         )
                         .await;
                     summary.tweets_measured += 1;
@@ -503,8 +510,7 @@ mod tests {
     #[tokio::test]
     async fn iteration_measures_replies() {
         let storage = Arc::new(
-            MockAnalyticsStorage::new()
-                .with_replies(vec!["r1".to_string(), "r2".to_string()]),
+            MockAnalyticsStorage::new().with_replies(vec!["r1".to_string(), "r2".to_string()]),
         );
         let analytics = AnalyticsLoop::new(
             Arc::new(MockProfileFetcher {
@@ -523,10 +529,7 @@ mod tests {
 
     #[tokio::test]
     async fn iteration_measures_tweets() {
-        let storage = Arc::new(
-            MockAnalyticsStorage::new()
-                .with_tweets(vec!["tw1".to_string()]),
-        );
+        let storage = Arc::new(MockAnalyticsStorage::new().with_tweets(vec!["tw1".to_string()]));
         let analytics = AnalyticsLoop::new(
             Arc::new(MockProfileFetcher {
                 metrics: default_profile(),
