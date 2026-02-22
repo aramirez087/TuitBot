@@ -115,12 +115,12 @@
 **Estimated prompt size**: ~500 lines
 
 ### Included Subtasks
-- [ ] T018 Define X API types in `crates/replyguy-core/src/x_api/types.rs`
-- [ ] T019 Implement X API client trait + reqwest implementation in `crates/replyguy-core/src/x_api/client.rs`
-- [ ] T020 Implement OAuth 2.0 PKCE manual code entry flow in `crates/replyguy-core/src/x_api/auth.rs`
-- [ ] T021 [P] Implement OAuth 2.0 PKCE local callback mode in `crates/replyguy-core/src/x_api/auth.rs`
-- [ ] T022 Implement token management (store, load, auto-refresh) in `crates/replyguy-core/src/x_api/auth.rs`
-- [ ] T023 Implement API tier detection in `crates/replyguy-core/src/x_api/tier.rs`
+- [x] T018 Define X API types in `crates/replyguy-core/src/x_api/types.rs`
+- [x] T019 Implement X API client trait + reqwest implementation in `crates/replyguy-core/src/x_api/client.rs`
+- [x] T020 Implement OAuth 2.0 PKCE manual code entry flow in `crates/replyguy-core/src/x_api/auth.rs`
+- [x] T021 [P] Implement OAuth 2.0 PKCE local callback mode in `crates/replyguy-core/src/x_api/auth.rs`
+- [x] T022 Implement token management (store, load, auto-refresh) in `crates/replyguy-core/src/x_api/auth.rs`
+- [x] T023 Implement API tier detection in `crates/replyguy-core/src/x_api/tier.rs`
 
 ### Implementation Notes
 - Client trait: `XApiClient` with methods `search_tweets`, `get_mentions`, `post_tweet`, `reply_to_tweet`, `get_tweet`
