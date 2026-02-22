@@ -2,7 +2,7 @@
 release = false
 git_only = false
 publish = false
-release_always = false
+release_always = true
 semver_check = false
 pr_labels = ["release"]
 git_tag_name = "v{{ version }}"

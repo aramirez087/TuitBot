@@ -445,6 +445,7 @@ Releases are fully automated in GitHub Actions and follow a release-PR model:
    * Cross-platform binary builds (`linux`, `macOS Intel`, `macOS Apple Silicon`, `windows`)
    * Asset uploads + `SHA256SUMS` checksum file
 4. If a release contains only library crate updates and no `tuitbot-cli` release, binary asset jobs are skipped automatically.
+5. The pipeline keeps `release_always = true` so unreleased versions on `main` (including first crates.io bootstrap) can publish without waiting for a generated release PR.
 
 To keep versioning clean, use Conventional Commit prefixes (`feat:`, `fix:`, `chore:`, etc.) and `!` for breaking changes.
 Repository setup required once: enable `Settings -> Actions -> General -> Allow GitHub Actions to create and approve pull requests`.
