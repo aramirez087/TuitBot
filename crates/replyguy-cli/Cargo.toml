@@ -1,0 +1,17 @@
+[package]
+name = "replyguy-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "CLI for ReplyGuy autonomous X growth assistant"
+
+[[bin]]
+name = "replyguy"
+path = "src/main.rs"
+
+[dependencies]
+replyguy-core = { path = "../replyguy-core" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["full"] }

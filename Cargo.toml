@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/replyguy-core", "crates/replyguy-cli"]
+resolver = "2"
