@@ -1,0 +1,15 @@
+[workspace]
+release = false
+git_only = true
+publish = false
+release_always = false
+semver_check = false
+pr_labels = ["release"]
+git_tag_name = "v{{ version }}"
+git_release_name = "v{{ version }}"
+
+[[package]]
+name = "tuitbot-cli"
+release = true
+changelog_path = "CHANGELOG.md"
+changelog_include = ["tuitbot-core", "tuitbot-mcp"]

@@ -7,12 +7,14 @@
 [![Rust](https://img.shields.io/badge/built_with-Rust-d32822?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![X API](https://img.shields.io/badge/X_API-Ready-black?style=for-the-badge&logo=x)](https://developer.x.com)
+[![CI](https://img.shields.io/github/actions/workflow/status/aramirez087/ReplyGuy/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/aramirez087/ReplyGuy/actions/workflows/ci.yml)
+[![Releases](https://img.shields.io/github/v/release/aramirez087/ReplyGuy?style=for-the-badge)](https://github.com/aramirez087/ReplyGuy/releases)
 
 Tuitbot runs in the background and grows your X account on autopilot — finding relevant conversations, replying with genuinely helpful content, posting educational tweets, and publishing weekly threads. **It's like having a social media manager who never sleeps.**
 
 Built for **founders**, **indie hackers**, and **solo makers** who'd rather build their product than spend hours on X.
 
-[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Configuration](#-configuration) • [AI Providers](#-ai-providers)
+[Features](#-features) • [Getting Started](#-getting-started) • [Configuration](#-configuration-reference) • [AI Providers](#-ai-providers) • [Release Strategy](#-release-strategy-ci)
 
 </div>
 
@@ -68,15 +70,23 @@ Tuitbot is engineered to keep your account totally safe and maintain your pristi
 
 | Requirement | Where to get it | Cost |
 |---|---|---|
-| **Rust 1.75+** | [rustup.rs](https://rustup.rs/) | Free |
 | **X API Developer Account** | [developer.x.com](https://developer.x.com) | Pay-per-use or Free |
 | **AI Provider** | [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), or [Ollama](https://ollama.ai/) | Varies (Ollama is Free) |
 
-### Installation
+### Fastest Install (Recommended)
 
 ```bash
-# Recommended: Install the binary globally
-cargo install --path crates/tuitbot-cli
+# Installs latest release for your current macOS/Linux architecture
+curl -fsSL https://raw.githubusercontent.com/aramirez087/ReplyGuy/main/scripts/install.sh | bash
+```
+
+**Windows:** download `tuitbot-x86_64-pc-windows-msvc.zip` from [Releases](https://github.com/aramirez087/ReplyGuy/releases), unzip, and add `tuitbot.exe` to your `PATH`.
+
+### Install from Source (Rust)
+
+```bash
+# Rust 1.75+ required
+cargo install --path crates/tuitbot-cli --locked
 
 # Verify installation successful
 tuitbot --help
@@ -253,6 +263,23 @@ sudo systemctl status tuitbot
 ```bash
 launchctl load ~/Library/LaunchAgents/com.tuitbot.agent.plist
 ```
+
+---
+
+## 🏷️ Release Strategy (CI)
+
+Releases are fully automated in GitHub Actions and follow a release-PR model:
+
+1. Every push to `main` runs `.github/workflows/release.yml`.
+2. `release-plz` keeps a release PR open with version/changelog updates (`CHANGELOG.md`).
+3. Merging that release PR triggers:
+   * Tag + GitHub release (`vX.Y.Z`)
+   * Cross-platform binary builds (`linux`, `macOS Intel`, `macOS Apple Silicon`, `windows`)
+   * Asset uploads + `SHA256SUMS` checksum file
+
+To keep versioning clean, use Conventional Commit prefixes (`feat:`, `fix:`, `chore:`, etc.) and `!` for breaking changes.
+Repository setup required once: enable `Settings -> Actions -> General -> Allow GitHub Actions to create and approve pull requests`.
+Optional but recommended: set a `RELEASE_PLZ_TOKEN` (PAT) secret so workflows also run on release PRs created by automation.
 
 ---
 
