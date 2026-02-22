@@ -52,6 +52,34 @@ Additional rules:
 - Treat all warnings as release blockers (CI uses denied warnings).
 - Do not finish the task until the checklist passes.
 
+## Crates.io Release Discipline (Mandatory)
+
+When changing any crate under `crates/`, keep the workspace publishable to crates.io:
+
+- Keep `Cargo.lock` committed and current.
+- Every local `path` dependency between workspace crates must also include an explicit `version`.
+- Keep package metadata present in every published crate:
+  - `description`
+  - `license`
+  - `repository`
+  - `homepage`
+  - `documentation`
+  - `keywords`
+- Do not change tag conventions in `release-plz.toml` without explicit approval:
+  - `tuitbot-core-vX.Y.Z`
+  - `tuitbot-mcp-vX.Y.Z`
+  - `tuitbot-cli-vX.Y.Z`
+- Keep `release_always = false` except for one-time bootstrap scenarios.
+
+Before handing off publish-affecting changes, run:
+
+```bash
+release-plz update --config release-plz.toml --allow-dirty
+cargo package --workspace --allow-dirty
+```
+
+If either command fails, treat it as a release blocker and fix before handoff.
+
 ## Architecture
 
 ### Workspace Layout
@@ -88,4 +116,3 @@ Additional rules:
 - **Approval queue**: When `approval_mode = true`, posting queue routes actions to `approval_queue` table instead of X API. `tuitbot approve` provides interactive CLI review.
 - **Storage**: SQLite WAL mode, pool of 4, `sqlx::migrate!()` for embedded migrations, 90-day configurable retention, dedup records are never deleted. Tests use `storage::init_test_db()` for in-memory SQLite.
 - **Build script**: `crates/tuitbot-core/build.rs` watches `migrations/` directory for recompilation.
-
