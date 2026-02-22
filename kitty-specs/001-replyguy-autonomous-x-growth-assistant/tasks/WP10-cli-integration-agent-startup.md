@@ -1,14 +1,17 @@
 ---
 work_package_id: WP10
 title: CLI Integration + Agent Startup
-lane: planned
+lane: "doing"
 dependencies:
 - WP04
+base_branch: 001-replyguy-autonomous-x-growth-assistant-WP01
+base_commit: 54b47b462601a1e58d0222f08ae0a65ca3068a1d
+created_at: '2026-02-22T01:41:04.570758+00:00'
 subtasks: [T050, T051, T052, T053, T054, T055, T056]
 phase: Phase 2 - Extended Features
 assignee: ''
 agent: ''
-shell_pid: ''
+shell_pid: "94521"
 review_status: ''
 reviewed_by: ''
 history:
