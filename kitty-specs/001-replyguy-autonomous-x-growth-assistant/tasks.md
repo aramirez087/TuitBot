@@ -19,12 +19,12 @@
 **Estimated prompt size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T001 Create Cargo workspace with `replyguy-core` (lib) and `replyguy-cli` (bin) crates
-- [ ] T002 Define error types with thiserror in `crates/replyguy-core/src/error.rs`
-- [ ] T003 [P] Define config types + defaults in `crates/replyguy-core/src/config/`
-- [ ] T004 [P] Implement config loading with layering (CLI > env > TOML > defaults)
-- [ ] T005 Implement config validation logic
-- [ ] T006 Create CLI skeleton with Clap in `crates/replyguy-cli/src/main.rs`
+- [x] T001 Create Cargo workspace with `replyguy-core` (lib) and `replyguy-cli` (bin) crates
+- [x] T002 Define error types with thiserror in `crates/replyguy-core/src/error.rs`
+- [x] T003 [P] Define config types + defaults in `crates/replyguy-core/src/config/`
+- [x] T004 [P] Implement config loading with layering (CLI > env > TOML > defaults)
+- [x] T005 Implement config validation logic
+- [x] T006 Create CLI skeleton with Clap in `crates/replyguy-cli/src/main.rs`
 
 ### Implementation Notes
 - Workspace root `Cargo.toml` defines members: `crates/replyguy-core`, `crates/replyguy-cli`
