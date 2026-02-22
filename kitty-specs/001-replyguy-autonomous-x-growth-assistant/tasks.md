@@ -250,7 +250,7 @@
 - [x] T039 Implement discovery loop in `crates/replyguy-core/src/automation/discovery_loop.rs`
 - [x] T040 Integrate both loops with safety module (rate checks, dedup, action logging)
 - [x] T041 [P] Implement dry-run support for both loops
-- [ ] T042 [P] Implement CLI `replyguy mentions` command in `crates/replyguy-cli/src/commands/mentions.rs`
+- [x] T042 [P] Implement CLI `replyguy mentions` command in `crates/replyguy-cli/src/commands/mentions.rs`
 - [ ] T043 [P] Implement CLI `replyguy discover` command in `crates/replyguy-cli/src/commands/discover.rs`
 
 ### Implementation Notes
