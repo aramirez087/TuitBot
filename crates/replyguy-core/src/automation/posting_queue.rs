@@ -93,13 +93,37 @@ pub fn create_posting_queue() -> (mpsc::Sender<PostAction>, mpsc::Receiver<PostA
     mpsc::channel(QUEUE_CAPACITY)
 }
 
+/// Trait for queueing actions for human approval instead of posting.
+#[async_trait::async_trait]
+pub trait ApprovalQueue: Send + Sync {
+    /// Queue a reply for human review. Returns the queue item ID.
+    async fn queue_reply(&self, tweet_id: &str, content: &str) -> Result<i64, String>;
+
+    /// Queue a tweet for human review. Returns the queue item ID.
+    async fn queue_tweet(&self, content: &str) -> Result<i64, String>;
+}
+
 /// Run the posting queue consumer loop.
 ///
 /// Processes actions sequentially with `min_delay` between each post.
 /// On cancellation, drains remaining actions in the channel before exiting.
+///
+/// When `approval_queue` is `Some`, actions are queued for human review
+/// instead of being posted directly.
 pub async fn run_posting_queue(
+    receiver: mpsc::Receiver<PostAction>,
+    executor: Arc<dyn PostExecutor>,
+    min_delay: Duration,
+    cancel: CancellationToken,
+) {
+    run_posting_queue_with_approval(receiver, executor, None, min_delay, cancel).await;
+}
+
+/// Run the posting queue consumer loop with optional approval mode.
+pub async fn run_posting_queue_with_approval(
     mut receiver: mpsc::Receiver<PostAction>,
     executor: Arc<dyn PostExecutor>,
+    approval_queue: Option<Arc<dyn ApprovalQueue>>,
     min_delay: Duration,
     cancel: CancellationToken,
 ) {
@@ -123,7 +147,7 @@ pub async fn run_posting_queue(
             }
         };
 
-        execute_and_respond(action, &executor).await;
+        execute_or_queue(action, &executor, &approval_queue).await;
 
         if !min_delay.is_zero() {
             tokio::time::sleep(min_delay).await;
@@ -133,7 +157,7 @@ pub async fn run_posting_queue(
     // Drain remaining actions after cancellation or channel close.
     let mut drained = 0u32;
     while let Ok(action) = receiver.try_recv() {
-        execute_and_respond(action, &executor).await;
+        execute_or_queue(action, &executor, &approval_queue).await;
         drained += 1;
     }
 
@@ -145,6 +169,68 @@ pub async fn run_posting_queue(
     }
 
     tracing::info!("Posting queue consumer stopped");
+}
+
+/// Route a post action: queue for approval if approval mode is on, otherwise execute.
+async fn execute_or_queue(
+    action: PostAction,
+    executor: &Arc<dyn PostExecutor>,
+    approval_queue: &Option<Arc<dyn ApprovalQueue>>,
+) {
+    if let Some(queue) = approval_queue {
+        queue_for_approval(action, queue).await;
+    } else {
+        execute_and_respond(action, executor).await;
+    }
+}
+
+/// Queue a post action for human approval instead of posting.
+async fn queue_for_approval(action: PostAction, queue: &Arc<dyn ApprovalQueue>) {
+    let (result, result_tx) = match action {
+        PostAction::Reply {
+            tweet_id,
+            content,
+            result_tx,
+        } => {
+            tracing::info!(tweet_id = %tweet_id, "Queuing reply for approval");
+            let r = queue
+                .queue_reply(&tweet_id, &content)
+                .await
+                .map(|id| format!("queued:{id}"));
+            (r, result_tx)
+        }
+        PostAction::Tweet {
+            content, result_tx, ..
+        } => {
+            tracing::info!("Queuing tweet for approval");
+            let r = queue
+                .queue_tweet(&content)
+                .await
+                .map(|id| format!("queued:{id}"));
+            (r, result_tx)
+        }
+        PostAction::ThreadTweet {
+            content,
+            in_reply_to,
+            result_tx,
+        } => {
+            tracing::info!(in_reply_to = %in_reply_to, "Queuing thread tweet for approval");
+            let r = queue
+                .queue_reply(&in_reply_to, &content)
+                .await
+                .map(|id| format!("queued:{id}"));
+            (r, result_tx)
+        }
+    };
+
+    match &result {
+        Ok(id) => tracing::info!(queue_id = %id, "Action queued for approval"),
+        Err(e) => tracing::warn!(error = %e, "Failed to queue action for approval"),
+    }
+
+    if let Some(tx) = result_tx {
+        let _ = tx.send(result);
+    }
 }
 
 /// Execute a single post action and send the result back via oneshot.
@@ -489,5 +575,124 @@ mod tests {
         let debug = format!("{action:?}");
         assert!(debug.contains("Reply"));
         assert!(debug.contains("123"));
+    }
+
+    // --- Approval queue tests ---
+
+    struct MockApprovalQueue {
+        items: Mutex<Vec<(String, String, String)>>,
+    }
+
+    impl MockApprovalQueue {
+        fn new() -> Self {
+            Self {
+                items: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn item_count(&self) -> usize {
+            self.items.lock().expect("lock").len()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ApprovalQueue for MockApprovalQueue {
+        async fn queue_reply(&self, tweet_id: &str, content: &str) -> Result<i64, String> {
+            self.items.lock().expect("lock").push((
+                "reply".to_string(),
+                tweet_id.to_string(),
+                content.to_string(),
+            ));
+            Ok(self.item_count() as i64)
+        }
+
+        async fn queue_tweet(&self, content: &str) -> Result<i64, String> {
+            self.items.lock().expect("lock").push((
+                "tweet".to_string(),
+                String::new(),
+                content.to_string(),
+            ));
+            Ok(self.item_count() as i64)
+        }
+    }
+
+    #[tokio::test]
+    async fn approval_mode_queues_instead_of_posting() {
+        let executor = Arc::new(MockExecutor::new());
+        let approval = Arc::new(MockApprovalQueue::new());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let approval_clone = approval.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue_with_approval(
+                rx,
+                exec_clone,
+                Some(approval_clone),
+                Duration::ZERO,
+                cancel_clone,
+            )
+            .await;
+        });
+
+        let (result_tx, result_rx) = oneshot::channel();
+        tx.send(PostAction::Reply {
+            tweet_id: "t1".to_string(),
+            content: "hello".to_string(),
+            result_tx: Some(result_tx),
+        })
+        .await
+        .expect("send");
+
+        let result = result_rx.await.expect("recv");
+        assert!(result.is_ok());
+        assert!(result.unwrap().starts_with("queued:"));
+
+        // Executor should NOT have been called
+        assert_eq!(executor.call_count(), 0);
+        // Approval queue should have the item
+        assert_eq!(approval.item_count(), 1);
+
+        cancel.cancel();
+        handle.await.expect("join");
+    }
+
+    #[tokio::test]
+    async fn approval_mode_queues_tweets() {
+        let executor = Arc::new(MockExecutor::new());
+        let approval = Arc::new(MockApprovalQueue::new());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let approval_clone = approval.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue_with_approval(
+                rx,
+                exec_clone,
+                Some(approval_clone),
+                Duration::ZERO,
+                cancel_clone,
+            )
+            .await;
+        });
+
+        tx.send(PostAction::Tweet {
+            content: "my tweet".to_string(),
+            result_tx: None,
+        })
+        .await
+        .expect("send");
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        assert_eq!(executor.call_count(), 0);
+        assert_eq!(approval.item_count(), 1);
+
+        cancel.cancel();
+        handle.await.expect("join");
     }
 }

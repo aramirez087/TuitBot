@@ -58,6 +58,8 @@ enum Commands {
     Score(commands::ScoreArgs),
     /// Show analytics dashboard
     Stats(commands::StatsArgs),
+    /// Review and approve queued posts
+    Approve(commands::ApproveArgs),
 }
 
 #[tokio::main]
@@ -127,6 +129,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Stats(_args) => {
             commands::stats::execute(&config).await?;
+        }
+        Commands::Approve(_args) => {
+            commands::approve::execute(&config).await?;
         }
     }
 

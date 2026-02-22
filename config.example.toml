@@ -18,6 +18,11 @@
 # Uncommented fields with placeholder values must be filled in.
 # =============================================================================
 
+# --- Approval Mode ---
+# When enabled, posts are queued for human review instead of posting automatically.
+# Use `replyguy approve` to review and approve queued items.
+# approval_mode = false
+
 # --- X API Credentials ---
 # Get your credentials from https://developer.x.com/en/portal/dashboard
 [x_api]

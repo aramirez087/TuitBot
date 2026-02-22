@@ -37,7 +37,10 @@ pub use loop_helpers::{
     ScoreResult, ThreadPoster, TopicScorer, TweetGenerator, TweetScorer, TweetSearcher,
 };
 pub use mentions_loop::{MentionResult, MentionsLoop};
-pub use posting_queue::{create_posting_queue, PostAction, PostExecutor, QUEUE_CAPACITY};
+pub use posting_queue::{
+    create_posting_queue, run_posting_queue_with_approval, ApprovalQueue, PostAction, PostExecutor,
+    QUEUE_CAPACITY,
+};
 pub use scheduler::{scheduler_from_config, LoopScheduler};
 pub use status_reporter::{ActionCounts, StatusQuerier};
 pub use target_loop::{

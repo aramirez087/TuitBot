@@ -5,6 +5,7 @@
 
 pub mod action_log;
 pub mod analytics;
+pub mod approval_queue;
 pub mod author_interactions;
 pub mod cleanup;
 pub mod rate_limits;
@@ -131,6 +132,7 @@ mod tests {
         assert!(table_names.contains(&"reply_performance"));
         assert!(table_names.contains(&"tweet_performance"));
         assert!(table_names.contains(&"content_scores"));
+        assert!(table_names.contains(&"approval_queue"));
     }
 
     #[tokio::test]

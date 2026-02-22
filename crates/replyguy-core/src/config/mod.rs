@@ -49,6 +49,10 @@ pub struct Config {
     #[serde(default)]
     pub targets: TargetsConfig,
 
+    /// Enable approval mode: queue posts for human review instead of posting.
+    #[serde(default)]
+    pub approval_mode: bool,
+
     /// Data storage configuration.
     #[serde(default)]
     pub storage: StorageConfig,

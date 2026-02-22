@@ -828,9 +828,9 @@ mod tests {
         )
         .with_topic_scorer(scorer);
 
-        // Use a seeded RNG that always returns 0.0 (< 0.8 = exploit)
         let mut recent = Vec::new();
-        let mut rng = StubRng(0.0);
+        // Low roll => exploit. Use thread_rng for the pick_topic fallback path.
+        let mut rng = FirstCallRng::low_roll();
 
         let topic = content
             .pick_topic_epsilon_greedy(&mut recent, &mut rng)
@@ -860,14 +860,13 @@ mod tests {
         )
         .with_topic_scorer(scorer);
 
-        // Use a seeded RNG that returns 0.9 (>= 0.8 = explore)
         let mut recent = Vec::new();
-        let mut rng = StubRng(0.9);
+        // High roll => explore, delegates to pick_topic with real rng
+        let mut rng = FirstCallRng::high_roll();
 
         let topic = content
             .pick_topic_epsilon_greedy(&mut recent, &mut rng)
             .await;
-        // Should pick from the full topic list (random)
         assert!(make_topics().contains(&topic));
     }
 
@@ -892,12 +891,12 @@ mod tests {
         .with_topic_scorer(scorer);
 
         let mut recent = Vec::new();
-        let mut rng = StubRng(0.0); // exploit
+        // Low roll => exploit, but scorer fails => falls back to random
+        let mut rng = FirstCallRng::low_roll();
 
         let topic = content
             .pick_topic_epsilon_greedy(&mut recent, &mut rng)
             .await;
-        // Falls back to random from all topics
         assert!(make_topics().contains(&topic));
     }
 
@@ -928,28 +927,49 @@ mod tests {
         assert!(make_topics().contains(&topic));
     }
 
-    /// Stub RNG that always returns a fixed f64 value for gen().
-    struct StubRng(f64);
+    /// RNG wrapper that overrides only the first `next_u64()` call,
+    /// then delegates everything to a real ThreadRng. This lets us
+    /// control the initial `gen::<f64>()` roll without breaking
+    /// subsequent `choose()` / `gen_range()` calls.
+    struct FirstCallRng {
+        first_u64: Option<u64>,
+        inner: rand::rngs::ThreadRng,
+    }
 
-    impl rand::RngCore for StubRng {
-        fn next_u32(&mut self) -> u32 {
-            // Map our f64 to a u32 range
-            (self.0 * u32::MAX as f64) as u32
-        }
-
-        fn next_u64(&mut self) -> u64 {
-            (self.0 * u64::MAX as f64) as u64
-        }
-
-        fn fill_bytes(&mut self, dest: &mut [u8]) {
-            for byte in dest.iter_mut() {
-                *byte = (self.0 * 255.0) as u8;
+    impl FirstCallRng {
+        /// Create an RNG whose first `gen::<f64>()` returns ~0.0 (exploit).
+        fn low_roll() -> Self {
+            Self {
+                first_u64: Some(0),
+                inner: rand::thread_rng(),
             }
         }
 
+        /// Create an RNG whose first `gen::<f64>()` returns ~1.0 (explore).
+        fn high_roll() -> Self {
+            Self {
+                first_u64: Some(u64::MAX),
+                inner: rand::thread_rng(),
+            }
+        }
+    }
+
+    impl rand::RngCore for FirstCallRng {
+        fn next_u32(&mut self) -> u32 {
+            self.inner.next_u32()
+        }
+        fn next_u64(&mut self) -> u64 {
+            if let Some(val) = self.first_u64.take() {
+                val
+            } else {
+                self.inner.next_u64()
+            }
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            self.inner.fill_bytes(dest);
+        }
         fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-            self.fill_bytes(dest);
-            Ok(())
+            self.inner.try_fill_bytes(dest)
         }
     }
 }

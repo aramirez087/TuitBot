@@ -2,6 +2,7 @@
 ///
 /// Each subcommand struct defines its flags and arguments
 /// matching the CLI interface contract.
+pub mod approve;
 pub mod auth;
 pub mod init;
 pub mod run;
@@ -104,3 +105,7 @@ pub struct ScoreArgs {
 /// Arguments for the `stats` subcommand.
 #[derive(Debug, Args)]
 pub struct StatsArgs;
+
+/// Arguments for the `approve` subcommand.
+#[derive(Debug, Args)]
+pub struct ApproveArgs;

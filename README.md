@@ -8,30 +8,40 @@ Built for **founders, indie hackers, and solo makers** who'd rather build their 
 
 ## What Does ReplyGuy Actually Do?
 
-ReplyGuy runs up to four automated loops, 24/7, while you focus on building:
+ReplyGuy runs up to six automated loops, 24/7, while you focus on building:
 
 ### 1. Finds Conversations That Matter
-ReplyGuy searches X for tweets matching your product's keywords (e.g., "mac productivity", "clipboard manager"). It scores every tweet using a smart scoring system to find the ones most worth replying to — prioritizing tweets with high engagement, relevant keywords, recent posts, and authors with real followings.
+ReplyGuy searches X for tweets matching your product's keywords (e.g., "mac productivity", "clipboard manager"). It scores every tweet using a 6-signal scoring engine — keyword relevance, follower sweet spot (1K-5K), recency, engagement rate, reply count (prefers underserved conversations), and content type (prefers text-only tweets).
 
 ### 2. Replies With Genuinely Helpful Content
-When it finds a high-scoring tweet, ReplyGuy uses AI to write a natural, helpful reply in **your brand voice**. It sounds like you, not a bot. It only mentions your product when it's genuinely relevant to the conversation — no spam, no "check out my app!" energy.
+When it finds a high-scoring tweet, ReplyGuy uses AI to write a natural, helpful reply using varied **reply archetypes** — agree and expand, ask a question, share an experience, add data, or respectfully disagree. Each reply sounds different. It only mentions your product 20% of the time (configurable), and never uses banned phrases like "check out" or "you should try".
 
 ### 3. Posts Educational Tweets
-Every few hours, ReplyGuy posts original educational tweets about your industry topics. This builds your authority and keeps your profile active without you lifting a finger.
+Every few hours, ReplyGuy posts original tweets using varied **formats** — lists, contrarian takes, storytelling, tips, questions, and more. It uses **epsilon-greedy topic selection**: 80% of the time it picks topics that perform well, 20% of the time it explores new ones.
 
 ### 4. Publishes Weekly Threads
-Once a week, ReplyGuy creates a 5-8 tweet thread on one of your topics — the kind of deep-dive content that gets bookmarks and retweets.
+Once a week, ReplyGuy creates a multi-tweet thread using varied **structures** — transformation stories, frameworks, common mistakes, or deep analysis.
 
 ### 5. Monitors Your Mentions
 When someone @-mentions you, ReplyGuy generates a thoughtful reply automatically. You never leave someone hanging.
 
-> **Note on X API access:** Features 1, 2, and 5 (discovery, replies, and mentions) require a paid X API tier or pay-per-use credits. Features 3 and 4 (posting tweets and threads) work on the Free tier. See [X API Access & Pricing](#x-api-access--pricing) for details.
+### 6. Tracks Target Accounts
+Configure specific accounts you want to engage with. ReplyGuy monitors their tweets and builds relationships over time — with optional auto-follow and a warmup period before first engagement.
+
+### 7. Tracks Analytics
+ReplyGuy snapshots your follower count daily, measures engagement on your content after 24 hours, and alerts you if followers drop more than 2%. Use `replyguy stats` to see your dashboard.
+
+> **Note on X API access:** Features 1, 2, 5, and 6 (discovery, replies, mentions, and target monitoring) require a paid X API tier or pay-per-use credits. Features 3 and 4 (posting tweets and threads) work on the Free tier. See [X API Access & Pricing](#x-api-access--pricing) for details.
 
 ### Built-In Safety
 ReplyGuy is designed to keep your account safe:
-- **Daily caps**: Limits on replies (15/day), tweets (3/day), and threads (1/week) to avoid looking spammy
+- **Conservative reply limits**: 5 replies/day (default), 6 tweets/day, 1 thread/week
+- **Per-author limits**: Max 1 reply per author per day — no harassment patterns
+- **Banned phrase filter**: Automatically blocks replies containing spammy phrases ("check out", "you should try", "I recommend", "link in bio")
+- **Product mention ratio**: Only mentions your product 20% of the time (configurable)
 - **Random delays**: 45-180 seconds of random delay between actions to look natural
 - **Deduplication**: Never replies to the same tweet twice, and detects when replies sound too similar to recent ones
+- **Approval mode**: Optionally queue all posts for human review before posting (`approval_mode = true`)
 - **Graceful shutdown**: Press Ctrl+C anytime — it stops cleanly within 30 seconds
 
 ---
@@ -172,7 +182,7 @@ That's it. ReplyGuy is now running. You'll see a startup banner:
 
 ```
 ReplyGuy v0.1.0
-Tier: Free | Loops: mentions, content, threads
+Tier: Free | Loops: content, threads, analytics
 Press Ctrl+C to stop.
 ```
 
@@ -196,6 +206,8 @@ You don't have to run the full agent. ReplyGuy also has commands for doing thing
 | `replyguy thread` | Generate and post a thread |
 | `replyguy thread --topic "5 macOS tips"` | Post a thread on a specific topic |
 | `replyguy score <tweet_id>` | Score a specific tweet to see if ReplyGuy would reply to it |
+| `replyguy stats` | Show analytics dashboard — follower trend, top topics, engagement rates |
+| `replyguy approve` | Review and approve queued posts (when `approval_mode = true`) |
 
 The `--dry-run` flag is great for testing. It shows you exactly what ReplyGuy would do without actually posting anything.
 
@@ -259,28 +271,75 @@ content_style = "Share practical tips. Prefer 'here's what I learned' framing."
 > - Include competitor names if you want to engage in those conversations
 > - Multi-word keywords are weighted 2x in scoring, so they're more effective
 
+### Persona (Optional)
+
+Make ReplyGuy sound more human by giving it opinions, experiences, and content pillars to draw from:
+
+```toml
+[business]
+# Strong opinions your persona holds (injected into reply/tweet prompts):
+persona_opinions = [
+    "Native apps will always beat Electron",
+    "Keyboard shortcuts are underrated",
+]
+
+# Experiences to reference in content:
+persona_experiences = [
+    "Built 3 macOS apps over 5 years",
+    "Switched from Windows to Mac in 2019",
+]
+
+# Core topics your content revolves around:
+content_pillars = ["Mac productivity", "Swift development", "Indie hacking"]
+```
+
+### Target Accounts
+
+Instead of only searching by keyword, you can monitor specific accounts and engage with their content. This builds relationships with the people who matter most to your growth.
+
+```toml
+[targets]
+accounts = ["@jason", "@levelsio", "@paborenstein"]
+max_target_replies_per_day = 3   # Separate limit from general replies
+auto_follow = false               # Automatically follow target accounts
+follow_warmup_days = 3            # Wait this many days after following before engaging
+```
+
+### Approval Mode
+
+For peace of mind, enable approval mode to review all generated content before it's posted:
+
+```toml
+approval_mode = true  # Queue posts for human review instead of posting automatically
+```
+
+When enabled, all loops queue their output instead of posting. Use `replyguy approve` to review:
+
+```bash
+replyguy approve
+# Shows each pending item with context. Type y/n/s/q to approve/reject/skip/quit.
+```
+
 ### Scoring Engine
 
-Controls how ReplyGuy decides which tweets are worth replying to. Each tweet gets a score from 0-100 based on four signals:
+Controls how ReplyGuy decides which tweets are worth replying to. Each tweet gets a score from 0-100 based on six signals:
 
 ```toml
 [scoring]
-threshold = 70  # Minimum score to trigger a reply (0-100)
+threshold = 60  # Minimum score to trigger a reply (0-100)
 
 # How much each signal contributes (must add up to 100):
-keyword_relevance_max = 40.0  # How well the tweet matches your keywords
-follower_count_max = 20.0     # Author's follower count (logarithmic scale)
-recency_max = 15.0            # How recently the tweet was posted
-engagement_rate_max = 25.0    # Likes + retweets + replies relative to followers
+keyword_relevance_max = 25.0    # How well the tweet matches your keywords
+follower_count_max = 15.0       # Bell curve peaking at ~1K followers (sweet spot)
+recency_max = 10.0              # How recently the tweet was posted
+engagement_rate_max = 15.0      # Likes + retweets + replies relative to followers
+reply_count_max = 15.0          # Fewer replies = higher score (underserved conversations)
+content_type_max = 10.0         # Text-only tweets score highest (no media/quotes)
 ```
 
-**What the scores mean in practice:**
-- **90-100**: Perfect match — your exact keywords, engaged author, very recent
-- **70-89**: Good match — worth replying to (this is the default threshold)
-- **50-69**: Marginal — might be relevant but not a sure thing
-- **Below 50**: Probably not relevant
+The scoring is designed to find **underserved conversations from mid-range accounts** — tweets with few replies where your reply will actually be seen, from accounts with 1K-5K followers who are likely to engage back.
 
-> **Tip**: Start with the default threshold of 70. If ReplyGuy is replying too much, raise it to 80. If it's not finding enough tweets, lower it to 60.
+> **Tip**: Start with the default threshold of 60. If ReplyGuy is replying too much, raise it to 70. If it's not finding enough tweets, lower it to 50.
 
 ### Safety Limits
 
@@ -288,16 +347,21 @@ These caps prevent ReplyGuy from posting too aggressively and getting your accou
 
 ```toml
 [limits]
-max_replies_per_day = 15        # Max replies per 24 hours
-max_tweets_per_day = 3          # Max original tweets per 24 hours
-max_threads_per_week = 1        # Max threads per 7 days
-min_action_delay_seconds = 45   # Minimum random delay between any actions
-max_action_delay_seconds = 180  # Maximum random delay between any actions
+max_replies_per_day = 5                 # Max replies per 24 hours
+max_tweets_per_day = 6                  # Max original tweets per 24 hours
+max_threads_per_week = 1               # Max threads per 7 days
+max_replies_per_author_per_day = 1     # Max replies to the same person per day
+min_action_delay_seconds = 45          # Minimum random delay between actions
+max_action_delay_seconds = 180         # Maximum random delay between actions
+product_mention_ratio = 0.2           # Only mention your product 20% of the time
+
+# Phrases that will be automatically blocked from replies:
+banned_phrases = ["check out", "you should try", "I recommend", "link in bio"]
 ```
 
 ReplyGuy adds a random delay between `min` and `max` seconds before each action. This makes activity look natural rather than bot-like.
 
-> **Tip**: Don't raise the limits above their defaults unless you're sure your account can handle it. Getting flagged by X is much worse than posting less.
+> **Tip**: The defaults are intentionally conservative. 5 replies/day with only 20% product mentions keeps you far from spam territory.
 
 ### Automation Intervals
 
@@ -307,7 +371,7 @@ How often each automation loop runs. Shorter intervals = more active, but uses m
 [intervals]
 mentions_check_seconds = 300        # Check mentions every 5 minutes
 discovery_search_seconds = 900      # Search for tweets every 15 minutes
-content_post_window_seconds = 18000 # Post a tweet at most every 5 hours
+content_post_window_seconds = 10800 # Post a tweet at most every 3 hours
 thread_interval_seconds = 604800    # Post a thread at most every 7 days
 ```
 
@@ -315,7 +379,7 @@ thread_interval_seconds = 604800    # Post a thread at most every 7 days
 |----------|---------|----------------|
 | Mention checks | 300 | Every 5 minutes |
 | Discovery searches | 900 | Every 15 minutes |
-| Content tweets | 18,000 | Every 5 hours |
+| Content tweets | 10,800 | Every 3 hours |
 | Thread publishing | 604,800 | Every 7 days |
 
 ### AI Provider
@@ -435,7 +499,7 @@ ReplyGuy auto-detects your tier at startup and enables/disables features accordi
 
 **On the Free tier**, only the content and thread loops run — ReplyGuy can post tweets and threads on your behalf, but cannot search for conversations or monitor your mentions (these are read endpoints that the Free tier doesn't include).
 
-**On Basic, Pro, or pay-per-use**, all four loops run — discovery, mentions, content, and threads. ReplyGuy automatically detects this and enables everything.
+**On Basic, Pro, or pay-per-use**, all loops run — discovery, mentions, content, threads, target monitoring, and analytics. ReplyGuy automatically detects this and enables everything.
 
 > **Bottom line:** If you want the full ReplyGuy experience (finding and replying to relevant tweets + monitoring mentions), you need at least the pay-per-use tier with credits loaded. The Free tier only supports posting original content.
 
