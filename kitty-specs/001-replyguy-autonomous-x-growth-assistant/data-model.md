@@ -55,7 +55,7 @@ A reply generated and posted by the agent.
 | Field | Type | Constraints | Description |
 |---|---|---|---|
 | `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | Internal ID |
-| `target_tweet_id` | TEXT | NOT NULL, FK → DiscoveredTweet | Tweet we replied to |
+| `target_tweet_id` | TEXT | NOT NULL | Tweet ID we replied to (may be a discovered tweet or a mention) |
 | `reply_tweet_id` | TEXT | NULL | Our reply's X tweet ID (NULL if post failed) |
 | `reply_content` | TEXT | NOT NULL | Generated reply text |
 | `llm_provider` | TEXT | NULL | Which LLM generated this |

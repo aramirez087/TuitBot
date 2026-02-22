@@ -197,7 +197,7 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
 - **Parallel?**: Can proceed in parallel with T021 (different functions in same file). Depends on WP01 config types for `client_id`.
 - **Notes**:
   - The `redirect_uri` for manual mode is `http://localhost/callback` -- this is a convention for manual copy-paste flows where no server is actually listening.
-  - Do not use the `oauth2` crate for this implementation. The X API PKCE flow is straightforward enough to implement with reqwest directly, and avoiding the crate gives more control over error handling.
+  - Use the `oauth2` crate (version 4.x) to implement the PKCE flow, as mandated by the project constitution. Construct an `AuthorizationRequest` with `PkceCodeChallenge::new_random_sha256()`, set the required scopes (`tweet.read`, `tweet.write`, `users.read`, `offline.access`), and exchange the code using `client.exchange_code()`. The crate handles code verifier generation, challenge computation, and token exchange. Map `oauth2` error types to `XApiError` variants for consistent error handling.
   - Validate that the pasted code is non-empty and does not contain whitespace.
   - Log the token exchange at `tracing::info!` level (but never log the actual token values -- only log success/failure and expiration time).
 
@@ -229,7 +229,8 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
   - The HTTP server only needs to handle one request. After receiving the callback, it should shut down immediately.
   - Keep the HTTP parsing minimal. The request will be `GET /callback?code=XXX&state=YYY HTTP/1.1\r\n...`. Parse the first line, extract the query string.
   - The success HTML response should be a simple, self-contained HTML page with no external dependencies.
-  - Consider factoring the common PKCE logic (verifier generation, challenge computation, URL building, token exchange) into shared helper functions used by both T020 and T021.
+  - Use the `oauth2` crate for URL construction and token exchange (same as T020). The crate handles PKCE challenge generation and code exchange; the temporary HTTP server for capturing the callback is still custom code.
+  - Consider factoring the common `oauth2` client setup (client ID, redirect URI, scopes) into a shared helper function used by both T020 and T021.
 
 ### Subtask T022 -- Token Management
 

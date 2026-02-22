@@ -141,7 +141,7 @@ A founder wants to manually evaluate a specific tweet's viral potential and rele
 
 - Q: What does the user see while the agent runs? → A: Quiet by default (errors only) with `--verbose` for full structured logs, plus an optional periodic status summary (configurable interval, off by default).
 - Q: How are OAuth tokens and API keys stored locally? → A: Default plaintext file with strict filesystem permissions (`~/.replyguy/tokens.json`, chmod 600) for maximum compatibility (servers, Raspberry Pi, containers). Optional OS keychain integration (macOS Keychain, Windows Credential Manager, Linux Secret Service) when available.
-- Q: What X API tier is required? → A: Design for Basic tier but degrade gracefully on Free. Free tier: mentions + posting only (discovery loop disabled). Basic tier: full functionality (search + discovery). API capability auto-detected at startup so the agent adapts to the user's tier.
+- Q: What X API tier is required? → A: Design for Basic tier but degrade gracefully on Free. Free tier: posting only — no search, no mentions endpoint access (discovery and mentions loops disabled). Basic tier: full functionality. Basic tier: full functionality (search + discovery). API capability auto-detected at startup so the agent adapts to the user's tier.
 - Q: Does the SQLite database grow unbounded? → A: Configurable retention with automatic cleanup. Default 90 days, configurable in config.toml. Periodic background job prunes old discovered tweets, action logs, and metrics records. Never deletes rate limit counters or recent replies/posts needed for deduplication.
 - Q: What is explicitly out of scope for v1? → A: No web UI, no multi-account support, no DM automation, no analytics dashboard, no scheduled content calendar, no reply-to-reply conversations (only direct mentions and top-level discovered tweets).
 
@@ -175,7 +175,7 @@ A founder wants to manually evaluate a specific tweet's viral potential and rele
 - **FR-024**: System MUST support an optional periodic status summary (e.g., replies sent, tweets scored, next cycle time) at a configurable interval, disabled by default.
 - **FR-025**: System MUST store OAuth tokens and API keys in a local file (`~/.replyguy/tokens.json`) with strict filesystem permissions (mode 600) by default.
 - **FR-026**: System SHOULD support optional OS keychain integration (macOS Keychain, Windows Credential Manager, Linux Secret Service) as an alternative credential storage backend, selectable via configuration.
-- **FR-027**: System MUST auto-detect the user's X API tier at startup and adapt available features accordingly: Free tier enables mentions monitoring, posting, and threads only; Basic tier (or higher) enables full functionality including keyword search and the discovery loop.
+- **FR-027**: System MUST auto-detect the user's X API tier at startup and adapt available features accordingly: Free tier enables posting and threads only (no search, no mentions); Basic tier (or higher) enables full functionality including keyword search and the discovery loop.
 - **FR-028**: System MUST inform the user at startup which API tier was detected and which loops are enabled or disabled as a result.
 - **FR-029**: System MUST automatically prune old discovered tweets, action logs, and metrics records beyond a configurable retention period (default: 90 days).
 - **FR-030**: System MUST NOT delete rate limit counters or recent reply/post records required for deduplication during cleanup.

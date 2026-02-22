@@ -199,6 +199,6 @@ config.toml ──► Config ──► Runtime Orchestrator
 
 4. **Serialized posting**: All loops feed actions through a shared posting queue to prevent race conditions and ensure rate limits are respected across loops.
 
-5. **Graceful tier degradation**: At startup, the agent probes the X API to determine the user's tier. On Free tier, the discovery loop is disabled and the user is informed. All other loops continue to function.
+5. **Graceful tier degradation**: At startup, the agent probes the X API to determine the user's tier. On Free tier, both the discovery loop and mentions loop are disabled and the user is informed. Content and thread loops continue to function.
 
 6. **Config layering**: CLI flags > env vars (prefixed `REPLYGUY_`) > `config.toml` > built-in defaults. Secrets can live in env vars to avoid committing them.

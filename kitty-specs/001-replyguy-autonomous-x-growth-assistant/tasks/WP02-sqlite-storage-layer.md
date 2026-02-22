@@ -156,7 +156,7 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
      ```sql
      CREATE TABLE IF NOT EXISTS replies_sent (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
-         target_tweet_id TEXT NOT NULL REFERENCES discovered_tweets(id),
+         target_tweet_id TEXT NOT NULL,
          reply_tweet_id TEXT,
          reply_content TEXT NOT NULL,
          llm_provider TEXT,
@@ -403,7 +403,7 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
 | Migration schema changes in later WPs break existing data | Use incremental migrations (new files, never modify existing ones). Each migration file has a unique timestamp prefix. |
 | SQLx compile-time checking requires `DATABASE_URL` env var | Use runtime queries (`sqlx::query(...)` with `.bind()`) instead of compile-time checked `sqlx::query!()` macros, OR set `DATABASE_URL` in `.env` for development. Runtime queries are simpler for this project. |
 | `sqlx::migrate!()` macro path resolution | The path is relative to the crate's `Cargo.toml`, not the workspace root. Since the crate is at `crates/replyguy-core/`, the path to `migrations/` at the workspace root is `"../../migrations"`. Verify during build. |
-| Foreign key constraint from `replies_sent` to `discovered_tweets` complicates cleanup | WP03 cleanup must delete replies before their parent discovered tweets, or remove the FK constraint. Address in WP03 design. |
+| No FK from `replies_sent` to `discovered_tweets` | Cleanup can delete discovered tweets independently. The `target_tweet_id` index supports dedup queries without referential integrity constraints. |
 | Thread insert partial failure leaves inconsistent state | Use SQLx transactions (`pool.begin()` / `tx.commit()`) for all multi-row inserts. Test rollback behavior explicitly. |
 | Timestamp format inconsistencies between Rust `chrono` and SQLite `strftime` | Standardize on `%Y-%m-%dT%H:%M:%SZ` format everywhere. Use `chrono::Utc::now().format(...)` in Rust and `strftime('%Y-%m-%dT%H:%M:%SZ', 'now')` in SQL defaults. |
 

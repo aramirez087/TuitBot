@@ -4,7 +4,7 @@ title: CLI Integration + Agent Startup
 lane: planned
 dependencies:
 - WP04
-subtasks: [T050, T051, T052, T053, T054]
+subtasks: [T050, T051, T052, T053, T054, T055, T056]
 phase: Phase 2 - Extended Features
 assignee: ''
 agent: ''
@@ -62,7 +62,7 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
 - **Plan**: See `plan.md`. WP10 is the integration layer that ties everything together. It sits at the top of the dependency graph (Wave 6).
 - **CLI contract**: See `contracts/cli-interface.md` for complete command signatures, flags, output formats, and exit codes.
 - **Data model**: All entities are consumed by this WP but defined and implemented in earlier WPs.
-- **Dependencies**: WP04 (X API client + auth), WP06 (scoring engine), WP08 (mentions + discovery loops), WP09 (content + thread loops). This WP depends on nearly everything.
+- **Dependencies**: WP04 (X API client + auth), WP06 (scoring engine), WP08 (mentions + discovery loops). Soft dependency on WP09 (content + thread loops) — `replyguy run` starts only the loops whose WPs are complete; content/thread loops activate when WP09 is implemented.
 - **This WP ties the entire application together** -- it is the last piece before the product is usable end-to-end.
 
 ## Subtasks & Detailed Guidance
@@ -104,7 +104,7 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
   4. Register the subcommand in `crates/replyguy-cli/src/commands/mod.rs` and `main.rs`.
 - **Files**: `crates/replyguy-cli/src/commands/run.rs`, `crates/replyguy-cli/src/commands/mod.rs`, `crates/replyguy-cli/src/main.rs`
 - **Parallel?**: No -- this is the integration command that depends on all other components.
-- **Notes**: The startup sequence order matters. Config must load first, then database (needs config for path), then auth (needs config for client_id), then tier detection (needs authenticated client), then dependency init (needs config + tier). If any step fails, exit early with a clear error message. The startup banner should be printed at `info!` level so it appears even in default (quiet) mode -- or use `eprintln!` directly for the banner.
+- **Notes**: The startup sequence order matters. Config must load first, then database (needs config for path), then auth (needs config for client_id), then tier detection (needs authenticated client), then dependency init (needs config + tier). If any step fails, exit early with a clear error message. The startup banner should be printed at `info!` level so it appears even in default (quiet) mode -- or use `eprintln!` directly for the banner. `replyguy run` should gracefully handle missing content/thread loop implementations (WP09) by skipping them — log an info message like "Content loop: not available (WP09 not implemented)" and start only the loops that are available.
 
 ### Subtask T051 -- CLI `replyguy auth` command
 
@@ -269,6 +269,42 @@ Use language identifiers in code blocks: ` ```python `, ` ```bash `
 - **Files**: `/Users/aramirez/Code/ReplyGuy/config.example.toml`
 - **Parallel?**: Yes -- can be developed alongside T051 and T052.
 - **Notes**: This file is part of the developer/user experience. Keep it clean, readable, and well-organized. The structure must match the `Config` struct in `replyguy-core` exactly -- if the struct changes, this file must be updated. Consider adding a CI check that validates the example config parses correctly (`replyguy test --config config.example.toml` minus credential checks).
+
+### Subtask T055 -- GitHub Actions CI workflow
+
+- **Purpose**: Create a CI pipeline that runs on every push and PR to ensure code quality across all three target platforms (Linux, macOS, Windows).
+- **Steps**:
+  1. Create `.github/workflows/ci.yml`.
+  2. Define a matrix strategy with `ubuntu-latest`, `macos-latest`, and `windows-latest`.
+  3. Use the `actions-rust-lang/setup-rust-toolchain` action to install the Rust toolchain.
+  4. Add the following jobs/steps:
+     - `cargo test --workspace` — run all unit and integration tests.
+     - `cargo clippy --workspace -- -D warnings` — lint with warnings as errors.
+     - `cargo fmt --all --check` — verify formatting.
+     - `cargo audit` — check for known vulnerabilities (install `cargo-audit` first).
+  5. Trigger on `push` to `main` and on all `pull_request` events.
+- **Files**: `.github/workflows/ci.yml`
+- **Parallel?**: Yes -- no dependencies on other subtasks.
+- **Notes**: The `cargo audit` step requires installing `cargo-audit` via `cargo install cargo-audit`. Consider caching the Cargo registry and build artifacts to speed up CI runs. The `actions-rust-lang/setup-rust-toolchain` action handles rustup and component installation.
+
+### Subtask T056 -- README.md
+
+- **Purpose**: Create a README.md at the repository root that serves as the primary entry point for new users and contributors, covering project overview, installation, quickstart, and configuration reference.
+- **Steps**:
+  1. Create `README.md` at the repository root.
+  2. Include the following sections:
+     - **Project description**: One-paragraph summary of what ReplyGuy does.
+     - **Features list**: Bullet list of key capabilities (discovery, mentions, content, threads, scoring).
+     - **Prerequisites**: Rust 1.75+, X API developer account, LLM provider API key.
+     - **Installation**: `cargo install --path crates/replyguy-cli` or `cargo build --release`.
+     - **Quickstart**: Step-by-step guide: (1) copy config.example.toml, (2) fill in credentials, (3) run `replyguy auth`, (4) run `replyguy test`, (5) run `replyguy run`.
+     - **CLI command reference**: Brief summary of all commands with link to `contracts/cli-interface.md` for full details.
+     - **Configuration reference**: Summary of config sections with link to `config.example.toml`.
+     - **License**: Reference the project license.
+  3. Keep the README concise but comprehensive — aim for a user to go from zero to running in under 10 minutes (matching SC-001).
+- **Files**: `README.md`
+- **Parallel?**: Yes -- no dependencies on other subtasks.
+- **Notes**: The README should reference `config.example.toml` (T054) for the full configuration reference rather than duplicating all fields. Use the Docklet example from the spec for any sample configuration snippets.
 
 ## Risks & Mitigations
 
