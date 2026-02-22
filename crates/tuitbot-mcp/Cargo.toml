@@ -6,7 +6,7 @@ rust-version = "1.75"
 description = "MCP server for Tuitbot autonomous X growth assistant"
 
 [dependencies]
-tuitbot-core = { path = "../tuitbot-core" }
+tuitbot-core = { version = "0.1.0", path = "../tuitbot-core" }
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -18,4 +18,4 @@ anyhow = "1"
 async-trait = "0.1"
 
 [dev-dependencies]
-tuitbot-core = { path = "../tuitbot-core", features = ["test-helpers"] }
+tuitbot-core = { version = "0.1.0", path = "../tuitbot-core", features = ["test-helpers"] }

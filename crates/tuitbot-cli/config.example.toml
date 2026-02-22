@@ -1,0 +1,255 @@
+# =============================================================================
+# Tuitbot Configuration
+# =============================================================================
+#
+# Tuitbot is an autonomous X (Twitter) growth assistant for founders
+# and indie hackers.
+#
+# Setup:
+#   1. Copy this file to ~/.tuitbot/config.toml
+#   2. Fill in your X API credentials (get them at https://developer.x.com)
+#   3. Add your LLM provider API key
+#   4. Customize the business profile for your product
+#   5. Run: tuitbot auth
+#   6. Run: tuitbot test
+#   7. Run: tuitbot run
+#
+# All fields shown here use their default values unless marked REQUIRED.
+# Uncommented fields with placeholder values must be filled in.
+# =============================================================================
+
+# --- Approval Mode ---
+# When enabled, posts are queued for human review instead of posting automatically.
+# Use `tuitbot approve` to review and approve queued items.
+# approval_mode = false
+
+# --- X API Credentials ---
+# Get your credentials from https://developer.x.com/en/portal/dashboard
+[x_api]
+# REQUIRED: Your OAuth 2.0 client ID.
+client_id = "your-client-id-here"
+
+# Optional: Client secret (only needed for confidential clients).
+# client_secret = "your-client-secret-here"
+
+# --- Authentication Settings ---
+[auth]
+# Auth mode: "local_callback" (auto-catch via local server) or "manual" (paste code from browser).
+mode = "local_callback"
+
+# Host for the local callback server (used in local_callback mode).
+callback_host = "127.0.0.1"
+
+# Port for the local callback server.
+callback_port = 8080
+
+# --- Business Profile ---
+# Describe your product so Tuitbot can find relevant conversations
+# and generate on-brand content.
+[business]
+# REQUIRED: Your product name.
+product_name = "Docklet"
+
+# REQUIRED: One-line description of your product.
+product_description = "Floating command strip for macOS — media controls, clipboard, AirDrop, timers, and more"
+
+# Optional: URL to your product website.
+product_url = "https://getdocklet.app"
+
+# REQUIRED: Who is your target audience?
+target_audience = "Mac power users, developers, and productivity enthusiasts"
+
+# REQUIRED: Keywords for tweet discovery (at least 1).
+# Tuitbot searches for tweets containing these keywords.
+product_keywords = ["macos productivity", "mac menu bar", "mac clipboard manager"]
+
+# Optional: Competitor keywords for discovery.
+competitor_keywords = ["notchnook alternative", "dynamic island mac", "bartender mac"]
+
+# REQUIRED: Topics for original content generation (at least 1).
+# Tuitbot creates educational tweets and threads on these topics.
+industry_topics = [
+    "Mac productivity tips",
+    "macOS power user workflows",
+    "Building native Swift apps",
+    "Indie Mac app development",
+]
+
+# Optional: Describe your brand's voice and personality.
+# This shapes how all generated content sounds.
+# Example: "Friendly technical expert. Casual tone, occasionally witty,
+# explains complex topics simply. Sounds like a knowledgeable friend."
+# brand_voice = "your brand voice description here"
+
+# Optional: Specific guidelines for how replies should feel.
+# Example: "Lead with genuine help. Ask follow-up questions. Only mention
+# our product if directly relevant. Never be pushy or salesy."
+# reply_style = "your reply style guidelines here"
+
+# Optional: Specific guidelines for original tweets and threads.
+# Example: "Share practical tips with real examples. Prefer 'here's what I
+# learned' framing over lecturing. End threads with actionable takeaways."
+# content_style = "your content style guidelines here"
+
+# Optional: Opinions the persona holds (adds variety to content).
+# persona_opinions = ["Native apps beat web wrappers for performance", "Keyboard shortcuts are underrated"]
+
+# Optional: Experiences the persona can reference (keeps content authentic).
+# persona_experiences = ["Built a macOS menu bar app from scratch", "Switched from Electron to SwiftUI"]
+
+# Optional: Core content pillars (broad themes the account focuses on).
+# content_pillars = ["macOS productivity", "indie development", "Swift programming"]
+
+# --- Scoring Engine ---
+# Controls how tweets are scored for reply-worthiness (0-100 scale).
+# Six signals: keyword(25) + follower(15) + recency(10) + engagement(15) + reply_count(15) + content_type(10) = 90 max.
+[scoring]
+# Minimum score to trigger a reply (0-100).
+threshold = 60
+
+# Maximum points for keyword relevance.
+keyword_relevance_max = 25.0
+
+# Maximum points for author follower count (bell curve, peaks ~1K followers).
+follower_count_max = 15.0
+
+# Maximum points for tweet recency.
+recency_max = 10.0
+
+# Maximum points for engagement rate (likes + retweets + replies).
+engagement_rate_max = 15.0
+
+# Maximum points for reply count signal (fewer replies = higher score).
+# Targets underserved conversations where your reply is more visible.
+reply_count_max = 15.0
+
+# Maximum points for content type signal.
+# Text-only original tweets score max; media/quote tweets score 0.
+content_type_max = 10.0
+
+# --- Safety Limits ---
+# Prevent aggressive posting that could trigger account restrictions.
+# Conservative defaults — better to under-post than get flagged.
+[limits]
+# Maximum replies per day (keep low to avoid looking like a bot).
+max_replies_per_day = 5
+
+# Maximum original tweets per day.
+max_tweets_per_day = 6
+
+# Maximum threads per week.
+max_threads_per_week = 1
+
+# Minimum delay between any two actions (seconds).
+# Also controls the minimum jitter added to all loop intervals.
+min_action_delay_seconds = 45
+
+# Maximum delay between any two actions (seconds).
+# Also controls the maximum jitter added to all loop intervals.
+max_action_delay_seconds = 180
+
+# Maximum replies to the same author per day (prevents harassment patterns).
+max_replies_per_author_per_day = 1
+
+# Phrases that should never appear in generated replies.
+# If the LLM outputs any of these, the reply is discarded.
+banned_phrases = ["check out", "you should try", "I recommend", "link in bio"]
+
+# Fraction of replies that may mention your product (0.0 - 1.0).
+# 0.2 means ~20% of replies reference the product; 80% are purely helpful.
+product_mention_ratio = 0.2
+
+# --- Automation Intervals ---
+# How often each loop runs. Shorter intervals use more API quota.
+[intervals]
+# Seconds between mention checks.
+mentions_check_seconds = 300
+
+# Seconds between discovery searches.
+discovery_search_seconds = 900
+
+# Minimum seconds between content tweets.
+content_post_window_seconds = 10800
+
+# Minimum seconds between thread posts.
+thread_interval_seconds = 604800
+
+# --- LLM Provider ---
+# Configure the AI provider for content generation.
+# Supported: "openai", "anthropic", "ollama"
+[llm]
+# REQUIRED: LLM provider name.
+provider = "openai"
+
+# REQUIRED for openai/anthropic: API key.
+api_key = "your-api-key-here"
+
+# Model to use for content generation.
+model = "gpt-4o-mini"
+
+# Optional: Override the API base URL (useful for proxies or Ollama).
+# base_url = "http://localhost:11434/v1"
+
+# --- Target Account Monitoring ---
+# Monitor specific accounts for relationship-based engagement.
+# Instead of keyword-spray, engage meaningfully with people you follow.
+[targets]
+# Usernames to monitor (without @). Their tweets are fetched and scored
+# independently of the keyword discovery loop.
+# accounts = ["pmarca", "naval", "paulg"]
+
+# Maximum replies to target account tweets per day (separate from general limit).
+max_target_replies_per_day = 3
+
+# Automatically follow target accounts (if not already following).
+auto_follow = false
+
+# Days to wait after following before first engagement (avoids looking robotic).
+follow_warmup_days = 3
+
+# --- Data Storage ---
+[storage]
+# Path to the SQLite database file.
+db_path = "~/.tuitbot/tuitbot.db"
+
+# Number of days to retain data (0 = keep forever).
+retention_days = 90
+
+# --- Logging ---
+[logging]
+# Seconds between periodic status summaries (0 = disabled).
+# When enabled, prints action counts and loop health.
+status_interval_seconds = 3600
+
+# --- Active Hours Schedule ---
+# The bot sleeps outside these hours, preventing 3 AM posts.
+# Wrapping ranges are supported (e.g. start=22, end=6 for night owls).
+[schedule]
+# IANA timezone name. Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+timezone = "UTC"
+
+# Hour (0-23) when the bot becomes active.
+active_hours_start = 8
+
+# Hour (0-23) when the bot goes to sleep.
+active_hours_end = 22
+
+# Days of the week the bot is active. Use 3-letter abbreviations.
+active_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+# Preferred posting times for tweets (HH:MM in 24h format, in timezone above).
+# When set, the content loop posts at these specific times instead of every N hours.
+# Use "auto" for research-backed defaults: 09:15 (morning), 12:30 (lunch), 17:00 (end-of-day).
+# preferred_times = ["auto"]
+# preferred_times = ["09:15", "12:30", "17:00"]
+
+# Per-day overrides for preferred posting times.
+# Days not listed use the default preferred_times above.
+# Use an empty list to skip posting on a specific day.
+# [schedule.preferred_times_override]
+# Sat = ["11:00"]
+# Sun = []
+
+# Preferred day and time for weekly thread posting (overrides thread_interval_seconds).
+# thread_preferred_day = "Tue"
+# thread_preferred_time = "10:00"

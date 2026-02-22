@@ -56,7 +56,7 @@ pub async fn init_db(db_path: &str) -> Result<DbPool, StorageError> {
         .await
         .map_err(|e| StorageError::Connection { source: e })?;
 
-    sqlx::migrate!("../../migrations")
+    sqlx::migrate!("./migrations")
         .run(&pool)
         .await
         .map_err(|e| StorageError::Migration { source: e })?;
@@ -81,7 +81,7 @@ pub async fn init_test_db() -> Result<DbPool, StorageError> {
         .await
         .map_err(|e| StorageError::Connection { source: e })?;
 
-    sqlx::migrate!("../../migrations")
+    sqlx::migrate!("./migrations")
         .run(&pool)
         .await
         .map_err(|e| StorageError::Migration { source: e })?;
@@ -139,7 +139,7 @@ mod tests {
     async fn init_test_db_idempotent() {
         let pool = init_test_db().await.expect("first init");
         // Running migrations again should not fail (SQLx tracks applied migrations)
-        sqlx::migrate!("../../migrations")
+        sqlx::migrate!("./migrations")
             .run(&pool)
             .await
             .expect("second migration run");

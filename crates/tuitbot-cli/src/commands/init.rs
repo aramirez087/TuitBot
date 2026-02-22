@@ -20,7 +20,7 @@ use tuitbot_core::startup::data_dir;
 use super::{auth, run, test};
 
 /// Embedded copy of the example config shipped with the repo.
-const EXAMPLE_CONFIG: &str = include_str!("../../../../config.example.toml");
+const EXAMPLE_CONFIG: &str = include_str!("../../config.example.toml");
 
 /// Collected wizard answers.
 struct WizardResult {
