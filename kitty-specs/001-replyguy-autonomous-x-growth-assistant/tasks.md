@@ -150,11 +150,11 @@
 **Estimated prompt size**: ~400 lines
 
 ### Included Subtasks
-- [ ] T024 Define LlmProvider trait + types in `crates/replyguy-core/src/llm/mod.rs`
-- [ ] T025 Implement OpenAI-compatible provider in `crates/replyguy-core/src/llm/openai_compat.rs`
-- [ ] T026 [P] Implement Anthropic native provider in `crates/replyguy-core/src/llm/anthropic.rs`
-- [ ] T027 Implement provider factory in `crates/replyguy-core/src/llm/factory.rs`
-- [ ] T028 Implement ContentGenerator in `crates/replyguy-core/src/content/generator.rs`
+- [x] T024 Define LlmProvider trait + types in `crates/replyguy-core/src/llm/mod.rs`
+- [x] T025 Implement OpenAI-compatible provider in `crates/replyguy-core/src/llm/openai_compat.rs`
+- [x] T026 [P] Implement Anthropic native provider in `crates/replyguy-core/src/llm/anthropic.rs`
+- [x] T027 Implement provider factory in `crates/replyguy-core/src/llm/factory.rs`
+- [x] T028 Implement ContentGenerator in `crates/replyguy-core/src/content/generator.rs`
 
 ### Implementation Notes
 - Trait: `LlmProvider` with `complete(system, user_message, params) -> LlmResponse` and `health_check()`
