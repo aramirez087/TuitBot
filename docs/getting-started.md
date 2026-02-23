@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- X Developer App credentials
+- X Developer App credentials and funded X API credits (pay-per-usage; see [X API pricing](https://docs.x.com/x-api/getting-started/pricing))
 - One LLM provider:
   - OpenAI
   - Anthropic

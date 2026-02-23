@@ -97,7 +97,7 @@ Once a week, Tuitbot crafts a multi-tweet thread using proven structures: transf
 ### 6. Tracks Analytics
 Snapshots your follower count daily, measures engagement after 24 hours, and alerts you if followers drop. View your dashboard anytime using `tuitbot stats`.
 
-> **Note on X API access:** Discovery, replies, mentions, and target monitoring require a paid X API tier or pay-per-use credits. Posting tweets and threads works on the Free tier. See `docs/getting-started.md` for setup details.
+> **Note on X API access:** X API access is pay-per-usage (credits). Discovery, replies, mentions, target monitoring, and posting all require available credits. Legacy Basic/Pro subscriptions may still exist for older accounts. See `docs/getting-started.md` for setup details.
 
 ---
 
@@ -124,7 +124,7 @@ Tuitbot is engineered to keep your account totally safe and maintain your pristi
 
 | Requirement | Where to get it | Cost |
 |---|---|---|
-| **X API Developer Account** | [developer.x.com](https://developer.x.com) | Pay-per-use or Free |
+| **X API Developer Account** | [developer.x.com](https://developer.x.com) | Pay-per-usage (credits) |
 | **AI Provider** | [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), or [Ollama](https://ollama.ai/) | Varies (Ollama is Free) |
 
 ### Install

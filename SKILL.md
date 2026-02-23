@@ -287,5 +287,5 @@ Tuitbot ships with an OpenClaw plugin at `plugins/openclaw-tuitbot/` that bridge
 
 - **`tuitbot run` is long-running**: Start it as a background process. It does not return until stopped.
 - **`tuitbot auth` requires user interaction**: OAuth 2.0 PKCE flow requires the user to visit a URL and paste back a code. Works on headless servers (VPS, SSH, OpenClaw) — no local browser needed — but cannot be fully automated.
-- **X API tier limits**: Discovery and replies require a paid X API tier or pay-per-use credits. Posting tweets/threads works on the Free tier.
+- **X API tier limits**: X API access is pay-per-usage credits. Discovery, replies, mentions, target monitoring, tweets, and threads all require available credits (legacy Basic/Pro subscriptions may still exist for older accounts).
 - **Rate limits**: The agent respects X API rate limits and configurable posting limits. It will not exceed them.
