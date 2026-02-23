@@ -110,6 +110,14 @@ tuitbot tick --output json
 
 Use this mode with cron/systemd/launchd/OpenClaw.
 
+## Updating
+
+```bash
+tuitbot update
+```
+
+This checks for a new release, updates the binary, and upgrades your config with any new feature groups. Run it periodically to stay current.
+
 ## Health Check
 
 ```bash

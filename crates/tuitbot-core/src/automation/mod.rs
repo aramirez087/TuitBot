@@ -53,9 +53,60 @@ pub use target_loop::{
 pub use thread_loop::{ThreadGenerator, ThreadLoop, ThreadResult};
 
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+
+use crate::x_api::auth::TokenManager;
+use crate::x_api::XApiHttpClient;
+
+/// Background loop that refreshes the X API OAuth token before it expires.
+///
+/// Checks every 60 seconds whether the token is within 5 minutes of expiry.
+/// On successful refresh, updates the `XApiHttpClient`'s bearer token.
+/// On `AuthExpired` error (refresh token revoked), cancels the runtime for
+/// graceful shutdown.
+pub async fn run_token_refresh_loop(
+    token_manager: Arc<TokenManager>,
+    x_client: Arc<XApiHttpClient>,
+    cancel: CancellationToken,
+) {
+    let interval = Duration::from_secs(60);
+    loop {
+        tokio::select! {
+            () = cancel.cancelled() => {
+                tracing::debug!("Token refresh loop cancelled");
+                return;
+            }
+            () = tokio::time::sleep(interval) => {}
+        }
+
+        match token_manager.refresh_if_needed().await {
+            Ok(()) => {
+                // Update the HTTP client's bearer token with whatever is current.
+                let token = token_manager
+                    .tokens_lock()
+                    .read()
+                    .await
+                    .access_token
+                    .clone();
+                x_client.set_access_token(token).await;
+            }
+            Err(crate::error::XApiError::AuthExpired) => {
+                tracing::error!(
+                    "Token refresh failed: authentication expired. \
+                     Run `tuitbot auth` to re-authenticate. Shutting down."
+                );
+                cancel.cancel();
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Token refresh attempt failed, will retry next cycle");
+            }
+        }
+    }
+}
 
 /// Automation runtime that manages concurrent task lifecycles.
 ///

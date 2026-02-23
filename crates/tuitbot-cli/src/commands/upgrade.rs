@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use console::Style;
-use dialoguer::Confirm;
 use toml_edit::{value, Array, DocumentMut};
 
 use super::init::{
@@ -60,7 +59,7 @@ impl UpgradeGroup {
     }
 
     /// Human-readable name for display.
-    fn display_name(&self) -> &str {
+    pub(crate) fn display_name(&self) -> &str {
         match self {
             UpgradeGroup::Persona => "Persona",
             UpgradeGroup::Targets => "Target Accounts",
@@ -70,7 +69,7 @@ impl UpgradeGroup {
     }
 
     /// One-line description of the feature.
-    fn description(&self) -> &str {
+    pub(crate) fn description(&self) -> &str {
         match self {
             UpgradeGroup::Persona => {
                 "Strong opinions, experiences, and content pillars for authentic content"
@@ -146,7 +145,24 @@ fn key_exists(table: &toml::value::Table, dotted_path: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Run the upgrade command explicitly.
+///
+/// **Deprecated:** Use `tuitbot update --config-only` instead. This command
+/// will be removed in a future release.
 pub async fn execute(non_interactive: bool, config_path_str: &str) -> Result<()> {
+    let dim = Style::new().dim();
+    eprintln!(
+        "{}",
+        Style::new()
+            .yellow()
+            .bold()
+            .apply_to("Note: 'tuitbot upgrade' is deprecated. Use 'tuitbot update' instead.")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("  'tuitbot update' also checks for new binary releases.")
+    );
+    eprintln!();
+
     let config_path = expand_tilde(config_path_str);
 
     if !config_path.exists() {
@@ -176,53 +192,8 @@ pub async fn execute(non_interactive: bool, config_path_str: &str) -> Result<()>
     run_upgrade_wizard(&config_path, &missing)
 }
 
-/// Check for missing features before `tuitbot run` and offer to configure.
-pub async fn check_before_run(config_path_str: &str) -> Result<()> {
-    let config_path = expand_tilde(config_path_str);
-
-    if !config_path.exists() {
-        return Ok(());
-    }
-
-    let missing = detect_missing_features(&config_path)?;
-    if missing.is_empty() {
-        return Ok(());
-    }
-
-    let bold = Style::new().bold();
-    let dim = Style::new().dim();
-
-    eprintln!();
-    eprintln!(
-        "{}",
-        bold.apply_to("New features available in your config:")
-    );
-    for group in &missing {
-        eprintln!("  • {} — {}", group.display_name(), group.description());
-    }
-    eprintln!();
-
-    let configure_now = Confirm::new()
-        .with_prompt("Configure new features now?")
-        .default(false)
-        .interact()?;
-
-    if !configure_now {
-        eprintln!(
-            "{}",
-            dim.apply_to("Tip: Run 'tuitbot upgrade' any time to configure new features.")
-        );
-        eprintln!();
-        return Ok(());
-    }
-
-    run_upgrade_wizard(&config_path, &missing)?;
-
-    Ok(())
-}
-
 /// Expand `~` at the start of a path to the user's home directory.
-fn expand_tilde(path: &str) -> PathBuf {
+pub(crate) fn expand_tilde(path: &str) -> PathBuf {
     if let Some(rest) = path.strip_prefix("~/") {
         if let Ok(home) = std::env::var("HOME") {
             return PathBuf::from(home).join(rest);
@@ -235,7 +206,7 @@ fn expand_tilde(path: &str) -> PathBuf {
 // Interactive wizard
 // ---------------------------------------------------------------------------
 
-fn run_upgrade_wizard(config_path: &Path, missing: &[UpgradeGroup]) -> Result<()> {
+pub(crate) fn run_upgrade_wizard(config_path: &Path, missing: &[UpgradeGroup]) -> Result<()> {
     let bold = Style::new().bold();
 
     eprintln!();
@@ -283,7 +254,7 @@ fn run_upgrade_wizard(config_path: &Path, missing: &[UpgradeGroup]) -> Result<()
 // Non-interactive defaults
 // ---------------------------------------------------------------------------
 
-fn apply_defaults(config_path: &Path, missing: &[UpgradeGroup]) -> Result<()> {
+pub(crate) fn apply_defaults(config_path: &Path, missing: &[UpgradeGroup]) -> Result<()> {
     let answers = UpgradeAnswers {
         persona: if missing.contains(&UpgradeGroup::Persona) {
             Some((vec![], vec![], vec![]))

@@ -8,9 +8,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tuitbot_core::automation::{
-    run_posting_queue_with_approval, scheduler_from_config, status_reporter::run_status_reporter,
-    AnalyticsLoop, ContentLoop, DiscoveryLoop, MentionsLoop, PostExecutor, Runtime, TargetLoop,
-    ThreadLoop,
+    run_posting_queue_with_approval, run_token_refresh_loop, scheduler_from_config,
+    status_reporter::run_status_reporter, AnalyticsLoop, ContentLoop, DiscoveryLoop, MentionsLoop,
+    PostExecutor, Runtime, TargetLoop, ThreadLoop,
 };
 use tuitbot_core::config::Config;
 use tuitbot_core::startup::format_startup_banner;
@@ -62,6 +62,14 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             .await;
         }
     });
+
+    // Spawn token refresh loop.
+    {
+        let cancel = runtime.cancel_token();
+        let tm = deps.token_manager.clone();
+        let xc = deps.x_client.clone();
+        runtime.spawn("token-refresh", run_token_refresh_loop(tm, xc, cancel));
+    }
 
     // --- Content loop (all tiers) ---
     {

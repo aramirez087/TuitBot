@@ -22,6 +22,15 @@ tuitbot tick --ignore-schedule
 tuitbot tick --output json
 ```
 
+## Update
+
+```bash
+tuitbot update              # check for new release + upgrade config
+tuitbot update --check      # check only, don't install
+tuitbot update --config-only        # skip binary, upgrade config only
+tuitbot update --non-interactive    # skip all prompts
+```
+
 ## Approval queue
 
 ```bash

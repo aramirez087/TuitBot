@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use tokio::sync::mpsc;
 
 use tuitbot_core::automation::adapters::{
@@ -21,8 +22,11 @@ use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::safety::SafetyGuard;
 use tuitbot_core::scoring::ScoringEngine;
-use tuitbot_core::startup::{expand_tilde, load_tokens_from_file, ApiTier, TierCapabilities};
+use tuitbot_core::startup::{
+    expand_tilde, load_tokens_from_file, token_file_path, ApiTier, TierCapabilities,
+};
 use tuitbot_core::storage;
+use tuitbot_core::x_api::auth::{TokenManager, Tokens};
 use tuitbot_core::x_api::tier::{self, detect_tier};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
@@ -68,6 +72,10 @@ pub struct RuntimeDeps {
     // Approval
     pub approval_queue: Option<Arc<dyn ApprovalQueue>>,
 
+    // Token refresh
+    pub token_manager: Arc<TokenManager>,
+    pub x_client: Arc<XApiHttpClient>,
+
     // Config slices needed by loops
     pub keywords: Vec<String>,
     pub target_loop_config: TargetLoopConfig,
@@ -83,19 +91,46 @@ impl RuntimeDeps {
         let db_path = expand_tilde(&config.storage.db_path);
         tracing::info!(path = %db_path.display(), "Database path configured");
 
-        // 2. Load OAuth tokens.
-        let tokens = load_tokens_from_file().map_err(|e| anyhow::anyhow!("{e}"))?;
+        // 2. Load OAuth tokens and create token manager.
+        let stored = load_tokens_from_file().map_err(|e| anyhow::anyhow!("{e}"))?;
 
-        if tokens.is_expired() {
-            anyhow::bail!("Authentication expired. Run `tuitbot auth` to re-authenticate.");
+        let auth_tokens = Tokens {
+            access_token: stored.access_token.clone(),
+            refresh_token: stored.refresh_token.clone().unwrap_or_default(),
+            expires_at: stored.expires_at.unwrap_or_else(Utc::now),
+            scopes: Vec::new(),
+        };
+
+        let token_manager = Arc::new(TokenManager::new(
+            auth_tokens,
+            config.x_api.client_id.clone(),
+            token_file_path(),
+        ));
+
+        // Attempt refresh if token is expired or near expiry, instead of bailing.
+        if let Err(e) = token_manager.refresh_if_needed().await {
+            if stored.is_expired() {
+                anyhow::bail!(
+                    "Authentication expired and refresh failed ({e}). Run `tuitbot auth` to re-authenticate."
+                );
+            }
+            // Token not yet expired but refresh failed — log and continue.
+            tracing::warn!(error = %e, "Token refresh attempt failed, continuing with current token");
         }
+
+        let current_token = token_manager
+            .tokens_lock()
+            .read()
+            .await
+            .access_token
+            .clone();
         tracing::info!(
-            expires_in = %tokens.format_expiry(),
+            expires_in = %stored.format_expiry(),
             "OAuth tokens loaded"
         );
 
         // 3. Determine API tier by probing the search endpoint.
-        let x_client = XApiHttpClient::new(tokens.access_token.clone());
+        let x_client = XApiHttpClient::new(current_token);
         let detected = detect_tier(&x_client)
             .await
             .map_err(|e| anyhow::anyhow!("Tier detection failed: {e}"))?;
@@ -246,6 +281,8 @@ impl RuntimeDeps {
             active_schedule,
             post_rx: Some(post_rx),
             approval_queue,
+            token_manager,
+            x_client: x_client.clone(),
             keywords,
             target_loop_config,
         })
