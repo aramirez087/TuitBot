@@ -16,7 +16,7 @@ Tuitbot grows your X account on autopilot — finding relevant conversations, re
 
 Built for **founders**, **indie hackers**, and **solo makers** who'd rather build their product than spend hours on X.
 
-[Two Modes](#two-operating-modes) · [Features](#features) · [Getting Started](#getting-started) · [Quick Commands](#quick-commands) · [Release Strategy](#release-strategy-ci) · [Full Docs](docs/index.md)
+[Two Modes](#two-operating-modes) · [Features](#features) · [Getting Started](#getting-started) · [Quick Commands](#quick-commands) · [Release Strategy](#release-strategy-ci) · [Full Docs](https://aramirez087.github.io/TuitBot/)
 
 </div>
 
@@ -97,7 +97,7 @@ Once a week, Tuitbot crafts a multi-tweet thread using proven structures: transf
 ### 6. Tracks Analytics
 Snapshots your follower count daily, measures engagement after 24 hours, and alerts you if followers drop. View your dashboard anytime using `tuitbot stats`.
 
-> **Note on X API access:** X API access is pay-per-usage (credits). Discovery, replies, mentions, target monitoring, and posting all require available credits. Legacy Basic/Pro subscriptions may still exist for older accounts. See `docs/getting-started.md` for setup details.
+> **Note on X API access:** X API access is pay-per-usage (credits). Discovery, replies, mentions, target monitoring, and posting all require available credits. Legacy Basic/Pro subscriptions may still exist for older accounts. See [Getting Started](https://aramirez087.github.io/TuitBot/getting-started/) for setup details.
 
 ---
 
@@ -199,9 +199,9 @@ Use your scheduler to invoke `tuitbot tick --output json` every 15-30 minutes.
 
 For full production examples (cron, systemd, launchd, OpenClaw), see:
 
-- `docs/getting-started.md`
-- `docs/operations.md`
-- `docs/mcp-reference.md`
+- [Getting Started](https://aramirez087.github.io/TuitBot/getting-started/)
+- [Operations](https://aramirez087.github.io/TuitBot/operations/)
+- [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/)
 
 ---
 
@@ -231,15 +231,15 @@ tuitbot mcp serve
 
 ## Documentation
 
-This README is intentionally concise. The full system docs are in `docs/`:
+This README is intentionally concise. The full system docs are on GitHub Pages:
 
-- `docs/index.md` - complete map
-- `docs/getting-started.md` - install and first run
-- `docs/configuration.md` - config model and production guidance
-- `docs/cli-reference.md` - command reference
-- `docs/mcp-reference.md` - AI agent integration
-- `docs/operations.md` - deployment and runbook
-- `docs/release-and-publishing.md` - release-plz and crates.io
+- [Docs Home](https://aramirez087.github.io/TuitBot/) - complete map
+- [Getting Started](https://aramirez087.github.io/TuitBot/getting-started/) - install and first run
+- [Configuration](https://aramirez087.github.io/TuitBot/configuration/) - config model and production guidance
+- [CLI Reference](https://aramirez087.github.io/TuitBot/cli-reference/) - command reference
+- [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) - AI agent integration
+- [Operations](https://aramirez087.github.io/TuitBot/operations/) - deployment and runbook
+- [Release and Publishing](https://aramirez087.github.io/TuitBot/release-and-publishing/) - release-plz and crates.io
 
 ---
 
@@ -260,7 +260,7 @@ Repository setup required once: enable `Settings -> Actions -> General -> Allow 
 Set a `CARGO_REGISTRY_TOKEN` secret from crates.io (`Account Settings -> API Tokens`) so CI can publish crates.
 Optional but recommended: set a `RELEASE_PLZ_TOKEN` (PAT) secret so workflows also run on release PRs created by automation.
 
-Full details: `docs/release-and-publishing.md`.
+Full details: [Release and Publishing](https://aramirez087.github.io/TuitBot/release-and-publishing/).
 
 ---
 
@@ -269,7 +269,7 @@ Full details: `docs/release-and-publishing.md`.
 - Auth issues: callback URL must be exactly `http://127.0.0.1:8080/callback`.
 - Lock issues on `tick`: ensure no other `tuitbot run` or `tuitbot tick` process is active.
 - Debug logs: `RUST_LOG=tuitbot_core=debug tuitbot run`.
-- Full troubleshooting guide: `docs/troubleshooting.md`.
+- Full troubleshooting guide: [Troubleshooting](https://aramirez087.github.io/TuitBot/troubleshooting/).
 
 ---
 
