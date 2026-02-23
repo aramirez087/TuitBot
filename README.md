@@ -219,6 +219,7 @@ tuitbot tick --output json
 tuitbot tick --dry-run
 
 # Operations
+tuitbot update
 tuitbot stats --output json
 tuitbot settings --show --output json
 tuitbot approve --list --output json

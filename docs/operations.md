@@ -27,6 +27,16 @@
 
 ## Upgrades
 
-- Upgrade binary.
-- Run `tuitbot test`.
-- Validate auth and rate-limit state.
+```bash
+tuitbot update
+```
+
+This single command:
+
+1. Checks GitHub Releases for a newer `tuitbot` binary.
+2. Downloads, verifies SHA256, and atomically replaces the running binary.
+3. Detects new config features and walks you through adding them.
+
+Use `--check` to see if an update is available without installing. Use `--config-only` to skip the binary update. Use `--non-interactive` in CI to apply config defaults automatically.
+
+After updating, run `tuitbot test` to validate auth and connectivity.

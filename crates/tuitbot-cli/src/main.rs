@@ -74,7 +74,10 @@ enum Commands {
     Stats(commands::StatsArgs),
     /// Review and approve queued posts
     Approve(commands::ApproveArgs),
+    /// Check for updates and upgrade binary + config
+    Update(commands::UpdateArgs),
     /// Configure new features added since last setup
+    #[command(hide = true)]
     Upgrade(commands::UpgradeArgs),
     /// Run each enabled loop once and exit (for external schedulers)
     Tick(commands::TickArgs),
@@ -110,10 +113,19 @@ async fn main() -> anyhow::Result<()> {
 
     let output_format = commands::OutputFormat::from_str(&cli.output);
 
-    // Handle `init`, `upgrade`, and `settings` before general config loading
-    // (they manage their own config lifecycle).
+    // Handle `init`, `update`, `upgrade`, and `settings` before general config
+    // loading (they manage their own config lifecycle).
     if let Commands::Init(args) = cli.command {
         return commands::init::execute(args.force, args.non_interactive).await;
+    }
+    if let Commands::Update(args) = cli.command {
+        return commands::update::execute(
+            args.non_interactive,
+            args.check,
+            args.config_only,
+            &cli.config,
+        )
+        .await;
     }
     if let Commands::Upgrade(args) = cli.command {
         return commands::upgrade::execute(args.non_interactive, &cli.config).await;
@@ -132,11 +144,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Check for config upgrade opportunity before `run`
     if matches!(&cli.command, Commands::Run(_)) && std::io::stdin().is_terminal() {
-        commands::upgrade::check_before_run(&cli.config).await?;
+        commands::update::check_before_run(&cli.config).await?;
     }
 
     match cli.command {
-        Commands::Init(_) | Commands::Upgrade(_) | Commands::Settings(_) => unreachable!(),
+        Commands::Init(_) | Commands::Update(_) | Commands::Upgrade(_) | Commands::Settings(_) => {
+            unreachable!()
+        }
         Commands::Mcp(args) => match args.command {
             commands::McpSubcommand::Serve => {
                 commands::mcp::execute(&config).await?;

@@ -11,6 +11,7 @@ pub mod settings;
 pub mod stats;
 pub mod test;
 pub mod tick;
+pub mod update;
 pub mod upgrade;
 
 use clap::Args;
@@ -164,6 +165,22 @@ pub struct SettingsArgs {
     /// Jump directly to a specific category
     #[arg(value_name = "CATEGORY")]
     pub category: Option<String>,
+}
+
+/// Arguments for the `update` subcommand.
+#[derive(Debug, Args)]
+pub struct UpdateArgs {
+    /// Skip all interactive prompts
+    #[arg(long)]
+    pub non_interactive: bool,
+
+    /// Only check for updates, don't install
+    #[arg(long)]
+    pub check: bool,
+
+    /// Skip binary update, only upgrade config
+    #[arg(long)]
+    pub config_only: bool,
 }
 
 /// Arguments for the `upgrade` subcommand.
