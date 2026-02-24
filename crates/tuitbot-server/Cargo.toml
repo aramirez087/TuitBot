@@ -1,6 +1,6 @@
 [package]
 name = "tuitbot-server"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 rust-version = "1.75"
 description = "HTTP API server for Tuitbot autonomous X growth assistant"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/tuitbot-server"
 keywords = ["x-api", "twitter", "api-server", "automation", "dashboard"]
 
 [dependencies]
-tuitbot-core = { version = "0.1.3", path = "../tuitbot-core" }
+tuitbot-core = { version = "0.1.4", path = "../tuitbot-core" }
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
@@ -27,7 +27,7 @@ rand = "0.8"
 hex = "0.4"
 
 [dev-dependencies]
-tuitbot-core = { version = "0.1.3", path = "../tuitbot-core", features = ["test-helpers"] }
+tuitbot-core = { version = "0.1.4", path = "../tuitbot-core", features = ["test-helpers"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tempfile = "3"

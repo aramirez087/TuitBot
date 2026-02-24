@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.3...tuitbot-cli-v0.1.4) - 2026-02-24
+
+### Added
+
+- Add LLM cost tracking, pricing, and a dashboard for usage reporting.
+- Remove `auto_follow` and `follow_warmup_days` settings, streamlining target account management and reinforcing the co-pilot approach.
+- remove auto-follow and follow warmup features for target accounts
+- Add aarch64-unknown-linux-gnu support to release builds and the update command.
+- Add pricing support for Gemini and DeepSeek LLM models.
+- Implement a new strategy module for weekly performance reports, recommendations, and a dedicated dashboard page.
+
 ### Added
 
 - Add Strategy dashboard page with weekly growth scorecard, recommendation engine, and historical trend charts.
