@@ -5,16 +5,29 @@
 	let {
 		schedule,
 		selectedTime = null,
+		targetDate = null,
 		onselect
 	}: {
 		schedule: ScheduleConfig | null;
 		selectedTime: string | null;
+		targetDate?: Date | null;
 		onselect: (time: string) => void;
 	} = $props();
 
 	let customTime = $state('');
 
 	const preferredTimes = $derived(schedule?.preferred_times ?? []);
+
+	const dateDisplay = $derived(() => {
+		if (!targetDate) return 'today';
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+		const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+		if (diffDays === 0) return 'today';
+		if (diffDays === 1) return 'tomorrow';
+		return targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	});
 
 	function selectCustom() {
 		if (customTime && /^\d{2}:\d{2}$/.test(customTime)) {
@@ -26,7 +39,7 @@
 <div class="time-picker">
 	<div class="picker-label">
 		<Clock size={12} />
-		<span>Schedule for</span>
+		<span>Schedule for {dateDisplay()}</span>
 	</div>
 
 	{#if preferredTimes.length > 0}

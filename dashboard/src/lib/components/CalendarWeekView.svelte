@@ -7,6 +7,7 @@
 		schedule,
 		days,
 		onslotclick,
+		ondayclick,
 		oncancel,
 		onedit
 	}: {
@@ -14,6 +15,7 @@
 		schedule: ScheduleConfig | null;
 		days: Date[];
 		onslotclick?: (date: Date, time: string) => void;
+		ondayclick?: (date: Date) => void;
 		oncancel?: (id: number) => void;
 		onedit?: (id: number) => void;
 	} = $props();
@@ -118,7 +120,7 @@
 	<div class="week-header">
 		<div class="time-gutter"></div>
 		{#each days as day, i}
-			<div class="day-header" class:today={isToday(day)}>
+			<button class="day-header" class:today={isToday(day)} onclick={() => ondayclick?.(day)}>
 				<span class="day-label">{dayLabels[i]}</span>
 				<span class="day-date" class:today={isToday(day)}>
 					{#if day.getDate() === 1 || i === 0}
@@ -126,7 +128,7 @@
 					{/if}
 					{formatDay(day)}
 				</span>
-			</div>
+			</button>
 		{/each}
 	</div>
 
@@ -150,7 +152,7 @@
 								<ContentItem {item} {oncancel} {onedit} />
 							{/each}
 						{:else}
-							<span class="empty-dot"></span>
+							<span class="empty-plus">+</span>
 						{/if}
 					</button>
 				{/each}
@@ -166,11 +168,15 @@
 			</div>
 			{#each days as day}
 				{@const unslotted = preferredTimes.length > 0 ? getUnslottedItems(day) : (itemsByDate().get(dateKey(day)) ?? [])}
-				<div class="slot-cell overflow-cell" class:today={isToday(day)}>
-					{#each unslotted as item}
-						<ContentItem {item} {oncancel} {onedit} />
-					{/each}
-				</div>
+				<button class="slot-cell overflow-cell" class:today={isToday(day)} onclick={() => ondayclick?.(day)}>
+					{#if unslotted.length > 0}
+						{#each unslotted as item}
+							<ContentItem {item} {oncancel} {onedit} />
+						{/each}
+					{:else}
+						<span class="empty-plus">+</span>
+					{/if}
+				</button>
 			{/each}
 		</div>
 	{/if}
@@ -213,7 +219,17 @@
 		align-items: center;
 		padding: 8px 4px;
 		border-right: 1px solid var(--color-border-subtle);
+		border-top: none;
+		border-bottom: none;
+		border-left: none;
+		background: transparent;
+		cursor: pointer;
 		gap: 2px;
+		transition: background 0.15s ease;
+	}
+
+	.day-header:hover {
+		background: var(--color-surface-hover);
 	}
 
 	.day-header:last-child {
@@ -290,23 +306,23 @@
 		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 	}
 
-	.overflow-cell {
-		cursor: default;
+	.empty-plus {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		min-height: 32px;
+		font-size: 16px;
+		font-weight: 300;
+		color: var(--color-border);
+		opacity: 0;
+		transition: opacity 0.15s ease, color 0.15s ease;
 	}
 
-	.empty-dot {
-		display: block;
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--color-border);
-		margin: auto;
-		opacity: 0.4;
-	}
-
-	.slot-cell:hover .empty-dot {
-		background: var(--color-accent);
-		opacity: 0.6;
+	.slot-cell:hover .empty-plus {
+		opacity: 1;
+		color: var(--color-accent);
 	}
 
 	.overflow-row {
