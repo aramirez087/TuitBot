@@ -47,7 +47,7 @@
 	};
 	/* eslint-enable @typescript-eslint/no-explicit-any */
 
-	const icon = $derived(iconMap[action.action_type] ?? Search);
+	const Icon = $derived(iconMap[action.action_type] ?? Search);
 
 	const statusClass = $derived(
 		action.status === 'success'
@@ -62,7 +62,7 @@
 
 <div class="activity-item">
 	<div class="item-dot {statusClass}">
-		<svelte:component this={icon} size={14} />
+		<Icon size={14} />
 	</div>
 	<div class="item-body">
 		<div class="item-header">

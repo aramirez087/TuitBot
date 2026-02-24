@@ -71,6 +71,8 @@ pub async fn auth_middleware(
         || path == "/api/settings/status"
         || path == "/settings/init"
         || path == "/api/settings/init"
+        || path == "/ws"
+        || path == "/api/ws"
     {
         return next.run(request).await;
     }

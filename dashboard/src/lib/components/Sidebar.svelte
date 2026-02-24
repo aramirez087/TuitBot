@@ -129,12 +129,12 @@
 					: "Switch to dark mode"}
 			>
 				{#if $theme === "dark"}
-					<Sun size={16} />
-				{:else}
 					<Moon size={16} />
+				{:else}
+					<Sun size={16} />
 				{/if}
 				{#if !collapsed}
-					<span>{$theme === "dark" ? "Light" : "Dark"}</span>
+					<span>{$theme === "dark" ? "Dark" : "Light"}</span>
 				{/if}
 			</button>
 
