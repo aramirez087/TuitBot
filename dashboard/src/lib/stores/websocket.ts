@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 
 /** Events pushed by the tuitbot-server WebSocket. */
 export interface WsEvent {
-    type: 'ActionPerformed' | 'ApprovalQueued' | 'ApprovalUpdated' | 'FollowerUpdate' | 'RuntimeStatus' | 'Error';
+    type: 'ActionPerformed' | 'ApprovalQueued' | 'ApprovalUpdated' | 'FollowerUpdate' | 'RuntimeStatus' | 'ContentScheduled' | 'Error';
     [key: string]: unknown;
 }
 
