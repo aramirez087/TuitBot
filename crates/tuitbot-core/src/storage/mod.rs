@@ -9,9 +9,11 @@ pub mod approval_queue;
 pub mod author_interactions;
 pub mod cleanup;
 pub mod cursors;
+pub mod llm_usage;
 pub mod rate_limits;
 pub mod replies;
 pub mod scheduled_content;
+pub mod strategy;
 pub mod target_accounts;
 pub mod threads;
 pub mod tweets;
@@ -136,6 +138,7 @@ mod tests {
         assert!(table_names.contains(&"content_scores"));
         assert!(table_names.contains(&"approval_queue"));
         assert!(table_names.contains(&"scheduled_content"));
+        assert!(table_names.contains(&"llm_usage"));
     }
 
     #[tokio::test]

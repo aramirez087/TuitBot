@@ -44,7 +44,6 @@ struct WizardResult {
     content_pillars: Vec<String>,
     // Target accounts
     target_accounts: Vec<String>,
-    auto_follow: bool,
     // Approval mode
     approval_mode: bool,
     // Schedule
@@ -310,8 +309,7 @@ fn step_x_api() -> Result<WizardResult> {
         persona_experiences: vec![],
         content_pillars: vec![],
         target_accounts: vec![],
-        auto_follow: false,
-        approval_mode: false,
+        approval_mode: true,
         timezone: "UTC".to_string(),
         active_hours_start: 8,
         active_hours_end: 22,
@@ -566,18 +564,16 @@ fn step_target_accounts(prev: WizardResult) -> Result<WizardResult> {
     );
     eprintln!();
 
-    let (accounts, auto_follow) = prompt_target_accounts()?;
+    let accounts = prompt_target_accounts()?;
 
     Ok(WizardResult {
         target_accounts: accounts,
-        auto_follow,
         ..prev
     })
 }
 
 /// Collect target account fields interactively.
-/// Returns (accounts, auto_follow).
-pub(crate) fn prompt_target_accounts() -> Result<(Vec<String>, bool)> {
+pub(crate) fn prompt_target_accounts() -> Result<Vec<String>> {
     let accounts_raw: String = Input::new()
         .with_prompt("Accounts to monitor, comma-separated @usernames (Enter to skip)")
         .allow_empty(true)
@@ -588,18 +584,9 @@ pub(crate) fn prompt_target_accounts() -> Result<(Vec<String>, bool)> {
         .map(|a| a.trim_start_matches('@').to_string())
         .collect();
 
-    let auto_follow = if !accounts.is_empty() {
-        Confirm::new()
-            .with_prompt("Auto-follow target accounts?")
-            .default(false)
-            .interact()?
-    } else {
-        false
-    };
-
     eprintln!();
 
-    Ok((accounts, auto_follow))
+    Ok(accounts)
 }
 
 /// Step 7/8: Approval Mode.
@@ -620,7 +607,7 @@ fn step_approval_mode(prev: WizardResult) -> Result<WizardResult> {
 pub(crate) fn prompt_approval_mode() -> Result<bool> {
     let approval_mode = Confirm::new()
         .with_prompt("Queue posts for review before posting?")
-        .default(false)
+        .default(true)
         .interact()?;
 
     eprintln!();
@@ -823,12 +810,6 @@ fn print_summary(result: &WizardResult) {
             result.target_accounts.join(", ")
         }
     );
-    if !result.target_accounts.is_empty() {
-        eprintln!(
-            "  Auto-follow:       {}",
-            if result.auto_follow { "yes" } else { "no" }
-        );
-    }
     eprintln!(
         "  Approval Mode:     {}",
         if result.approval_mode { "yes" } else { "no" }
@@ -980,18 +961,15 @@ fn render_config_toml(r: &WizardResult) -> String {
         "# --- Target Accounts ---\n\
          # Monitor specific accounts and reply to their conversations.\n\
          # [targets]\n\
-         # accounts = [\"elonmusk\", \"levelsio\"]\n\
-         # auto_follow = false"
+         # accounts = [\"elonmusk\", \"levelsio\"]"
             .to_string()
     } else {
         format!(
             "# --- Target Accounts ---\n\
              # Monitor specific accounts and reply to their conversations.\n\
              [targets]\n\
-             accounts = {accounts}\n\
-             auto_follow = {auto_follow}",
+             accounts = {accounts}",
             accounts = format_toml_array(&r.target_accounts),
-            auto_follow = r.auto_follow,
         )
     };
 
@@ -1208,7 +1186,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "openai".to_string(),
             llm_api_key: Some("sk-test-key".to_string()),
@@ -1273,7 +1250,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1327,7 +1303,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1375,7 +1350,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1431,7 +1405,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1479,7 +1452,6 @@ mod tests {
             persona_experiences: vec!["Built 3 startups".to_string()],
             content_pillars: vec!["Developer tools".to_string(), "Productivity".to_string()],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1535,7 +1507,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec!["elonmusk".to_string(), "levelsio".to_string()],
-            auto_follow: true,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1560,7 +1531,6 @@ mod tests {
             toml::from_str(&toml_str).expect("rendered TOML should parse");
 
         assert_eq!(config.targets.accounts, vec!["elonmusk", "levelsio"]);
-        assert!(config.targets.auto_follow);
     }
 
     #[test]
@@ -1581,7 +1551,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: true,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,
@@ -1626,7 +1595,6 @@ mod tests {
             persona_experiences: vec![],
             content_pillars: vec![],
             target_accounts: vec![],
-            auto_follow: false,
             approval_mode: false,
             llm_provider: "ollama".to_string(),
             llm_api_key: None,

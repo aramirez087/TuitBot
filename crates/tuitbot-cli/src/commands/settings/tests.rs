@@ -142,7 +142,6 @@ fn render_config_with_all_fields() {
     config.llm.model = "gpt-4o-mini".to_string();
     config.llm.base_url = Some("https://api.openai.com".to_string());
     config.targets.accounts = vec!["user1".to_string()];
-    config.targets.auto_follow = true;
     config.approval_mode = true;
 
     let toml_str = render_config(&config);
@@ -154,7 +153,6 @@ fn render_config_with_all_fields() {
     );
     assert_eq!(parsed.business.brand_voice, Some("Friendly".to_string()));
     assert_eq!(parsed.targets.accounts, vec!["user1"]);
-    assert!(parsed.targets.auto_follow);
     assert!(parsed.approval_mode);
     assert_eq!(parsed.llm.api_key, Some("sk-test".to_string()));
 }

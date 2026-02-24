@@ -326,18 +326,6 @@ impl XApiClient for XApiHttpClient {
             .map_err(|e| XApiError::Network { source: e })
     }
 
-    async fn follow_user(
-        &self,
-        source_user_id: &str,
-        target_user_id: &str,
-    ) -> Result<(), XApiError> {
-        let path = format!("/users/{source_user_id}/following");
-        let body = serde_json::json!({ "target_user_id": target_user_id });
-
-        self.post_json(&path, &body).await?;
-        Ok(())
-    }
-
     async fn get_user_by_username(&self, username: &str) -> Result<User, XApiError> {
         let path = format!("/users/by/username/{username}");
         let params = [("user.fields", USER_FIELDS)];

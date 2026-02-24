@@ -17,7 +17,8 @@
 		'3': '/approval',
 		'4': '/content',
 		'5': '/targets',
-		'6': '/settings',
+		'6': '/strategy',
+		'7': '/settings',
 	};
 
 	function handleKeydown(e: KeyboardEvent) {

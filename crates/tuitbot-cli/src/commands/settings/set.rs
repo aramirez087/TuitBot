@@ -404,20 +404,6 @@ pub(super) fn set_direct(config: &mut Config, kv: &str, config_path: &Path) -> R
             "max_target_replies_per_day",
             value,
         )?,
-        "targets.auto_follow" => set_bool(
-            &mut tracker,
-            &mut config.targets.auto_follow,
-            "targets",
-            "auto_follow",
-            value,
-        )?,
-        "targets.follow_warmup_days" => set_u32(
-            &mut tracker,
-            &mut config.targets.follow_warmup_days,
-            "targets",
-            "follow_warmup_days",
-            value,
-        )?,
 
         // LLM
         "llm.provider" => set_string(

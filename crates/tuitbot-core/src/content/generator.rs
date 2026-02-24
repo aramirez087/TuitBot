@@ -6,7 +6,33 @@
 use crate::config::BusinessProfile;
 use crate::content::frameworks::{ReplyArchetype, ThreadStructure, TweetFormat};
 use crate::error::LlmError;
-use crate::llm::{GenerationParams, LlmProvider};
+use crate::llm::{GenerationParams, LlmProvider, TokenUsage};
+
+/// Output from a single-text generation (reply or tweet).
+#[derive(Debug, Clone)]
+pub struct GenerationOutput {
+    /// The generated text.
+    pub text: String,
+    /// Accumulated token usage across all attempts (including retries).
+    pub usage: TokenUsage,
+    /// The model that produced the final response.
+    pub model: String,
+    /// The provider name (e.g., "openai", "anthropic", "ollama").
+    pub provider: String,
+}
+
+/// Output from thread generation.
+#[derive(Debug, Clone)]
+pub struct ThreadGenerationOutput {
+    /// The generated tweets in thread order.
+    pub tweets: Vec<String>,
+    /// Accumulated token usage across all attempts (including retries).
+    pub usage: TokenUsage,
+    /// The model that produced the final response.
+    pub model: String,
+    /// The provider name.
+    pub provider: String,
+}
 
 /// Maximum characters allowed in a single tweet.
 const MAX_TWEET_CHARS: usize = 280;
@@ -40,7 +66,7 @@ impl ContentGenerator {
         tweet_text: &str,
         tweet_author: &str,
         mention_product: bool,
-    ) -> Result<String, LlmError> {
+    ) -> Result<GenerationOutput, LlmError> {
         self.generate_reply_with_archetype(tweet_text, tweet_author, mention_product, None)
             .await
     }
@@ -52,7 +78,7 @@ impl ContentGenerator {
         tweet_author: &str,
         mention_product: bool,
         archetype: Option<ReplyArchetype>,
-    ) -> Result<String, LlmError> {
+    ) -> Result<GenerationOutput, LlmError> {
         tracing::debug!(
             author = %tweet_author,
             archetype = ?archetype,
@@ -128,12 +154,20 @@ impl ContentGenerator {
             .provider
             .complete(&system, &user_message, &params)
             .await?;
+        let mut usage = resp.usage.clone();
+        let provider_name = self.provider.name().to_string();
+        let model = resp.model.clone();
         let text = resp.text.trim().to_string();
 
         tracing::debug!(chars = text.len(), "Generated reply");
 
         if validate_length(&text, MAX_TWEET_CHARS) {
-            return Ok(text);
+            return Ok(GenerationOutput {
+                text,
+                usage,
+                model,
+                provider: provider_name,
+            });
         }
 
         // Retry with stricter instruction
@@ -141,20 +175,31 @@ impl ContentGenerator {
             "{user_message}\n\nImportant: Your reply MUST be under 280 characters. Be more concise."
         );
         let resp = self.provider.complete(&system, &retry_msg, &params).await?;
+        usage.accumulate(&resp.usage);
         let text = resp.text.trim().to_string();
 
         if validate_length(&text, MAX_TWEET_CHARS) {
-            return Ok(text);
+            return Ok(GenerationOutput {
+                text,
+                usage,
+                model,
+                provider: provider_name,
+            });
         }
 
         // Last resort: truncate at sentence boundary
-        Ok(truncate_at_sentence(&text, MAX_TWEET_CHARS))
+        Ok(GenerationOutput {
+            text: truncate_at_sentence(&text, MAX_TWEET_CHARS),
+            usage,
+            model,
+            provider: provider_name,
+        })
     }
 
     /// Generate a standalone educational tweet.
     ///
     /// The tweet will be informative, engaging, and under 280 characters.
-    pub async fn generate_tweet(&self, topic: &str) -> Result<String, LlmError> {
+    pub async fn generate_tweet(&self, topic: &str) -> Result<GenerationOutput, LlmError> {
         self.generate_tweet_with_format(topic, None).await
     }
 
@@ -163,7 +208,7 @@ impl ContentGenerator {
         &self,
         topic: &str,
         format: Option<TweetFormat>,
-    ) -> Result<String, LlmError> {
+    ) -> Result<GenerationOutput, LlmError> {
         tracing::debug!(
             topic = %topic,
             format = ?format,
@@ -215,10 +260,18 @@ impl ContentGenerator {
             .provider
             .complete(&system, &user_message, &params)
             .await?;
+        let mut usage = resp.usage.clone();
+        let provider_name = self.provider.name().to_string();
+        let model = resp.model.clone();
         let text = resp.text.trim().to_string();
 
         if validate_length(&text, MAX_TWEET_CHARS) {
-            return Ok(text);
+            return Ok(GenerationOutput {
+                text,
+                usage,
+                model,
+                provider: provider_name,
+            });
         }
 
         // Retry with stricter instruction
@@ -226,20 +279,31 @@ impl ContentGenerator {
             "{user_message}\n\nImportant: Your tweet MUST be under 280 characters. Be more concise."
         );
         let resp = self.provider.complete(&system, &retry_msg, &params).await?;
+        usage.accumulate(&resp.usage);
         let text = resp.text.trim().to_string();
 
         if validate_length(&text, MAX_TWEET_CHARS) {
-            return Ok(text);
+            return Ok(GenerationOutput {
+                text,
+                usage,
+                model,
+                provider: provider_name,
+            });
         }
 
-        Ok(truncate_at_sentence(&text, MAX_TWEET_CHARS))
+        Ok(GenerationOutput {
+            text: truncate_at_sentence(&text, MAX_TWEET_CHARS),
+            usage,
+            model,
+            provider: provider_name,
+        })
     }
 
     /// Generate an educational thread of 5-8 tweets.
     ///
     /// Each tweet in the thread will be under 280 characters.
     /// Retries up to 2 times if the LLM produces malformed output.
-    pub async fn generate_thread(&self, topic: &str) -> Result<Vec<String>, LlmError> {
+    pub async fn generate_thread(&self, topic: &str) -> Result<ThreadGenerationOutput, LlmError> {
         self.generate_thread_with_structure(topic, None).await
     }
 
@@ -248,7 +312,7 @@ impl ContentGenerator {
         &self,
         topic: &str,
         structure: Option<ThreadStructure>,
-    ) -> Result<Vec<String>, LlmError> {
+    ) -> Result<ThreadGenerationOutput, LlmError> {
         tracing::debug!(
             topic = %topic,
             structure = ?structure,
@@ -297,6 +361,10 @@ impl ContentGenerator {
             ..Default::default()
         };
 
+        let mut usage = TokenUsage::default();
+        let provider_name = self.provider.name().to_string();
+        let mut model = String::new();
+
         for attempt in 0..=MAX_THREAD_RETRIES {
             let msg = if attempt == 0 {
                 user_message.clone()
@@ -308,12 +376,19 @@ impl ContentGenerator {
             };
 
             let resp = self.provider.complete(&system, &msg, &params).await?;
+            usage.accumulate(&resp.usage);
+            model.clone_from(&resp.model);
             let tweets = parse_thread(&resp.text);
 
             if (5..=8).contains(&tweets.len())
                 && tweets.iter().all(|t| validate_length(t, MAX_TWEET_CHARS))
             {
-                return Ok(tweets);
+                return Ok(ThreadGenerationOutput {
+                    tweets,
+                    usage,
+                    model,
+                    provider: provider_name,
+                });
             }
         }
 
@@ -617,12 +692,13 @@ mod tests {
             MockProvider::single("Great point about testing! I've found similar results.");
         let gen = ContentGenerator::new(Box::new(provider), test_business());
 
-        let reply = gen
+        let output = gen
             .generate_reply("Testing is important", "devuser", true)
             .await
             .expect("reply");
-        assert!(reply.len() <= MAX_TWEET_CHARS);
-        assert!(!reply.is_empty());
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
+        assert!(!output.text.is_empty());
+        assert_eq!(output.provider, "mock");
     }
 
     #[tokio::test]
@@ -631,11 +707,11 @@ mod tests {
         let provider = MockProvider::new(vec![long_text.clone(), long_text]);
         let gen = ContentGenerator::new(Box::new(provider), test_business());
 
-        let reply = gen
+        let output = gen
             .generate_reply("test", "user", true)
             .await
             .expect("reply");
-        assert!(reply.len() <= MAX_TWEET_CHARS);
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
     }
 
     #[tokio::test]
@@ -643,12 +719,12 @@ mod tests {
         let provider = MockProvider::single("That's a great approach for productivity!");
         let gen = ContentGenerator::new(Box::new(provider), test_business());
 
-        let reply = gen
+        let output = gen
             .generate_reply("How do you stay productive?", "devuser", false)
             .await
             .expect("reply");
-        assert!(reply.len() <= MAX_TWEET_CHARS);
-        assert!(!reply.is_empty());
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
+        assert!(!output.text.is_empty());
     }
 
     // --- generate_tweet tests ---
@@ -659,12 +735,12 @@ mod tests {
             MockProvider::single("Testing your code early saves hours of debugging later.");
         let gen = ContentGenerator::new(Box::new(provider), test_business());
 
-        let tweet = gen
+        let output = gen
             .generate_tweet("testing best practices")
             .await
             .expect("tweet");
-        assert!(tweet.len() <= MAX_TWEET_CHARS);
-        assert!(!tweet.is_empty());
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
+        assert!(!output.text.is_empty());
     }
 
     // --- generate_thread tests ---
@@ -689,13 +765,13 @@ mod tests {
         let provider = MockProvider::single(&thread_text);
         let gen = ContentGenerator::new(Box::new(provider), test_business());
 
-        let thread = gen.generate_thread("testing").await.expect("thread");
+        let output = gen.generate_thread("testing").await.expect("thread");
         assert!(
-            (5..=8).contains(&thread.len()),
+            (5..=8).contains(&output.tweets.len()),
             "got {} tweets",
-            thread.len()
+            output.tweets.len()
         );
-        for tweet in &thread {
+        for tweet in &output.tweets {
             assert!(tweet.len() <= MAX_TWEET_CHARS);
         }
     }
@@ -708,8 +784,8 @@ mod tests {
         let provider = MockProvider::new(vec![bad.into(), bad.into(), good.into()]);
         let gen = ContentGenerator::new(Box::new(provider), test_business());
 
-        let thread = gen.generate_thread("topic").await.expect("thread");
-        assert_eq!(thread.len(), 5);
+        let output = gen.generate_thread("topic").await.expect("thread");
+        assert_eq!(output.tweets.len(), 5);
     }
 
     #[tokio::test]

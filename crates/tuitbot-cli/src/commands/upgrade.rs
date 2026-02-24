@@ -86,7 +86,7 @@ impl UpgradeGroup {
 /// Collected answers from the upgrade wizard.
 struct UpgradeAnswers {
     persona: Option<(Vec<String>, Vec<String>, Vec<String>)>,
-    targets: Option<(Vec<String>, bool)>,
+    targets: Option<Vec<String>>,
     approval_mode: Option<bool>,
     enhanced_limits: Option<(u32, Vec<String>, f32)>,
 }
@@ -262,7 +262,7 @@ pub(crate) fn apply_defaults(config_path: &Path, missing: &[UpgradeGroup]) -> Re
             None
         },
         targets: if missing.contains(&UpgradeGroup::Targets) {
-            Some((vec![], false))
+            Some(vec![])
         } else {
             None
         },
@@ -327,8 +327,8 @@ fn patch_config(
                 }
             }
             UpgradeGroup::Targets => {
-                if let Some((accounts, auto_follow)) = &answers.targets {
-                    patch_targets(&mut doc, accounts, *auto_follow);
+                if let Some(accounts) = &answers.targets {
+                    patch_targets(&mut doc, accounts);
                 }
             }
             UpgradeGroup::ApprovalMode => {
@@ -388,16 +388,14 @@ fn patch_persona(
     }
 }
 
-fn patch_targets(doc: &mut DocumentMut, accounts: &[String], auto_follow: bool) {
+fn patch_targets(doc: &mut DocumentMut, accounts: &[String]) {
     if doc.get("targets").is_some() {
         return;
     }
 
     let mut table = toml_edit::Table::new();
     table.insert("accounts", value(to_toml_array(accounts)));
-    table.insert("auto_follow", value(auto_follow));
     table.insert("max_target_replies_per_day", value(3i64));
-    table.insert("follow_warmup_days", value(3i64));
 
     table.decor_mut().set_prefix(
         "\n# --- Target Accounts ---\n# Monitor specific accounts and reply to their conversations.\n",
@@ -578,8 +576,6 @@ mentions_check_seconds = 300
 
 [targets]
 accounts = []
-auto_follow = false
-
 [llm]
 provider = "ollama"
 model = "llama3.2"
@@ -647,7 +643,7 @@ max_replies_per_day = 10
                 vec!["Built 3 apps".to_string()],
                 vec!["Dev tools".to_string()],
             )),
-            targets: Some((vec!["elonmusk".to_string()], true)),
+            targets: Some(vec!["elonmusk".to_string()]),
             approval_mode: Some(true),
             enhanced_limits: Some((
                 2,
@@ -685,7 +681,6 @@ max_replies_per_day = 10
         assert_eq!(config.business.persona_experiences, vec!["Built 3 apps"]);
         assert_eq!(config.business.content_pillars, vec!["Dev tools"]);
         assert_eq!(config.targets.accounts, vec!["elonmusk"]);
-        assert!(config.targets.auto_follow);
         assert!(config.approval_mode);
         assert_eq!(config.limits.max_replies_per_author_per_day, 2);
         assert_eq!(
@@ -755,7 +750,7 @@ product_name = "App"
 
         let answers = UpgradeAnswers {
             persona: None,
-            targets: Some((vec!["levelsio".to_string(), "naval".to_string()], false)),
+            targets: Some(vec!["levelsio".to_string(), "naval".to_string()]),
             approval_mode: None,
             enhanced_limits: None,
         };
@@ -767,9 +762,7 @@ product_name = "App"
             toml::from_str(&result).expect("patched config should parse");
 
         assert_eq!(config.targets.accounts, vec!["levelsio", "naval"]);
-        assert!(!config.targets.auto_follow);
         assert_eq!(config.targets.max_target_replies_per_day, 3);
-        assert_eq!(config.targets.follow_warmup_days, 3);
     }
 
     #[test]

@@ -4,7 +4,7 @@
 
 # Tuitbot
 
-**Your autonomous X (Twitter) growth assistant.**
+**Your AI-powered X (Twitter) growth co-pilot.**
 
 [![Rust](https://img.shields.io/badge/built_with-Rust-d32822?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](https://opensource.org/licenses/MIT)
@@ -12,7 +12,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/aramirez087/TuitBot/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/aramirez087/TuitBot/actions/workflows/ci.yml)
 [![Releases](https://img.shields.io/github/v/release/aramirez087/TuitBot?style=for-the-badge)](https://github.com/aramirez087/TuitBot/releases)
 
-Tuitbot grows your X account on autopilot — finding relevant conversations, replying with genuinely helpful content, posting educational tweets, and publishing weekly threads. **It's like having a social media manager who never sleeps.**
+Tuitbot discovers relevant conversations, drafts genuinely helpful replies, and queues everything for your review. When you're ready, flip the switch to let it post autonomously within strict safety guardrails. **Think of it as a growth-focused writing partner** that handles the research so you can focus on building.
 
 Built for **founders**, **indie hackers**, and **solo makers** who'd rather build their product than spend hours on X.
 
@@ -39,8 +39,9 @@ The easiest way to use Tuitbot. Built with Tauri and SvelteKit, the desktop app 
 - **Analytics:** 30-day follower charts, engagement stats, and top-performing topics.
 - **Visual Approval Queue:** Edit, review, and manually approve AI-generated replies and tweets.
 - **Content Calendar:** Schedule threads and tweets visually alongside autonomous content.
-- **Target Accounts Manager:** Track relationships, view interaction history, and monitor warmup progress.
+- **Target Accounts Manager:** Track relationships and view interaction history.
 - **Settings Editor:** Configure your business profile, adjust LLM settings, and manipulate the 6-signal scoring engine without touching a `.toml` file.
+- **Strategy Dashboard:** Weekly growth scorecard with follower trends, reply acceptance rates, top/bottom topics, and AI-generated recommendations for what to post more (or less) of.
 
 ### CLI & Scheduler-Driven Modes
 
@@ -52,41 +53,75 @@ For power users and self-hosters, Tuitbot still provides the robust `tuitbot-cli
 
 ## Features
 
-Tuitbot runs up to six automated loops while you focus on building. You can monitor all of this through the **Dashboard's Live Activity Feed**, which provides real-time visibility into the AI's decision-making process.
+Tuitbot runs six background loops — discovering conversations, drafting content, and routing everything through your approval queue (or posting automatically if you've enabled Autopost Mode). You can monitor all of this through the **Dashboard's Live Activity Feed**, which provides real-time visibility into the AI's decision-making process.
 
 ### 1. Finds Conversations That Matter
 Searches X for tweets matching your product's keywords. Tuitbot uses a **6-signal scoring engine** (configurable via the GUI) to find the perfect interactions:
 * **Keyword relevance** · **Follower sweet spot (1K-5K)** · **Recency** · **Engagement rate** · **Reply count** · **Content type**.
 
 ### 2. Replies With Genuinely Helpful Content
-When it finds a high-scoring tweet, Tuitbot uses AI to write a natural, helpful reply. With the **Visual Approval Queue**, you can opt to review, edit, and approve these replies manually before they are posted.
+When it finds a high-scoring tweet, Tuitbot drafts a natural, helpful reply and queues it for your review. In the **Visual Approval Queue**, you can edit, approve, or reject before anything is posted. (In Autopost Mode, replies post automatically within your configured limits.)
 
 ### 3. Posts Educational Tweets & Threads
 Tuitbot posts original tweets and weekly threads. Through the **Content Calendar**, you can visualize scheduled autonomous posts and compose your own manual tweets to interleave with the AI-generated content.
 
 ### 4. Monitors Mentions & Tracks Targets
-* Automatically generates thoughtful replies when someone @-mentions you.
+* Drafts thoughtful replies when someone @-mentions you, queued for your review.
 * Uses the **Target Accounts CRM** to monitor specific people, build relationships over time, and visually track interaction history.
 
 ### 5. Rich Analytics
 Snapshots your follower count daily and measures engagement after 24 hours. The **Analytics Dashboard** visualizes this data with beautiful charts and top-performing topic breakdowns.
 
+### 6. Weekly Strategy Reports
+Tuitbot generates a weekly scorecard that aggregates your engagement data into actionable insights. The **Strategy Dashboard** shows your growth loop — inputs, engine, outputs, and metrics — in a single view. An 8-rule recommendation engine automatically identifies winning topics to double down on, underperformers to cut, follower stalls, and engagement regressions.
+
+---
+
+## Two Operating Modes
+
+| Mode | Behavior | Recommended for |
+|------|----------|-----------------|
+| **Assist Mode** (default) | Discovers conversations and drafts content — nothing is posted until you approve it in the dashboard or CLI. | New accounts, cautious users, anyone who wants full control. |
+| **Autopost Mode** | Posts automatically within your configured safety limits (daily caps, banned phrases, dedup). | Established accounts after you've reviewed ~50 drafts and trust the AI's tone. Set `approval_mode = false`. |
+
+**Start in Assist Mode.** Graduate to Autopost only after you're confident in the output quality.
+For an extra-cautious approach, keep Assist Mode on for replies permanently and only autopost original tweets and threads.
+
 ---
 
 ## Built-In Safety & Anti-Spam
 
-Tuitbot is engineered to keep your account totally safe and maintain your pristine reputation:
+Tuitbot is engineered to keep your account safe and maintain your reputation:
 
 | Feature | Description |
 |---|---|
+| **Approval Mode** | Enabled by default — all posts are queued for human review before posting. |
 | **Conservative Limits** | Defaults to **5 replies/day**, **6 tweets/day**, **1 thread/week**. |
 | **Anti-Harassment** | Maximum 1 reply per author per day. |
 | **Spam Filter** | Automatically blocks replies containing salesy phrases. |
 | **Active Hours** | Sleeps completely outside your active hours (default 8 AM - 10 PM). |
-| **Human-like Jitter** | Intervals and post delays are randomized (45-180s) to avoid bot detection. |
+| **Human-like Jitter** | Intervals and post delays are randomized (45-180s), matching natural human posting cadence. |
 | **Deduplication** | Never replies to the same tweet twice; detects and prevents repetitive phrasing. |
-| **Approval Mode** | Set `approval_mode = true` to queue all posts for simple human review. |
 | **Process Lock** | Only one instance runs at a time — no accidental double-posting. |
+
+---
+
+## X Platform Compliance
+
+Tuitbot is designed to operate within X's [Automation Rules](https://help.x.com/en/rules-and-policies/x-automation) and [Developer Agreement](https://developer.x.com/en/developer-terms/agreement-and-policy). The following behaviors are **not implemented and never will be**:
+
+| Forbidden behavior | How Tuitbot prevents it |
+|-|-|
+| **Auto-follow / auto-like / auto-retweet** | Not in the codebase. Tuitbot only posts original text content. |
+| **Trend-jacking** | Discovery uses your configured keywords only — never the Trending API. |
+| **Duplicate or near-duplicate content** | The dedup engine (Jaccard similarity >= 0.8) blocks repetitive phrasing across all posts. |
+| **Mass-reply patterns** | Hard cap of 5 replies/day (default) and 1 reply per author per day. |
+| **Engagement manipulation** | No coordinated behavior, vote manipulation, or artificial amplification. |
+| **DM automation** | Not implemented. |
+
+All generated content is original — created per-request by your configured LLM, not from templates or recycled text.
+
+> **You are responsible** for reviewing Tuitbot's output and ensuring compliance with X's Terms of Service and your local regulations. Tuitbot is a tool, not a compliance guarantee.
 
 ---
 
@@ -100,7 +135,7 @@ The easiest way to get started is by downloading the desktop app. You don't need
 2. Open the app and follow the interactive **Onboarding Wizard**.
 3. The app will guide you through connecting your X account, configuring your AI provider (OpenAI, Anthropic, or local Ollama), and setting up your business profile.
 
-The app will run quietly as a system tray icon, managing the automation in the background.
+The app will run quietly as a system tray icon, discovering and drafting content for your review.
 
 ### 2. Self-Hosted Docker
 

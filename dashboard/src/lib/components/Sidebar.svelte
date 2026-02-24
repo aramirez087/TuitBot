@@ -12,6 +12,8 @@
 		CheckCircle,
 		FileText,
 		Target,
+		Compass,
+		DollarSign,
 		Settings,
 		ChevronLeft,
 		ChevronRight,
@@ -45,6 +47,8 @@
 		{ href: "/approval", label: "Approval", icon: CheckCircle },
 		{ href: "/content", label: "Content", icon: FileText },
 		{ href: "/targets", label: "Targets", icon: Target },
+		{ href: "/strategy", label: "Strategy", icon: Compass },
+		{ href: "/costs", label: "Costs", icon: DollarSign },
 		{ href: "/settings", label: "Settings", icon: Settings },
 	];
 

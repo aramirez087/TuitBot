@@ -98,16 +98,6 @@ pub async fn get_active_target_accounts(pool: &DbPool) -> Result<Vec<TargetAccou
         .collect())
 }
 
-/// Record that we followed a target account.
-pub async fn record_follow(pool: &DbPool, account_id: &str) -> Result<(), StorageError> {
-    sqlx::query("UPDATE target_accounts SET followed_at = datetime('now') WHERE account_id = ?")
-        .bind(account_id)
-        .execute(pool)
-        .await
-        .map_err(|e| StorageError::Query { source: e })?;
-    Ok(())
-}
-
 /// Record a reply to a target account's tweet.
 pub async fn record_target_reply(pool: &DbPool, account_id: &str) -> Result<(), StorageError> {
     sqlx::query(
@@ -470,22 +460,6 @@ mod tests {
 
         let accounts = get_active_target_accounts(&pool).await.expect("get all");
         assert_eq!(accounts.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn record_follow_sets_timestamp() {
-        let pool = init_test_db().await.expect("init db");
-
-        upsert_target_account(&pool, "acc_1", "alice")
-            .await
-            .expect("upsert");
-        record_follow(&pool, "acc_1").await.expect("follow");
-
-        let account = get_target_account(&pool, "acc_1")
-            .await
-            .expect("get")
-            .expect("found");
-        assert!(account.followed_at.is_some());
     }
 
     #[tokio::test]

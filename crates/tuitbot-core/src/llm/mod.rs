@@ -6,16 +6,25 @@
 pub mod anthropic;
 pub mod factory;
 pub mod openai_compat;
+pub mod pricing;
 
 use crate::error::LlmError;
 
 /// Token usage information from an LLM completion.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TokenUsage {
     /// Number of tokens in the input/prompt.
     pub input_tokens: u32,
     /// Number of tokens in the output/completion.
     pub output_tokens: u32,
+}
+
+impl TokenUsage {
+    /// Accumulate token counts from another usage record (e.g. across retries).
+    pub fn accumulate(&mut self, other: &TokenUsage) {
+        self.input_tokens += other.input_tokens;
+        self.output_tokens += other.output_tokens;
+    }
 }
 
 /// Response from an LLM completion request.

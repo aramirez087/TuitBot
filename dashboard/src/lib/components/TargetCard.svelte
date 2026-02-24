@@ -1,31 +1,17 @@
 <script lang="ts">
-	import { Target, UserCheck, Clock, Eye, Trash2 } from 'lucide-svelte';
+	import { Target, Clock, Eye, Trash2 } from 'lucide-svelte';
 	import type { TargetAccount } from '$lib/api';
 
 	interface Props {
 		target: TargetAccount;
 		maxDailyReplies: number;
-		followWarmupDays: number;
 		onview: (username: string) => void;
 		onremove: (username: string) => void;
 	}
 
-	let { target, maxDailyReplies, followWarmupDays, onview, onremove }: Props = $props();
+	let { target, maxDailyReplies, onview, onremove }: Props = $props();
 
 	let confirmingRemove = $state(false);
-
-	const isFollowing = $derived(target.followed_at !== null);
-
-	const warmupDaysElapsed = $derived(() => {
-		if (!target.followed_at) return 0;
-		const followed = new Date(target.followed_at).getTime();
-		return Math.floor((Date.now() - followed) / 86_400_000);
-	});
-
-	const warmupComplete = $derived(isFollowing && warmupDaysElapsed() >= followWarmupDays);
-	const warmupRemaining = $derived(
-		isFollowing ? Math.max(0, followWarmupDays - warmupDaysElapsed()) : followWarmupDays
-	);
 
 	const dailyPercent = $derived(
 		maxDailyReplies > 0
@@ -73,22 +59,6 @@
 			<span class="card-interactions">
 				{target.total_replies_sent} interaction{target.total_replies_sent !== 1 ? 's' : ''}
 			</span>
-		</div>
-
-		<div class="card-status">
-			{#if isFollowing}
-				<span class="status-badge following">
-					<UserCheck size={12} />
-					Following
-				</span>
-			{/if}
-			{#if warmupComplete}
-				<span class="status-badge warmup-complete">Warmup complete</span>
-			{:else if isFollowing}
-				<span class="status-badge warmup-pending">
-					Warmup: {warmupRemaining}d remaining
-				</span>
-			{/if}
 		</div>
 
 		<div class="card-meta">
@@ -196,38 +166,6 @@
 		color: var(--color-text-muted);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
-	}
-
-	.card-status {
-		display: flex;
-		gap: 6px;
-		margin-bottom: 8px;
-		flex-wrap: wrap;
-	}
-
-	.status-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 11px;
-		font-weight: 500;
-		padding: 2px 8px;
-		border-radius: 4px;
-	}
-
-	.status-badge.following {
-		background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
-		color: var(--color-success);
-	}
-
-	.status-badge.warmup-complete {
-		background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
-		color: var(--color-success);
-	}
-
-	.status-badge.warmup-pending {
-		background-color: color-mix(in srgb, var(--color-warning) 12%, transparent);
-		color: var(--color-warning);
 	}
 
 	.card-meta {

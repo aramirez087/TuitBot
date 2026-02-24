@@ -15,6 +15,10 @@ use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 
+fn default_approval_mode() -> bool {
+    true
+}
+
 /// Top-level configuration for the Tuitbot agent.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Config {
@@ -51,7 +55,7 @@ pub struct Config {
     pub targets: TargetsConfig,
 
     /// Enable approval mode: queue posts for human review instead of posting.
-    #[serde(default)]
+    #[serde(default = "default_approval_mode")]
     pub approval_mode: bool,
 
     /// Data storage configuration.
@@ -249,20 +253,9 @@ pub struct TargetsConfig {
     /// Maximum target account replies per day (separate from general limit).
     #[serde(default = "default_max_target_replies_per_day")]
     pub max_target_replies_per_day: u32,
-
-    /// Whether to auto-follow target accounts.
-    #[serde(default)]
-    pub auto_follow: bool,
-
-    /// Number of days to wait after following before engaging.
-    #[serde(default = "default_follow_warmup_days")]
-    pub follow_warmup_days: u32,
 }
 
 fn default_max_target_replies_per_day() -> u32 {
-    3
-}
-fn default_follow_warmup_days() -> u32 {
     3
 }
 
@@ -1416,7 +1409,7 @@ thread_preferred_time = "10:00"
     fn env_var_override_approval_mode() {
         env::set_var("TUITBOT_APPROVAL_MODE", "true");
         let mut config = Config::default();
-        assert!(!config.approval_mode);
+        config.approval_mode = false;
         config.apply_env_overrides().expect("env override");
         assert!(config.approval_mode);
         env::remove_var("TUITBOT_APPROVAL_MODE");
@@ -1426,7 +1419,6 @@ thread_preferred_time = "10:00"
     fn env_var_override_approval_mode_false() {
         env::set_var("TUITBOT_APPROVAL_MODE", "false");
         let mut config = Config::default();
-        config.approval_mode = true;
         config.apply_env_overrides().expect("env override");
         assert!(!config.approval_mode);
         env::remove_var("TUITBOT_APPROVAL_MODE");
@@ -1436,7 +1428,7 @@ thread_preferred_time = "10:00"
     fn openclaw_env_enables_approval_mode() {
         env::set_var("OPENCLAW_AGENT_ID", "test");
         let mut config = Config::default();
-        assert!(!config.approval_mode);
+        config.approval_mode = false;
         config.apply_env_overrides().expect("env override");
         assert!(config.approval_mode);
         env::remove_var("OPENCLAW_AGENT_ID");

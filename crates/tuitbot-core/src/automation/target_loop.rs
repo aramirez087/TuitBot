@@ -26,18 +26,11 @@ pub trait TargetTweetFetcher: Send + Sync {
     async fn fetch_user_tweets(&self, user_id: &str) -> Result<Vec<LoopTweet>, LoopError>;
 }
 
-/// Looks up a user by username and optionally follows them.
+/// Looks up a user by username.
 #[async_trait::async_trait]
 pub trait TargetUserManager: Send + Sync {
     /// Look up a user by username. Returns (user_id, username).
     async fn lookup_user(&self, username: &str) -> Result<(String, String), LoopError>;
-
-    /// Follow a user.
-    async fn follow_user(
-        &self,
-        source_user_id: &str,
-        target_user_id: &str,
-    ) -> Result<(), LoopError>;
 }
 
 /// Storage operations for target account state.
@@ -50,12 +43,6 @@ pub trait TargetStorage: Send + Sync {
         account_id: &str,
         username: &str,
     ) -> Result<(), LoopError>;
-
-    /// Get the followed_at timestamp for a target account.
-    async fn get_followed_at(&self, account_id: &str) -> Result<Option<String>, LoopError>;
-
-    /// Record that we followed a target account.
-    async fn record_follow(&self, account_id: &str) -> Result<(), LoopError>;
 
     /// Check if a target tweet already exists.
     async fn target_tweet_exists(&self, tweet_id: &str) -> Result<bool, LoopError>;
@@ -101,12 +88,6 @@ pub struct TargetLoopConfig {
     pub accounts: Vec<String>,
     /// Maximum target replies per day.
     pub max_target_replies_per_day: u32,
-    /// Whether to auto-follow target accounts.
-    pub auto_follow: bool,
-    /// Days to wait after following before engaging.
-    pub follow_warmup_days: u32,
-    /// Our own user ID (to pass for follow_user).
-    pub own_user_id: String,
     /// Whether this is a dry run.
     pub dry_run: bool,
 }
@@ -306,7 +287,7 @@ impl TargetLoop {
         Ok(all_results)
     }
 
-    /// Process a single target account: resolve, optionally follow, fetch tweets, reply.
+    /// Process a single target account: resolve, fetch tweets, reply.
     async fn process_account(
         &self,
         username: &str,
@@ -319,89 +300,6 @@ impl TargetLoop {
         self.storage
             .upsert_target_account(&user_id, &resolved_username)
             .await?;
-
-        // Handle auto-follow
-        if self.config.auto_follow {
-            let followed_at = self.storage.get_followed_at(&user_id).await?;
-            if followed_at.is_none() {
-                tracing::info!(username = %resolved_username, "Auto-following target account");
-                if !self.config.dry_run {
-                    match self
-                        .user_mgr
-                        .follow_user(&self.config.own_user_id, &user_id)
-                        .await
-                    {
-                        Ok(()) => {
-                            self.storage.record_follow(&user_id).await?;
-
-                            let _ = self
-                                .storage
-                                .log_action(
-                                    "target_follow",
-                                    "success",
-                                    &format!("Followed @{resolved_username}"),
-                                )
-                                .await;
-
-                            // Don't engage yet — warmup period starts now
-                            return Ok(Vec::new());
-                        }
-                        Err(e) => {
-                            // AuthExpired should propagate — no point fetching tweets either.
-                            if matches!(e, LoopError::AuthExpired) {
-                                return Err(e);
-                            }
-
-                            // Follow failed (e.g. 403 on Basic tier). Log warning but
-                            // continue to engagement — following is best-effort.
-                            tracing::warn!(
-                                username = %resolved_username,
-                                error = %e,
-                                "Auto-follow failed (API tier may not support follows), skipping follow"
-                            );
-
-                            let _ = self
-                                .storage
-                                .log_action(
-                                    "target_follow",
-                                    "skipped",
-                                    &format!("Follow @{resolved_username} failed: {e}"),
-                                )
-                                .await;
-
-                            // Record as "followed" to avoid retrying every iteration
-                            let _ = self.storage.record_follow(&user_id).await;
-                        }
-                    }
-                } else {
-                    let _ = self
-                        .storage
-                        .log_action(
-                            "target_follow",
-                            "dry_run",
-                            &format!("Followed @{resolved_username}"),
-                        )
-                        .await;
-
-                    // Don't engage yet — warmup period starts now
-                    return Ok(Vec::new());
-                }
-            }
-
-            // Check warmup period (skip if follow was recorded due to failure)
-            if self.config.follow_warmup_days > 0 {
-                if let Some(ref followed_str) = self.storage.get_followed_at(&user_id).await? {
-                    if !warmup_elapsed(followed_str, self.config.follow_warmup_days) {
-                        tracing::debug!(
-                            username = %resolved_username,
-                            warmup_days = self.config.follow_warmup_days,
-                            "Still in follow warmup period"
-                        );
-                        return Ok(Vec::new());
-                    }
-                }
-            }
-        }
 
         // Fetch recent tweets
         let tweets = self.fetcher.fetch_user_tweets(&user_id).await?;
@@ -551,19 +449,6 @@ impl TargetLoop {
     }
 }
 
-/// Check if the follow warmup period has elapsed.
-fn warmup_elapsed(followed_at: &str, warmup_days: u32) -> bool {
-    // Parse the SQLite datetime format ("YYYY-MM-DD HH:MM:SS")
-    let followed = match chrono::NaiveDateTime::parse_from_str(followed_at, "%Y-%m-%d %H:%M:%S") {
-        Ok(dt) => dt,
-        Err(_) => return true, // If we can't parse, assume warmup is done
-    };
-
-    let now = chrono::Utc::now().naive_utc();
-    let elapsed = now.signed_duration_since(followed);
-    elapsed.num_days() >= warmup_days as i64
-}
-
 /// Truncate a string for display.
 fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
@@ -605,14 +490,6 @@ mod tests {
                 }
             }
             Err(LoopError::Other(format!("user not found: {username}")))
-        }
-
-        async fn follow_user(
-            &self,
-            _source_user_id: &str,
-            _target_user_id: &str,
-        ) -> Result<(), LoopError> {
-            Ok(())
         }
     }
 
@@ -667,7 +544,6 @@ mod tests {
     }
 
     struct MockTargetStorage {
-        followed_at: Mutex<Option<String>>,
         existing_tweets: Mutex<Vec<String>>,
         replies_today: Mutex<i64>,
     }
@@ -675,15 +551,6 @@ mod tests {
     impl MockTargetStorage {
         fn new() -> Self {
             Self {
-                followed_at: Mutex::new(None),
-                existing_tweets: Mutex::new(Vec::new()),
-                replies_today: Mutex::new(0),
-            }
-        }
-
-        fn with_followed_at(followed_at: &str) -> Self {
-            Self {
-                followed_at: Mutex::new(Some(followed_at.to_string())),
                 existing_tweets: Mutex::new(Vec::new()),
                 replies_today: Mutex::new(0),
             }
@@ -697,13 +564,6 @@ mod tests {
             _account_id: &str,
             _username: &str,
         ) -> Result<(), LoopError> {
-            Ok(())
-        }
-        async fn get_followed_at(&self, _account_id: &str) -> Result<Option<String>, LoopError> {
-            Ok(self.followed_at.lock().expect("lock").clone())
-        }
-        async fn record_follow(&self, _account_id: &str) -> Result<(), LoopError> {
-            *self.followed_at.lock().expect("lock") = Some("2026-01-01 00:00:00".to_string());
             Ok(())
         }
         async fn target_tweet_exists(&self, tweet_id: &str) -> Result<bool, LoopError> {
@@ -789,9 +649,6 @@ mod tests {
         TargetLoopConfig {
             accounts: vec!["alice".to_string()],
             max_target_replies_per_day: 3,
-            auto_follow: false,
-            follow_warmup_days: 3,
-            own_user_id: "own_123".to_string(),
             dry_run: false,
         }
     }
@@ -892,74 +749,6 @@ mod tests {
         assert_eq!(poster.sent_count(), 0);
     }
 
-    #[tokio::test]
-    async fn auto_follow_follows_and_skips_engagement() {
-        let tweets = vec![test_tweet("tw1", "alice")];
-        let storage = Arc::new(MockTargetStorage::new());
-        let mut config = default_config();
-        config.auto_follow = true;
-        let (target_loop, poster) = build_loop(tweets, config, storage.clone());
-
-        let results = target_loop.run_iteration().await.expect("iteration");
-        // Should follow but NOT reply (warmup starts)
-        assert!(results.is_empty());
-        assert_eq!(poster.sent_count(), 0);
-        // Should have recorded the follow
-        assert!(storage.followed_at.lock().expect("lock").is_some());
-    }
-
-    #[tokio::test]
-    async fn auto_follow_warmup_blocks_engagement() {
-        let tweets = vec![test_tweet("tw1", "alice")];
-        // Followed yesterday — warmup is 3 days
-        let now = chrono::Utc::now().naive_utc();
-        let yesterday = now - chrono::Duration::days(1);
-        let followed_str = yesterday.format("%Y-%m-%d %H:%M:%S").to_string();
-        let storage = Arc::new(MockTargetStorage::with_followed_at(&followed_str));
-        let mut config = default_config();
-        config.auto_follow = true;
-        let (target_loop, poster) = build_loop(tweets, config, storage);
-
-        let results = target_loop.run_iteration().await.expect("iteration");
-        assert!(results.is_empty());
-        assert_eq!(poster.sent_count(), 0);
-    }
-
-    #[tokio::test]
-    async fn auto_follow_warmup_elapsed_allows_engagement() {
-        let tweets = vec![test_tweet("tw1", "alice")];
-        // Followed 5 days ago — warmup is 3 days
-        let now = chrono::Utc::now().naive_utc();
-        let five_days_ago = now - chrono::Duration::days(5);
-        let followed_str = five_days_ago.format("%Y-%m-%d %H:%M:%S").to_string();
-        let storage = Arc::new(MockTargetStorage::with_followed_at(&followed_str));
-        let mut config = default_config();
-        config.auto_follow = true;
-        let (target_loop, poster) = build_loop(tweets, config, storage);
-
-        let results = target_loop.run_iteration().await.expect("iteration");
-        assert_eq!(results.len(), 1);
-        assert!(matches!(results[0], TargetResult::Replied { .. }));
-        assert_eq!(poster.sent_count(), 1);
-    }
-
-    #[test]
-    fn warmup_elapsed_parses_correctly() {
-        assert!(warmup_elapsed("2020-01-01 00:00:00", 3));
-        assert!(!warmup_elapsed(
-            &chrono::Utc::now()
-                .naive_utc()
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string(),
-            3
-        ));
-    }
-
-    #[test]
-    fn warmup_elapsed_invalid_date_returns_true() {
-        assert!(warmup_elapsed("not-a-date", 3));
-    }
-
     #[test]
     fn truncate_short_string() {
         assert_eq!(truncate("hello", 10), "hello");
@@ -996,14 +785,6 @@ mod tests {
                 _ => unreachable!(),
             })
         }
-
-        async fn follow_user(
-            &self,
-            _source_user_id: &str,
-            _target_user_id: &str,
-        ) -> Result<(), LoopError> {
-            Ok(())
-        }
     }
 
     /// A user manager where the first lookup fails and the second succeeds.
@@ -1020,14 +801,6 @@ mod tests {
             } else {
                 Ok((format!("uid_{username}"), username.to_string()))
             }
-        }
-
-        async fn follow_user(
-            &self,
-            _source_user_id: &str,
-            _target_user_id: &str,
-        ) -> Result<(), LoopError> {
-            Ok(())
         }
     }
 

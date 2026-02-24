@@ -2,7 +2,7 @@
 
 ## Workspace crates
 
-- `tuitbot-core`: business logic, storage, API integrations, safety.
+- `tuitbot-core`: business logic, storage, API integrations, safety, strategy reports.
 - `tuitbot-server`: Axum-based HTTP API and WebSocket event hub serving endpoints for internal UIs.
 - `tuitbot-cli`: command-line UX and runtime entrypoints.
 - `tuitbot-mcp`: MCP tool surface and transport wiring.
@@ -26,6 +26,7 @@
 - content posting
 - thread publishing
 - analytics snapshots
+- strategy reports (weekly, on-demand via API)
 
 ## Design principles
 

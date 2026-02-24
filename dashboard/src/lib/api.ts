@@ -262,8 +262,6 @@ export interface TuitbotConfig {
 	targets: {
 		accounts: string[];
 		max_target_replies_per_day: number;
-		auto_follow: boolean;
-		follow_warmup_days: number;
 	};
 	approval_mode: boolean;
 	storage: {
@@ -294,6 +292,96 @@ export interface SettingsTestResult {
 	success: boolean;
 	error?: string;
 	latency_ms?: number;
+}
+
+// --- Strategy types ---
+
+export interface TopicPerformance {
+	topic: string;
+	format: string;
+	avg_score: number;
+	post_count: number;
+}
+
+export interface ContentHighlight {
+	content_type: string;
+	content_preview: string;
+	performance_score: number;
+	likes: number;
+	replies_received: number;
+}
+
+export interface Recommendation {
+	category: string;
+	priority: string;
+	title: string;
+	description: string;
+}
+
+export interface StrategyReport {
+	id: number;
+	week_start: string;
+	week_end: string;
+	replies_sent: number;
+	tweets_posted: number;
+	threads_posted: number;
+	target_replies: number;
+	follower_start: number;
+	follower_end: number;
+	follower_delta: number;
+	avg_reply_score: number;
+	avg_tweet_score: number;
+	reply_acceptance_rate: number;
+	estimated_follow_conversion: number;
+	top_topics: TopicPerformance[];
+	bottom_topics: TopicPerformance[];
+	top_content: ContentHighlight[];
+	recommendations: Recommendation[];
+}
+
+export interface StrategyInputs {
+	content_pillars: string[];
+	industry_topics: string[];
+	product_keywords: string[];
+	competitor_keywords: string[];
+	target_accounts: string[];
+}
+
+// --- Cost types ---
+
+export interface CostSummary {
+	cost_today: number;
+	cost_7d: number;
+	cost_30d: number;
+	cost_all_time: number;
+	calls_today: number;
+	calls_7d: number;
+	calls_30d: number;
+	calls_all_time: number;
+}
+
+export interface DailyCostSummary {
+	date: string;
+	cost: number;
+	calls: number;
+	input_tokens: number;
+	output_tokens: number;
+}
+
+export interface ModelCostBreakdown {
+	provider: string;
+	model: string;
+	cost: number;
+	calls: number;
+	input_tokens: number;
+	output_tokens: number;
+}
+
+export interface TypeCostBreakdown {
+	generation_type: string;
+	cost: number;
+	calls: number;
+	avg_cost: number;
 }
 
 // --- API client ---
@@ -400,6 +488,25 @@ export const api = {
 			),
 		stats: (username: string) =>
 			request<TargetStats>(`/api/targets/${encodeURIComponent(username)}/stats`)
+	},
+
+	strategy: {
+		current: () => request<StrategyReport>('/api/strategy/current'),
+		history: (limit: number = 12) =>
+			request<StrategyReport[]>(`/api/strategy/history?limit=${limit}`),
+		refresh: () =>
+			request<StrategyReport>('/api/strategy/refresh', { method: 'POST' }),
+		inputs: () => request<StrategyInputs>('/api/strategy/inputs')
+	},
+
+	costs: {
+		summary: () => request<CostSummary>('/api/costs/summary'),
+		daily: (days: number = 30) =>
+			request<DailyCostSummary[]>(`/api/costs/daily?days=${days}`),
+		byModel: (days: number = 30) =>
+			request<ModelCostBreakdown[]>(`/api/costs/by-model?days=${days}`),
+		byType: (days: number = 30) =>
+			request<TypeCostBreakdown[]>(`/api/costs/by-type?days=${days}`)
 	},
 
 	approval: {

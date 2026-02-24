@@ -161,7 +161,7 @@ pub(super) fn interactive_menu(config: &mut Config, config_path: &Path) -> Resul
             "Persona             — opinions, experiences, content pillars",
             "AI Provider         — LLM provider, API key, model",
             "X API Credentials   — client ID, client secret",
-            "Target Accounts     — accounts to monitor, auto-follow",
+            "Target Accounts     — accounts to monitor and engage with",
             "Posting Limits      — replies/tweets/threads per day",
             "Scoring             — how picky the bot is about which tweets to reply to",
             "Timing              — how often the bot checks for new tweets",
@@ -549,18 +549,6 @@ pub(super) fn edit_category_targets(
             "Max replies/day:   {}",
             config.targets.max_target_replies_per_day
         ),
-        format!(
-            "Auto-follow:       {}",
-            if config.targets.auto_follow {
-                "yes"
-            } else {
-                "no"
-            }
-        ),
-        format!(
-            "Follow warmup:     {} days",
-            config.targets.follow_warmup_days
-        ),
         "Back to categories".to_string(),
     ];
 
@@ -588,21 +576,6 @@ pub(super) fn edit_category_targets(
             "targets",
             "max_target_replies_per_day",
             "Max target replies per day",
-            None,
-        )?,
-        2 => edit_and_record_bool(
-            tracker,
-            &mut config.targets.auto_follow,
-            "targets",
-            "auto_follow",
-            "Auto-follow target accounts?",
-        )?,
-        3 => edit_and_record_u32(
-            tracker,
-            &mut config.targets.follow_warmup_days,
-            "targets",
-            "follow_warmup_days",
-            "Follow warmup days",
             None,
         )?,
         _ => {} // Back

@@ -204,10 +204,12 @@ impl RuntimeDeps {
         let thread_poster: Arc<XApiThreadPosterAdapter> =
             Arc::new(XApiThreadPosterAdapter::new(x_client.clone()));
 
-        let reply_gen: Arc<LlmReplyAdapter> = Arc::new(LlmReplyAdapter::new(content_gen.clone()));
-        let tweet_gen: Arc<LlmTweetAdapter> = Arc::new(LlmTweetAdapter::new(content_gen.clone()));
+        let reply_gen: Arc<LlmReplyAdapter> =
+            Arc::new(LlmReplyAdapter::new(content_gen.clone(), pool.clone()));
+        let tweet_gen: Arc<LlmTweetAdapter> =
+            Arc::new(LlmTweetAdapter::new(content_gen.clone(), pool.clone()));
         let thread_gen: Arc<LlmThreadAdapter> =
-            Arc::new(LlmThreadAdapter::new(content_gen.clone()));
+            Arc::new(LlmThreadAdapter::new(content_gen.clone(), pool.clone()));
 
         let scorer: Arc<ScoringAdapter> = Arc::new(ScoringAdapter::new(scoring_engine));
         let safety: Arc<SafetyAdapter> =
@@ -249,9 +251,6 @@ impl RuntimeDeps {
         let target_loop_config = TargetLoopConfig {
             accounts: config.targets.accounts.clone(),
             max_target_replies_per_day: config.targets.max_target_replies_per_day,
-            auto_follow: config.targets.auto_follow,
-            follow_warmup_days: config.targets.follow_warmup_days,
-            own_user_id: own_user_id.clone(),
             dry_run,
         };
 

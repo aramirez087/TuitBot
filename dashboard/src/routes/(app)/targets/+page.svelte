@@ -25,7 +25,6 @@
 	let addError = $state<string | null>(null);
 
 	const maxDailyReplies = $derived($config?.targets?.max_target_replies_per_day ?? 3);
-	const followWarmupDays = $derived($config?.targets?.follow_warmup_days ?? 3);
 
 	async function handleAddTarget(username: string) {
 		addSubmitting = true;
@@ -122,7 +121,6 @@
 				<TargetCard
 					{target}
 					{maxDailyReplies}
-					{followWarmupDays}
 					onview={handleViewTarget}
 					onremove={handleRemoveTarget}
 				/>

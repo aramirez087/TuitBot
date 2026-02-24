@@ -240,14 +240,6 @@ mod tests {
             unimplemented!()
         }
 
-        async fn follow_user(
-            &self,
-            _source_user_id: &str,
-            _target_user_id: &str,
-        ) -> Result<(), XApiError> {
-            unimplemented!()
-        }
-
         async fn get_user_by_username(&self, _username: &str) -> Result<User, XApiError> {
             unimplemented!()
         }

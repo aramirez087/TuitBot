@@ -69,8 +69,7 @@ pub(super) fn render_config(config: &Config) -> String {
          # Monitor specific accounts and reply to their conversations.\n\
          [targets]\n\
          # accounts = [\"elonmusk\", \"levelsio\"]\n\
-         accounts = []\n\
-         # auto_follow = false"
+         accounts = []"
             .to_string()
     } else {
         format!(
@@ -78,13 +77,9 @@ pub(super) fn render_config(config: &Config) -> String {
              # Monitor specific accounts and reply to their conversations.\n\
              [targets]\n\
              accounts = {accounts}\n\
-             max_target_replies_per_day = {max_target}\n\
-             auto_follow = {auto_follow}\n\
-             follow_warmup_days = {warmup}",
+             max_target_replies_per_day = {max_target}",
             accounts = format_toml_array(&config.targets.accounts),
             max_target = config.targets.max_target_replies_per_day,
-            auto_follow = config.targets.auto_follow,
-            warmup = config.targets.follow_warmup_days,
         )
     };
 

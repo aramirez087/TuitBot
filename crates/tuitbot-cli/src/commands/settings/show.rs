@@ -118,18 +118,6 @@ pub(super) fn show_config(config: &Config) {
         "  Max replies/day:     {}",
         config.targets.max_target_replies_per_day
     );
-    eprintln!(
-        "  Auto-follow:         {}",
-        if config.targets.auto_follow {
-            "yes"
-        } else {
-            "no"
-        }
-    );
-    eprintln!(
-        "  Follow warmup days:  {}",
-        config.targets.follow_warmup_days
-    );
 
     // Limits
     eprintln!();
