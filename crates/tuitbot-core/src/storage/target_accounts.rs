@@ -227,6 +227,214 @@ pub async fn deactivate_target_account(
     Ok(result.rows_affected() > 0)
 }
 
+// --- Enriched queries for the dashboard ---
+
+/// A target account with today's interaction count.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EnrichedTargetAccount {
+    pub account_id: String,
+    pub username: String,
+    pub followed_at: Option<String>,
+    pub first_engagement_at: Option<String>,
+    pub total_replies_sent: i64,
+    pub last_reply_at: Option<String>,
+    pub status: String,
+    pub interactions_today: i64,
+}
+
+type EnrichedRow = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    Option<String>,
+    String,
+    i64,
+);
+
+/// Get all active target accounts with today's interaction count.
+pub async fn get_enriched_target_accounts(
+    pool: &DbPool,
+) -> Result<Vec<EnrichedTargetAccount>, StorageError> {
+    let rows: Vec<EnrichedRow> = sqlx::query_as(
+        "SELECT ta.account_id, ta.username, ta.followed_at, ta.first_engagement_at, \
+                ta.total_replies_sent, ta.last_reply_at, ta.status, \
+                COALESCE(SUM(CASE WHEN tt.replied_to = 1 \
+                    AND date(tt.discovered_at) = date('now') THEN 1 ELSE 0 END), 0) \
+         FROM target_accounts ta \
+         LEFT JOIN target_tweets tt ON tt.account_id = ta.account_id \
+         WHERE ta.status = 'active' \
+         GROUP BY ta.account_id",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| EnrichedTargetAccount {
+            account_id: r.0,
+            username: r.1,
+            followed_at: r.2,
+            first_engagement_at: r.3,
+            total_replies_sent: r.4,
+            last_reply_at: r.5,
+            status: r.6,
+            interactions_today: r.7,
+        })
+        .collect())
+}
+
+/// A single entry in a target's interaction timeline.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TargetTimelineItem {
+    pub tweet_id: String,
+    pub text: String,
+    pub posted_at: String,
+    pub relevance_score: f64,
+    pub replied_to: bool,
+    pub tweet_reply_count: i64,
+    pub tweet_like_count: i64,
+    pub reply_content: Option<String>,
+    pub reply_created_at: Option<String>,
+}
+
+type TimelineRow = (
+    String,
+    String,
+    String,
+    f64,
+    i64,
+    i64,
+    i64,
+    Option<String>,
+    Option<String>,
+);
+
+/// Get the interaction timeline for a target account.
+pub async fn get_target_timeline(
+    pool: &DbPool,
+    username: &str,
+    limit: i64,
+) -> Result<Vec<TargetTimelineItem>, StorageError> {
+    let rows: Vec<TimelineRow> = sqlx::query_as(
+        "SELECT tt.id, tt.content, tt.created_at, tt.relevance_score, tt.replied_to, \
+                tt.reply_count, tt.like_count, \
+                rs.reply_content, rs.created_at \
+         FROM target_tweets tt \
+         JOIN target_accounts ta ON ta.account_id = tt.account_id \
+         LEFT JOIN replies_sent rs ON rs.target_tweet_id = tt.id \
+         WHERE ta.username = ? AND ta.status = 'active' \
+         ORDER BY tt.created_at DESC \
+         LIMIT ?",
+    )
+    .bind(username)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| TargetTimelineItem {
+            tweet_id: r.0,
+            text: r.1,
+            posted_at: r.2,
+            relevance_score: r.3,
+            replied_to: r.4 != 0,
+            tweet_reply_count: r.5,
+            tweet_like_count: r.6,
+            reply_content: r.7,
+            reply_created_at: r.8,
+        })
+        .collect())
+}
+
+/// Aggregated statistics for a target account.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TargetStats {
+    pub total_replies: i64,
+    pub avg_score: f64,
+    pub best_reply_content: Option<String>,
+    pub best_reply_score: Option<f64>,
+    pub first_interaction: Option<String>,
+    pub interaction_frequency_days: Option<f64>,
+}
+
+type StatsRow = (i64, f64, Option<String>, Option<String>);
+type BestReplyRow = (String, f64);
+
+/// Get aggregated stats for a target account by username.
+pub async fn get_target_stats(
+    pool: &DbPool,
+    username: &str,
+) -> Result<Option<TargetStats>, StorageError> {
+    let row: Option<StatsRow> = sqlx::query_as(
+        "SELECT ta.total_replies_sent, \
+                COALESCE(AVG(tt.relevance_score), 0), \
+                ta.first_engagement_at, ta.last_reply_at \
+         FROM target_accounts ta \
+         LEFT JOIN target_tweets tt ON tt.account_id = ta.account_id AND tt.replied_to = 1 \
+         WHERE ta.username = ? AND ta.status = 'active' \
+         GROUP BY ta.account_id",
+    )
+    .bind(username)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let Some(r) = row else {
+        return Ok(None);
+    };
+
+    let total_replies = r.0;
+    let avg_score = r.1;
+    let first_interaction = r.2;
+    let last_reply_at = r.3;
+
+    // Best reply by relevance score.
+    let best: Option<BestReplyRow> = sqlx::query_as(
+        "SELECT rs.reply_content, tt.relevance_score \
+         FROM replies_sent rs \
+         JOIN target_tweets tt ON tt.id = rs.target_tweet_id \
+         JOIN target_accounts ta ON ta.account_id = tt.account_id \
+         WHERE ta.username = ? AND ta.status = 'active' \
+         ORDER BY tt.relevance_score DESC \
+         LIMIT 1",
+    )
+    .bind(username)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    // Compute interaction frequency from first/last interaction dates.
+    let frequency = compute_frequency(&first_interaction, &last_reply_at, total_replies);
+
+    Ok(Some(TargetStats {
+        total_replies,
+        avg_score,
+        best_reply_content: best.as_ref().map(|b| b.0.clone()),
+        best_reply_score: best.map(|b| b.1),
+        first_interaction,
+        interaction_frequency_days: frequency,
+    }))
+}
+
+/// Compute average days between interactions.
+fn compute_frequency(first: &Option<String>, last: &Option<String>, total: i64) -> Option<f64> {
+    if total < 2 {
+        return None;
+    }
+    let first_dt = first.as_ref()?.parse::<chrono::NaiveDateTime>().ok()?;
+    let last_dt = last.as_ref()?.parse::<chrono::NaiveDateTime>().ok()?;
+    let span = (last_dt - first_dt).num_hours() as f64 / 24.0;
+    if span <= 0.0 {
+        return None;
+    }
+    Some(span / (total - 1) as f64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +542,174 @@ mod tests {
         // Verify by checking the count of replied tweets
         let count = count_target_replies_today(&pool).await.expect("count");
         assert!(count >= 0); // May or may not be today depending on test timing
+    }
+
+    #[tokio::test]
+    async fn get_enriched_includes_interactions_today() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+        upsert_target_account(&pool, "acc_2", "bob")
+            .await
+            .expect("upsert");
+
+        // Store a tweet for alice discovered today and mark as replied
+        let today = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        store_target_tweet(&pool, "tw_1", "acc_1", "hello", &today, 0, 5, 80.0)
+            .await
+            .expect("store");
+        mark_target_tweet_replied(&pool, "tw_1")
+            .await
+            .expect("mark");
+
+        let enriched = get_enriched_target_accounts(&pool).await.expect("enriched");
+        assert_eq!(enriched.len(), 2);
+
+        let alice = enriched.iter().find(|a| a.username == "alice").unwrap();
+        assert_eq!(alice.interactions_today, 1);
+
+        let bob = enriched.iter().find(|a| a.username == "bob").unwrap();
+        assert_eq!(bob.interactions_today, 0);
+    }
+
+    #[tokio::test]
+    async fn get_target_timeline_returns_tweets_with_replies() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+
+        store_target_tweet(
+            &pool,
+            "tw_1",
+            "acc_1",
+            "First tweet",
+            "2026-02-20T10:00:00Z",
+            2,
+            10,
+            75.0,
+        )
+        .await
+        .expect("store");
+        store_target_tweet(
+            &pool,
+            "tw_2",
+            "acc_1",
+            "Second tweet",
+            "2026-02-21T10:00:00Z",
+            1,
+            5,
+            60.0,
+        )
+        .await
+        .expect("store");
+        mark_target_tweet_replied(&pool, "tw_1")
+            .await
+            .expect("mark");
+
+        // Insert a reply for tw_1
+        sqlx::query(
+            "INSERT INTO replies_sent (target_tweet_id, reply_content, created_at, status) \
+             VALUES ('tw_1', 'Great point!', '2026-02-20T11:00:00Z', 'sent')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert reply");
+
+        let timeline = get_target_timeline(&pool, "alice", 50)
+            .await
+            .expect("timeline");
+        assert_eq!(timeline.len(), 2);
+
+        // Most recent first
+        assert_eq!(timeline[0].tweet_id, "tw_2");
+        assert!(!timeline[0].replied_to);
+        assert!(timeline[0].reply_content.is_none());
+
+        assert_eq!(timeline[1].tweet_id, "tw_1");
+        assert!(timeline[1].replied_to);
+        assert_eq!(timeline[1].reply_content.as_deref(), Some("Great point!"));
+    }
+
+    #[tokio::test]
+    async fn get_target_stats_returns_aggregates() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+
+        // Record some replies to set first/last engagement
+        record_target_reply(&pool, "acc_1").await.expect("reply");
+        record_target_reply(&pool, "acc_1").await.expect("reply");
+
+        // Store tweets with scores and mark as replied
+        store_target_tweet(
+            &pool,
+            "tw_1",
+            "acc_1",
+            "Tweet one",
+            "2026-02-20T10:00:00Z",
+            0,
+            5,
+            70.0,
+        )
+        .await
+        .expect("store");
+        mark_target_tweet_replied(&pool, "tw_1")
+            .await
+            .expect("mark");
+
+        store_target_tweet(
+            &pool,
+            "tw_2",
+            "acc_1",
+            "Tweet two",
+            "2026-02-22T10:00:00Z",
+            0,
+            3,
+            90.0,
+        )
+        .await
+        .expect("store");
+        mark_target_tweet_replied(&pool, "tw_2")
+            .await
+            .expect("mark");
+
+        // Insert replies for both
+        sqlx::query(
+            "INSERT INTO replies_sent (target_tweet_id, reply_content, created_at, status) \
+             VALUES ('tw_1', 'Reply one', '2026-02-20T11:00:00Z', 'sent')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert reply");
+        sqlx::query(
+            "INSERT INTO replies_sent (target_tweet_id, reply_content, created_at, status) \
+             VALUES ('tw_2', 'Reply two', '2026-02-22T11:00:00Z', 'sent')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert reply");
+
+        let stats = get_target_stats(&pool, "alice")
+            .await
+            .expect("stats")
+            .expect("found");
+        assert_eq!(stats.total_replies, 2);
+        assert!((stats.avg_score - 80.0).abs() < 0.01); // (70+90)/2
+        assert!(stats.best_reply_content.is_some());
+        assert!((stats.best_reply_score.unwrap() - 90.0).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn get_target_stats_returns_none_for_missing() {
+        let pool = init_test_db().await.expect("init db");
+
+        let stats = get_target_stats(&pool, "nobody").await.expect("stats");
+        assert!(stats.is_none());
     }
 }

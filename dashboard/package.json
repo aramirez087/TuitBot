@@ -30,6 +30,10 @@
 	},
 	"dependencies": {
 		"@tauri-apps/api": "^2.0.1",
+		"@tauri-apps/plugin-autostart": "^2.0.0-rc",
+		"@tauri-apps/plugin-notification": "^2.0.0-rc",
+		"@tauri-apps/plugin-store": "^2.0.0-rc",
+		"@tauri-apps/plugin-updater": "^2.0.0-rc",
 		"chart.js": "^4.5.1",
 		"lucide-svelte": "^0.575.0"
 	}

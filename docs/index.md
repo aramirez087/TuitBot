@@ -1,9 +1,10 @@
 # Tuitbot Documentation
 
-Tuitbot is an autonomous X growth assistant with two execution modes:
+Tuitbot is an autonomous X growth assistant that operates across three distinct architectures:
 
-- `tuitbot run`: long-running daemon with internal scheduling.
-- `tuitbot tick`: single-pass execution for external schedulers.
+- **Desktop App**: A beautiful Tauri+Svelte visual dashboard for editing and approving content visually.
+- **Docker Self-Hosted**: 24/7 web-based dashboard driven natively through a persistent remote container.
+- **headless CLI**: The foundational CLI, suitable for cron execution (`tuitbot tick`) or background daemons (`tuitbot run`).
 
 This documentation is the source of truth for setup, operations, release, and publishing.
 

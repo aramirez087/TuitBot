@@ -1,5 +1,7 @@
 # Configuration
 
+> **Note**: While power-users and CLI users can edit following paths directly via terminal, the recommended method is using the **Visual Settings UI Editor** inside the Desktop App dashboard under the "Settings" tab.
+
 ## Config file location
 
 Default path:

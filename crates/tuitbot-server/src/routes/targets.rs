@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -11,9 +11,9 @@ use tuitbot_core::storage::target_accounts;
 use crate::error::ApiError;
 use crate::state::AppState;
 
-/// `GET /api/targets` — list target accounts and their state.
+/// `GET /api/targets` — list target accounts with enriched data.
 pub async fn list_targets(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ApiError> {
-    let accounts = target_accounts::get_active_target_accounts(&state.db).await?;
+    let accounts = target_accounts::get_enriched_target_accounts(&state.db).await?;
     Ok(Json(json!(accounts)))
 }
 
@@ -69,4 +69,37 @@ pub async fn remove_target(
     }
 
     Ok(Json(json!({"status": "removed", "username": username})))
+}
+
+/// Query parameters for the timeline endpoint.
+#[derive(Deserialize)]
+pub struct TimelineQuery {
+    /// Maximum number of timeline items to return (default: 50).
+    pub limit: Option<i64>,
+}
+
+/// `GET /api/targets/:username/timeline` — interaction timeline for a target.
+pub async fn target_timeline(
+    State(state): State<Arc<AppState>>,
+    Path(username): Path<String>,
+    Query(params): Query<TimelineQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let limit = params.limit.unwrap_or(50).min(200);
+    let items = target_accounts::get_target_timeline(&state.db, &username, limit).await?;
+    Ok(Json(json!(items)))
+}
+
+/// `GET /api/targets/:username/stats` — aggregated stats for a target.
+pub async fn target_stats(
+    State(state): State<Arc<AppState>>,
+    Path(username): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let stats = target_accounts::get_target_stats(&state.db, &username).await?;
+
+    match stats {
+        Some(s) => Ok(Json(json!(s))),
+        None => Err(ApiError::NotFound(format!(
+            "active target account @{username} not found"
+        ))),
+    }
 }

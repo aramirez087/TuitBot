@@ -69,6 +69,28 @@ async fn post_json(
     (status, json)
 }
 
+/// Helper: send a PATCH request with auth and JSON body.
+async fn patch_json(
+    router: axum::Router,
+    path: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(path)
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    let status = response.status();
+    let bytes = response.into_body().collect().await.expect("read body");
+    let json: serde_json::Value = serde_json::from_slice(&bytes.to_bytes()).expect("parse JSON");
+
+    (status, json)
+}
+
 /// Helper: send a DELETE request with auth.
 async fn delete_json(router: axum::Router, path: &str) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
@@ -196,6 +218,155 @@ async fn approval_reject_not_found() {
     let router = test_router().await;
     let (status, _) = post_json(router, "/api/approval/99999/reject", serde_json::json!({})).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn approval_stats_returns_counts() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        runtime: Mutex::new(None),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // Seed data.
+    tuitbot_core::storage::approval_queue::enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0)
+        .await
+        .expect("enqueue");
+    let id2 = tuitbot_core::storage::approval_queue::enqueue(
+        &pool, "reply", "t1", "@u", "B", "Rust", "", 50.0,
+    )
+    .await
+    .expect("enqueue");
+    tuitbot_core::storage::approval_queue::update_status(&pool, id2, "approved")
+        .await
+        .expect("update");
+
+    let (status, body) = get_json(router, "/api/approval/stats").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["pending"], 1);
+    assert_eq!(body["approved"], 1);
+    assert_eq!(body["rejected"], 0);
+}
+
+#[tokio::test]
+async fn approval_list_with_status_filter() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        runtime: Mutex::new(None),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // Seed: one pending, one approved.
+    tuitbot_core::storage::approval_queue::enqueue(
+        &pool, "tweet", "", "", "Pending", "General", "", 0.0,
+    )
+    .await
+    .expect("enqueue");
+    let id2 = tuitbot_core::storage::approval_queue::enqueue(
+        &pool, "tweet", "", "", "Approved", "General", "", 0.0,
+    )
+    .await
+    .expect("enqueue");
+    tuitbot_core::storage::approval_queue::update_status(&pool, id2, "approved")
+        .await
+        .expect("update");
+
+    // Default (pending only).
+    let (status, body) = get_json(router.clone(), "/api/approval").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.as_array().unwrap().len(), 1);
+
+    // Approved only.
+    let (status, body) = get_json(router.clone(), "/api/approval?status=approved").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.as_array().unwrap().len(), 1);
+    assert_eq!(body[0]["generated_content"], "Approved");
+
+    // Both pending and approved.
+    let (status, body) = get_json(router, "/api/approval?status=pending,approved").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn approval_edit_content() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        runtime: Mutex::new(None),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool, "tweet", "", "", "Original", "General", "", 0.0,
+    )
+    .await
+    .expect("enqueue");
+
+    let (status, body) = patch_json(
+        router,
+        &format!("/api/approval/{id}"),
+        serde_json::json!({"content": "Edited version"}),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["generated_content"], "Edited version");
+    assert_eq!(body["status"], "pending");
+}
+
+#[tokio::test]
+async fn approval_edit_not_found() {
+    let router = test_router().await;
+    let (status, _) = patch_json(
+        router,
+        "/api/approval/99999",
+        serde_json::json!({"content": "Something"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn approval_edit_empty_content() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        runtime: Mutex::new(None),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool, "tweet", "", "", "Original", "General", "", 0.0,
+    )
+    .await
+    .expect("enqueue");
+
+    let (status, _) = patch_json(
+        router,
+        &format!("/api/approval/{id}"),
+        serde_json::json!({"content": "   "}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 // ============================================================

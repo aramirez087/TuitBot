@@ -101,6 +101,24 @@ pub async fn count_replies_today(pool: &DbPool) -> Result<i64, StorageError> {
     Ok(row.0)
 }
 
+/// Get replies within a date range, ordered by creation time.
+pub async fn get_replies_in_range(
+    pool: &DbPool,
+    from: &str,
+    to: &str,
+) -> Result<Vec<ReplySent>, StorageError> {
+    sqlx::query_as::<_, ReplySent>(
+        "SELECT * FROM replies_sent \
+         WHERE created_at BETWEEN ? AND ? \
+         ORDER BY created_at ASC",
+    )
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
 /// Get the most recent replies, newest first, with pagination.
 pub async fn get_recent_replies(
     pool: &DbPool,
@@ -172,6 +190,30 @@ mod tests {
 
         let contents = get_recent_reply_contents(&pool, 5).await.expect("get");
         assert_eq!(contents.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn get_replies_in_range_filters() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut r1 = sample_reply("t_range1");
+        r1.created_at = "2026-02-20T10:00:00Z".to_string();
+        insert_reply(&pool, &r1).await.expect("insert");
+
+        let mut r2 = sample_reply("t_range2");
+        r2.created_at = "2026-02-25T10:00:00Z".to_string();
+        insert_reply(&pool, &r2).await.expect("insert");
+
+        let in_range = get_replies_in_range(&pool, "2026-02-19T00:00:00Z", "2026-02-21T00:00:00Z")
+            .await
+            .expect("range");
+        assert_eq!(in_range.len(), 1);
+        assert_eq!(in_range[0].target_tweet_id, "t_range1");
+
+        let all = get_replies_in_range(&pool, "2026-02-01T00:00:00Z", "2026-02-28T00:00:00Z")
+            .await
+            .expect("range");
+        assert_eq!(all.len(), 2);
     }
 
     #[tokio::test]

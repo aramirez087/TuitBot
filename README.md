@@ -22,82 +22,54 @@ Built for **founders**, **indie hackers**, and **solo makers** who'd rather buil
 
 ---
 
-## Two Operating Modes
+## Three Deployment Modes
 
-Tuitbot runs in two distinct modes. Pick the one that fits your infrastructure:
+Tuitbot supports three ways to run — all using the exact same core automation engine:
 
-| | **Standalone Daemon** | **Scheduler-Driven (Tick)** |
-|---|---|---|
-| **Command** | `tuitbot run` | `tuitbot tick` |
-| **How it works** | Long-running process with 6 concurrent loops | Single pass through all loops, then exits |
-| **Best for** | VPS, tmux, dedicated server | Cron, systemd timers, launchd, [OpenClaw](https://openclaw.org) |
-| **Scheduling** | Built-in (active hours + jitter) | External scheduler decides when to invoke |
-| **Process model** | Always running, graceful shutdown on SIGTERM | Runs once, exits with JSON summary |
-| **Resource usage** | Persistent (~15 MB RSS) | Zero when idle, spins up on schedule |
+| Mode | How it runs | Dashboard access | Best for |
+|------|-------------|-----------------|----------|
+| **Desktop App** | Native window (Tauri) on macOS/Windows. | Built-in native UI | Users who want a beautiful app with point-and-click settings. |
+| **Self-Hosted** | `docker compose up` on a VPS. | Browser → `http://localhost:3001` | Technical users who want 24/7 automation and full control. |
+| **Cloud Tier**  | Fully managed by us. | Browser → `app.tuitbot.dev` | Zero setup, always-on automation. |
 
-Both modes share the same config, the same database, and the same safety guardrails. You can switch between them freely — they use a process lock to prevent overlap.
+### Desktop App (Native GUI)
 
-### Standalone Daemon (`tuitbot run`)
+The easiest way to use Tuitbot. Built with Tauri and SvelteKit, the desktop app provides a beautiful, data-rich dashboard:
 
-The traditional mode. Tuitbot runs as a long-lived process, managing its own loop timing, jitter, and active-hours gating:
+- **Analytics:** 30-day follower charts, engagement stats, and top-performing topics.
+- **Visual Approval Queue:** Edit, review, and manually approve AI-generated replies and tweets.
+- **Content Calendar:** Schedule threads and tweets visually alongside autonomous content.
+- **Target Accounts Manager:** Track relationships, view interaction history, and monitor warmup progress.
+- **Settings Editor:** Configure your business profile, adjust LLM settings, and manipulate the 6-signal scoring engine without touching a `.toml` file.
 
-```bash
-tuitbot run
-# Leave running. Ctrl+C to gracefully stop.
-```
+### CLI & Scheduler-Driven Modes
 
-### Scheduler-Driven (`tuitbot tick`)
-
-The new idempotent mode. Each invocation runs every enabled loop exactly once and exits with a structured summary. Your external scheduler (cron, systemd timer, OpenClaw) controls the cadence:
-
-```bash
-# Run all loops once
-tuitbot tick
-
-# Dry run — see what would happen without posting
-tuitbot tick --dry-run
-
-# Run only specific loops
-tuitbot tick --loops discovery,content,analytics
-
-# Ignore active-hours window (useful for testing)
-tuitbot tick --ignore-schedule
-
-# Get machine-readable JSON output
-tuitbot tick --output json
-```
-
-**Process lock:** Only one `tuitbot tick` (or `tuitbot run`) can execute at a time. A second invocation exits immediately with a clear error.
-
-**Exit summary:** Every tick prints a per-loop status report (completed / skipped / failed) with counts and timing. With `--output json`, this is a structured JSON object ready for log aggregation.
+For power users and self-hosters, Tuitbot still provides the robust `tuitbot-cli`:
+- `tuitbot run`: Long-running daemon with internal scheduling.
+- `tuitbot tick`: Idempotent execution for external schedulers (cron, systemd, OpenClaw).
 
 ---
 
 ## Features
 
-Tuitbot runs up to six automated loops while you focus on building. It respects configurable **active hours** and supports precise **slot-based scheduling** so you can target peak engagement windows or fall back to a natural, interval-based cadence.
+Tuitbot runs up to six automated loops while you focus on building. You can monitor all of this through the **Dashboard's Live Activity Feed**, which provides real-time visibility into the AI's decision-making process.
 
 ### 1. Finds Conversations That Matter
-Searches X for tweets matching your product's keywords. Tuitbot uses a **6-signal scoring engine** to find the perfect interactions:
-* **Keyword relevance** · **Follower sweet spot (1K-5K)** · **Recency** · **Engagement rate** · **Reply count** (prefers underserved conversations) · **Content type** (prefers text-only).
+Searches X for tweets matching your product's keywords. Tuitbot uses a **6-signal scoring engine** (configurable via the GUI) to find the perfect interactions:
+* **Keyword relevance** · **Follower sweet spot (1K-5K)** · **Recency** · **Engagement rate** · **Reply count** · **Content type**.
 
 ### 2. Replies With Genuinely Helpful Content
-When it finds a high-scoring tweet, Tuitbot uses AI to write a natural, helpful reply using varied **reply archetypes** (agree and expand, ask a question, share an experience). It mentions your product sparingly (configurable) and never uses banned phrases like *"check out"* or *"link in bio"*.
+When it finds a high-scoring tweet, Tuitbot uses AI to write a natural, helpful reply. With the **Visual Approval Queue**, you can opt to review, edit, and approve these replies manually before they are posted.
 
-### 3. Posts Educational Tweets
-Tuitbot posts original tweets at your preferred precise times (e.g., peak engagement windows) or automatically every few hours using varied formats (lists, contrarian takes, tips, questions). It uses **epsilon-greedy topic selection** to continuously explore new topics while doubling down on what performs best.
+### 3. Posts Educational Tweets & Threads
+Tuitbot posts original tweets and weekly threads. Through the **Content Calendar**, you can visualize scheduled autonomous posts and compose your own manual tweets to interleave with the AI-generated content.
 
-### 4. Publishes Weekly Threads
-Once a week, Tuitbot crafts a multi-tweet thread using proven structures: transformation stories, frameworks, common mistakes, or deep analysis. You can target specific high-traction days and times for your threads to maximize reach.
-
-### 5. Monitors Mentions & Tracks Targets
+### 4. Monitors Mentions & Tracks Targets
 * Automatically generates thoughtful replies when someone @-mentions you.
-* Monitors specific target accounts and builds relationships over time with an optional auto-follow and engagement warmup period.
+* Uses the **Target Accounts CRM** to monitor specific people, build relationships over time, and visually track interaction history.
 
-### 6. Tracks Analytics
-Snapshots your follower count daily, measures engagement after 24 hours, and alerts you if followers drop. View your dashboard anytime using `tuitbot stats`.
-
-> **Note on X API access:** X API access is pay-per-usage (credits). Discovery, replies, mentions, target monitoring, and posting all require available credits. Legacy Basic/Pro subscriptions may still exist for older accounts. See [Getting Started](https://aramirez087.github.io/TuitBot/getting-started/) for setup details.
+### 5. Rich Analytics
+Snapshots your follower count daily and measures engagement after 24 hours. The **Analytics Dashboard** visualizes this data with beautiful charts and top-performing topic breakdowns.
 
 ---
 
@@ -120,88 +92,41 @@ Tuitbot is engineered to keep your account totally safe and maintain your pristi
 
 ## Getting Started
 
-### Prerequisites
+### 1. The Desktop App (Recommended)
 
-| Requirement | Where to get it | Cost |
-|---|---|---|
-| **X API Developer Account** | [developer.x.com](https://developer.x.com) | Pay-per-usage (credits) |
-| **AI Provider** | [OpenAI](https://platform.openai.com/), [Anthropic](https://console.anthropic.com/), or [Ollama](https://ollama.ai/) | Varies (Ollama is Free) |
+The easiest way to get started is by downloading the desktop app. You don't need to touch the terminal.
 
-### Install
+1. Download the latest `.dmg` (macOS), `.exe` (Windows), or `.AppImage` (Linux) from the [Releases](https://github.com/aramirez087/TuitBot/releases) page.
+2. Open the app and follow the interactive **Onboarding Wizard**.
+3. The app will guide you through connecting your X account, configuring your AI provider (OpenAI, Anthropic, or local Ollama), and setting up your business profile.
 
-**From crates.io (recommended):**
+The app will run quietly as a system tray icon, managing the automation in the background.
+
+### 2. Self-Hosted Docker
+
+For users who want to run Tuitbot on a cloud VPS (like Hetzner or DigitalOcean) for 24/7 uptime without keeping a laptop open:
+
+```bash
+git clone https://github.com/aramirez087/TuitBot.git
+cd TuitBot
+cp .env.example .env
+# Edit .env to add your API keys
+docker compose up -d
+```
+Then navigate to `http://localhost:3001` to access the full graphical dashboard in your browser.
+
+### 3. Command Line Interface (CLI)
+
+For power users who prefer the terminal, Tuitbot is available as a Rust crate:
+
 ```bash
 cargo install tuitbot-cli --locked
-```
-
-**Prebuilt binary (no Rust toolchain):**
-```bash
-curl -fsSL https://raw.githubusercontent.com/aramirez087/TuitBot/main/scripts/install.sh | bash
-```
-
-**From source (contributors, Rust 1.75+):**
-```bash
-cargo install --path crates/tuitbot-cli --locked
-```
-
-**Windows:** download `tuitbot-x86_64-pc-windows-msvc.zip` from [Releases](https://github.com/aramirez087/TuitBot/releases), unzip, and add `tuitbot.exe` to your `PATH`.
-
-### OS-specific quickstart
-
-| OS | Install path | First run | Recommended mode |
-|---|---|---|---|
-| **Linux** | `cargo install tuitbot-cli --locked` or install script | `tuitbot init && tuitbot auth && tuitbot test` | `tuitbot run` under systemd, or `tuitbot tick` via cron/systemd timer |
-| **macOS** | `cargo install tuitbot-cli --locked` or install script | `tuitbot init && tuitbot auth && tuitbot test` | `tuitbot run` in launchd/tmux, or `tuitbot tick` via launchd |
-| **Windows** | Release zip + add `tuitbot.exe` to `PATH` (or `cargo install tuitbot-cli --locked`) | `tuitbot init`, then `tuitbot auth`, then `tuitbot test` in PowerShell | `tuitbot tick` via Task Scheduler (or run `tuitbot run` in a persistent terminal) |
-
-If `tuitbot` is not found after `cargo install`, add the cargo bin directory to `PATH`:
-
-- Linux/macOS: `$HOME/.cargo/bin`
-- Windows: `%USERPROFILE%\\.cargo\\bin`
-
-### Setup (both modes)
-
-Steps 1-3 are identical regardless of which mode you choose.
-
-#### 1. Set Up X Developer App
-Go to the [X Developer Portal](https://developer.x.com/en/portal/dashboard) and create an app.
-* **App permissions:** Read and write
-* **Type of App:** Native App *(also called "public client")*
-* **Callback URI:** `http://127.0.0.1:8080/callback` **(Must be exact — no HTTPS or trailing slash)**
-* **Website URL:** Your product's URL
-
-Copy your **OAuth 2.0 Client ID**.
-
-#### 2. Initialize Tuitbot
-```bash
 tuitbot init
+tuitbot auth
+tuitbot run    # Run daemon
+# OR
+tuitbot tick   # For cron/planners
 ```
-Follow the interactive prompts to define your Business Profile, Brand Voice, and AI Provider.
-
-#### 3. Authenticate & Test
-```bash
-tuitbot auth        # Authorize your X account via browser
-tuitbot test        # Validate all components
-```
-
-#### 4a. Run as Standalone Daemon
-
-```bash
-tuitbot run
-# Leave running. Ctrl+C to gracefully stop.
-```
-
-That's it. Tuitbot manages its own timing, active hours, and loop scheduling internally.
-
-#### 4b. Run with an External Scheduler
-
-Use your scheduler to invoke `tuitbot tick --output json` every 15-30 minutes.
-
-For full production examples (cron, systemd, launchd, OpenClaw), see:
-
-- [Getting Started](https://aramirez087.github.io/TuitBot/getting-started/)
-- [Operations](https://aramirez087.github.io/TuitBot/operations/)
-- [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/)
 
 ---
 

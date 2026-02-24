@@ -31,6 +31,12 @@ pub enum WsEvent {
         action_type: String,
         content: String,
     },
+    /// An approval item's status was updated (approved, rejected, edited).
+    ApprovalUpdated {
+        id: i64,
+        status: String,
+        action_type: String,
+    },
     /// Follower count changed.
     FollowerUpdate { count: i64, change: i64 },
     /// Automation runtime status changed.
@@ -50,6 +56,12 @@ pub enum WsEvent {
         action_type: String,
         reason: String,
         timestamp: String,
+    },
+    /// A new content item was scheduled via the composer.
+    ContentScheduled {
+        id: i64,
+        content_type: String,
+        scheduled_for: Option<String>,
     },
     /// An error occurred.
     Error { message: String },

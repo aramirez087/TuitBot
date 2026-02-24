@@ -289,6 +289,23 @@ pub trait ContentStorage: Send + Sync {
         status: &str,
         message: &str,
     ) -> Result<(), ContentLoopError>;
+
+    /// Check for scheduled content that is due for posting.
+    ///
+    /// Returns the next due item (content, id) or None.
+    async fn next_scheduled_item(&self) -> Result<Option<(i64, String, String)>, ContentLoopError> {
+        // Default: no scheduled content support.
+        Ok(None)
+    }
+
+    /// Mark a scheduled content item as posted.
+    async fn mark_scheduled_posted(
+        &self,
+        _id: i64,
+        _tweet_id: Option<&str>,
+    ) -> Result<(), ContentLoopError> {
+        Ok(())
+    }
 }
 
 /// Posts tweets directly to X (for thread reply chains).

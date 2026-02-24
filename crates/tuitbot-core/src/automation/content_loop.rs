@@ -231,6 +231,11 @@ impl ContentLoop {
         max_recent: usize,
         rng: &mut impl rand::Rng,
     ) -> ContentResult {
+        // Check for manually scheduled content due for posting
+        if let Some(result) = self.try_post_scheduled().await {
+            return result;
+        }
+
         // Check safety (daily tweet limit)
         if !self.safety.can_post_tweet().await {
             return ContentResult::RateLimited;
@@ -286,6 +291,11 @@ impl ContentLoop {
         max_recent: usize,
         rng: &mut impl rand::Rng,
     ) -> ContentResult {
+        // Check for manually scheduled content due for posting
+        if let Some(result) = self.try_post_scheduled().await {
+            return result;
+        }
+
         // Check elapsed time since last tweet
         match self.storage.last_tweet_time().await {
             Ok(Some(last_time)) => {
@@ -368,6 +378,64 @@ impl ContentLoop {
         }
 
         pick_topic(&self.topics, recent_topics, rng)
+    }
+
+    /// Check for scheduled content due for posting and post it if found.
+    ///
+    /// Returns `Some(ContentResult)` if a scheduled item was handled,
+    /// `None` if no scheduled items are due.
+    async fn try_post_scheduled(&self) -> Option<ContentResult> {
+        match self.storage.next_scheduled_item().await {
+            Ok(Some((id, content_type, content))) => {
+                tracing::info!(
+                    id = id,
+                    content_type = %content_type,
+                    "Posting scheduled content"
+                );
+
+                if self.dry_run {
+                    tracing::info!(
+                        "DRY RUN: Would post scheduled {} (id={}): \"{}\"",
+                        content_type,
+                        id,
+                        &content[..content.len().min(80)]
+                    );
+                    let _ = self
+                        .storage
+                        .log_action(
+                            &content_type,
+                            "dry_run",
+                            &format!("Scheduled id={id}: {}", &content[..content.len().min(80)]),
+                        )
+                        .await;
+                } else if let Err(e) = self.storage.post_tweet("scheduled", &content).await {
+                    tracing::error!(error = %e, "Failed to post scheduled content");
+                    return Some(ContentResult::Failed {
+                        error: format!("Scheduled post failed: {e}"),
+                    });
+                } else {
+                    let _ = self.storage.mark_scheduled_posted(id, None).await;
+                    let _ = self
+                        .storage
+                        .log_action(
+                            &content_type,
+                            "success",
+                            &format!("Scheduled id={id}: {}", &content[..content.len().min(80)]),
+                        )
+                        .await;
+                }
+
+                Some(ContentResult::Posted {
+                    topic: format!("scheduled:{id}"),
+                    content,
+                })
+            }
+            Ok(None) => None,
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to check scheduled content");
+                None
+            }
+        }
     }
 
     /// Generate a tweet and post it (or print in dry-run mode).

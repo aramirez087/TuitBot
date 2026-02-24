@@ -4,6 +4,8 @@
 	import RateLimitBar from '$lib/components/RateLimitBar.svelte';
 	import ActivityFilter from '$lib/components/ActivityFilter.svelte';
 	import ActivityItem from '$lib/components/ActivityItem.svelte';
+	import ErrorState from '$lib/components/ErrorState.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import {
 		actions,
 		rateLimits,
@@ -46,7 +48,9 @@
 	<p class="subtitle">Real-time feed of automation actions</p>
 </div>
 
-{#if $error}
+{#if $error && $actions.length === 0}
+	<ErrorState message={$error} onretry={() => loadActivity(true)} />
+{:else if $error}
 	<div class="error-banner">
 		<span>{$error}</span>
 		<button onclick={() => loadActivity(true)}>Retry</button>
@@ -82,10 +86,10 @@
 		</div>
 	{:else if $actions.length === 0}
 		<div class="feed-container">
-			<div class="empty-state">
-				<p class="empty-title">No activity yet</p>
-				<p class="empty-hint">Actions will appear here as the automation runs.</p>
-			</div>
+			<EmptyState
+				title="No activity recorded yet"
+				description="Actions will appear here as the automation runs."
+			/>
 		</div>
 	{:else}
 		<div class="feed-container">
@@ -206,23 +210,6 @@
 		overflow: hidden;
 	}
 
-	.empty-state {
-		padding: 60px 20px;
-		text-align: center;
-	}
-
-	.empty-title {
-		margin: 0 0 6px;
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--color-text);
-	}
-
-	.empty-hint {
-		margin: 0;
-		font-size: 13px;
-		color: var(--color-text-subtle);
-	}
 
 	.load-more {
 		display: flex;

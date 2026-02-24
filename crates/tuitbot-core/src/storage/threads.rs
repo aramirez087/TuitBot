@@ -202,6 +202,42 @@ pub async fn count_threads_this_week(pool: &DbPool) -> Result<i64, StorageError>
     Ok(row.0)
 }
 
+/// Get original tweets within a date range, ordered by creation time.
+pub async fn get_tweets_in_range(
+    pool: &DbPool,
+    from: &str,
+    to: &str,
+) -> Result<Vec<OriginalTweet>, StorageError> {
+    sqlx::query_as::<_, OriginalTweet>(
+        "SELECT * FROM original_tweets \
+         WHERE created_at BETWEEN ? AND ? \
+         ORDER BY created_at ASC",
+    )
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
+/// Get threads within a date range, ordered by creation time.
+pub async fn get_threads_in_range(
+    pool: &DbPool,
+    from: &str,
+    to: &str,
+) -> Result<Vec<Thread>, StorageError> {
+    sqlx::query_as::<_, Thread>(
+        "SELECT * FROM threads \
+         WHERE created_at BETWEEN ? AND ? \
+         ORDER BY created_at ASC",
+    )
+    .bind(from)
+    .bind(to)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
 /// Get the most recent original tweets, newest first.
 pub async fn get_recent_original_tweets(
     pool: &DbPool,
@@ -375,5 +411,53 @@ mod tests {
         let pool = init_test_db().await.expect("init db");
         let time = get_last_thread_time(&pool).await.expect("get time");
         assert!(time.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_tweets_in_range_filters() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut tweet = sample_original_tweet();
+        tweet.created_at = "2026-02-20T10:00:00Z".to_string();
+        insert_original_tweet(&pool, &tweet).await.expect("insert");
+
+        let mut tweet2 = sample_original_tweet();
+        tweet2.created_at = "2026-02-25T10:00:00Z".to_string();
+        tweet2.tweet_id = Some("ot_456".to_string());
+        insert_original_tweet(&pool, &tweet2).await.expect("insert");
+
+        let in_range = get_tweets_in_range(&pool, "2026-02-19T00:00:00Z", "2026-02-21T00:00:00Z")
+            .await
+            .expect("range");
+        assert_eq!(in_range.len(), 1);
+        assert_eq!(in_range[0].tweet_id, Some("ot_123".to_string()));
+
+        let all = get_tweets_in_range(&pool, "2026-02-01T00:00:00Z", "2026-02-28T00:00:00Z")
+            .await
+            .expect("range");
+        assert_eq!(all.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn get_threads_in_range_filters() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut thread = sample_thread();
+        thread.created_at = "2026-02-20T10:00:00Z".to_string();
+        insert_thread(&pool, &thread).await.expect("insert");
+
+        let mut thread2 = sample_thread();
+        thread2.created_at = "2026-02-25T10:00:00Z".to_string();
+        insert_thread(&pool, &thread2).await.expect("insert");
+
+        let in_range = get_threads_in_range(&pool, "2026-02-19T00:00:00Z", "2026-02-21T00:00:00Z")
+            .await
+            .expect("range");
+        assert_eq!(in_range.len(), 1);
+
+        let all = get_threads_in_range(&pool, "2026-02-01T00:00:00Z", "2026-02-28T00:00:00Z")
+            .await
+            .expect("range");
+        assert_eq!(all.len(), 2);
     }
 }

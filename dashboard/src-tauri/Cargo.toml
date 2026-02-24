@@ -19,6 +19,17 @@ tauri-build = { version = "2.0.0-rc.13" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
-dirs = "6"
 tauri = { version = "2.0.0-rc.17" }
 tauri-plugin-log = "2.0.0-rc"
+
+# Embed the server as a library (replaces child-process spawning)
+tuitbot-server = { path = "../../crates/tuitbot-server" }
+tuitbot-core = { path = "../../crates/tuitbot-core" }
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+
+# Tauri plugins
+tauri-plugin-autostart = "2.0.0-rc"
+tauri-plugin-notification = "2.0.0-rc"
+tauri-plugin-store = "2.0.0-rc"
+tauri-plugin-updater = "2.0.0-rc"

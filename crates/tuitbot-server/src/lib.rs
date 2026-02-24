@@ -12,7 +12,7 @@ pub mod ws;
 use std::sync::Arc;
 
 use axum::middleware;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use axum::Router;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
@@ -36,13 +36,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(routes::analytics::recent_performance),
         )
         // Approval
-        .route("/approval", get(routes::approval::list_pending))
+        .route("/approval", get(routes::approval::list_items))
+        .route("/approval/stats", get(routes::approval::stats))
+        .route("/approval/approve-all", post(routes::approval::approve_all))
+        .route("/approval/{id}", patch(routes::approval::edit_item))
         .route(
             "/approval/{id}/approve",
             post(routes::approval::approve_item),
         )
         .route("/approval/{id}/reject", post(routes::approval::reject_item))
-        .route("/approval/approve-all", post(routes::approval::approve_all))
         // Activity
         .route("/activity", get(routes::activity::list_activity))
         .route(
@@ -60,16 +62,39 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/content/threads",
             get(routes::content::list_threads).post(routes::content::compose_thread),
         )
+        .route("/content/calendar", get(routes::content::calendar))
+        .route("/content/schedule", get(routes::content::schedule))
+        .route("/content/compose", post(routes::content::compose))
+        .route(
+            "/content/scheduled/{id}",
+            patch(routes::content::edit_scheduled).delete(routes::content::cancel_scheduled),
+        )
         // Targets
         .route(
             "/targets",
             get(routes::targets::list_targets).post(routes::targets::add_target),
         )
         .route(
+            "/targets/{username}/timeline",
+            get(routes::targets::target_timeline),
+        )
+        .route(
+            "/targets/{username}/stats",
+            get(routes::targets::target_stats),
+        )
+        .route(
             "/targets/{username}",
             delete(routes::targets::remove_target),
         )
         // Settings
+        .route("/settings/status", get(routes::settings::config_status))
+        .route("/settings/init", post(routes::settings::init_settings))
+        .route(
+            "/settings/validate",
+            post(routes::settings::validate_settings),
+        )
+        .route("/settings/defaults", get(routes::settings::get_defaults))
+        .route("/settings/test-llm", post(routes::settings::test_llm))
         .route(
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),

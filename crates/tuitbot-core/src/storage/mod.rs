@@ -11,6 +11,7 @@ pub mod cleanup;
 pub mod cursors;
 pub mod rate_limits;
 pub mod replies;
+pub mod scheduled_content;
 pub mod target_accounts;
 pub mod threads;
 pub mod tweets;
@@ -134,6 +135,7 @@ mod tests {
         assert!(table_names.contains(&"tweet_performance"));
         assert!(table_names.contains(&"content_scores"));
         assert!(table_names.contains(&"approval_queue"));
+        assert!(table_names.contains(&"scheduled_content"));
     }
 
     #[tokio::test]
