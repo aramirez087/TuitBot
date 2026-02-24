@@ -80,6 +80,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         // Settings
         .route(
+            "/settings/validate",
+            post(routes::settings::validate_settings),
+        )
+        .route("/settings/defaults", get(routes::settings::get_defaults))
+        .route("/settings/test-llm", post(routes::settings::test_llm))
+        .route(
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),
         )

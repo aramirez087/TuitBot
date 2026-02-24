@@ -167,6 +167,101 @@ export interface ScheduledContentItem {
 	updated_at: string;
 }
 
+// --- Settings types ---
+
+export interface TuitbotConfig {
+	x_api: {
+		client_id: string;
+		client_secret: string | null;
+	};
+	auth: {
+		mode: string;
+		callback_host: string;
+		callback_port: number;
+	};
+	business: {
+		product_name: string;
+		product_description: string;
+		product_url: string | null;
+		target_audience: string;
+		product_keywords: string[];
+		competitor_keywords: string[];
+		industry_topics: string[];
+		brand_voice: string | null;
+		reply_style: string | null;
+		content_style: string | null;
+		persona_opinions: string[];
+		persona_experiences: string[];
+		content_pillars: string[];
+	};
+	scoring: {
+		threshold: number;
+		keyword_relevance_max: number;
+		follower_count_max: number;
+		recency_max: number;
+		engagement_rate_max: number;
+		reply_count_max: number;
+		content_type_max: number;
+	};
+	limits: {
+		max_replies_per_day: number;
+		max_tweets_per_day: number;
+		max_threads_per_week: number;
+		min_action_delay_seconds: number;
+		max_action_delay_seconds: number;
+		max_replies_per_author_per_day: number;
+		banned_phrases: string[];
+		product_mention_ratio: number;
+	};
+	intervals: {
+		mentions_check_seconds: number;
+		discovery_search_seconds: number;
+		content_post_window_seconds: number;
+		thread_interval_seconds: number;
+	};
+	llm: {
+		provider: string;
+		api_key: string | null;
+		model: string;
+		base_url: string | null;
+	};
+	targets: {
+		accounts: string[];
+		max_target_replies_per_day: number;
+		auto_follow: boolean;
+		follow_warmup_days: number;
+	};
+	approval_mode: boolean;
+	storage: {
+		db_path: string;
+		retention_days: number;
+	};
+	logging: {
+		status_interval_seconds: number;
+	};
+	schedule: {
+		timezone: string;
+		active_hours_start: number;
+		active_hours_end: number;
+		active_days: string[];
+		preferred_times: string[];
+		preferred_times_override: Record<string, string[]>;
+		thread_preferred_day: string | null;
+		thread_preferred_time: string;
+	};
+}
+
+export interface SettingsValidationResult {
+	valid: boolean;
+	errors: Array<{ field: string; message: string }>;
+}
+
+export interface SettingsTestResult {
+	success: boolean;
+	error?: string;
+	latency_ms?: number;
+}
+
 // --- API client ---
 
 export const api = {
@@ -217,6 +312,31 @@ export const api = {
 			request<unknown[]>(`/api/content/tweets?limit=${limit}`),
 		threads: (limit: number = 20) =>
 			request<unknown[]>(`/api/content/threads?limit=${limit}`)
+	},
+
+	settings: {
+		get: () => request<TuitbotConfig>('/api/settings'),
+		patch: (data: Partial<TuitbotConfig>) =>
+			request<TuitbotConfig>('/api/settings', {
+				method: 'PATCH',
+				body: JSON.stringify(data)
+			}),
+		validate: (data: Partial<TuitbotConfig>) =>
+			request<SettingsValidationResult>('/api/settings/validate', {
+				method: 'POST',
+				body: JSON.stringify(data)
+			}),
+		defaults: () => request<TuitbotConfig>('/api/settings/defaults'),
+		testLlm: (data: {
+			provider: string;
+			api_key?: string | null;
+			model: string;
+			base_url?: string | null;
+		}) =>
+			request<SettingsTestResult>('/api/settings/test-llm', {
+				method: 'POST',
+				body: JSON.stringify(data)
+			})
 	},
 
 	approval: {
