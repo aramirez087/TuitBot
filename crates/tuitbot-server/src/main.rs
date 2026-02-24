@@ -7,10 +7,13 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
+use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 use tuitbot_core::storage;
 
+use tuitbot_server::auth;
 use tuitbot_server::state::AppState;
+use tuitbot_server::ws::WsEvent;
 
 /// Tuitbot API server — serves the dashboard REST API.
 #[derive(Parser)]
@@ -49,9 +52,19 @@ async fn main() -> Result<()> {
 
     let pool = storage::init_db(&db_path.to_string_lossy()).await?;
 
+    // Ensure the API token file exists and read it.
+    let api_token = auth::ensure_api_token(db_dir)?;
+    tracing::info!(token_path = %db_dir.join("api_token").display(), "API token ready");
+
+    // Create the broadcast channel for WebSocket events.
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
     let state = Arc::new(AppState {
         db: pool,
         config_path,
+        event_tx,
+        api_token,
+        runtime: Mutex::new(None),
     });
 
     let router = tuitbot_server::build_router(state);

@@ -14,6 +14,8 @@ pub enum ApiError {
     NotFound(String),
     /// Bad request (invalid query parameters, etc.).
     BadRequest(String),
+    /// Conflict (resource already exists, runtime already running, etc.).
+    Conflict(String),
 }
 
 impl From<tuitbot_core::error::StorageError> for ApiError {
@@ -31,6 +33,7 @@ impl IntoResponse for ApiError {
             }
             Self::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            Self::Conflict(msg) => (StatusCode::CONFLICT, msg),
         };
 
         let body = axum::Json(json!({ "error": message }));

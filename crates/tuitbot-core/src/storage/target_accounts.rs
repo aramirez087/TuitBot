@@ -186,6 +186,47 @@ pub async fn mark_target_tweet_replied(pool: &DbPool, tweet_id: &str) -> Result<
     Ok(())
 }
 
+/// Get a target account by username.
+pub async fn get_target_account_by_username(
+    pool: &DbPool,
+    username: &str,
+) -> Result<Option<TargetAccount>, StorageError> {
+    let row: Option<TargetAccountRow> = sqlx::query_as(
+        "SELECT account_id, username, followed_at, first_engagement_at, \
+             total_replies_sent, last_reply_at, status \
+             FROM target_accounts WHERE username = ?",
+    )
+    .bind(username)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(|r| TargetAccount {
+        account_id: r.0,
+        username: r.1,
+        followed_at: r.2,
+        first_engagement_at: r.3,
+        total_replies_sent: r.4,
+        last_reply_at: r.5,
+        status: r.6,
+    }))
+}
+
+/// Deactivate a target account by username (soft delete).
+pub async fn deactivate_target_account(
+    pool: &DbPool,
+    username: &str,
+) -> Result<bool, StorageError> {
+    let result = sqlx::query(
+        "UPDATE target_accounts SET status = 'inactive' WHERE username = ? AND status = 'active'",
+    )
+    .bind(username)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+    Ok(result.rows_affected() > 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
