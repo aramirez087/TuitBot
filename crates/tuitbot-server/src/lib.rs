@@ -91,6 +91,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/strategy/history", get(routes::strategy::history))
         .route("/strategy/refresh", post(routes::strategy::refresh))
         .route("/strategy/inputs", get(routes::strategy::inputs))
+        // Costs
+        .route("/costs/summary", get(routes::costs::summary))
+        .route("/costs/daily", get(routes::costs::daily))
+        .route("/costs/by-model", get(routes::costs::by_model))
+        .route("/costs/by-type", get(routes::costs::by_type))
         // Settings
         .route("/settings/status", get(routes::settings::config_status))
         .route("/settings/init", post(routes::settings::init_settings))

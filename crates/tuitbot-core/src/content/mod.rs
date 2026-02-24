@@ -9,4 +9,4 @@ pub mod frameworks;
 pub mod generator;
 
 pub use frameworks::{ReplyArchetype, ThreadStructure, TweetFormat};
-pub use generator::ContentGenerator;
+pub use generator::{ContentGenerator, GenerationOutput, ThreadGenerationOutput};

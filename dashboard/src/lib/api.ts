@@ -347,6 +347,43 @@ export interface StrategyInputs {
 	target_accounts: string[];
 }
 
+// --- Cost types ---
+
+export interface CostSummary {
+	cost_today: number;
+	cost_7d: number;
+	cost_30d: number;
+	cost_all_time: number;
+	calls_today: number;
+	calls_7d: number;
+	calls_30d: number;
+	calls_all_time: number;
+}
+
+export interface DailyCostSummary {
+	date: string;
+	cost: number;
+	calls: number;
+	input_tokens: number;
+	output_tokens: number;
+}
+
+export interface ModelCostBreakdown {
+	provider: string;
+	model: string;
+	cost: number;
+	calls: number;
+	input_tokens: number;
+	output_tokens: number;
+}
+
+export interface TypeCostBreakdown {
+	generation_type: string;
+	cost: number;
+	calls: number;
+	avg_cost: number;
+}
+
 // --- API client ---
 
 export const api = {
@@ -460,6 +497,16 @@ export const api = {
 		refresh: () =>
 			request<StrategyReport>('/api/strategy/refresh', { method: 'POST' }),
 		inputs: () => request<StrategyInputs>('/api/strategy/inputs')
+	},
+
+	costs: {
+		summary: () => request<CostSummary>('/api/costs/summary'),
+		daily: (days: number = 30) =>
+			request<DailyCostSummary[]>(`/api/costs/daily?days=${days}`),
+		byModel: (days: number = 30) =>
+			request<ModelCostBreakdown[]>(`/api/costs/by-model?days=${days}`),
+		byType: (days: number = 30) =>
+			request<TypeCostBreakdown[]>(`/api/costs/by-type?days=${days}`)
 	},
 
 	approval: {

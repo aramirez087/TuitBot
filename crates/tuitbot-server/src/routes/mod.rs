@@ -4,6 +4,7 @@ pub mod activity;
 pub mod analytics;
 pub mod approval;
 pub mod content;
+pub mod costs;
 pub mod health;
 pub mod replies;
 pub mod runtime;

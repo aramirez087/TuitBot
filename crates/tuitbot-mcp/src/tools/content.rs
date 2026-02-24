@@ -64,9 +64,9 @@ pub async fn generate_reply(
         .generate_reply(tweet_text, tweet_author, mention_product)
         .await
     {
-        Ok(reply) => serde_json::json!({
-            "reply": reply,
-            "char_count": reply.len(),
+        Ok(output) => serde_json::json!({
+            "reply": output.text,
+            "char_count": output.text.len(),
         })
         .to_string(),
         Err(e) => format!("Error generating reply: {e}"),
@@ -85,9 +85,9 @@ pub async fn generate_tweet(
     let gen = ContentGenerator::new(provider, business.clone());
 
     match gen.generate_tweet(topic).await {
-        Ok(tweet) => serde_json::json!({
-            "tweet": tweet,
-            "char_count": tweet.len(),
+        Ok(output) => serde_json::json!({
+            "tweet": output.text,
+            "char_count": output.text.len(),
         })
         .to_string(),
         Err(e) => format!("Error generating tweet: {e}"),
@@ -106,9 +106,9 @@ pub async fn generate_thread(
     let gen = ContentGenerator::new(provider, business.clone());
 
     match gen.generate_thread(topic).await {
-        Ok(tweets) => serde_json::json!({
-            "thread": tweets,
-            "tweet_count": tweets.len(),
+        Ok(output) => serde_json::json!({
+            "thread": output.tweets,
+            "tweet_count": output.tweets.len(),
         })
         .to_string(),
         Err(e) => format!("Error generating thread: {e}"),
