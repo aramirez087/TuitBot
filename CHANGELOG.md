@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.2...tuitbot-cli-v0.1.3) - 2026-02-24
+
+### Added
+
+- Add target account management with dedicated UI components and API endpoints.
+- Implement content scheduling with calendar views and real-time updates
+- Implement the approval queue dashboard with full UI, API, and WebSocket integration.
+
+### Other
+
+- Merge branch 'main' into feat/dashboard
+
 ## [0.1.2](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.1...tuitbot-cli-v0.1.2) - 2026-02-24
 
 ### Added
