@@ -62,10 +62,16 @@ pub async fn auth_middleware(
     request: Request,
     next: Next,
 ) -> Response {
-    // Skip auth for the health endpoint.
-    // Inside a nested router (`/api`), the path may appear as `/health` or `/api/health`.
+    // Skip auth for health and onboarding endpoints.
+    // Inside a nested router (`/api`), the path may appear with or without the `/api` prefix.
     let path = request.uri().path();
-    if path == "/health" || path == "/api/health" {
+    if path == "/health"
+        || path == "/api/health"
+        || path == "/settings/status"
+        || path == "/api/settings/status"
+        || path == "/settings/init"
+        || path == "/api/settings/init"
+    {
         return next.run(request).await;
     }
 

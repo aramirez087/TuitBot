@@ -103,6 +103,85 @@ fn config_errors_to_response(errors: Vec<ConfigError>) -> Vec<ValidationErrorIte
 }
 
 // ---------------------------------------------------------------------------
+// Onboarding endpoints (no auth required)
+// ---------------------------------------------------------------------------
+
+/// `GET /api/settings/status` — check if config exists.
+pub async fn config_status(State(state): State<Arc<AppState>>) -> Json<Value> {
+    let configured = state.config_path.exists();
+    Json(serde_json::json!({ "configured": configured }))
+}
+
+/// `POST /api/settings/init` — create initial config from JSON.
+///
+/// Accepts the full configuration as JSON, validates it, converts to TOML,
+/// and writes to `config_path`. Returns 409 if config already exists.
+pub async fn init_settings(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    if state.config_path.exists() {
+        return Err(ApiError::Conflict(
+            "configuration already exists; use PATCH /api/settings to update".to_string(),
+        ));
+    }
+
+    if !body.is_object() {
+        return Err(ApiError::BadRequest(
+            "request body must be a JSON object".to_string(),
+        ));
+    }
+
+    // Convert JSON to TOML.
+    let toml_value = json_to_toml(&body)
+        .map_err(|e| ApiError::BadRequest(format!("invalid config values: {e}")))?;
+
+    let toml_str = toml::to_string_pretty(&toml_value)
+        .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
+
+    // Validate by parsing through Config.
+    let config: Config = toml::from_str(&toml_str)
+        .map_err(|e| ApiError::BadRequest(format!("invalid config: {e}")))?;
+
+    if let Err(errors) = config.validate() {
+        let items = config_errors_to_response(errors);
+        return Ok(Json(serde_json::json!({
+            "status": "validation_failed",
+            "errors": items
+        })));
+    }
+
+    // Ensure parent directory exists and write.
+    if let Some(parent) = state.config_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| ApiError::BadRequest(format!("failed to create config directory: {e}")))?;
+    }
+
+    std::fs::write(&state.config_path, &toml_str).map_err(|e| {
+        ApiError::BadRequest(format!(
+            "could not write config file {}: {e}",
+            state.config_path.display()
+        ))
+    })?;
+
+    // Set file permissions to 0600 on Unix.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ =
+            std::fs::set_permissions(&state.config_path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    let json = serde_json::to_value(config)
+        .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "created",
+        "config": json
+    })))
+}
+
+// ---------------------------------------------------------------------------
 // Endpoints
 // ---------------------------------------------------------------------------
 

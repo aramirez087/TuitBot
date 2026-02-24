@@ -16,7 +16,8 @@
 		Eye,
 		EyeOff,
 		Plus,
-		X
+		X,
+		Power
 	} from 'lucide-svelte';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 	import TagInput from '$lib/components/settings/TagInput.svelte';
@@ -95,6 +96,7 @@
 			// Small delay so DOM is ready
 			setTimeout(setupObservers, 100);
 		});
+		loadAutoStartState();
 	});
 
 	onDestroy(() => {
@@ -168,6 +170,37 @@
 		'Australia/Melbourne',
 		'Pacific/Auckland'
 	];
+
+	// --- Auto-start ---
+	let autoStartEnabled = $state(false);
+	let autoStartLoading = $state(false);
+
+	async function loadAutoStartState() {
+		try {
+			const { isEnabled } = await import('@tauri-apps/plugin-autostart');
+			autoStartEnabled = await isEnabled();
+		} catch {
+			// Not in Tauri — ignore.
+		}
+	}
+
+	async function toggleAutoStart() {
+		autoStartLoading = true;
+		try {
+			if (autoStartEnabled) {
+				const { disable } = await import('@tauri-apps/plugin-autostart');
+				await disable();
+				autoStartEnabled = false;
+			} else {
+				const { enable } = await import('@tauri-apps/plugin-autostart');
+				await enable();
+				autoStartEnabled = true;
+			}
+		} catch {
+			// Not in Tauri — ignore.
+		}
+		autoStartLoading = false;
+	}
 
 	let timezoneSearch = $state('');
 
@@ -1154,6 +1187,31 @@
 								onchange={(v) =>
 									updateDraft('storage.retention_days', v)}
 							/>
+						</div>
+
+						<div class="field full-width">
+							<div class="toggle-row">
+								<div class="toggle-info">
+									<span class="field-label">Auto-start on Login</span>
+									<span class="field-hint">
+										Launch Tuitbot automatically when you log in to your computer
+									</span>
+								</div>
+								<button
+									type="button"
+									class="toggle"
+									class:active={autoStartEnabled}
+									onclick={toggleAutoStart}
+									disabled={autoStartLoading}
+									role="switch"
+									aria-checked={autoStartEnabled}
+									aria-label="Toggle auto-start"
+								>
+									<span class="toggle-track">
+										<span class="toggle-thumb"></span>
+									</span>
+								</button>
+							</div>
 						</div>
 					</div>
 				</SettingsSection>

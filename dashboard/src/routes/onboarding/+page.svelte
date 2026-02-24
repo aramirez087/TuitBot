@@ -1,0 +1,359 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { api } from '$lib/api';
+	import { onboardingData } from '$lib/stores/onboarding';
+	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
+	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
+	import BusinessStep from '$lib/components/onboarding/BusinessStep.svelte';
+	import LlmStep from '$lib/components/onboarding/LlmStep.svelte';
+	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
+	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
+
+	const STEPS = ['Welcome', 'X API', 'Business', 'LLM', 'Review'];
+	let currentStep = $state(0);
+	let submitting = $state(false);
+	let errorMsg = $state('');
+
+	function canAdvance(): boolean {
+		const data = $onboardingData;
+		switch (currentStep) {
+			case 0:
+				return true;
+			case 1:
+				return data.client_id.trim().length > 0;
+			case 2:
+				return (
+					data.product_name.trim().length > 0 &&
+					data.product_description.trim().length > 0 &&
+					data.target_audience.trim().length > 0 &&
+					data.product_keywords.length > 0 &&
+					data.industry_topics.length > 0
+				);
+			case 3:
+				if (data.llm_provider === 'ollama') return data.llm_model.trim().length > 0;
+				return data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0;
+			case 4:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	function next() {
+		if (currentStep < STEPS.length - 1) {
+			currentStep++;
+			errorMsg = '';
+		}
+	}
+
+	function back() {
+		if (currentStep > 0) {
+			currentStep--;
+			errorMsg = '';
+		}
+	}
+
+	async function submit() {
+		submitting = true;
+		errorMsg = '';
+
+		try {
+			const data = $onboardingData;
+			const config: Record<string, unknown> = {
+				x_api: {
+					client_id: data.client_id,
+					...(data.client_secret ? { client_secret: data.client_secret } : {}),
+				},
+				business: {
+					product_name: data.product_name,
+					product_description: data.product_description,
+					...(data.product_url ? { product_url: data.product_url } : {}),
+					target_audience: data.target_audience,
+					product_keywords: data.product_keywords,
+					industry_topics: data.industry_topics,
+				},
+				llm: {
+					provider: data.llm_provider,
+					...(data.llm_api_key ? { api_key: data.llm_api_key } : {}),
+					model: data.llm_model,
+					...(data.llm_base_url ? { base_url: data.llm_base_url } : {}),
+				},
+				approval_mode: data.approval_mode,
+			};
+
+			const result = await api.settings.init(config);
+
+			if (result.status === 'validation_failed' && result.errors) {
+				errorMsg = result.errors.map((e) => `${e.field}: ${e.message}`).join('; ');
+				return;
+			}
+
+			onboardingData.reset();
+			goto('/');
+		} catch (e) {
+			errorMsg = e instanceof Error ? e.message : 'Failed to create configuration';
+		} finally {
+			submitting = false;
+		}
+	}
+</script>
+
+<div class="onboarding">
+	<div class="onboarding-header">
+		<div class="logo">
+			<Zap size={20} strokeWidth={2.5} />
+			<span class="logo-text">Tuitbot</span>
+		</div>
+	</div>
+
+	<div class="onboarding-content">
+		<div class="progress">
+			{#each STEPS as step, i}
+				<div class="progress-step" class:active={i === currentStep} class:completed={i < currentStep}>
+					<div class="progress-dot">
+						{#if i < currentStep}
+							<span class="check-mark">&#10003;</span>
+						{:else}
+							{i + 1}
+						{/if}
+					</div>
+					<span class="progress-label">{step}</span>
+				</div>
+				{#if i < STEPS.length - 1}
+					<div class="progress-line" class:filled={i < currentStep}></div>
+				{/if}
+			{/each}
+		</div>
+
+		<div class="step-content">
+			{#if currentStep === 0}
+				<WelcomeStep />
+			{:else if currentStep === 1}
+				<XApiStep />
+			{:else if currentStep === 2}
+				<BusinessStep />
+			{:else if currentStep === 3}
+				<LlmStep />
+			{:else if currentStep === 4}
+				<ReviewStep />
+			{/if}
+		</div>
+
+		{#if errorMsg}
+			<div class="error-banner">{errorMsg}</div>
+		{/if}
+
+		<div class="actions">
+			{#if currentStep > 0}
+				<button class="btn btn-secondary" onclick={back} disabled={submitting}>
+					<ArrowLeft size={16} />
+					Back
+				</button>
+			{:else}
+				<div></div>
+			{/if}
+
+			{#if currentStep < STEPS.length - 1}
+				<button
+					class="btn btn-primary"
+					onclick={next}
+					disabled={!canAdvance()}
+				>
+					{currentStep === 0 ? 'Get Started' : 'Next'}
+					<ArrowRight size={16} />
+				</button>
+			{:else}
+				<button
+					class="btn btn-primary"
+					onclick={submit}
+					disabled={submitting}
+				>
+					{#if submitting}
+						<span class="spinner"><Loader2 size={16} /></span>
+						Creating...
+					{:else}
+						Start Tuitbot
+						<Zap size={16} />
+					{/if}
+				</button>
+			{/if}
+		</div>
+	</div>
+</div>
+
+<style>
+	.onboarding {
+		min-height: 100vh;
+		background-color: var(--color-base);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.onboarding-header {
+		width: 100%;
+		padding: 20px 32px;
+		border-bottom: 1px solid var(--color-border-subtle);
+	}
+
+	.logo {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		color: var(--color-accent);
+	}
+
+	.logo-text {
+		font-size: 16px;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--color-text);
+	}
+
+	.onboarding-content {
+		width: 100%;
+		max-width: 600px;
+		padding: 40px 24px;
+		display: flex;
+		flex-direction: column;
+		gap: 32px;
+	}
+
+	.progress {
+		display: flex;
+		align-items: center;
+		gap: 0;
+	}
+
+	.progress-step {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.progress-dot {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 12px;
+		font-weight: 600;
+		background: var(--color-surface);
+		border: 2px solid var(--color-border);
+		color: var(--color-text-muted);
+		transition: all 0.2s;
+	}
+
+	.progress-step.active .progress-dot {
+		background: var(--color-accent);
+		border-color: var(--color-accent);
+		color: white;
+	}
+
+	.progress-step.completed .progress-dot {
+		background: var(--color-success);
+		border-color: var(--color-success);
+		color: white;
+	}
+
+	.check-mark {
+		font-size: 14px;
+	}
+
+	.progress-label {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+		white-space: nowrap;
+	}
+
+	.progress-step.active .progress-label {
+		color: var(--color-text);
+		font-weight: 500;
+	}
+
+	.progress-line {
+		flex: 1;
+		height: 2px;
+		background: var(--color-border);
+		margin: 0 4px;
+		margin-bottom: 20px;
+		transition: background 0.2s;
+	}
+
+	.progress-line.filled {
+		background: var(--color-success);
+	}
+
+	.step-content {
+		min-height: 300px;
+	}
+
+	.error-banner {
+		padding: 12px 16px;
+		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+		border-radius: 8px;
+		color: var(--color-danger);
+		font-size: 13px;
+	}
+
+	.actions {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding-top: 16px;
+		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 20px;
+		border: none;
+		border-radius: 8px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.btn-primary {
+		background: var(--color-accent);
+		color: white;
+	}
+
+	.btn-primary:hover:not(:disabled) {
+		filter: brightness(1.1);
+	}
+
+	.btn-secondary {
+		background: var(--color-surface);
+		color: var(--color-text-muted);
+		border: 1px solid var(--color-border);
+	}
+
+	.btn-secondary:hover:not(:disabled) {
+		background: var(--color-surface-hover);
+		color: var(--color-text);
+	}
+
+	.spinner {
+		display: inline-flex;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+</style>

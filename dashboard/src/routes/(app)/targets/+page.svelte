@@ -4,6 +4,8 @@
 	import { Target, Plus } from 'lucide-svelte';
 	import TargetCard from '$lib/components/TargetCard.svelte';
 	import AddTargetModal from '$lib/components/AddTargetModal.svelte';
+	import ErrorState from '$lib/components/ErrorState.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import {
 		targets,
 		loading,
@@ -87,7 +89,9 @@
 	</div>
 </div>
 
-{#if $error}
+{#if $error && $targets.length === 0}
+	<ErrorState message={$error} onretry={() => loadTargets()} />
+{:else if $error}
 	<div class="error-banner">
 		<span>{$error}</span>
 		<button onclick={() => loadTargets()}>Retry</button>
@@ -103,19 +107,14 @@
 		</div>
 	{:else if $targets.length === 0}
 		<div class="feed-container">
-			<div class="empty-state">
-				<div class="empty-icon">
-					<Target size={32} />
-				</div>
-				<p class="empty-title">No target accounts yet</p>
-				<p class="empty-hint">
-					Add accounts to build relationships through automated engagement.
-				</p>
-				<button class="empty-add-btn" onclick={handleOpenAddModal}>
-					<Plus size={14} />
-					Add your first target
-				</button>
-			</div>
+			<EmptyState
+				title="No target accounts yet"
+				description="Add accounts to build relationships through automated engagement."
+				actionLabel="Add your first target"
+				onaction={handleOpenAddModal}
+			>
+				{#snippet icon()}<Target size={40} strokeWidth={1.2} />{/snippet}
+			</EmptyState>
 		</div>
 	{:else}
 		<div class="feed-container">
@@ -226,49 +225,6 @@
 		overflow: hidden;
 	}
 
-	.empty-state {
-		padding: 60px 20px;
-		text-align: center;
-	}
-
-	.empty-icon {
-		color: var(--color-text-subtle);
-		margin-bottom: 12px;
-		opacity: 0.5;
-	}
-
-	.empty-title {
-		margin: 0 0 6px;
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--color-text);
-	}
-
-	.empty-hint {
-		margin: 0 0 16px;
-		font-size: 13px;
-		color: var(--color-text-subtle);
-	}
-
-	.empty-add-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding: 8px 20px;
-		border: 1px dashed var(--color-border);
-		border-radius: 6px;
-		background: transparent;
-		color: var(--color-accent);
-		font-size: 13px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.empty-add-btn:hover {
-		border-color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 5%, transparent);
-	}
 
 	.skeleton-item {
 		height: 130px;

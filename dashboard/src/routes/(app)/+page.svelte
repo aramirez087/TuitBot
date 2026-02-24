@@ -5,6 +5,8 @@
 	import FollowerChart from '$lib/components/FollowerChart.svelte';
 	import TopTopics from '$lib/components/TopTopics.svelte';
 	import RecentPerformance from '$lib/components/RecentPerformance.svelte';
+	import ErrorState from '$lib/components/ErrorState.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import {
 		summary,
 		recentPerformance,
@@ -39,7 +41,9 @@
 	<p class="subtitle">Your autonomous growth overview</p>
 </div>
 
-{#if $error}
+{#if $error && !$summary}
+	<ErrorState message={$error} onretry={() => loadDashboard()} />
+{:else if $error}
 	<div class="error-banner">
 		<span>{$error}</span>
 		<button onclick={() => loadDashboard()}>Retry</button>
@@ -53,6 +57,13 @@
 		{/each}
 	</div>
 	<div class="skeleton-chart"></div>
+{:else if !$summary && !$loading && !$error}
+	<EmptyState
+		title="No analytics data yet"
+		description="Start the automation to begin tracking your growth."
+		actionLabel="Refresh"
+		onaction={() => loadDashboard()}
+	/>
 {:else}
 	<div class="stat-grid">
 		<StatCard label="Followers" value={$followerCount.toLocaleString()} change={$followerChange7d}>

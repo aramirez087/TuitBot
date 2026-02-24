@@ -3,6 +3,9 @@
 	import { connected, runtimeRunning } from "$lib/stores/websocket";
 	import { pendingCount } from "$lib/stores/approval";
 	import { theme } from "$lib/stores/theme";
+	import { updateAvailable, installUpdate } from "$lib/stores/update";
+	import { persistGet, persistSet } from "$lib/stores/persistence";
+	import { onMount } from "svelte";
 	import {
 		LayoutDashboard,
 		Activity,
@@ -15,9 +18,26 @@
 		Zap,
 		Sun,
 		Moon,
+		Download,
 	} from "lucide-svelte";
 
 	let collapsed = $state(false);
+	let updating = $state(false);
+
+	onMount(async () => {
+		collapsed = await persistGet('sidebar_collapsed', false);
+	});
+
+	function toggleCollapsed() {
+		collapsed = !collapsed;
+		persistSet('sidebar_collapsed', collapsed);
+	}
+
+	async function handleUpdate() {
+		updating = true;
+		await installUpdate();
+		updating = false;
+	}
 
 	const navItems = [
 		{ href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -68,6 +88,20 @@
 	</nav>
 
 	<div class="sidebar-footer">
+		{#if $updateAvailable}
+			<button
+				class="update-btn"
+				onclick={handleUpdate}
+				disabled={updating}
+				title="Update available — click to install"
+			>
+				<Download size={14} />
+				{#if !collapsed}
+					<span>{updating ? 'Installing...' : 'Update Available'}</span>
+				{/if}
+			</button>
+		{/if}
+
 		<div
 			class="status-row"
 			title={$connected ? "Server connected" : "Server disconnected"}
@@ -106,7 +140,7 @@
 
 			<button
 				class="action-btn"
-				onclick={() => (collapsed = !collapsed)}
+				onclick={toggleCollapsed}
 				title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
 			>
 				{#if collapsed}
@@ -279,5 +313,29 @@
 		font-size: 11px;
 		font-weight: 700;
 		line-height: 1.3;
+	}
+
+	.update-btn {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 7px 10px;
+		border: none;
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		color: var(--color-accent);
+		cursor: pointer;
+		font-size: 12px;
+		font-weight: 500;
+		transition: background 0.15s;
+	}
+
+	.update-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+	}
+
+	.update-btn:disabled {
+		opacity: 0.7;
+		cursor: wait;
 	}
 </style>

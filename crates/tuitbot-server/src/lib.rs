@@ -87,6 +87,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             delete(routes::targets::remove_target),
         )
         // Settings
+        .route("/settings/status", get(routes::settings::config_status))
+        .route("/settings/init", post(routes::settings::init_settings))
         .route(
             "/settings/validate",
             post(routes::settings::validate_settings),

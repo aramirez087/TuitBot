@@ -19,6 +19,28 @@ let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectDelay = 1000;
 const MAX_RECONNECT_DELAY = 30000;
+let consecutiveErrors = 0;
+
+/** Send a native notification if available and the app is in the background. */
+async function sendNativeNotification(title: string, body: string) {
+    if (typeof document === 'undefined' || !document.hidden) return;
+
+    try {
+        const { isPermissionGranted, requestPermission, sendNotification } =
+            await import('@tauri-apps/plugin-notification');
+
+        let permitted = await isPermissionGranted();
+        if (!permitted) {
+            const result = await requestPermission();
+            permitted = result === 'granted';
+        }
+        if (permitted) {
+            sendNotification({ title, body });
+        }
+    } catch {
+        // Not in Tauri context — skip notifications.
+    }
+}
 
 /**
  * Connect to the tuitbot-server WebSocket.
@@ -34,6 +56,7 @@ export function connectWs(token: string) {
     ws.onopen = () => {
         connected.set(true);
         reconnectDelay = 1000; // Reset backoff on successful connect
+        consecutiveErrors = 0;
     };
 
     ws.onclose = () => {
@@ -61,6 +84,26 @@ export function connectWs(token: string) {
             // Track runtime status
             if (event.type === 'RuntimeStatus') {
                 runtimeRunning.set(event.running as boolean);
+            }
+
+            // Native notifications when app is in background
+            if (event.type === 'ApprovalQueued') {
+                sendNativeNotification('Tuitbot', 'New item pending approval');
+                consecutiveErrors = 0;
+            } else if (event.type === 'FollowerUpdate') {
+                const count = event.count as number;
+                if (count > 0 && count % 100 === 0) {
+                    sendNativeNotification('Tuitbot', `Follower milestone: ${count} followers!`);
+                }
+                consecutiveErrors = 0;
+            } else if (event.type === 'Error') {
+                consecutiveErrors++;
+                if (consecutiveErrors >= 3) {
+                    sendNativeNotification('Tuitbot', 'Multiple automation errors detected');
+                    consecutiveErrors = 0;
+                }
+            } else {
+                consecutiveErrors = 0;
             }
         } catch {
             // Ignore malformed messages

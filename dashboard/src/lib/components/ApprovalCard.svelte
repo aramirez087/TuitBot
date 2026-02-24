@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fly } from 'svelte/transition';
 	import {
 		MessageSquare,
 		FileText,
@@ -97,7 +98,7 @@
 	});
 </script>
 
-<div class="card" class:focused class:editing>
+<div class="card" class:focused class:editing transition:fly={{ x: 300, duration: 250 }}>
 	<div class="card-icon {statusClass}">
 		<Icon size={16} />
 	</div>

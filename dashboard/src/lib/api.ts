@@ -349,6 +349,15 @@ export const api = {
 	},
 
 	settings: {
+		configStatus: () => request<{ configured: boolean }>('/api/settings/status'),
+		init: (data: Partial<TuitbotConfig>) =>
+			request<{ status: string; config?: TuitbotConfig; errors?: Array<{ field: string; message: string }> }>(
+				'/api/settings/init',
+				{
+					method: 'POST',
+					body: JSON.stringify(data)
+				}
+			),
 		get: () => request<TuitbotConfig>('/api/settings'),
 		patch: (data: Partial<TuitbotConfig>) =>
 			request<TuitbotConfig>('/api/settings', {

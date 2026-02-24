@@ -4,6 +4,8 @@
 	import CalendarWeekView from '$lib/components/CalendarWeekView.svelte';
 	import CalendarMonthView from '$lib/components/CalendarMonthView.svelte';
 	import ComposeModal from '$lib/components/ComposeModal.svelte';
+	import ErrorState from '$lib/components/ErrorState.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import {
 		calendarItems,
 		schedule,
@@ -124,10 +126,7 @@
 		<span>Loading calendar...</span>
 	</div>
 {:else if $error && $calendarItems.length === 0}
-	<div class="error-state">
-		<p>{$error}</p>
-		<button class="retry-btn" onclick={() => loadCalendar()}>Retry</button>
-	</div>
+	<ErrorState message={$error} onretry={() => loadCalendar()} />
 {:else}
 	<div class="calendar-body">
 		{#if $viewMode === 'week'}
@@ -149,10 +148,12 @@
 	</div>
 
 	{#if $calendarItems.length === 0 && !$loading}
-		<div class="empty-state">
-			<p>No content in this period.</p>
-			<p class="empty-hint">Click a time slot or use the Compose button to schedule content.</p>
-		</div>
+		<EmptyState
+			title="No content scheduled"
+			description="Click a time slot or use the Compose button to schedule your first post."
+			actionLabel="Compose"
+			onaction={() => openCompose()}
+		/>
 	{/if}
 
 	<div class="legend">
@@ -353,42 +354,6 @@
 		}
 	}
 
-	.error-state {
-		padding: 40px;
-		text-align: center;
-		color: var(--color-danger);
-		font-size: 13px;
-	}
-
-	.retry-btn {
-		margin-top: 8px;
-		padding: 6px 14px;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: transparent;
-		color: var(--color-text);
-		font-size: 12px;
-		cursor: pointer;
-	}
-
-	.retry-btn:hover {
-		background: var(--color-surface-hover);
-	}
-
-	.empty-state {
-		text-align: center;
-		padding: 24px;
-		color: var(--color-text-subtle);
-		font-size: 13px;
-	}
-
-	.empty-state p {
-		margin: 0 0 4px;
-	}
-
-	.empty-hint {
-		font-size: 12px;
-	}
 
 	.legend {
 		display: flex;
