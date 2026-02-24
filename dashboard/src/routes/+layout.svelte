@@ -3,6 +3,7 @@
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import { setToken } from "$lib/api";
 	import { connectWs } from "$lib/stores/websocket";
+	import { loadStats as loadApprovalStats } from "$lib/stores/approval";
 	import { initTheme } from "$lib/stores/theme";
 	import { onMount } from "svelte";
 
@@ -28,6 +29,7 @@
 		if (token) {
 			setToken(token);
 			connectWs(token);
+			loadApprovalStats();
 		}
 	});
 </script>

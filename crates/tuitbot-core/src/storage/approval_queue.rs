@@ -155,6 +155,93 @@ pub async fn get_by_id(pool: &DbPool, id: i64) -> Result<Option<ApprovalItem>, S
     Ok(row.map(ApprovalItem::from))
 }
 
+/// Counts of approval items grouped by status.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ApprovalStats {
+    pub pending: i64,
+    pub approved: i64,
+    pub rejected: i64,
+}
+
+/// Get counts of items grouped by status.
+pub async fn get_stats(pool: &DbPool) -> Result<ApprovalStats, StorageError> {
+    let row: (i64, i64, i64) = sqlx::query_as(
+        "SELECT
+            COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0)
+         FROM approval_queue",
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(ApprovalStats {
+        pending: row.0,
+        approved: row.1,
+        rejected: row.2,
+    })
+}
+
+/// Get approval items filtered by one or more statuses, with optional action type filter.
+///
+/// Returns items ordered by creation time (oldest first).
+/// If `statuses` is empty, returns an empty `Vec`.
+pub async fn get_by_statuses(
+    pool: &DbPool,
+    statuses: &[&str],
+    action_type: Option<&str>,
+) -> Result<Vec<ApprovalItem>, StorageError> {
+    if statuses.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = statuses.iter().map(|_| "?").collect();
+    let in_clause = placeholders.join(", ");
+
+    let query = if let Some(at) = action_type {
+        let sql = format!(
+            "SELECT id, action_type, target_tweet_id, target_author, generated_content, topic, archetype, score, status, created_at
+             FROM approval_queue
+             WHERE status IN ({in_clause}) AND action_type = ?
+             ORDER BY created_at ASC"
+        );
+        let mut q = sqlx::query_as::<_, ApprovalRow>(&sql);
+        for s in statuses {
+            q = q.bind(*s);
+        }
+        q = q.bind(at);
+        q.fetch_all(pool).await
+    } else {
+        let sql = format!(
+            "SELECT id, action_type, target_tweet_id, target_author, generated_content, topic, archetype, score, status, created_at
+             FROM approval_queue
+             WHERE status IN ({in_clause})
+             ORDER BY created_at ASC"
+        );
+        let mut q = sqlx::query_as::<_, ApprovalRow>(&sql);
+        for s in statuses {
+            q = q.bind(*s);
+        }
+        q.fetch_all(pool).await
+    };
+
+    let rows = query.map_err(|e| StorageError::Query { source: e })?;
+    Ok(rows.into_iter().map(ApprovalItem::from).collect())
+}
+
+/// Update the generated content of an item without changing its status.
+pub async fn update_content(pool: &DbPool, id: i64, new_content: &str) -> Result<(), StorageError> {
+    sqlx::query("UPDATE approval_queue SET generated_content = ? WHERE id = ?")
+        .bind(new_content)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
 /// Expire old pending items (older than the specified hours).
 pub async fn expire_old_items(pool: &DbPool, hours: u32) -> Result<u64, StorageError> {
     let result = sqlx::query(
@@ -291,5 +378,125 @@ mod tests {
         assert_eq!(pending[0].generated_content, "First");
         assert_eq!(pending[1].generated_content, "Second");
         assert_eq!(pending[2].generated_content, "Third");
+    }
+
+    #[tokio::test]
+    async fn get_stats_counts_correctly() {
+        let pool = init_test_db().await.expect("init db");
+
+        // Empty table.
+        let stats = get_stats(&pool).await.expect("stats");
+        assert_eq!(stats.pending, 0);
+        assert_eq!(stats.approved, 0);
+        assert_eq!(stats.rejected, 0);
+
+        // Add items and change statuses.
+        let id1 = enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+        enqueue(&pool, "tweet", "", "", "B", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+        let id3 = enqueue(&pool, "reply", "t1", "@u", "C", "Rust", "", 50.0)
+            .await
+            .expect("enqueue");
+
+        update_status(&pool, id1, "approved").await.expect("update");
+        update_status(&pool, id3, "rejected").await.expect("update");
+
+        let stats = get_stats(&pool).await.expect("stats");
+        assert_eq!(stats.pending, 1);
+        assert_eq!(stats.approved, 1);
+        assert_eq!(stats.rejected, 1);
+    }
+
+    #[tokio::test]
+    async fn get_by_statuses_filters_correctly() {
+        let pool = init_test_db().await.expect("init db");
+
+        let id1 = enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+        enqueue(&pool, "tweet", "", "", "B", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+        let id3 = enqueue(&pool, "reply", "t1", "@u", "C", "Rust", "", 50.0)
+            .await
+            .expect("enqueue");
+
+        update_status(&pool, id1, "approved").await.expect("update");
+        update_status(&pool, id3, "rejected").await.expect("update");
+
+        // Only pending.
+        let items = get_by_statuses(&pool, &["pending"], None)
+            .await
+            .expect("query");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].generated_content, "B");
+
+        // Pending + approved.
+        let items = get_by_statuses(&pool, &["pending", "approved"], None)
+            .await
+            .expect("query");
+        assert_eq!(items.len(), 2);
+
+        // All three.
+        let items = get_by_statuses(&pool, &["pending", "approved", "rejected"], None)
+            .await
+            .expect("query");
+        assert_eq!(items.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn get_by_statuses_with_action_type() {
+        let pool = init_test_db().await.expect("init db");
+
+        enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+        enqueue(&pool, "reply", "t1", "@u", "B", "Rust", "", 50.0)
+            .await
+            .expect("enqueue");
+
+        let items = get_by_statuses(&pool, &["pending"], Some("reply"))
+            .await
+            .expect("query");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].action_type, "reply");
+
+        let items = get_by_statuses(&pool, &["pending"], Some("tweet"))
+            .await
+            .expect("query");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].action_type, "tweet");
+    }
+
+    #[tokio::test]
+    async fn get_by_statuses_empty_returns_empty() {
+        let pool = init_test_db().await.expect("init db");
+
+        enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+
+        let items = get_by_statuses(&pool, &[], None).await.expect("query");
+        assert!(items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn update_content_preserves_status() {
+        let pool = init_test_db().await.expect("init db");
+
+        let id = enqueue(&pool, "tweet", "", "", "Original", "General", "", 0.0)
+            .await
+            .expect("enqueue");
+
+        update_content(&pool, id, "Edited version")
+            .await
+            .expect("update");
+
+        let item = get_by_id(&pool, id).await.expect("get").expect("found");
+        assert_eq!(item.generated_content, "Edited version");
+        assert_eq!(item.status, "pending");
     }
 }

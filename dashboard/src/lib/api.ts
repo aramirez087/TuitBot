@@ -110,6 +110,25 @@ export interface RateLimitUsage {
 	threads: ActionUsage;
 }
 
+export interface ApprovalItem {
+	id: number;
+	action_type: string;
+	target_tweet_id: string;
+	target_author: string;
+	generated_content: string;
+	topic: string;
+	archetype: string;
+	score: number;
+	status: string;
+	created_at: string;
+}
+
+export interface ApprovalStats {
+	pending: number;
+	approved: number;
+	rejected: number;
+}
+
 // --- API client ---
 
 export const api = {
@@ -136,5 +155,27 @@ export const api = {
 			return request<ActivityResponse>(`/api/activity${qs ? `?${qs}` : ''}`);
 		},
 		rateLimits: () => request<RateLimitUsage>('/api/activity/rate-limits')
+	},
+
+	approval: {
+		list: (params: { status?: string; type?: string } = {}) => {
+			const query = new URLSearchParams();
+			if (params.status) query.set('status', params.status);
+			if (params.type) query.set('type', params.type);
+			const qs = query.toString();
+			return request<ApprovalItem[]>(`/api/approval${qs ? `?${qs}` : ''}`);
+		},
+		stats: () => request<ApprovalStats>('/api/approval/stats'),
+		approve: (id: number) =>
+			request<{ status: string; id: number }>(`/api/approval/${id}/approve`, { method: 'POST' }),
+		reject: (id: number) =>
+			request<{ status: string; id: number }>(`/api/approval/${id}/reject`, { method: 'POST' }),
+		edit: (id: number, content: string) =>
+			request<ApprovalItem>(`/api/approval/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ content })
+			}),
+		approveAll: () =>
+			request<{ status: string; count: number }>('/api/approval/approve-all', { method: 'POST' })
 	}
 };

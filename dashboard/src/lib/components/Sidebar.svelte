@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/stores";
 	import { connected, runtimeRunning } from "$lib/stores/websocket";
+	import { pendingCount } from "$lib/stores/approval";
 	import { theme } from "$lib/stores/theme";
 	import {
 		LayoutDashboard,
@@ -58,6 +59,9 @@
 				<item.icon size={18} />
 				{#if !collapsed}
 					<span>{item.label}</span>
+					{#if item.href === '/approval' && $pendingCount > 0}
+						<span class="nav-badge">{$pendingCount}</span>
+					{/if}
 				{/if}
 			</a>
 		{/each}
@@ -264,5 +268,16 @@
 	.action-btn:hover {
 		background-color: var(--color-surface-hover);
 		color: var(--color-text-muted);
+	}
+
+	.nav-badge {
+		margin-left: auto;
+		padding: 1px 7px;
+		border-radius: 10px;
+		background-color: var(--color-accent);
+		color: white;
+		font-size: 11px;
+		font-weight: 700;
+		line-height: 1.3;
 	}
 </style>

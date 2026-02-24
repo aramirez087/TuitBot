@@ -31,6 +31,12 @@ pub enum WsEvent {
         action_type: String,
         content: String,
     },
+    /// An approval item's status was updated (approved, rejected, edited).
+    ApprovalUpdated {
+        id: i64,
+        status: String,
+        action_type: String,
+    },
     /// Follower count changed.
     FollowerUpdate { count: i64, change: i64 },
     /// Automation runtime status changed.
