@@ -29,6 +29,7 @@
 
 	let composeOpen = $state(false);
 	let composePrefillTime = $state<string | null>(null);
+	let composePrefillDate = $state<Date | null>(null);
 
 	const headerLabel = $derived(() => {
 		const d = $currentDate;
@@ -45,18 +46,18 @@
 		}
 	});
 
-	function openCompose(prefillTime: string | null = null) {
+	function openCompose(date: Date | null = null, prefillTime: string | null = null) {
+		composePrefillDate = date;
 		composePrefillTime = prefillTime;
 		composeOpen = true;
 	}
 
-	function handleSlotClick(_date: Date, time: string) {
-		openCompose(time);
+	function handleSlotClick(date: Date, time: string) {
+		openCompose(date, time);
 	}
 
 	function handleDayClick(date: Date) {
-		currentDate.set(date);
-		setViewMode('week');
+		openCompose(date);
 	}
 
 	async function handleCompose(data: { content_type: string; content: string; scheduled_for?: string }) {
@@ -90,7 +91,7 @@
 			<span class="timezone-badge">{$schedule.timezone}</span>
 		{/if}
 	</div>
-	<button class="compose-btn" onclick={() => openCompose()}>
+	<button class="compose-btn" onclick={() => openCompose(new Date())}>
 		<Plus size={14} />
 		Compose
 	</button>
@@ -135,6 +136,7 @@
 				schedule={$schedule}
 				days={$weekDays}
 				onslotclick={handleSlotClick}
+				ondayclick={handleDayClick}
 				oncancel={handleCancel}
 			/>
 		{:else}
@@ -152,7 +154,7 @@
 			title="No content scheduled"
 			description="Click a time slot or use the Compose button to schedule your first post."
 			actionLabel="Compose"
-			onaction={() => openCompose()}
+			onaction={() => openCompose(new Date())}
 		/>
 	{/if}
 
@@ -179,6 +181,7 @@
 <ComposeModal
 	open={composeOpen}
 	prefillTime={composePrefillTime}
+	prefillDate={composePrefillDate}
 	schedule={$schedule}
 	onclose={() => (composeOpen = false)}
 	onsubmit={handleCompose}

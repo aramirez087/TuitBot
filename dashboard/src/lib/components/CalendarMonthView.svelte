@@ -117,6 +117,8 @@
 							</span>
 						{/if}
 					</div>
+				{:else}
+					<span class="empty-plus">+</span>
 				{/if}
 			</button>
 		{/each}
@@ -232,5 +234,18 @@
 
 	.dot-count {
 		font-family: var(--font-mono);
+	}
+
+	.empty-plus {
+		font-size: 14px;
+		font-weight: 300;
+		color: var(--color-border);
+		opacity: 0;
+		transition: opacity 0.15s ease, color 0.15s ease;
+	}
+
+	.month-cell:hover .empty-plus {
+		opacity: 1;
+		color: var(--color-accent);
 	}
 </style>

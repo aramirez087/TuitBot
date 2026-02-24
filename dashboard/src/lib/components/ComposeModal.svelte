@@ -6,12 +6,14 @@
 	let {
 		open,
 		prefillTime = null,
+		prefillDate = null,
 		schedule,
 		onclose,
 		onsubmit
 	}: {
 		open: boolean;
 		prefillTime?: string | null;
+		prefillDate?: Date | null;
 		schedule: ScheduleConfig | null;
 		onclose: () => void;
 		onsubmit: (data: { content_type: string; content: string; scheduled_for?: string }) => void;
@@ -23,6 +25,11 @@
 	let selectedTime = $state<string | null>(null);
 	let submitting = $state(false);
 	let submitError = $state<string | null>(null);
+
+	const targetDate = $derived(prefillDate ?? new Date());
+	const dateLabel = $derived(
+		targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+	);
 
 	// Sync prefillTime when modal opens
 	$effect(() => {
@@ -75,15 +82,11 @@
 			};
 
 			if (selectedTime) {
-				// Build ISO datetime from today + selected time
-				const today = new Date();
+				// Build ISO datetime from target date + selected time
+				const scheduled = new Date(targetDate);
 				const [h, m] = selectedTime.split(':').map(Number);
-				today.setHours(h, m, 0, 0);
-				// If time already passed today, schedule for tomorrow
-				if (today < new Date()) {
-					today.setDate(today.getDate() + 1);
-				}
-				data.scheduled_for = today.toISOString().replace('Z', '');
+				scheduled.setHours(h, m, 0, 0);
+				data.scheduled_for = scheduled.toISOString().replace('Z', '');
 			}
 
 			onsubmit(data);
@@ -113,7 +116,10 @@
 	<div class="backdrop" onclick={handleBackdropClick}>
 		<div class="modal">
 			<div class="modal-header">
-				<h2>Compose</h2>
+				<div class="modal-title">
+					<h2>Compose</h2>
+					<span class="date-subtitle">{dateLabel}</span>
+				</div>
 				<button class="close-btn" onclick={onclose}>
 					<X size={16} />
 				</button>
@@ -178,6 +184,7 @@
 					<TimePicker
 						{schedule}
 						{selectedTime}
+						targetDate={targetDate}
 						onselect={(time) => (selectedTime = time || null)}
 					/>
 				</div>
@@ -228,11 +235,23 @@
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 
+	.modal-title {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+	}
+
 	.modal-header h2 {
 		font-size: 16px;
 		font-weight: 600;
 		margin: 0;
 		color: var(--color-text);
+	}
+
+	.date-subtitle {
+		font-size: 13px;
+		font-weight: 400;
+		color: var(--color-text-muted);
 	}
 
 	.close-btn {
