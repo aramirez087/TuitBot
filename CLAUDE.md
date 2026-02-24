@@ -126,7 +126,8 @@ config.example.toml  — Full configuration reference
 | `x_api/` | X API v2 client behind `XApiClient` trait; OAuth 2.0 PKCE auth; tier detection |
 | `llm/` | `LlmProvider` trait with `OpenAiCompatProvider` (OpenAI + Ollama) and `AnthropicProvider` |
 | `scoring/` | 6-signal heuristic scoring — keyword relevance, targeted followers (bell curve), recency, engagement, reply count, content type |
-| `storage/` | SQLite via SQLx — WAL mode, pool of 4, embedded migrations, `init_test_db()` for tests. Submodules: `analytics`, `approval_queue`, `author_interactions`, `target_accounts`, `replies`, `threads`, `tweets`, `action_log`, `rate_limits`, `cleanup` |
+| `storage/` | SQLite via SQLx — WAL mode, pool of 4, embedded migrations, `init_test_db()` for tests. Submodules: `analytics`, `approval_queue`, `author_interactions`, `target_accounts`, `replies`, `threads`, `tweets`, `action_log`, `rate_limits`, `cleanup`, `strategy`, `scheduled_content`, `cursors` |
+| `strategy/` | Weekly report engine — `metrics.rs` (date-ranged queries over existing tables), `recommendations.rs` (8-rule deterministic engine), `report.rs` (orchestration + ISO week computation) |
 | `safety/` | Deduplication, rate limit enforcement, banned phrase filtering, per-author reply limits, self-reply prevention |
 | `content/` | Content generation via LLM + `frameworks.rs` (reply archetypes, tweet formats, thread structures with weighted random selection) |
 | `automation/` | Runtime with `CancellationToken` + 6 concurrent loops: discovery, mentions, content, threads, target monitoring, analytics. Also: posting queue with optional approval mode, `schedule.rs` (timezone-aware active hours gating via `chrono-tz`), `scheduler.rs` (`LoopScheduler` with jitter for human-like timing) |
@@ -136,7 +137,7 @@ config.example.toml  — Full configuration reference
 
 | Module | Purpose |
 |--------|---------|
-| `routes/` | Axum route handlers grouped by domain: `analytics`, `approval`, `content`, `targets`, `settings`, `activity` |
+| `routes/` | Axum route handlers grouped by domain: `analytics`, `approval`, `content`, `targets`, `settings`, `activity`, `strategy` |
 | `state.rs` | Shared `AppState` — holds `DbPool`, config, runtime handle, broadcast channels |
 | `ws.rs` | WebSocket hub for real-time events (activity feed, approval notifications, runtime status) |
 | `auth.rs` | Local bearer token auth (generated on first run, stored in config dir) |
@@ -146,7 +147,7 @@ config.example.toml  — Full configuration reference
 
 | Area | Purpose |
 |------|---------|
-| `routes/` | SvelteKit pages: dashboard, activity, approval, calendar, targets, settings |
+| `routes/` | SvelteKit pages: dashboard, activity, approval, calendar, targets, settings, strategy |
 | `lib/components/` | Reusable UI components (charts, cards, tables, forms) |
 | `lib/stores/` | Svelte stores wrapping API calls + WebSocket subscriptions |
 | `lib/api.ts` | Typed API client (auto-generated from server OpenAPI spec or hand-written) |
@@ -160,6 +161,7 @@ config.example.toml  — Full configuration reference
 - **Automation runtime**: `Runtime` struct spawns tokio tasks sharing a `CancellationToken`. Graceful shutdown on SIGTERM/Ctrl+C with 30s timeout. Six concurrent loops: discovery, mentions, content, threads, target monitoring, analytics. All posting loops use `LoopScheduler` for jittered intervals and `schedule_gate()` for timezone-aware active hours (analytics loop runs 24/7, no schedule gate).
 - **Content frameworks**: `ReplyArchetype` (weighted random), `TweetFormat` (avoid-recent), `ThreadStructure` (random). Each provides prompt fragments injected into LLM generation. Persona opinions/experiences/content pillars enrich prompts.
 - **Analytics feedback loop**: Hourly follower snapshots, 24h engagement measurement on posted content, performance scoring formula `(likes*3 + replies*5 + retweets*4) / max(impressions,1) * 1000`, epsilon-greedy topic selection (80% exploit / 20% explore).
+- **Strategy reports**: Weekly aggregation layer computing derived metrics (follower delta, acceptance rate, topic performance) from existing tables. 8-rule deterministic recommendation engine (promote winners, kill losers, detect stalls, celebrate high-performers). Reports stored in `strategy_reports` table with JSON columns for topics and recommendations. Server computes on-the-fly for the current (in-progress) week; historical reports are cached.
 - **Approval queue**: When `approval_mode = true`, posting queue routes actions to `approval_queue` table instead of X API. `tuitbot approve` provides interactive CLI review. The dashboard provides a visual alternative.
 - **Storage**: SQLite WAL mode, pool of 4, `sqlx::migrate!()` for embedded migrations, 90-day configurable retention, dedup records are never deleted. Tests use `storage::init_test_db()` for in-memory SQLite.
 - **Build script**: `crates/tuitbot-core/build.rs` watches `migrations/` directory for recompilation.

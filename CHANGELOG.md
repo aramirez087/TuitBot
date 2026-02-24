@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Strategy dashboard page with weekly growth scorecard, recommendation engine, and historical trend charts.
+- Add `strategy_reports` table and storage CRUD for persisted weekly reports.
+- Add `strategy/metrics.rs` module with date-ranged queries over existing analytics tables.
+- Add `strategy/recommendations.rs` with 8-rule deterministic recommendation engine.
+- Add 4 new API endpoints: `GET /api/strategy/current`, `GET /api/strategy/history`, `POST /api/strategy/refresh`, `GET /api/strategy/inputs`.
+
 ## [0.1.3](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.2...tuitbot-cli-v0.1.3) - 2026-02-24
 
 ### Added

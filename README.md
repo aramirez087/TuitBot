@@ -41,6 +41,7 @@ The easiest way to use Tuitbot. Built with Tauri and SvelteKit, the desktop app 
 - **Content Calendar:** Schedule threads and tweets visually alongside autonomous content.
 - **Target Accounts Manager:** Track relationships and view interaction history.
 - **Settings Editor:** Configure your business profile, adjust LLM settings, and manipulate the 6-signal scoring engine without touching a `.toml` file.
+- **Strategy Dashboard:** Weekly growth scorecard with follower trends, reply acceptance rates, top/bottom topics, and AI-generated recommendations for what to post more (or less) of.
 
 ### CLI & Scheduler-Driven Modes
 
@@ -70,6 +71,9 @@ Tuitbot posts original tweets and weekly threads. Through the **Content Calendar
 
 ### 5. Rich Analytics
 Snapshots your follower count daily and measures engagement after 24 hours. The **Analytics Dashboard** visualizes this data with beautiful charts and top-performing topic breakdowns.
+
+### 6. Weekly Strategy Reports
+Tuitbot generates a weekly scorecard that aggregates your engagement data into actionable insights. The **Strategy Dashboard** shows your growth loop — inputs, engine, outputs, and metrics — in a single view. An 8-rule recommendation engine automatically identifies winning topics to double down on, underperformers to cut, follower stalls, and engagement regressions.
 
 ---
 
