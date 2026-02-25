@@ -7,9 +7,8 @@ use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::*;
 use rmcp::{tool, tool_handler, tool_router, ServerHandler};
-use schemars::JsonSchema;
-use serde::Deserialize;
 
+use crate::requests::*;
 use crate::state::SharedState;
 use crate::tools;
 
@@ -28,176 +27,6 @@ impl TuitbotMcpServer {
             tool_router: Self::tool_router(),
         }
     }
-}
-
-// --- Request structs for tools with parameters ---
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct GetStatsRequest {
-    /// Number of days to look back (default: 7)
-    days: Option<u32>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct GetFollowerTrendRequest {
-    /// Number of snapshots to return (default: 7)
-    limit: Option<u32>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct GetActionLogRequest {
-    /// Hours to look back (default: 24)
-    since_hours: Option<u32>,
-    /// Filter by action type (e.g., 'reply', 'tweet', 'search')
-    action_type: Option<String>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SinceHoursRequest {
-    /// Hours to look back (default: 24)
-    since_hours: Option<u32>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct ListUnrepliedTweetsRequest {
-    /// Minimum relevance score threshold (default: 0.0)
-    threshold: Option<f64>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct ScoreTweetRequest {
-    /// The tweet text content
-    text: String,
-    /// Author's X username
-    author_username: String,
-    /// Author's follower count
-    author_followers: u64,
-    /// Number of likes on the tweet
-    likes: u64,
-    /// Number of retweets
-    retweets: u64,
-    /// Number of replies
-    replies: u64,
-    /// Tweet creation timestamp (ISO 8601)
-    created_at: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct ApprovalIdRequest {
-    /// The approval queue item ID
-    id: i64,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct GenerateReplyRequest {
-    /// The tweet text to reply to
-    tweet_text: String,
-    /// Username of the tweet author
-    tweet_author: String,
-    /// Whether to potentially mention the product (default: false)
-    mention_product: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct TopicRequest {
-    /// Topic (uses a random industry topic from config if not provided)
-    topic: Option<String>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct ComposeTweetRequest {
-    /// The text content of the tweet or thread (JSON array for thread).
-    content: String,
-    /// Content type: "tweet" or "thread" (default: "tweet").
-    content_type: Option<String>,
-    /// Optional ISO-8601 datetime for scheduling. If omitted, creates a draft.
-    scheduled_for: Option<String>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct DiscoveryFeedRequest {
-    /// Minimum relevance score (default: 50.0)
-    min_score: Option<f64>,
-    /// Maximum number of tweets to return (default: 10)
-    limit: Option<u32>,
-}
-
-// --- Direct X API request structs ---
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct TweetIdRequest {
-    /// The tweet ID to look up.
-    tweet_id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct UsernameRequest {
-    /// The X username (without @) to look up.
-    username: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct SearchTweetsRequest {
-    /// Search query string.
-    query: String,
-    /// Maximum number of results (10-100, default: 10).
-    max_results: Option<u32>,
-    /// Only return tweets newer than this tweet ID.
-    since_id: Option<String>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct GetUserMentionsRequest {
-    /// Only return mentions newer than this tweet ID.
-    since_id: Option<String>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct GetUserTweetsRequest {
-    /// The user ID whose tweets to fetch.
-    user_id: String,
-    /// Maximum number of results (5-100, default: 10).
-    max_results: Option<u32>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct PostTweetTextRequest {
-    /// The tweet text content (max 280 characters).
-    text: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct ReplyToTweetRequest {
-    /// The reply text content.
-    text: String,
-    /// The tweet ID to reply to.
-    in_reply_to_id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct QuoteTweetRequest {
-    /// The quote tweet text content.
-    text: String,
-    /// The tweet ID to quote.
-    quoted_tweet_id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct LikeTweetMcpRequest {
-    /// The tweet ID to like.
-    tweet_id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct FollowUserMcpRequest {
-    /// The user ID to follow.
-    target_user_id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-struct UnfollowUserMcpRequest {
-    /// The user ID to unfollow.
-    target_user_id: String,
 }
 
 #[tool_router]
@@ -710,6 +539,81 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<UnfollowUserMcpRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let result = tools::x_actions::unfollow_user(&self.state, &req.target_user_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    // --- Composite Tools ---
+
+    /// Search X for tweets, score them, persist to DB, and return ranked reply opportunities. Read-only (no posts made).
+    #[tool]
+    async fn find_reply_opportunities(
+        &self,
+        Parameters(req): Parameters<FindReplyOpportunitiesRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::composite::find_opportunities::execute(
+            &self.state,
+            req.query.as_deref(),
+            req.min_score,
+            req.limit,
+            req.since_id.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Generate reply drafts for previously discovered tweet candidates. Read-only. Requires LLM provider.
+    #[tool]
+    async fn draft_replies_for_candidates(
+        &self,
+        Parameters(req): Parameters<DraftRepliesRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        if self.state.llm_provider.is_none() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+            )]));
+        }
+        let mention = req.mention_product.unwrap_or(false);
+        let result = tools::composite::draft_replies::execute(
+            &self.state,
+            &req.candidate_ids,
+            req.archetype.as_deref(),
+            mention,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Safety-check replies and either queue them for approval or execute them directly. MUTATION — policy-gated.
+    #[tool]
+    async fn propose_and_queue_replies(
+        &self,
+        Parameters(req): Parameters<ProposeAndQueueRepliesRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let mention = req.mention_product.unwrap_or(false);
+        let result =
+            tools::composite::propose_queue::execute(&self.state, &req.items, mention).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Generate a structured thread with hook analysis and performance estimate. Read-only. Requires LLM provider.
+    #[tool]
+    async fn generate_thread_plan(
+        &self,
+        Parameters(req): Parameters<GenerateThreadPlanRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        if self.state.llm_provider.is_none() {
+            return Ok(CallToolResult::success(vec![Content::text(
+                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+            )]));
+        }
+        let result = tools::composite::thread_plan::execute(
+            &self.state,
+            &req.topic,
+            req.objective.as_deref(),
+            req.target_audience.as_deref(),
+            req.structure.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 }

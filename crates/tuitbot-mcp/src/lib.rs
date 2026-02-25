@@ -4,6 +4,7 @@
 //! allowing AI agents to natively discover and call analytics, approval queue,
 //! content generation, scoring, and configuration operations.
 
+mod requests;
 mod server;
 mod state;
 mod tools;

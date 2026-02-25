@@ -13,8 +13,8 @@ use crate::state::AppState;
 ///
 /// This lets us pass a `Box<dyn LlmProvider>` to `ContentGenerator` while
 /// the actual provider lives inside `Arc<AppState>`.
-struct ArcProvider {
-    state: Arc<AppState>,
+pub(crate) struct ArcProvider {
+    pub(crate) state: Arc<AppState>,
 }
 
 #[async_trait::async_trait]

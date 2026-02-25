@@ -248,3 +248,26 @@ active_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 # Preferred day and time for weekly thread posting (overrides thread_interval_seconds).
 # thread_preferred_day = "Tue"
 # thread_preferred_time = "10:00"
+
+# --- MCP Mutation Policy ---
+# Controls whether MCP mutation tools (post, reply, like, follow, etc.)
+# are gated by policy checks before execution. This is the safety layer
+# between AI agents and real X API actions.
+[mcp_policy]
+# Master switch: set to false to disable all policy enforcement.
+# enforce_for_mutations = true
+
+# Tools that require routing through the approval queue before execution.
+# In Composer mode, ALL mutations require approval regardless of this list.
+# require_approval_for = ["post_tweet", "reply_to_tweet", "follow_user", "like_tweet"]
+
+# Tools that are completely blocked from execution.
+# A tool cannot be in both blocked_tools and require_approval_for.
+# blocked_tools = []
+
+# When true, mutations return a dry-run response without executing.
+# Useful for testing agent behavior without side effects.
+# dry_run_mutations = false
+
+# Maximum MCP mutations allowed per hour (aggregate across all tools).
+# max_mutations_per_hour = 20
