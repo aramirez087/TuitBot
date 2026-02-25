@@ -391,8 +391,12 @@ impl Default for ScheduleConfig {
 ///
 /// Controls whether MCP mutation tools (post, reply, like, follow, etc.)
 /// are gated by policy checks before execution.
+///
+/// v2 fields (`template`, `rules`, `rate_limits`) are additive — existing
+/// v1 configs deserialize without changes.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct McpPolicyConfig {
+    // --- v1 fields (unchanged) ---
     /// Master switch: when false, all mutations are allowed without checks.
     #[serde(default = "default_true")]
     pub enforce_for_mutations: bool,
@@ -412,6 +416,19 @@ pub struct McpPolicyConfig {
     /// Maximum MCP mutations allowed per hour (aggregate across all tools).
     #[serde(default = "default_max_mutations_per_hour")]
     pub max_mutations_per_hour: u32,
+
+    // --- v2 fields ---
+    /// Optional named template to apply as the baseline rule set.
+    #[serde(default)]
+    pub template: Option<crate::mcp_policy::types::PolicyTemplateName>,
+
+    /// Explicit policy rules (user-defined). Evaluated by priority order.
+    #[serde(default)]
+    pub rules: Vec<crate::mcp_policy::types::PolicyRule>,
+
+    /// Per-dimension rate limits (beyond the global `max_mutations_per_hour`).
+    #[serde(default)]
+    pub rate_limits: Vec<crate::mcp_policy::types::PolicyRateLimit>,
 }
 
 fn default_true() -> bool {

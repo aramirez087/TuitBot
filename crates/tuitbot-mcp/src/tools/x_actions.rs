@@ -202,8 +202,12 @@ pub async fn post_tweet(state: &SharedState, text: &str) -> String {
 
     match client.post_tweet(text).await {
         Ok(tweet) => {
-            let _ =
-                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "post_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
             let elapsed = start.elapsed().as_millis() as u64;
             ToolResponse::success(&tweet)
                 .with_meta(ToolMeta::new(elapsed))
@@ -228,8 +232,12 @@ pub async fn reply_to_tweet(state: &SharedState, text: &str, in_reply_to_id: &st
 
     match client.reply_to_tweet(text, in_reply_to_id).await {
         Ok(tweet) => {
-            let _ =
-                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "reply_to_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
             let elapsed = start.elapsed().as_millis() as u64;
             ToolResponse::success(&tweet)
                 .with_meta(ToolMeta::new(elapsed))
@@ -254,8 +262,12 @@ pub async fn quote_tweet(state: &SharedState, text: &str, quoted_tweet_id: &str)
 
     match client.quote_tweet(text, quoted_tweet_id).await {
         Ok(tweet) => {
-            let _ =
-                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "quote_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
             let elapsed = start.elapsed().as_millis() as u64;
             ToolResponse::success(&tweet)
                 .with_meta(ToolMeta::new(elapsed))
@@ -293,8 +305,12 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
 
     match client.like_tweet(user_id, tweet_id).await {
         Ok(liked) => {
-            let _ =
-                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "like_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
             let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct LikeResult {
@@ -340,8 +356,12 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
 
     match client.follow_user(user_id, target_user_id).await {
         Ok(following) => {
-            let _ =
-                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "follow_user",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
             let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct FollowResult {
@@ -387,8 +407,12 @@ pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String 
 
     match client.unfollow_user(user_id, target_user_id).await {
         Ok(following) => {
-            let _ =
-                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "unfollow_user",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
             let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct UnfollowResult {
@@ -812,6 +836,7 @@ mod tests {
             require_approval_for: Vec::new(),
             dry_run_mutations: false,
             max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
         };
         config
     }
@@ -824,6 +849,7 @@ mod tests {
             blocked_tools: Vec::new(),
             dry_run_mutations: false,
             max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
         };
         config
     }
@@ -836,6 +862,7 @@ mod tests {
             blocked_tools: Vec::new(),
             dry_run_mutations: true,
             max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
         };
         config
     }
@@ -848,6 +875,7 @@ mod tests {
             blocked_tools: Vec::new(),
             dry_run_mutations: false,
             max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
         };
         config
     }
@@ -861,6 +889,7 @@ mod tests {
             blocked_tools: Vec::new(),
             dry_run_mutations: false,
             max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
         };
         config
     }

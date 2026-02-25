@@ -266,6 +266,7 @@ mod tests {
             require_approval_for: Vec::new(),
             dry_run_mutations: false,
             max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
         };
         config.business.product_keywords = vec!["rust".to_string(), "async".to_string()];
         config.business.industry_topics = vec!["software engineering".to_string()];

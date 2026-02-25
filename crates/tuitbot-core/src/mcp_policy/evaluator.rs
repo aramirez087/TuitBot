@@ -1,13 +1,12 @@
 //! Core policy evaluator and audit types.
 //!
-//! Evaluation order (safest wins):
-//! 1. `enforce_for_mutations` disabled → Allow
-//! 2. Tool in `blocked_tools` → Deny(ToolBlocked)
-//! 3. `dry_run_mutations` enabled → DryRun
-//! 4. MCP mutation rate limit exceeded → Deny(RateLimited)
-//! 5. Composer mode → RouteToApproval (all mutations)
-//! 6. Tool in `require_approval_for` → RouteToApproval
-//! 7. Otherwise → Allow
+//! v2 evaluation order:
+//! 1. `enforce_for_mutations` disabled → Allow (master kill switch)
+//! 2. Build effective rule set via `build_effective_rules()`
+//! 3. Walk rules by priority: first match → mapped PolicyDecision
+//! 4. Check per-dimension rate limits from `config.rate_limits`
+//! 5. Check legacy global rate limit (`mcp_mutation`)
+//! 6. Default → Allow
 
 use serde::Serialize;
 
@@ -16,17 +15,26 @@ use crate::error::StorageError;
 use crate::storage::rate_limits;
 use crate::storage::DbPool;
 
+use super::rules::{build_effective_rules, find_matching_rule, make_eval_context};
+use super::types::{tool_category, PolicyAction, PolicyAuditRecordV2};
+
 /// The outcome of a policy evaluation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyDecision {
     /// The mutation is allowed to proceed.
     Allow,
     /// The mutation should be routed to the approval queue.
-    RouteToApproval { reason: String },
+    RouteToApproval {
+        reason: String,
+        rule_id: Option<String>,
+    },
     /// The mutation is denied.
-    Deny { reason: PolicyDenialReason },
+    Deny {
+        reason: PolicyDenialReason,
+        rule_id: Option<String>,
+    },
     /// Dry-run mode: return what would happen without executing.
-    DryRun,
+    DryRun { rule_id: Option<String> },
 }
 
 /// Reason a mutation was denied.
@@ -36,6 +44,10 @@ pub enum PolicyDenialReason {
     ToolBlocked,
     /// The hourly MCP mutation rate limit has been exceeded.
     RateLimited,
+    /// A hard rule denied the request.
+    HardRule,
+    /// A user-defined rule denied the request.
+    UserRule,
 }
 
 impl std::fmt::Display for PolicyDenialReason {
@@ -43,6 +55,8 @@ impl std::fmt::Display for PolicyDenialReason {
         match self {
             PolicyDenialReason::ToolBlocked => write!(f, "tool_blocked"),
             PolicyDenialReason::RateLimited => write!(f, "rate_limited"),
+            PolicyDenialReason::HardRule => write!(f, "hard_rule"),
+            PolicyDenialReason::UserRule => write!(f, "user_rule"),
         }
     }
 }
@@ -53,6 +67,9 @@ pub struct PolicyAuditRecord {
     pub tool_name: String,
     pub decision: String,
     pub reason: Option<String>,
+    pub matched_rule_id: Option<String>,
+    pub matched_rule_label: Option<String>,
+    pub rate_limit_key: Option<String>,
 }
 
 /// Centralized MCP mutation policy evaluator.
@@ -61,7 +78,8 @@ pub struct McpPolicyEvaluator;
 impl McpPolicyEvaluator {
     /// Evaluate whether a tool invocation should proceed.
     ///
-    /// Follows the ordered evaluation chain described in the module docs.
+    /// Accepts `params_json` for future keyword/author matching;
+    /// currently unused but threaded through for v2 extensibility.
     pub async fn evaluate(
         pool: &DbPool,
         config: &McpPolicyConfig,
@@ -73,41 +91,67 @@ impl McpPolicyEvaluator {
             return Ok(PolicyDecision::Allow);
         }
 
-        // 2. Blocked tool → deny
-        if config.blocked_tools.iter().any(|t| t == tool_name) {
+        // 2. Build effective rule set
+        let rules = build_effective_rules(config, mode);
+        let ctx = make_eval_context(tool_name, mode);
+
+        // 3. Walk rules by priority: first match wins
+        if let Some(rule) = find_matching_rule(&rules, &ctx) {
+            let rule_id = Some(rule.id.clone());
+            match &rule.action {
+                PolicyAction::Allow => {
+                    // Rule explicitly allows — still check rate limits below
+                }
+                PolicyAction::Deny { reason } => {
+                    let denial = if rule.id.starts_with("v1:blocked:") {
+                        PolicyDenialReason::ToolBlocked
+                    } else if rule.id.starts_with("hard:") {
+                        PolicyDenialReason::HardRule
+                    } else {
+                        PolicyDenialReason::UserRule
+                    };
+                    return Ok(PolicyDecision::Deny {
+                        reason: denial,
+                        rule_id: Some(format!("{} ({})", rule.id, reason)),
+                    });
+                }
+                PolicyAction::RequireApproval { reason } => {
+                    return Ok(PolicyDecision::RouteToApproval {
+                        reason: reason.clone(),
+                        rule_id,
+                    });
+                }
+                PolicyAction::DryRun => {
+                    return Ok(PolicyDecision::DryRun { rule_id });
+                }
+            }
+        }
+
+        // 4. Check per-dimension rate limits
+        if let Some(exceeded_key) = rate_limits::check_policy_rate_limits(
+            pool,
+            tool_name,
+            &ctx.category.to_string(),
+            &config.rate_limits,
+        )
+        .await?
+        {
             return Ok(PolicyDecision::Deny {
-                reason: PolicyDenialReason::ToolBlocked,
+                reason: PolicyDenialReason::RateLimited,
+                rule_id: Some(exceeded_key),
             });
         }
 
-        // 3. Dry-run mode → return DryRun
-        if config.dry_run_mutations {
-            return Ok(PolicyDecision::DryRun);
-        }
-
-        // 4. Rate limit check
+        // 5. Legacy global rate limit
         let allowed = rate_limits::check_rate_limit(pool, "mcp_mutation").await?;
         if !allowed {
             return Ok(PolicyDecision::Deny {
                 reason: PolicyDenialReason::RateLimited,
+                rule_id: None,
             });
         }
 
-        // 5. Composer mode forces approval for all mutations
-        if *mode == OperatingMode::Composer {
-            return Ok(PolicyDecision::RouteToApproval {
-                reason: "composer mode requires approval for all mutations".to_string(),
-            });
-        }
-
-        // 6. Tool in require_approval_for list
-        if config.require_approval_for.iter().any(|t| t == tool_name) {
-            return Ok(PolicyDecision::RouteToApproval {
-                reason: format!("tool '{tool_name}' requires approval"),
-            });
-        }
-
-        // 7. Default: allow
+        // 6. Default: allow
         Ok(PolicyDecision::Allow)
     }
 
@@ -117,19 +161,27 @@ impl McpPolicyEvaluator {
         tool_name: &str,
         decision: &PolicyDecision,
     ) -> Result<(), StorageError> {
-        let (status, reason_str) = match decision {
-            PolicyDecision::Allow => ("allowed", None),
-            PolicyDecision::RouteToApproval { reason } => {
-                ("routed_to_approval", Some(reason.clone()))
+        let (status, reason_str, rule_id) = match decision {
+            PolicyDecision::Allow => ("allowed", None, None),
+            PolicyDecision::RouteToApproval { reason, rule_id } => {
+                ("routed_to_approval", Some(reason.clone()), rule_id.clone())
             }
-            PolicyDecision::Deny { reason } => ("denied", Some(reason.to_string())),
-            PolicyDecision::DryRun => ("dry_run", None),
+            PolicyDecision::Deny { reason, rule_id } => {
+                ("denied", Some(reason.to_string()), rule_id.clone())
+            }
+            PolicyDecision::DryRun { rule_id } => ("dry_run", None, rule_id.clone()),
         };
 
-        let audit = PolicyAuditRecord {
+        let category = tool_category(tool_name);
+
+        let audit = PolicyAuditRecordV2 {
             tool_name: tool_name.to_string(),
+            category: category.to_string(),
             decision: status.to_string(),
             reason: reason_str,
+            matched_rule_id: rule_id,
+            matched_rule_label: None,
+            rate_limit_key: None,
         };
 
         let metadata = serde_json::to_string(&audit).ok();
@@ -144,8 +196,20 @@ impl McpPolicyEvaluator {
         .await
     }
 
-    /// Record a successful mutation against the rate limit counter.
-    pub async fn record_mutation(pool: &DbPool) -> Result<(), StorageError> {
-        rate_limits::increment_rate_limit(pool, "mcp_mutation").await
+    /// Record a successful mutation against rate limit counters.
+    ///
+    /// Increments both the legacy global counter and any applicable
+    /// per-dimension counters.
+    pub async fn record_mutation(
+        pool: &DbPool,
+        tool_name: &str,
+        rate_limit_configs: &[super::types::PolicyRateLimit],
+    ) -> Result<(), StorageError> {
+        // Legacy global counter
+        rate_limits::increment_rate_limit(pool, "mcp_mutation").await?;
+
+        // Per-dimension counters
+        let category = tool_category(tool_name).to_string();
+        rate_limits::record_policy_rate_limits(pool, tool_name, &category, rate_limit_configs).await
     }
 }

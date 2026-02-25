@@ -178,7 +178,12 @@ pub async fn execute(state: &SharedState, items: &[ProposeItem], mention_product
     }
 
     // Record one mutation for the batch
-    let _ = McpPolicyEvaluator::record_mutation(&state.pool).await;
+    let _ = McpPolicyEvaluator::record_mutation(
+        &state.pool,
+        "propose_and_queue_replies",
+        &state.config.mcp_policy.rate_limits,
+    )
+    .await;
 
     let elapsed = start.elapsed().as_millis() as u64;
     let has_error = results

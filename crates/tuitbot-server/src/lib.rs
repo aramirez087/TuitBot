@@ -162,6 +162,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/mcp/policy",
             get(routes::mcp::get_policy).patch(routes::mcp::patch_policy),
         )
+        .route("/mcp/policy/templates", get(routes::mcp::list_templates))
+        .route(
+            "/mcp/policy/templates/{name}",
+            post(routes::mcp::apply_template),
+        )
         .route(
             "/mcp/telemetry/summary",
             get(routes::mcp::telemetry_summary),

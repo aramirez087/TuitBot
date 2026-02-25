@@ -422,6 +422,47 @@ export interface EndpointBreakdown {
 
 // --- MCP types ---
 
+export interface McpPolicyRuleConditions {
+	tools?: string[];
+	categories?: string[];
+	modes?: string[];
+	schedule_window?: {
+		start_hour: number;
+		end_hour: number;
+		timezone: string;
+		days: string[];
+	};
+}
+
+export interface McpPolicyAction {
+	type: 'allow' | 'deny' | 'require_approval' | 'dry_run';
+	reason?: string;
+}
+
+export interface McpPolicyRule {
+	id: string;
+	priority: number;
+	label: string;
+	enabled: boolean;
+	conditions: McpPolicyRuleConditions;
+	action: McpPolicyAction;
+}
+
+export interface McpPolicyRateLimit {
+	key: string;
+	dimension: string;
+	match_value: string;
+	max_count: number;
+	period_seconds: number;
+}
+
+export interface McpPolicyTemplate {
+	name: string;
+	description: string;
+	rules: McpPolicyRule[];
+	rate_limits: McpPolicyRateLimit[];
+}
+
 export interface McpPolicyStatus {
 	enforce_for_mutations: boolean;
 	require_approval_for: string[];
@@ -435,6 +476,9 @@ export interface McpPolicyStatus {
 		period_seconds?: number;
 		period_start?: string;
 	};
+	template?: string;
+	rules: McpPolicyRule[];
+	rate_limits: McpPolicyRateLimit[];
 }
 
 export interface McpPolicyPatch {
@@ -443,6 +487,9 @@ export interface McpPolicyPatch {
 	blocked_tools?: string[];
 	dry_run_mutations?: boolean;
 	max_mutations_per_hour?: number;
+	template?: string;
+	rules?: McpPolicyRule[];
+	rate_limits?: McpPolicyRateLimit[];
 }
 
 export interface McpTelemetrySummary {
@@ -741,6 +788,12 @@ export const api = {
 				method: 'PATCH',
 				body: JSON.stringify(data)
 			}),
+		listTemplates: () => request<McpPolicyTemplate[]>('/api/mcp/policy/templates'),
+		applyTemplate: (name: string) =>
+			request<{ applied_template: string; description: string }>(
+				`/api/mcp/policy/templates/${name}`,
+				{ method: 'POST' }
+			),
 		telemetrySummary: (hours: number = 24) =>
 			request<McpTelemetrySummary>(`/api/mcp/telemetry/summary?hours=${hours}`),
 		telemetryMetrics: (hours: number = 24) =>

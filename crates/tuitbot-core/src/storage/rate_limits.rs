@@ -274,6 +274,87 @@ pub async fn get_all_rate_limits(pool: &DbPool) -> Result<Vec<RateLimit>, Storag
         .map_err(|e| StorageError::Query { source: e })
 }
 
+// ---------------------------------------------------------------------------
+// Per-dimension rate limits (v2 policy engine)
+// ---------------------------------------------------------------------------
+
+use crate::mcp_policy::types::{PolicyRateLimit, RateLimitDimension};
+
+/// Initialize rate limit rows for v2 policy rate limits.
+///
+/// Uses `INSERT OR IGNORE` so existing counters are preserved.
+pub async fn init_policy_rate_limits(
+    pool: &DbPool,
+    limits: &[PolicyRateLimit],
+) -> Result<(), StorageError> {
+    for limit in limits {
+        sqlx::query(
+            "INSERT OR IGNORE INTO rate_limits \
+             (action_type, request_count, period_start, max_requests, period_seconds) \
+             VALUES (?, 0, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?, ?)",
+        )
+        .bind(&limit.key)
+        .bind(i64::from(limit.max_count))
+        .bind(limit.period_seconds as i64)
+        .execute(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+    }
+    Ok(())
+}
+
+/// Check all applicable rate limits for a tool invocation.
+///
+/// Returns the key of the first exceeded limit, or `None` if all pass.
+pub async fn check_policy_rate_limits(
+    pool: &DbPool,
+    tool_name: &str,
+    category: &str,
+    limits: &[PolicyRateLimit],
+) -> Result<Option<String>, StorageError> {
+    for limit in limits {
+        let matches = match limit.dimension {
+            RateLimitDimension::Tool => limit.match_value == tool_name,
+            RateLimitDimension::Category => limit.match_value == category,
+            RateLimitDimension::EngagementType => limit.match_value == tool_name,
+            RateLimitDimension::Global => true,
+        };
+
+        if !matches {
+            continue;
+        }
+
+        let allowed = check_rate_limit(pool, &limit.key).await?;
+        if !allowed {
+            return Ok(Some(limit.key.clone()));
+        }
+    }
+    Ok(None)
+}
+
+/// Increment all applicable rate limit counters after a successful mutation.
+pub async fn record_policy_rate_limits(
+    pool: &DbPool,
+    tool_name: &str,
+    category: &str,
+    limits: &[PolicyRateLimit],
+) -> Result<(), StorageError> {
+    for limit in limits {
+        let matches = match limit.dimension {
+            RateLimitDimension::Tool => limit.match_value == tool_name,
+            RateLimitDimension::Category => limit.match_value == category,
+            RateLimitDimension::EngagementType => limit.match_value == tool_name,
+            RateLimitDimension::Global => true,
+        };
+
+        if matches {
+            // Best-effort: if the row doesn't exist yet, skip it
+            let _ = increment_rate_limit(pool, &limit.key).await;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

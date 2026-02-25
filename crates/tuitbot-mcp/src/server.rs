@@ -403,6 +403,8 @@ impl TuitbotMcpServer {
                 Ok(id) => {
                     let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
                         &self.state.pool,
+                        "compose_tweet",
+                        &self.state.config.mcp_policy.rate_limits,
                     )
                     .await;
                     let elapsed = start.elapsed().as_millis() as u64;
@@ -437,6 +439,8 @@ impl TuitbotMcpServer {
                 Ok(id) => {
                     let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
                         &self.state.pool,
+                        "compose_tweet",
+                        &self.state.config.mcp_policy.rate_limits,
                     )
                     .await;
                     let elapsed = start.elapsed().as_millis() as u64;

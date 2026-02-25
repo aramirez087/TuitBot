@@ -6,7 +6,8 @@ import {
 	type McpToolMetrics,
 	type McpErrorBreakdown,
 	type McpTelemetryEntry,
-	type McpPolicyPatch
+	type McpPolicyPatch,
+	type McpPolicyTemplate
 } from '$lib/api';
 
 // --- Writable stores ---
@@ -16,6 +17,7 @@ export const summary = writable<McpTelemetrySummary | null>(null);
 export const metrics = writable<McpToolMetrics[]>([]);
 export const errors = writable<McpErrorBreakdown[]>([]);
 export const recentExecutions = writable<McpTelemetryEntry[]>([]);
+export const templates = writable<McpPolicyTemplate[]>([]);
 export const loading = writable(true);
 export const error = writable<string | null>(null);
 
@@ -55,6 +57,31 @@ export async function updatePolicy(patch: McpPolicyPatch) {
 		policy.set(policyData);
 	} catch (e) {
 		error.set(e instanceof Error ? e.message : 'Failed to update policy');
+		throw e;
+	}
+}
+
+// --- Templates ---
+
+export async function loadTemplates() {
+	try {
+		const data = await api.mcp.listTemplates();
+		templates.set(data);
+	} catch (e) {
+		// Non-critical: templates may not be available
+		console.warn('Failed to load templates:', e);
+	}
+}
+
+export async function applyTemplate(name: string) {
+	error.set(null);
+	try {
+		await api.mcp.applyTemplate(name);
+		// Reload policy to get updated rules/rate_limits
+		const policyData = await api.mcp.policy();
+		policy.set(policyData);
+	} catch (e) {
+		error.set(e instanceof Error ? e.message : 'Failed to apply template');
 		throw e;
 	}
 }

@@ -3,11 +3,13 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tuitbot_core::config::Config;
+use tuitbot_core::mcp_policy::templates;
+use tuitbot_core::mcp_policy::types::PolicyTemplateName;
 use tuitbot_core::storage::{mcp_telemetry, rate_limits};
 
 use crate::error::ApiError;
@@ -43,7 +45,7 @@ fn default_limit() -> u32 {
 // Policy endpoints
 // ---------------------------------------------------------------------------
 
-/// `GET /api/mcp/policy` — current MCP policy config + rate limit usage.
+/// `GET /api/mcp/policy` — current MCP policy config + rate limit usage + v2 fields.
 pub async fn get_policy(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ApiError> {
     let config = read_config(&state)?;
 
@@ -71,6 +73,9 @@ pub async fn get_policy(State(state): State<Arc<AppState>>) -> Result<Json<Value
         "max_mutations_per_hour": config.mcp_policy.max_mutations_per_hour,
         "mode": format!("{}", config.mode),
         "rate_limit": rate_limit_info,
+        "template": config.mcp_policy.template,
+        "rules": config.mcp_policy.rules,
+        "rate_limits": config.mcp_policy.rate_limits,
     })))
 }
 
@@ -125,6 +130,83 @@ pub async fn patch_policy(
         "blocked_tools": config.mcp_policy.blocked_tools,
         "dry_run_mutations": config.mcp_policy.dry_run_mutations,
         "max_mutations_per_hour": config.mcp_policy.max_mutations_per_hour,
+        "template": config.mcp_policy.template,
+        "rules": config.mcp_policy.rules,
+        "rate_limits": config.mcp_policy.rate_limits,
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// Template endpoints
+// ---------------------------------------------------------------------------
+
+/// `GET /api/mcp/policy/templates` — list available policy templates.
+pub async fn list_templates() -> Json<Value> {
+    let templates = templates::list_templates();
+    Json(json!(templates))
+}
+
+/// `POST /api/mcp/policy/templates/{name}` — apply a template.
+pub async fn apply_template(
+    State(state): State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let template_name: PolicyTemplateName =
+        name.parse().map_err(|e: String| ApiError::BadRequest(e))?;
+
+    let template = templates::get_template(&template_name);
+
+    // Build a patch that sets the template and its rules/rate_limits
+    let patch = json!({
+        "template": template_name,
+        "rules": template.rules,
+        "rate_limits": template.rate_limits,
+    });
+
+    // Wrap under mcp_policy and merge into config
+    let wrapped = json!({ "mcp_policy": patch });
+
+    let contents = std::fs::read_to_string(&state.config_path).map_err(|e| {
+        ApiError::BadRequest(format!(
+            "could not read config file {}: {e}",
+            state.config_path.display()
+        ))
+    })?;
+
+    let mut toml_value: toml::Value = contents.parse().map_err(|e: toml::de::Error| {
+        ApiError::BadRequest(format!("failed to parse existing config: {e}"))
+    })?;
+
+    let patch_toml = json_to_toml(&wrapped)
+        .map_err(|e| ApiError::BadRequest(format!("patch contains invalid values: {e}")))?;
+
+    merge_toml(&mut toml_value, &patch_toml);
+
+    let merged_str = toml::to_string_pretty(&toml_value)
+        .map_err(|e| ApiError::BadRequest(format!("failed to serialize merged config: {e}")))?;
+
+    let config: Config = toml::from_str(&merged_str)
+        .map_err(|e| ApiError::BadRequest(format!("merged config is invalid: {e}")))?;
+
+    std::fs::write(&state.config_path, &merged_str).map_err(|e| {
+        ApiError::BadRequest(format!(
+            "could not write config file {}: {e}",
+            state.config_path.display()
+        ))
+    })?;
+
+    // Initialize rate limit rows for the new template limits
+    if let Err(e) =
+        rate_limits::init_policy_rate_limits(&state.db, &config.mcp_policy.rate_limits).await
+    {
+        tracing::warn!("Failed to initialize policy rate limits: {e}");
+    }
+
+    Ok(Json(json!({
+        "applied_template": template_name,
+        "description": template.description,
+        "rules_count": config.mcp_policy.rules.len(),
+        "rate_limits_count": config.mcp_policy.rate_limits.len(),
     })))
 }
 

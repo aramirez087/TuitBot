@@ -84,6 +84,9 @@ impl Default for McpPolicyConfig {
             blocked_tools: Vec::new(),
             dry_run_mutations: false,
             max_mutations_per_hour: 20,
+            template: None,
+            rules: Vec::new(),
+            rate_limits: Vec::new(),
         }
     }
 }
