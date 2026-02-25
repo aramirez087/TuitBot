@@ -420,6 +420,74 @@ export interface EndpointBreakdown {
 	error_count: number;
 }
 
+// --- MCP types ---
+
+export interface McpPolicyStatus {
+	enforce_for_mutations: boolean;
+	require_approval_for: string[];
+	blocked_tools: string[];
+	dry_run_mutations: boolean;
+	max_mutations_per_hour: number;
+	mode: string;
+	rate_limit: {
+		used: number;
+		max: number;
+		period_seconds?: number;
+		period_start?: string;
+	};
+}
+
+export interface McpPolicyPatch {
+	enforce_for_mutations?: boolean;
+	require_approval_for?: string[];
+	blocked_tools?: string[];
+	dry_run_mutations?: boolean;
+	max_mutations_per_hour?: number;
+}
+
+export interface McpTelemetrySummary {
+	total_calls: number;
+	total_successes: number;
+	total_failures: number;
+	overall_success_rate: number;
+	avg_latency_ms: number;
+	unique_tools: number;
+	policy_decisions: Record<string, number>;
+}
+
+export interface McpToolMetrics {
+	tool_name: string;
+	category: string;
+	total_calls: number;
+	success_count: number;
+	failure_count: number;
+	success_rate: number;
+	avg_latency_ms: number;
+	p50_latency_ms: number;
+	p95_latency_ms: number;
+	min_latency_ms: number;
+	max_latency_ms: number;
+}
+
+export interface McpErrorBreakdown {
+	tool_name: string;
+	error_code: string;
+	count: number;
+	latest_at: string;
+}
+
+export interface McpTelemetryEntry {
+	id: number;
+	tool_name: string;
+	category: string;
+	latency_ms: number;
+	success: boolean;
+	error_code: string | null;
+	policy_decision: string | null;
+	metadata: string | null;
+	created_at: string;
+}
+
 // --- File upload helper ---
 
 async function uploadFile(path: string, file: File): Promise<MediaUploadResponse> {
@@ -664,6 +732,23 @@ export const api = {
 				`/api/content/drafts/${id}/publish`,
 				{ method: 'POST' }
 			)
+	},
+
+	mcp: {
+		policy: () => request<McpPolicyStatus>('/api/mcp/policy'),
+		patchPolicy: (data: McpPolicyPatch) =>
+			request<McpPolicyPatch>('/api/mcp/policy', {
+				method: 'PATCH',
+				body: JSON.stringify(data)
+			}),
+		telemetrySummary: (hours: number = 24) =>
+			request<McpTelemetrySummary>(`/api/mcp/telemetry/summary?hours=${hours}`),
+		telemetryMetrics: (hours: number = 24) =>
+			request<McpToolMetrics[]>(`/api/mcp/telemetry/metrics?hours=${hours}`),
+		telemetryErrors: (hours: number = 24) =>
+			request<McpErrorBreakdown[]>(`/api/mcp/telemetry/errors?hours=${hours}`),
+		telemetryRecent: (limit: number = 50) =>
+			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`)
 	},
 
 	discovery: {

@@ -23,6 +23,7 @@
 		Download,
 		Search,
 		PenLine,
+		Shield,
 	} from "lucide-svelte";
 
 	let collapsed = $state(false);
@@ -53,6 +54,7 @@
 		{ href: "/targets", label: "Targets", icon: Target },
 		{ href: "/strategy", label: "Strategy", icon: Compass },
 		{ href: "/costs", label: "Costs", icon: DollarSign },
+		{ href: "/mcp", label: "MCP", icon: Shield },
 		{ href: "/settings", label: "Settings", icon: Settings },
 	];
 

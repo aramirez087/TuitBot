@@ -157,6 +157,21 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),
         )
+        // MCP governance
+        .route(
+            "/mcp/policy",
+            get(routes::mcp::get_policy).patch(routes::mcp::patch_policy),
+        )
+        .route(
+            "/mcp/telemetry/summary",
+            get(routes::mcp::telemetry_summary),
+        )
+        .route(
+            "/mcp/telemetry/metrics",
+            get(routes::mcp::telemetry_metrics),
+        )
+        .route("/mcp/telemetry/errors", get(routes::mcp::telemetry_errors))
+        .route("/mcp/telemetry/recent", get(routes::mcp::telemetry_recent))
         // Runtime
         .route("/runtime/status", get(routes::runtime::status))
         .route("/runtime/start", post(routes::runtime::start))

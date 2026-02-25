@@ -35,7 +35,10 @@ pub struct TelemetryParams<'a> {
 }
 
 /// Insert a telemetry entry.
-pub async fn log_telemetry(pool: &DbPool, params: &TelemetryParams<'_>) -> Result<(), StorageError> {
+pub async fn log_telemetry(
+    pool: &DbPool,
+    params: &TelemetryParams<'_>,
+) -> Result<(), StorageError> {
     sqlx::query(
         "INSERT INTO mcp_telemetry \
          (tool_name, category, latency_ms, success, error_code, policy_decision, metadata) \
@@ -252,6 +255,22 @@ pub async fn get_summary(pool: &DbPool, since: &str) -> Result<TelemetrySummary,
     })
 }
 
+/// Get recent telemetry entries, ordered newest-first.
+pub async fn get_recent_entries(
+    pool: &DbPool,
+    limit: u32,
+) -> Result<Vec<TelemetryEntry>, StorageError> {
+    sqlx::query_as::<_, TelemetryEntry>(
+        "SELECT id, tool_name, category, latency_ms, success, \
+         error_code, policy_decision, metadata, created_at \
+         FROM mcp_telemetry ORDER BY created_at DESC LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
 /// Compute a percentile from sorted latency values.
 fn percentile(sorted: &[(i64,)], pct: u32) -> i64 {
     if sorted.is_empty() {
@@ -267,13 +286,36 @@ mod tests {
     use super::*;
     use crate::storage::init_test_db;
 
+    async fn log(
+        pool: &DbPool,
+        tool: &str,
+        cat: &str,
+        ms: u64,
+        ok: bool,
+        err: Option<&str>,
+        policy: Option<&str>,
+    ) {
+        log_telemetry(
+            pool,
+            &TelemetryParams {
+                tool_name: tool,
+                category: cat,
+                latency_ms: ms,
+                success: ok,
+                error_code: err,
+                policy_decision: policy,
+                metadata: None,
+            },
+        )
+        .await
+        .expect("log telemetry");
+    }
+
     #[tokio::test]
     async fn log_and_retrieve_telemetry() {
         let pool = init_test_db().await.expect("init db");
 
-        log_telemetry(&pool, "get_stats", "analytics", 42, true, None, None, None)
-            .await
-            .expect("log");
+        log(&pool, "get_stats", "analytics", 42, true, None, None).await;
 
         let metrics = get_metrics_since(&pool, "2000-01-01T00:00:00Z")
             .await
@@ -289,7 +331,7 @@ mod tests {
     async fn error_breakdown_groups_by_code() {
         let pool = init_test_db().await.expect("init db");
 
-        log_telemetry(
+        log(
             &pool,
             "compose_tweet",
             "mutation",
@@ -297,11 +339,9 @@ mod tests {
             false,
             Some("policy_denied_blocked"),
             Some("deny"),
-            None,
         )
-        .await
-        .expect("log");
-        log_telemetry(
+        .await;
+        log(
             &pool,
             "compose_tweet",
             "mutation",
@@ -309,11 +349,9 @@ mod tests {
             false,
             Some("policy_denied_blocked"),
             Some("deny"),
-            None,
         )
-        .await
-        .expect("log");
-        log_telemetry(
+        .await;
+        log(
             &pool,
             "compose_tweet",
             "mutation",
@@ -321,10 +359,8 @@ mod tests {
             false,
             Some("db_error"),
             None,
-            None,
         )
-        .await
-        .expect("log");
+        .await;
 
         let errors = get_error_breakdown(&pool, "2000-01-01T00:00:00Z")
             .await
@@ -341,13 +377,9 @@ mod tests {
     async fn summary_aggregates_correctly() {
         let pool = init_test_db().await.expect("init db");
 
-        log_telemetry(&pool, "get_stats", "analytics", 10, true, None, None, None)
-            .await
-            .expect("log");
-        log_telemetry(&pool, "get_stats", "analytics", 20, true, None, None, None)
-            .await
-            .expect("log");
-        log_telemetry(
+        log(&pool, "get_stats", "analytics", 10, true, None, None).await;
+        log(&pool, "get_stats", "analytics", 20, true, None, None).await;
+        log(
             &pool,
             "compose_tweet",
             "mutation",
@@ -355,10 +387,8 @@ mod tests {
             false,
             Some("err"),
             Some("deny"),
-            None,
         )
-        .await
-        .expect("log");
+        .await;
 
         let summary = get_summary(&pool, "2000-01-01T00:00:00Z")
             .await
@@ -395,9 +425,7 @@ mod tests {
         let pool = init_test_db().await.expect("init db");
 
         for ms in [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] {
-            log_telemetry(&pool, "test_tool", "test", ms, true, None, None, None)
-                .await
-                .expect("log");
+            log(&pool, "test_tool", "test", ms, true, None, None).await;
         }
 
         let metrics = get_metrics_since(&pool, "2000-01-01T00:00:00Z")
