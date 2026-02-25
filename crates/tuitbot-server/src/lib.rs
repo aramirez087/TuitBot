@@ -69,6 +69,23 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/content/scheduled/{id}",
             patch(routes::content::edit_scheduled).delete(routes::content::cancel_scheduled),
         )
+        // Drafts
+        .route(
+            "/content/drafts",
+            get(routes::content::list_drafts).post(routes::content::create_draft),
+        )
+        .route(
+            "/content/drafts/{id}",
+            patch(routes::content::edit_draft).delete(routes::content::delete_draft),
+        )
+        .route(
+            "/content/drafts/{id}/schedule",
+            post(routes::content::schedule_draft),
+        )
+        .route(
+            "/content/drafts/{id}/publish",
+            post(routes::content::publish_draft),
+        )
         // Targets
         .route(
             "/targets",
@@ -102,6 +119,27 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/costs/x-api/by-endpoint",
             get(routes::costs::x_api_by_endpoint),
+        )
+        // AI Assist
+        .route("/assist/tweet", post(routes::assist::assist_tweet))
+        .route("/assist/reply", post(routes::assist::assist_reply))
+        .route("/assist/thread", post(routes::assist::assist_thread))
+        .route("/assist/improve", post(routes::assist::assist_improve))
+        .route("/assist/topics", get(routes::assist::assist_topics))
+        .route(
+            "/assist/optimal-times",
+            get(routes::assist::assist_optimal_times),
+        )
+        .route("/assist/mode", get(routes::assist::get_mode))
+        // Discovery feed
+        .route("/discovery/feed", get(routes::discovery::feed))
+        .route(
+            "/discovery/{tweet_id}/compose-reply",
+            post(routes::discovery::compose_reply),
+        )
+        .route(
+            "/discovery/{tweet_id}/queue-reply",
+            post(routes::discovery::queue_reply),
         )
         // Media
         .route("/media/upload", post(routes::media::upload))

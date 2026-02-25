@@ -4,7 +4,8 @@ description: >
   Autonomous X (Twitter) growth assistant for founders and indie hackers.
   Discovers relevant conversations, scores tweets, generates AI-powered
   replies/tweets/threads, monitors target accounts, and tracks analytics.
-  Supports human-in-the-loop approval mode.
+  Supports dual operating modes: fully autonomous (Autopilot) or
+  user-controlled with AI assist (Composer).
 version: 0.1.0
 homepage: https://github.com/aramirez087/tuitbot
 metadata:
@@ -30,6 +31,9 @@ Use this skill when the user wants to:
 - Review and approve queued posts (approval mode)
 - View analytics on follower growth and content performance
 - Configure posting limits, scoring thresholds, or brand voice
+- Switch between Autopilot and Composer operating modes
+- Manage drafts with AI-assisted content generation
+- Browse the Discovery Feed and compose replies to scored tweets
 
 ## Installation
 
@@ -199,6 +203,7 @@ The server communicates via JSON-RPC 2.0 over stdin/stdout (newline-delimited).
 | **Content Generation** | `generate_reply`, `generate_tweet`, `generate_thread` (requires LLM provider) |
 | **Capabilities** | `get_capabilities` (tier, rate limits, recommended max actions) |
 | **Config & Health** | `get_config`, `validate_config`, `health_check` |
+| **Composer Mode** | `get_mode`, `compose_tweet`, `get_discovery_feed`, `suggest_topics` |
 
 ### MCP vs CLI
 
@@ -270,6 +275,7 @@ Key settings that can be modified via `tuitbot settings --set`:
 | `limits.max_replies_per_day` | int | 5 | Maximum replies per day |
 | `limits.max_tweets_per_day` | int | 6 | Maximum tweets per day |
 | `limits.product_mention_ratio` | 0.0-1.0 | 0.2 | Fraction of replies mentioning product |
+| `mode` | string | autopilot | Operating mode: autopilot or composer |
 | `approval_mode` | bool | false | Queue posts for human review |
 | `schedule.timezone` | string | UTC | IANA timezone for active hours |
 | `schedule.active_hours_start` | 0-23 | 8 | Start of posting window |

@@ -280,6 +280,36 @@ pub async fn update_media_paths(
     Ok(())
 }
 
+/// Fetch the next approved item ready for posting.
+///
+/// Returns the oldest item with `status='approved'`, ordered by `reviewed_at`.
+pub async fn get_next_approved(pool: &DbPool) -> Result<Option<ApprovalItem>, StorageError> {
+    let row: Option<ApprovalRow> = sqlx::query_as(
+        "SELECT id, action_type, target_tweet_id, target_author, generated_content, topic, archetype, score, status, created_at, COALESCE(media_paths, '[]')
+         FROM approval_queue
+         WHERE status = 'approved'
+         ORDER BY reviewed_at ASC
+         LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(ApprovalItem::from))
+}
+
+/// Mark an approved item as posted, storing the returned tweet ID.
+pub async fn mark_posted(pool: &DbPool, id: i64, tweet_id: &str) -> Result<(), StorageError> {
+    sqlx::query("UPDATE approval_queue SET status = 'posted', posted_tweet_id = ? WHERE id = ?")
+        .bind(tweet_id)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
 /// Expire old pending items (older than the specified hours).
 pub async fn expire_old_items(pool: &DbPool, hours: u32) -> Result<u64, StorageError> {
     let result = sqlx::query(

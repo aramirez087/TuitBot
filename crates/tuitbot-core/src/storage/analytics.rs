@@ -430,6 +430,46 @@ pub async fn get_recent_performance_items(
         .collect())
 }
 
+/// Hourly posting performance data.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HourlyPerformance {
+    /// Hour of day (0-23).
+    pub hour: i64,
+    /// Average engagement score for posts in this hour.
+    pub avg_engagement: f64,
+    /// Number of posts in this hour.
+    pub post_count: i64,
+}
+
+/// Get optimal posting times based on historical performance.
+pub async fn get_optimal_posting_times(
+    pool: &DbPool,
+) -> Result<Vec<HourlyPerformance>, StorageError> {
+    let rows: Vec<(i64, f64, i64)> = sqlx::query_as(
+        "SELECT
+            CAST(strftime('%H', ot.created_at) AS INTEGER) as hour,
+            COALESCE(AVG(tp.performance_score), 0.0) as avg_engagement,
+            COUNT(*) as post_count
+         FROM original_tweets ot
+         LEFT JOIN tweet_performance tp ON tp.tweet_id = ot.tweet_id
+         WHERE ot.status = 'sent' AND ot.tweet_id IS NOT NULL
+         GROUP BY hour
+         ORDER BY avg_engagement DESC",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(hour, avg_engagement, post_count)| HourlyPerformance {
+            hour,
+            avg_engagement,
+            post_count,
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

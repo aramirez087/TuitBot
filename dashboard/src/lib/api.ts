@@ -271,6 +271,7 @@ export interface TuitbotConfig {
 		accounts: string[];
 		max_target_replies_per_day: number;
 	};
+	mode: 'autopilot' | 'composer';
 	approval_mode: boolean;
 	storage: {
 		db_path: string;
@@ -598,5 +599,104 @@ export const api = {
 			}),
 		approveAll: () =>
 			request<{ status: string; count: number }>('/api/approval/approve-all', { method: 'POST' })
+	},
+
+	assist: {
+		tweet: (topic: string) =>
+			request<{ content: string; topic: string }>('/api/assist/tweet', {
+				method: 'POST',
+				body: JSON.stringify({ topic })
+			}),
+		reply: (tweetText: string, tweetAuthor: string, mentionProduct: boolean = false) =>
+			request<{ content: string }>('/api/assist/reply', {
+				method: 'POST',
+				body: JSON.stringify({
+					tweet_text: tweetText,
+					tweet_author: tweetAuthor,
+					mention_product: mentionProduct
+				})
+			}),
+		thread: (topic: string) =>
+			request<{ tweets: string[]; topic: string }>('/api/assist/thread', {
+				method: 'POST',
+				body: JSON.stringify({ topic })
+			}),
+		improve: (draft: string, context?: string) =>
+			request<{ content: string }>('/api/assist/improve', {
+				method: 'POST',
+				body: JSON.stringify({ draft, context })
+			}),
+		topics: () =>
+			request<{ topics: Array<{ topic: string; score: number }> }>('/api/assist/topics'),
+		optimalTimes: () =>
+			request<{ times: Array<{ hour: number; avg_engagement: number; post_count: number }> }>(
+				'/api/assist/optimal-times'
+			),
+		mode: () => request<{ mode: string; approval_mode: boolean }>('/api/assist/mode')
+	},
+
+	drafts: {
+		list: () => request<ScheduledContentItem[]>('/api/content/drafts'),
+		create: (contentType: string, content: string, source: string = 'manual') =>
+			request<{ id: number; status: string }>('/api/content/drafts', {
+				method: 'POST',
+				body: JSON.stringify({ content_type: contentType, content, source })
+			}),
+		edit: (id: number, content: string) =>
+			request<{ id: number; status: string }>(`/api/content/drafts/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ content })
+			}),
+		delete: (id: number) =>
+			request<{ id: number; status: string }>(`/api/content/drafts/${id}`, {
+				method: 'DELETE'
+			}),
+		schedule: (id: number, scheduledFor: string) =>
+			request<{ id: number; status: string; scheduled_for: string }>(
+				`/api/content/drafts/${id}/schedule`,
+				{
+					method: 'POST',
+					body: JSON.stringify({ scheduled_for: scheduledFor })
+				}
+			),
+		publish: (id: number) =>
+			request<{ id: number; approval_queue_id: number; status: string }>(
+				`/api/content/drafts/${id}/publish`,
+				{ method: 'POST' }
+			)
+	},
+
+	discovery: {
+		feed: (minScore: number = 50, limit: number = 20) =>
+			request<
+				Array<{
+					id: string;
+					author_username: string;
+					content: string;
+					relevance_score: number;
+					matched_keyword: string | null;
+					like_count: number;
+					retweet_count: number;
+					reply_count: number;
+					replied_to: boolean;
+					discovered_at: string;
+				}>
+			>(`/api/discovery/feed?min_score=${minScore}&limit=${limit}`),
+		composeReply: (tweetId: string, mentionProduct: boolean = false) =>
+			request<{ content: string; tweet_id: string }>(
+				`/api/discovery/${tweetId}/compose-reply`,
+				{
+					method: 'POST',
+					body: JSON.stringify({ mention_product: mentionProduct })
+				}
+			),
+		queueReply: (tweetId: string, content: string) =>
+			request<{ approval_queue_id: number; tweet_id: string; status: string }>(
+				`/api/discovery/${tweetId}/queue-reply`,
+				{
+					method: 'POST',
+					body: JSON.stringify({ content })
+				}
+			)
 	}
 };

@@ -53,7 +53,7 @@ For power users and self-hosters, Tuitbot still provides the robust `tuitbot-cli
 
 ## Features
 
-Tuitbot runs six background loops — discovering conversations, drafting content, and routing everything through your approval queue (or posting automatically if you've enabled Autopost Mode). You can monitor all of this through the **Dashboard's Live Activity Feed**, which provides real-time visibility into the AI's decision-making process.
+Tuitbot runs background loops — discovering conversations, drafting content, and routing everything through your approval queue (or posting automatically in Autopilot mode). You can monitor all of this through the **Dashboard's Live Activity Feed**, which provides real-time visibility into the AI's decision-making process.
 
 ### 1. Finds Conversations That Matter
 Searches X for tweets matching your product's keywords. Tuitbot uses a **6-signal scoring engine** (configurable via the GUI) to find the perfect interactions:
@@ -75,17 +75,27 @@ Snapshots your follower count daily and measures engagement after 24 hours. The 
 ### 6. Weekly Strategy Reports
 Tuitbot generates a weekly scorecard that aggregates your engagement data into actionable insights. The **Strategy Dashboard** shows your growth loop — inputs, engine, outputs, and metrics — in a single view. An 8-rule recommendation engine automatically identifies winning topics to double down on, underperformers to cut, follower stalls, and engagement regressions.
 
+### 7. Composer Mode: AI-Assisted Writing
+When you want to stay in the driver's seat, switch to Composer mode for a hands-on writing experience powered by the same AI engine:
+* **AI Assist** — generate tweets, replies, and threads on demand; improve existing drafts with one click.
+* **Draft System** — create, edit, schedule, and publish content at your own pace.
+* **Discovery Feed** — browse scored conversations and compose replies manually instead of letting the agent queue them.
+
 ---
 
 ## Two Operating Modes
 
 | Mode | Behavior | Recommended for |
 |------|----------|-----------------|
-| **Assist Mode** (default) | Discovers conversations and drafts content — nothing is posted until you approve it in the dashboard or CLI. | New accounts, cautious users, anyone who wants full control. |
-| **Autopost Mode** | Posts automatically within your configured safety limits (daily caps, banned phrases, dedup). | Established accounts after you've reviewed ~50 drafts and trust the AI's tone. Set `approval_mode = false`. |
+| **Autopilot** (default) | Discovers conversations and drafts content autonomously. Posts automatically when `approval_mode = false`, or queues for review when `approval_mode = true`. | Established accounts that trust the AI's tone. |
+| **Composer** | Autonomous loops are disabled. Discovery runs read-only to feed the Discovery Feed. Approval mode is always on. You write and schedule content with AI Assist, drafts, and the Discovery Feed. | New accounts, cautious users, anyone who wants full creative control. |
 
-**Start in Assist Mode.** Graduate to Autopost only after you're confident in the output quality.
-For an extra-cautious approach, keep Assist Mode on for replies permanently and only autopost original tweets and threads.
+```toml
+# config.toml
+mode = "composer"   # or "autopilot" (default)
+```
+
+**Start in Composer mode.** Graduate to Autopilot after you've reviewed enough AI-generated content to trust the tone and quality. You can switch between modes at any time without losing drafts, scheduled posts, or approval queue items.
 
 ---
 
@@ -95,7 +105,7 @@ Tuitbot is engineered to keep your account safe and maintain your reputation:
 
 | Feature | Description |
 |---|---|
-| **Approval Mode** | Enabled by default — all posts are queued for human review before posting. |
+| **Approval Mode** | Enabled by default — all posts are queued for human review before posting. Always on in Composer mode. |
 | **Conservative Limits** | Defaults to **5 replies/day**, **6 tweets/day**, **1 thread/week**. |
 | **Anti-Harassment** | Maximum 1 reply per author per day. |
 | **Spam Filter** | Automatically blocks replies containing salesy phrases. |
@@ -199,6 +209,7 @@ This README is intentionally concise. The full system docs are on GitHub Pages:
 - [Configuration](https://aramirez087.github.io/TuitBot/configuration/) - config model and production guidance
 - [CLI Reference](https://aramirez087.github.io/TuitBot/cli-reference/) - command reference
 - [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) - AI agent integration
+- [Composer Mode](https://aramirez087.github.io/TuitBot/composer-mode/) - AI-assisted writing, drafts, and discovery feed
 - [Operations](https://aramirez087.github.io/TuitBot/operations/) - deployment and runbook
 - [Release and Publishing](https://aramirez087.github.io/TuitBot/release-and-publishing/) - release-plz and crates.io
 

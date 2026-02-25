@@ -103,3 +103,23 @@ pub async fn get_follower_trend(pool: &DbPool, limit: u32) -> String {
     serde_json::to_string_pretty(&out)
         .unwrap_or_else(|e| format!("Error serializing follower trend: {e}"))
 }
+
+/// Get top-performing topics from analytics.
+pub async fn get_top_topics(pool: &DbPool, limit: u32) -> String {
+    match storage::analytics::get_top_topics(pool, limit).await {
+        Ok(topics) => {
+            let out: Vec<serde_json::Value> = topics
+                .iter()
+                .map(|cs| {
+                    serde_json::json!({
+                        "topic": cs.topic,
+                        "score": cs.avg_performance,
+                    })
+                })
+                .collect();
+            serde_json::to_string_pretty(&out)
+                .unwrap_or_else(|e| format!("Error serializing topics: {e}"))
+        }
+        Err(e) => format!("Error fetching top topics: {e}"),
+    }
+}

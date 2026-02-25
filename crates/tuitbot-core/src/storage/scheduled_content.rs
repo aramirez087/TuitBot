@@ -156,6 +156,89 @@ pub async fn update_content(
     Ok(())
 }
 
+// ============================================================================
+// Draft operations
+// ============================================================================
+
+/// Insert a new draft (status = 'draft', no scheduled_for).
+pub async fn insert_draft(
+    pool: &DbPool,
+    content_type: &str,
+    content: &str,
+    source: &str,
+) -> Result<i64, StorageError> {
+    let result = sqlx::query(
+        "INSERT INTO scheduled_content (content_type, content, status, source) \
+         VALUES (?, ?, 'draft', ?)",
+    )
+    .bind(content_type)
+    .bind(content)
+    .bind(source)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(result.last_insert_rowid())
+}
+
+/// List all draft items, ordered by creation time (newest first).
+pub async fn list_drafts(pool: &DbPool) -> Result<Vec<ScheduledContent>, StorageError> {
+    sqlx::query_as::<_, ScheduledContent>(
+        "SELECT * FROM scheduled_content WHERE status = 'draft' ORDER BY created_at DESC",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
+/// Update a draft's content.
+pub async fn update_draft(pool: &DbPool, id: i64, content: &str) -> Result<(), StorageError> {
+    sqlx::query(
+        "UPDATE scheduled_content SET content = ?, updated_at = datetime('now') \
+         WHERE id = ? AND status = 'draft'",
+    )
+    .bind(content)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
+/// Delete a draft (set status to 'cancelled').
+pub async fn delete_draft(pool: &DbPool, id: i64) -> Result<(), StorageError> {
+    sqlx::query(
+        "UPDATE scheduled_content SET status = 'cancelled', updated_at = datetime('now') \
+         WHERE id = ? AND status = 'draft'",
+    )
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
+/// Promote a draft to scheduled (set status to 'scheduled' with a scheduled_for time).
+pub async fn schedule_draft(
+    pool: &DbPool,
+    id: i64,
+    scheduled_for: &str,
+) -> Result<(), StorageError> {
+    sqlx::query(
+        "UPDATE scheduled_content SET status = 'scheduled', scheduled_for = ?, updated_at = datetime('now') \
+         WHERE id = ? AND status = 'draft'",
+    )
+    .bind(scheduled_for)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

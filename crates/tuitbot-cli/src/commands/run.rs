@@ -8,11 +8,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tuitbot_core::automation::{
-    run_posting_queue_with_approval, run_token_refresh_loop, scheduler_from_config,
-    status_reporter::run_status_reporter, AnalyticsLoop, ContentLoop, DiscoveryLoop, MentionsLoop,
-    PostExecutor, Runtime, TargetLoop, ThreadLoop,
+    run_approval_poster, run_posting_queue_with_approval, run_token_refresh_loop,
+    scheduler_from_config, status_reporter::run_status_reporter, AnalyticsLoop, ContentLoop,
+    DiscoveryLoop, MentionsLoop, PostExecutor, Runtime, TargetLoop, ThreadLoop,
 };
-use tuitbot_core::config::Config;
+use tuitbot_core::config::{Config, OperatingMode};
 use tuitbot_core::startup::format_startup_banner;
 
 use crate::deps::RuntimeDeps;
@@ -71,57 +71,73 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         runtime.spawn("token-refresh", run_token_refresh_loop(tm, xc, cancel));
     }
 
-    // --- Content loop (all tiers) ---
+    // Spawn approval poster loop (always — processes approved items from queue).
     {
-        let content_loop = ContentLoop::new(
-            deps.tweet_gen.clone(),
-            deps.content_safety.clone(),
-            deps.content_storage.clone(),
-            config.business.industry_topics.clone(),
-            config.intervals.content_post_window_seconds,
-            false,
-        )
-        .with_topic_scorer(deps.topic_scorer.clone());
-
         let cancel = runtime.cancel_token();
-        let scheduler = scheduler_from_config(
-            config.intervals.content_post_window_seconds,
-            config.limits.min_action_delay_seconds,
-            config.limits.max_action_delay_seconds,
+        let pool = deps.pool.clone();
+        let xc = deps.x_client.clone();
+        runtime.spawn(
+            "approval-poster",
+            run_approval_poster(pool, xc, min_delay, max_delay, cancel),
         );
-        let schedule = deps.active_schedule.clone();
-        runtime.spawn("content-loop", async move {
-            content_loop.run(cancel, scheduler, schedule).await;
-        });
     }
 
-    // --- Thread loop (all tiers) ---
-    {
-        let thread_loop = ThreadLoop::new(
-            deps.thread_gen.clone(),
-            deps.content_safety.clone(),
-            deps.content_storage.clone(),
-            deps.thread_poster.clone(),
-            config.business.industry_topics.clone(),
-            config.intervals.thread_interval_seconds,
-            false,
-        );
+    let is_composer = config.mode == OperatingMode::Composer;
 
-        let cancel = runtime.cancel_token();
-        let scheduler = scheduler_from_config(
-            config.intervals.thread_interval_seconds,
-            config.limits.min_action_delay_seconds,
-            config.limits.max_action_delay_seconds,
-        );
-        let schedule = deps.active_schedule.clone();
-        runtime.spawn("thread-loop", async move {
-            thread_loop.run(cancel, scheduler, schedule).await;
-        });
+    // --- Autopilot-only loops ---
+    if !is_composer {
+        // Content loop (all tiers)
+        {
+            let content_loop = ContentLoop::new(
+                deps.tweet_gen.clone(),
+                deps.content_safety.clone(),
+                deps.content_storage.clone(),
+                config.business.industry_topics.clone(),
+                config.intervals.content_post_window_seconds,
+                false,
+            )
+            .with_topic_scorer(deps.topic_scorer.clone());
+
+            let cancel = runtime.cancel_token();
+            let scheduler = scheduler_from_config(
+                config.intervals.content_post_window_seconds,
+                config.limits.min_action_delay_seconds,
+                config.limits.max_action_delay_seconds,
+            );
+            let schedule = deps.active_schedule.clone();
+            runtime.spawn("content-loop", async move {
+                content_loop.run(cancel, scheduler, schedule).await;
+            });
+        }
+
+        // Thread loop (all tiers)
+        {
+            let thread_loop = ThreadLoop::new(
+                deps.thread_gen.clone(),
+                deps.content_safety.clone(),
+                deps.content_storage.clone(),
+                deps.thread_poster.clone(),
+                config.business.industry_topics.clone(),
+                config.intervals.thread_interval_seconds,
+                false,
+            );
+
+            let cancel = runtime.cancel_token();
+            let scheduler = scheduler_from_config(
+                config.intervals.thread_interval_seconds,
+                config.limits.min_action_delay_seconds,
+                config.limits.max_action_delay_seconds,
+            );
+            let schedule = deps.active_schedule.clone();
+            runtime.spawn("thread-loop", async move {
+                thread_loop.run(cancel, scheduler, schedule).await;
+            });
+        }
     }
 
-    // --- Tier-gated loops (Basic/Pro only) ---
+    // --- Tier-gated loops ---
     if deps.capabilities.discovery {
-        // Discovery loop
+        // Discovery loop: in composer mode, run with dry_run=true (read-only).
         let discovery_loop = DiscoveryLoop::new(
             deps.searcher.clone(),
             deps.scorer.clone(),
@@ -131,7 +147,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
             deps.post_sender.clone(),
             deps.keywords.clone(),
             config.scoring.threshold as f32,
-            false,
+            is_composer, // dry_run in composer mode
         );
 
         let cancel = runtime.cancel_token();
@@ -146,8 +162,8 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         });
     }
 
-    if deps.capabilities.mentions {
-        // Mentions loop
+    if deps.capabilities.mentions && !is_composer {
+        // Mentions loop (autopilot only)
         let mentions_loop = MentionsLoop::new(
             deps.mentions_fetcher.clone(),
             deps.reply_gen.clone(),
@@ -170,7 +186,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
                 .await;
         });
 
-        // Target loop
+        // Target loop (autopilot only)
         let target_loop = TargetLoop::new(
             deps.target_adapter.clone(),
             deps.target_adapter.clone(),
@@ -191,8 +207,10 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         runtime.spawn("target-loop", async move {
             target_loop.run(cancel, scheduler, schedule).await;
         });
+    }
 
-        // Analytics loop (no schedule gate -- analytics runs 24/7)
+    // Analytics loop runs in both modes (passive data collection).
+    if deps.capabilities.mentions {
         let analytics_loop = AnalyticsLoop::new(
             deps.profile_adapter.clone(),
             deps.profile_adapter.clone(),

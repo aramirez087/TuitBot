@@ -3,8 +3,10 @@
 pub mod activity;
 pub mod analytics;
 pub mod approval;
+pub mod assist;
 pub mod content;
 pub mod costs;
+pub mod discovery;
 pub mod health;
 pub mod media;
 pub mod replies;

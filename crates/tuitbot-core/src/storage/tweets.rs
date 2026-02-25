@@ -106,6 +106,25 @@ pub async fn get_unreplied_tweets_above_score(
     .map_err(|e| StorageError::Query { source: e })
 }
 
+/// Fetch discovered tweets above a score threshold, ordered by discovery time (newest first).
+pub async fn get_discovery_feed(
+    pool: &DbPool,
+    min_score: f64,
+    limit: u32,
+) -> Result<Vec<DiscoveredTweet>, StorageError> {
+    sqlx::query_as::<_, DiscoveredTweet>(
+        "SELECT * FROM discovered_tweets \
+         WHERE COALESCE(relevance_score, 0.0) >= ? \
+         ORDER BY discovered_at DESC \
+         LIMIT ?",
+    )
+    .bind(min_score)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
 /// Check if a tweet exists in the database.
 pub async fn tweet_exists(pool: &DbPool, tweet_id: &str) -> Result<bool, StorageError> {
     let row: (i64,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM discovered_tweets WHERE id = ?)")

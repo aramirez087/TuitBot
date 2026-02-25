@@ -22,6 +22,7 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Configuration: configuration.md
+  - Composer Mode: composer-mode.md
   - CLI Reference: cli-reference.md
   - MCP Reference: mcp-reference.md
   - Architecture: architecture.md

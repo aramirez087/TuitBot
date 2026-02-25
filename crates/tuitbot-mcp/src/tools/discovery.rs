@@ -49,3 +49,19 @@ pub async fn list_unreplied_tweets(pool: &DbPool, threshold: f64) -> String {
         Err(e) => format!("Error fetching unreplied tweets: {e}"),
     }
 }
+
+/// List unreplied tweets above a score threshold with a limit.
+pub async fn list_unreplied_tweets_with_limit(pool: &DbPool, threshold: f64, limit: u32) -> String {
+    match storage::tweets::get_unreplied_tweets_above_score(pool, threshold).await {
+        Ok(tweets) => {
+            let out: Vec<DiscoveredTweetOut> = tweets
+                .iter()
+                .take(limit as usize)
+                .map(tweet_to_out)
+                .collect();
+            serde_json::to_string_pretty(&out)
+                .unwrap_or_else(|e| format!("Error serializing tweets: {e}"))
+        }
+        Err(e) => format!("Error fetching unreplied tweets: {e}"),
+    }
+}

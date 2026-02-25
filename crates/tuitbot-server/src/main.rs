@@ -9,6 +9,9 @@ use anyhow::Result;
 use clap::Parser;
 use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
+use tuitbot_core::config::Config;
+use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage;
 
 use tuitbot_server::auth;
@@ -61,6 +64,24 @@ async fn main() -> Result<()> {
 
     let data_dir = db_dir.to_path_buf();
 
+    // Try to initialize content generator from config (optional — AI assist endpoints need it).
+    let content_generator = match Config::load(Some(&cli.config)) {
+        Ok(config) => match create_provider(&config.llm) {
+            Ok(provider) => {
+                tracing::info!("LLM provider initialized for AI assist endpoints");
+                Some(Arc::new(ContentGenerator::new(provider, config.business)))
+            }
+            Err(e) => {
+                tracing::info!(error = %e, "LLM provider not configured — AI assist endpoints disabled");
+                None
+            }
+        },
+        Err(e) => {
+            tracing::info!(error = %e, "Config not loaded — AI assist endpoints disabled");
+            None
+        }
+    };
+
     let state = Arc::new(AppState {
         db: pool,
         config_path,
@@ -68,6 +89,7 @@ async fn main() -> Result<()> {
         event_tx,
         api_token,
         runtime: Mutex::new(None),
+        content_generator,
     });
 
     let router = tuitbot_server::build_router(state);

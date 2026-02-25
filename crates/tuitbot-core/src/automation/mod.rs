@@ -16,6 +16,7 @@
 
 pub mod adapters;
 pub mod analytics_loop;
+pub mod approval_poster;
 pub mod content_loop;
 pub mod discovery_loop;
 pub mod loop_helpers;
@@ -31,6 +32,7 @@ pub use analytics_loop::{
     AnalyticsError, AnalyticsLoop, AnalyticsStorage, AnalyticsSummary, EngagementFetcher,
     ProfileFetcher, ProfileMetrics, TweetMetrics,
 };
+pub use approval_poster::run_approval_poster;
 pub use content_loop::{ContentLoop, ContentResult};
 pub use discovery_loop::{DiscoveryLoop, DiscoveryResult, DiscoverySummary};
 pub use loop_helpers::{

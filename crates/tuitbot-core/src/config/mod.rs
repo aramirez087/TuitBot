@@ -19,9 +19,38 @@ fn default_approval_mode() -> bool {
     true
 }
 
+/// Operating mode controlling how autonomous Tuitbot is.
+///
+/// - **Autopilot**: Full autonomous operation — discovers, generates, and posts content.
+/// - **Composer**: User-controlled posting with on-demand AI intelligence.
+///   In composer mode, `approval_mode` is implicitly `true` and autonomous
+///   posting loops (content, threads, discovery replies) are disabled.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OperatingMode {
+    /// Full autonomous operation.
+    #[default]
+    Autopilot,
+    /// User-controlled posting with on-demand AI assist.
+    Composer,
+}
+
+impl std::fmt::Display for OperatingMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OperatingMode::Autopilot => write!(f, "autopilot"),
+            OperatingMode::Composer => write!(f, "composer"),
+        }
+    }
+}
+
 /// Top-level configuration for the Tuitbot agent.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Config {
+    /// Operating mode: "autopilot" (default) or "composer".
+    #[serde(default)]
+    pub mode: OperatingMode,
+
     /// X API credentials.
     #[serde(default)]
     pub x_api: XApiConfig,
@@ -498,6 +527,19 @@ impl Config {
         Ok(config)
     }
 
+    /// Returns `true` if approval mode is effectively enabled.
+    ///
+    /// In composer mode, approval mode is always implicitly enabled so
+    /// the user controls all posting.
+    pub fn effective_approval_mode(&self) -> bool {
+        self.approval_mode || self.mode == OperatingMode::Composer
+    }
+
+    /// Returns `true` if the agent is in composer mode.
+    pub fn is_composer_mode(&self) -> bool {
+        self.mode == OperatingMode::Composer
+    }
+
     /// Validate the configuration, returning all errors found (not just the first).
     pub fn validate(&self) -> Result<(), Vec<ConfigError>> {
         let mut errors = Vec::new();
@@ -755,6 +797,22 @@ impl Config {
     /// Environment variables use the `TUITBOT_` prefix with double underscores
     /// separating nested keys (e.g., `TUITBOT_LLM__API_KEY`).
     fn apply_env_overrides(&mut self) -> Result<(), ConfigError> {
+        // Operating mode
+        if let Ok(val) = env::var("TUITBOT_MODE") {
+            match val.to_lowercase().as_str() {
+                "autopilot" => self.mode = OperatingMode::Autopilot,
+                "composer" => self.mode = OperatingMode::Composer,
+                other => {
+                    return Err(ConfigError::InvalidValue {
+                        field: "mode".to_string(),
+                        message: format!(
+                            "invalid mode '{other}', expected 'autopilot' or 'composer'"
+                        ),
+                    });
+                }
+            }
+        }
+
         // X API
         if let Ok(val) = env::var("TUITBOT_X_API__CLIENT_ID") {
             self.x_api.client_id = val;

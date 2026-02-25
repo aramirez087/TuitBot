@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api, type ScheduleConfig } from '$lib/api';
+	import { tweetWeightedLen } from '$lib/utils/tweetLength';
 	import { X, Plus, Trash2, Send, Image, Film } from 'lucide-svelte';
 	import TimePicker from './TimePicker.svelte';
 
@@ -79,13 +80,13 @@
 	});
 
 	const TWEET_MAX = 280;
-	const tweetChars = $derived(tweetText.length);
+	const tweetChars = $derived(tweetWeightedLen(tweetText));
 	const tweetOverLimit = $derived(tweetChars > TWEET_MAX);
 
 	const canSubmitTweet = $derived(tweetText.trim().length > 0 && !tweetOverLimit);
 	const canSubmitThread = $derived(
 		threadParts.filter((p) => p.trim().length > 0).length >= 2 &&
-			threadParts.every((p) => p.length <= TWEET_MAX)
+			threadParts.every((p) => tweetWeightedLen(p) <= TWEET_MAX)
 	);
 	const canSubmit = $derived(mode === 'tweet' ? canSubmitTweet : canSubmitThread);
 
@@ -218,6 +219,35 @@
 			onclose();
 		}
 	}
+
+	// AI Assist
+	let assisting = $state(false);
+
+	async function handleAiAssist() {
+		assisting = true;
+		submitError = null;
+		try {
+			if (mode === 'tweet') {
+				if (tweetText.trim()) {
+					// Improve existing draft
+					const result = await api.assist.improve(tweetText);
+					tweetText = result.content;
+				} else {
+					// Generate new tweet
+					const result = await api.assist.tweet('general');
+					tweetText = result.content;
+				}
+			} else {
+				// Generate thread
+				const result = await api.assist.thread('general');
+				threadParts = result.tweets;
+			}
+		} catch (e) {
+			submitError = e instanceof Error ? e.message : 'AI assist failed';
+		} finally {
+			assisting = false;
+		}
+	}
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -273,14 +303,14 @@
 								</div>
 								<textarea
 									class="compose-input thread-input"
-									class:over-limit={part.length > TWEET_MAX}
+									class:over-limit={tweetWeightedLen(part) > TWEET_MAX}
 									placeholder={i === 0 ? 'Start your thread...' : 'Continue...'}
 									value={part}
 									oninput={(e) => updateThreadPart(i, e.currentTarget.value)}
 									rows={3}
 								></textarea>
-								<div class="char-counter" class:over-limit={part.length > TWEET_MAX}>
-									{part.length}/{TWEET_MAX}
+								<div class="char-counter" class:over-limit={tweetWeightedLen(part) > TWEET_MAX}>
+									{tweetWeightedLen(part)}/{TWEET_MAX}
 								</div>
 							</div>
 						{/each}
@@ -349,6 +379,10 @@
 			</div>
 
 			<div class="modal-footer">
+				<button class="assist-btn" onclick={handleAiAssist} disabled={assisting}>
+					{assisting ? 'Generating...' : tweetText.trim() ? 'AI Improve' : 'AI Assist'}
+				</button>
+				<div class="footer-spacer"></div>
 				<button class="cancel-btn" onclick={onclose}>Cancel</button>
 				<button class="submit-btn" onclick={handleSubmit} disabled={!canSubmit || submitting}>
 					<Send size={14} />
@@ -684,6 +718,30 @@
 		gap: 8px;
 		padding: 16px 20px;
 		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.assist-btn {
+		padding: 8px 16px;
+		border: 1px solid var(--color-accent);
+		border-radius: 6px;
+		background: transparent;
+		color: var(--color-accent);
+		font-size: 13px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.assist-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+	}
+
+	.assist-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.footer-spacer {
+		flex: 1;
 	}
 
 	.cancel-btn {

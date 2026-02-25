@@ -813,11 +813,31 @@
 						</div>
 
 						<div class="field full-width">
+							<label class="field-label" for="mode">Operating Mode</label>
+							<select
+								id="mode"
+								class="text-input"
+								value={$draft.mode ?? 'autopilot'}
+								onchange={(e) => updateDraft('mode', e.currentTarget.value)}
+							>
+								<option value="autopilot">Autopilot — fully autonomous posting</option>
+								<option value="composer">Composer — you control what gets posted</option>
+							</select>
+							<span class="field-hint">
+								{#if ($draft.mode ?? 'autopilot') === 'composer'}
+									Composer mode disables all autonomous loops. Use AI Assist to generate content, then approve manually.
+								{:else}
+									Autopilot runs discovery, content generation, and posting automatically.
+								{/if}
+							</span>
+						</div>
+
+						<div class="field full-width">
 							<div class="toggle-row">
 								<div class="toggle-info">
 									<span class="field-label">Approval Mode</span>
 									<span class="field-hint">
-										Queue all posts for manual review before publishing
+										Queue all posts for manual review before publishing{#if ($draft.mode ?? 'autopilot') === 'composer'} (always on in Composer mode){/if}
 									</span>
 								</div>
 								<button

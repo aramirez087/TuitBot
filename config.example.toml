@@ -18,6 +18,17 @@
 # Uncommented fields with placeholder values must be filled in.
 # =============================================================================
 
+# --- Operating Mode ---
+# Controls how autonomous Tuitbot is.
+#   "autopilot" (default) — Full autonomous operation: discovers, generates, and posts content.
+#   "composer"             — User-controlled posting with on-demand AI intelligence.
+#                            In composer mode, approval_mode is implicitly true and
+#                            autonomous posting loops are disabled. Discovery runs
+#                            in read-only mode to surface opportunities.
+# mode = "autopilot"
+#
+# Environment variable override: TUITBOT_MODE=autopilot|composer
+
 # --- Approval Mode ---
 # Enabled by default. Posts are queued for human review before posting.
 # Use `tuitbot approve` or the dashboard's Approval Queue to review items.

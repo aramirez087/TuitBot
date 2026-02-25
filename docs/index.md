@@ -12,6 +12,7 @@ This documentation is the source of truth for setup, operations, release, and pu
 
 - [Getting Started](getting-started.md): install, initialize, authenticate, and run.
 - [Configuration](configuration.md): configuration model and production guidance.
+- [Composer Mode](composer-mode.md): AI-assisted writing, drafts, and discovery feed.
 - [CLI Reference](cli-reference.md): command-by-command usage.
 - [MCP Reference](mcp-reference.md): AI-agent integration and tools.
 - [Architecture](architecture.md): crate boundaries and runtime design.

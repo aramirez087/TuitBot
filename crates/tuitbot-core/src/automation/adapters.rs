@@ -879,6 +879,27 @@ impl ContentStorage for ContentStorageAdapter {
             .await
             .map_err(|e| ContentLoopError::StorageError(e.to_string()))
     }
+
+    async fn next_scheduled_item(&self) -> Result<Option<(i64, String, String)>, ContentLoopError> {
+        let items = storage::scheduled_content::get_due_items(&self.pool)
+            .await
+            .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        Ok(items
+            .into_iter()
+            .next()
+            .map(|item| (item.id, item.content_type, item.content)))
+    }
+
+    async fn mark_scheduled_posted(
+        &self,
+        id: i64,
+        tweet_id: Option<&str>,
+    ) -> Result<(), ContentLoopError> {
+        storage::scheduled_content::update_status(&self.pool, id, "posted", tweet_id)
+            .await
+            .map_err(|e| ContentLoopError::StorageError(e.to_string()))
+    }
 }
 
 /// Adapts `DbPool` to the `TargetStorage` port trait.

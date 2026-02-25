@@ -16,7 +16,7 @@ use tuitbot_core::automation::{
     run_posting_queue_with_approval, AnalyticsLoop, ContentLoop, DiscoveryLoop, MentionsLoop,
     PostExecutor, TargetLoop, ThreadLoop,
 };
-use tuitbot_core::config::Config;
+use tuitbot_core::config::{Config, OperatingMode};
 
 use super::{OutputFormat, TickArgs};
 use crate::deps::RuntimeDeps;
@@ -203,24 +203,55 @@ pub async fn execute(
 
     // 5. Run enabled loops sequentially.
     let mut errors: Vec<LoopErrorJson> = Vec::new();
+    let is_composer = config.mode == OperatingMode::Composer;
 
-    // --- Analytics ---
+    // --- Analytics (runs in both modes) ---
     let analytics_outcome = run_analytics(&deps, &filter, &mut errors).await;
 
-    // --- Discovery ---
-    let discovery_outcome = run_discovery(&deps, &filter, config, &mut errors).await;
+    // --- Discovery (dry_run in composer mode) ---
+    let discovery_outcome = if is_composer {
+        LoopOutcome::Skipped {
+            reason: "disabled in composer mode".to_string(),
+        }
+    } else {
+        run_discovery(&deps, &filter, config, &mut errors).await
+    };
 
-    // --- Mentions ---
-    let mentions_outcome = run_mentions(&deps, &filter, &mut errors).await;
+    // --- Mentions (autopilot only) ---
+    let mentions_outcome = if is_composer {
+        LoopOutcome::Skipped {
+            reason: "disabled in composer mode".to_string(),
+        }
+    } else {
+        run_mentions(&deps, &filter, &mut errors).await
+    };
 
-    // --- Target ---
-    let target_outcome = run_target(&deps, &filter, &mut errors).await;
+    // --- Target (autopilot only) ---
+    let target_outcome = if is_composer {
+        LoopOutcome::Skipped {
+            reason: "disabled in composer mode".to_string(),
+        }
+    } else {
+        run_target(&deps, &filter, &mut errors).await
+    };
 
-    // --- Content ---
-    let content_outcome = run_content(&deps, &filter, config, &mut errors).await;
+    // --- Content (autopilot only) ---
+    let content_outcome = if is_composer {
+        LoopOutcome::Skipped {
+            reason: "disabled in composer mode".to_string(),
+        }
+    } else {
+        run_content(&deps, &filter, config, &mut errors).await
+    };
 
-    // --- Thread ---
-    let thread_outcome = run_thread(&deps, &filter, config, &mut errors).await;
+    // --- Thread (autopilot only) ---
+    let thread_outcome = if is_composer {
+        LoopOutcome::Skipped {
+            reason: "disabled in composer mode".to_string(),
+        }
+    } else {
+        run_thread(&deps, &filter, config, &mut errors).await
+    };
 
     // 6. Cancel posting queue and await drain (30s timeout).
     cancel.cancel();

@@ -104,6 +104,24 @@ struct TopicRequest {
     topic: Option<String>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ComposeTweetRequest {
+    /// The text content of the tweet or thread (JSON array for thread).
+    content: String,
+    /// Content type: "tweet" or "thread" (default: "tweet").
+    content_type: Option<String>,
+    /// Optional ISO-8601 datetime for scheduling. If omitted, creates a draft.
+    scheduled_for: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct DiscoveryFeedRequest {
+    /// Minimum relevance score (default: 50.0)
+    min_score: Option<f64>,
+    /// Maximum number of tweets to return (default: 10)
+    limit: Option<u32>,
+}
+
 #[tool_router]
 impl TuitbotMcpServer {
     // --- Analytics ---
@@ -383,6 +401,78 @@ impl TuitbotMcpServer {
     async fn health_check(&self) -> Result<CallToolResult, rmcp::ErrorData> {
         let provider = self.state.llm_provider.as_deref();
         let result = tools::health::health_check(&self.state.pool, provider).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    // --- Composer Mode ---
+
+    /// Get the current operating mode (autopilot or composer) and effective approval mode.
+    #[tool]
+    async fn get_mode(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        let mode = self.state.config.mode.to_string();
+        let approval = self.state.config.effective_approval_mode();
+        let result = serde_json::json!({
+            "mode": mode,
+            "approval_mode": approval,
+        });
+        Ok(CallToolResult::success(vec![Content::text(
+            result.to_string(),
+        )]))
+    }
+
+    /// Create a new draft or scheduled tweet/thread. In composer mode, this is the primary way to queue content.
+    #[tool]
+    async fn compose_tweet(
+        &self,
+        Parameters(req): Parameters<ComposeTweetRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let content_type = req.content_type.as_deref().unwrap_or("tweet");
+        let result = if let Some(scheduled_for) = &req.scheduled_for {
+            match tuitbot_core::storage::scheduled_content::insert(
+                &self.state.pool,
+                content_type,
+                &req.content,
+                Some(scheduled_for),
+            )
+            .await
+            {
+                Ok(id) => format!("Scheduled item created with id={id}"),
+                Err(e) => format!("Error: {e}"),
+            }
+        } else {
+            match tuitbot_core::storage::scheduled_content::insert_draft(
+                &self.state.pool,
+                content_type,
+                &req.content,
+                "mcp",
+            )
+            .await
+            {
+                Ok(id) => format!("Draft created with id={id}"),
+                Err(e) => format!("Error: {e}"),
+            }
+        };
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Browse high-scoring discovered tweets for manual engagement.
+    #[tool]
+    async fn get_discovery_feed(
+        &self,
+        Parameters(req): Parameters<DiscoveryFeedRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let threshold = req.min_score.unwrap_or(50.0);
+        let limit = req.limit.unwrap_or(10);
+        let result =
+            tools::discovery::list_unreplied_tweets_with_limit(&self.state.pool, threshold, limit)
+                .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get analytics-driven topic recommendations based on past performance.
+    #[tool]
+    async fn suggest_topics(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::analytics::get_top_topics(&self.state.pool, 10).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 }

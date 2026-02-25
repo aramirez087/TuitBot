@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Introduce Composer Mode (`mode = "composer"`) — user-controlled posting with on-demand AI intelligence. Disables autonomous loops; discovery runs read-only; approval mode is always active.
+- Add AI Assist endpoints for on-demand content generation: tweet, reply, thread, improve, topics, optimal posting times.
+- Add Draft system with full lifecycle: create, edit, schedule, publish, delete.
+- Add Discovery Feed for browsing scored tweets with AI-powered reply composition.
+- Add 4 new MCP tools for Composer mode: `get_mode`, `compose_tweet`, `get_discovery_feed`, `suggest_topics`.
+- Add Drafts and Discovery pages to the dashboard.
+- Add AI Assist button in ComposeModal for on-demand content generation and draft improvement.
+- Add operating mode selector in the dashboard Settings page.
+- Add approval poster loop that automatically posts approved queue items.
+- Wire scheduled content to the posting runtime.
+- Fix URL-aware tweet length calculation on client side.
+
 ## [0.1.4](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.3...tuitbot-cli-v0.1.4) - 2026-02-24
 
 ### Added
