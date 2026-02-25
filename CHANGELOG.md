@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.4...tuitbot-cli-v0.1.5) - 2026-02-25
+
+### Added
+
+- Implement MCP mutation policy enforcement and approval queue for composite tools.
+- Introduce new dashboard settings sections and refactor the CLI `init` command for improved modularity.
+- Add Composer operating mode, enabling user-driven content creation with AI assist, drafts, and discovery features.
+- Implement media upload and display functionality for approval items.
+- Implement X API usage tracking, including storage, API endpoints, and dashboard display for costs and call breakdowns.
+- implement MCP telemetry and policy management with new API routes, storage functions, and dashboard UI, and update benchmark artifacts.
+- Implement MCP tool telemetry, including storage, query tools, and integration into existing tools.
+- Implement context intelligence tools for author profiling, engagement recommendations, and topic performance snapshots.
+- Implement Multi-Constraint Policy (MCP) evaluation and enforcement for tool mutations.
+- Add direct X API tools, client initialization, and comprehensive documentation.
+- Implement URL-aware tweet length calculation and validation using the `regex` crate.
+- Introduce unified tool response envelope, add a benchmark tool, and establish comprehensive roadmap documentation.
+
+### Other
+
+- Merge branch 'main' into fix/feat_obsidian
+- Update `reqwest` to use `rustls-tls` and improve release workflow robustness by handling cancellations and partial build failures.
+- Creating the parent directory before both writes.
+
 ### Added
 
 - Introduce Composer Mode (`mode = "composer"`) — user-controlled posting with on-demand AI intelligence. Disables autonomous loops; discovery runs read-only; approval mode is always active.
