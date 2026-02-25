@@ -184,6 +184,50 @@ via `get_capabilities` → `direct_tools`.
 }
 ```
 
+## Policy Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_policy_status` | Get current MCP mutation policy settings and rate limit usage | None |
+
+### Policy Error Codes
+
+Mutation tools may return these additional error codes when policy enforcement is enabled:
+
+| Code | Meaning | Retryable |
+|------|---------|-----------|
+| `policy_denied_blocked` | Tool is in `blocked_tools` configuration | No |
+| `policy_denied_rate_limited` | Hourly MCP mutation rate limit exceeded | No |
+| `policy_error` | Policy evaluation failed (DB error) | Yes |
+
+When a mutation is routed to the approval queue, the response is a success envelope:
+
+```json
+{
+  "success": true,
+  "data": {
+    "routed_to_approval": true,
+    "approval_queue_id": 42,
+    "reason": "tool 'post_tweet' requires approval"
+  },
+  "meta": { "tool_version": "1.0", "elapsed_ms": 5 }
+}
+```
+
+When dry-run mode is active:
+
+```json
+{
+  "success": true,
+  "data": {
+    "dry_run": true,
+    "would_execute": "post_tweet",
+    "params": "{\"text\":\"Hello!\"}"
+  },
+  "meta": { "tool_version": "1.0", "elapsed_ms": 2 }
+}
+```
+
 ## Operational notes
 
 - MCP server uses same config and DB as CLI.

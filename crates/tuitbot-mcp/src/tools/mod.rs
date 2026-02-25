@@ -10,6 +10,7 @@ pub mod config;
 pub mod content;
 pub mod discovery;
 pub mod health;
+pub mod policy_gate;
 pub mod rate_limits;
 pub mod replies;
 pub mod response;

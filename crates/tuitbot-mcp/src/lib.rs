@@ -31,6 +31,10 @@ pub async fn run_stdio_server(config: Config) -> anyhow::Result<()> {
     // Initialize database
     let pool = storage::init_db(&config.storage.db_path).await?;
 
+    // Initialize MCP mutation rate limit
+    storage::rate_limits::init_mcp_rate_limit(&pool, config.mcp_policy.max_mutations_per_hour)
+        .await?;
+
     // Try to create LLM provider (optional — content tools won't work without it)
     let llm_provider = match llm::factory::create_provider(&config.llm) {
         Ok(provider) => {

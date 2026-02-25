@@ -60,6 +60,23 @@ pub async fn init_rate_limits(
     Ok(())
 }
 
+/// Initialize the MCP mutation rate limit row.
+///
+/// Uses `INSERT OR IGNORE` so an existing counter is preserved across restarts.
+pub async fn init_mcp_rate_limit(pool: &DbPool, max_per_hour: u32) -> Result<(), StorageError> {
+    sqlx::query(
+        "INSERT OR IGNORE INTO rate_limits \
+         (action_type, request_count, period_start, max_requests, period_seconds) \
+         VALUES ('mcp_mutation', 0, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?, 3600)",
+    )
+    .bind(i64::from(max_per_hour))
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
 /// Check whether the rate limit for an action type allows another request.
 ///
 /// Within a single transaction:

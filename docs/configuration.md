@@ -61,6 +61,41 @@ tuitbot test
 
 Use these commands after every config change.
 
+## MCP Mutation Policy
+
+The `[mcp_policy]` section controls how MCP mutation tools (post, reply, like, follow, etc.) are gated before execution. This is the safety layer between AI agents and real X API actions.
+
+```toml
+[mcp_policy]
+enforce_for_mutations = true
+require_approval_for = ["post_tweet", "reply_to_tweet", "follow_user", "like_tweet"]
+blocked_tools = []
+dry_run_mutations = false
+max_mutations_per_hour = 20
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `enforce_for_mutations` | `true` | Master switch. Set to `false` to disable all policy checks. |
+| `require_approval_for` | `["post_tweet", "reply_to_tweet", "follow_user", "like_tweet"]` | Tools routed to the approval queue. |
+| `blocked_tools` | `[]` | Tools completely blocked. Cannot overlap with `require_approval_for`. |
+| `dry_run_mutations` | `false` | Return dry-run responses without executing. |
+| `max_mutations_per_hour` | `20` | Aggregate hourly rate limit for all MCP mutations. |
+
+**Evaluation order** (safest wins): disabled? > blocked? > dry_run? > rate limited? > requires approval? > allow.
+
+**Composer mode**: All mutations require approval regardless of `require_approval_for`.
+
+**Environment variable overrides**:
+
+```bash
+export TUITBOT_MCP_POLICY__ENFORCE_FOR_MUTATIONS=true
+export TUITBOT_MCP_POLICY__REQUIRE_APPROVAL_FOR="post_tweet,reply_to_tweet"
+export TUITBOT_MCP_POLICY__BLOCKED_TOOLS="follow_user"
+export TUITBOT_MCP_POLICY__DRY_RUN_MUTATIONS=false
+export TUITBOT_MCP_POLICY__MAX_MUTATIONS_PER_HOUR=20
+```
+
 ## Production Guidance
 
 - Keep secrets out of shell history.

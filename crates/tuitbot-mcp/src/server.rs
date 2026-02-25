@@ -502,12 +502,32 @@ impl TuitbotMcpServer {
         )]))
     }
 
+    /// Get the current MCP mutation policy status: enforcement settings, blocked tools, rate limit usage, and operating mode.
+    #[tool]
+    async fn get_policy_status(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::policy_gate::get_policy_status(&self.state).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
     /// Create a new draft or scheduled tweet/thread. In composer mode, this is the primary way to queue content.
     #[tool]
     async fn compose_tweet(
         &self,
         Parameters(req): Parameters<ComposeTweetRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let start = std::time::Instant::now();
+        let params = serde_json::json!({
+            "content": req.content,
+            "content_type": req.content_type,
+            "scheduled_for": req.scheduled_for,
+        })
+        .to_string();
+        match tools::policy_gate::check_policy(&self.state, "compose_tweet", &params, start).await {
+            tools::policy_gate::GateResult::EarlyReturn(r) => {
+                return Ok(CallToolResult::success(vec![Content::text(r)]));
+            }
+            tools::policy_gate::GateResult::Proceed => {}
+        }
         let content_type = req.content_type.as_deref().unwrap_or("tweet");
         let result = if let Some(scheduled_for) = &req.scheduled_for {
             match tuitbot_core::storage::scheduled_content::insert(
@@ -518,7 +538,13 @@ impl TuitbotMcpServer {
             )
             .await
             {
-                Ok(id) => format!("Scheduled item created with id={id}"),
+                Ok(id) => {
+                    let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                        &self.state.pool,
+                    )
+                    .await;
+                    format!("Scheduled item created with id={id}")
+                }
                 Err(e) => format!("Error: {e}"),
             }
         } else {
@@ -530,7 +556,13 @@ impl TuitbotMcpServer {
             )
             .await
             {
-                Ok(id) => format!("Draft created with id={id}"),
+                Ok(id) => {
+                    let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                        &self.state.pool,
+                    )
+                    .await;
+                    format!("Draft created with id={id}")
+                }
                 Err(e) => format!("Error: {e}"),
             }
         };

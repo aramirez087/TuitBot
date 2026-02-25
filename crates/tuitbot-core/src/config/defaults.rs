@@ -3,7 +3,9 @@
 //! These defaults match the values specified in the CLI interface contract.
 //! Users only need to supply credentials and business profile.
 
-use super::{AuthConfig, IntervalsConfig, LimitsConfig, ScoringConfig, StorageConfig};
+use super::{
+    AuthConfig, IntervalsConfig, LimitsConfig, McpPolicyConfig, ScoringConfig, StorageConfig,
+};
 
 impl Default for AuthConfig {
     fn default() -> Self {
@@ -65,6 +67,23 @@ impl Default for StorageConfig {
         Self {
             db_path: "~/.tuitbot/tuitbot.db".to_string(),
             retention_days: 90,
+        }
+    }
+}
+
+impl Default for McpPolicyConfig {
+    fn default() -> Self {
+        Self {
+            enforce_for_mutations: true,
+            require_approval_for: vec![
+                "post_tweet".to_string(),
+                "reply_to_tweet".to_string(),
+                "follow_user".to_string(),
+                "like_tweet".to_string(),
+            ],
+            blocked_tools: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
         }
     }
 }

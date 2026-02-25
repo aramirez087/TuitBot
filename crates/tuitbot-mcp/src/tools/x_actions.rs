@@ -190,6 +190,11 @@ pub async fn get_user_tweets(state: &SharedState, user_id: &str, max_results: u3
 /// Post a new tweet.
 pub async fn post_tweet(state: &SharedState, text: &str) -> String {
     let start = Instant::now();
+    let params = serde_json::json!({"text": text}).to_string();
+    match super::policy_gate::check_policy(state, "post_tweet", &params, start).await {
+        super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::policy_gate::GateResult::Proceed => {}
+    }
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -197,6 +202,8 @@ pub async fn post_tweet(state: &SharedState, text: &str) -> String {
 
     match client.post_tweet(text).await {
         Ok(tweet) => {
+            let _ =
+                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
             let elapsed = start.elapsed().as_millis() as u64;
             ToolResponse::success(&tweet)
                 .with_meta(ToolMeta::new(elapsed))
@@ -209,6 +216,11 @@ pub async fn post_tweet(state: &SharedState, text: &str) -> String {
 /// Reply to an existing tweet.
 pub async fn reply_to_tweet(state: &SharedState, text: &str, in_reply_to_id: &str) -> String {
     let start = Instant::now();
+    let params = serde_json::json!({"text": text, "in_reply_to_id": in_reply_to_id}).to_string();
+    match super::policy_gate::check_policy(state, "reply_to_tweet", &params, start).await {
+        super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::policy_gate::GateResult::Proceed => {}
+    }
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -216,6 +228,8 @@ pub async fn reply_to_tweet(state: &SharedState, text: &str, in_reply_to_id: &st
 
     match client.reply_to_tweet(text, in_reply_to_id).await {
         Ok(tweet) => {
+            let _ =
+                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
             let elapsed = start.elapsed().as_millis() as u64;
             ToolResponse::success(&tweet)
                 .with_meta(ToolMeta::new(elapsed))
@@ -228,6 +242,11 @@ pub async fn reply_to_tweet(state: &SharedState, text: &str, in_reply_to_id: &st
 /// Post a quote tweet.
 pub async fn quote_tweet(state: &SharedState, text: &str, quoted_tweet_id: &str) -> String {
     let start = Instant::now();
+    let params = serde_json::json!({"text": text, "quoted_tweet_id": quoted_tweet_id}).to_string();
+    match super::policy_gate::check_policy(state, "quote_tweet", &params, start).await {
+        super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::policy_gate::GateResult::Proceed => {}
+    }
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -235,6 +254,8 @@ pub async fn quote_tweet(state: &SharedState, text: &str, quoted_tweet_id: &str)
 
     match client.quote_tweet(text, quoted_tweet_id).await {
         Ok(tweet) => {
+            let _ =
+                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
             let elapsed = start.elapsed().as_millis() as u64;
             ToolResponse::success(&tweet)
                 .with_meta(ToolMeta::new(elapsed))
@@ -247,6 +268,11 @@ pub async fn quote_tweet(state: &SharedState, text: &str, quoted_tweet_id: &str)
 /// Like a tweet.
 pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
     let start = Instant::now();
+    let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
+    match super::policy_gate::check_policy(state, "like_tweet", &params, start).await {
+        super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::policy_gate::GateResult::Proceed => {}
+    }
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -267,6 +293,8 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
 
     match client.like_tweet(user_id, tweet_id).await {
         Ok(liked) => {
+            let _ =
+                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
             let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct LikeResult {
@@ -287,6 +315,11 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
 /// Follow a user.
 pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
     let start = Instant::now();
+    let params = serde_json::json!({"target_user_id": target_user_id}).to_string();
+    match super::policy_gate::check_policy(state, "follow_user", &params, start).await {
+        super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::policy_gate::GateResult::Proceed => {}
+    }
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -307,6 +340,8 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
 
     match client.follow_user(user_id, target_user_id).await {
         Ok(following) => {
+            let _ =
+                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
             let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct FollowResult {
@@ -327,6 +362,11 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
 /// Unfollow a user.
 pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String {
     let start = Instant::now();
+    let params = serde_json::json!({"target_user_id": target_user_id}).to_string();
+    match super::policy_gate::check_policy(state, "unfollow_user", &params, start).await {
+        super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::policy_gate::GateResult::Proceed => {}
+    }
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -347,6 +387,8 @@ pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String 
 
     match client.unfollow_user(user_id, target_user_id).await {
         Ok(following) => {
+            let _ =
+                tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(&state.pool).await;
             let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct UnfollowResult {
@@ -583,14 +625,39 @@ mod tests {
         }
     }
 
+    /// Create test state with policy enforcement disabled (for existing X API tests).
     async fn make_state(
         x_client: Option<Box<dyn XApiClient>>,
         user_id: Option<String>,
     ) -> SharedState {
+        let mut config = Config::default();
+        config.mcp_policy.enforce_for_mutations = false;
         let pool = storage::init_test_db().await.expect("init db");
         Arc::new(AppState {
             pool,
-            config: Config::default(),
+            config,
+            llm_provider: None,
+            x_client,
+            authenticated_user_id: user_id,
+        })
+    }
+
+    /// Create test state with specific config for policy tests.
+    async fn make_state_with_config(
+        x_client: Option<Box<dyn XApiClient>>,
+        user_id: Option<String>,
+        config: Config,
+    ) -> SharedState {
+        let pool = storage::init_test_db().await.expect("init db");
+        tuitbot_core::storage::rate_limits::init_mcp_rate_limit(
+            &pool,
+            config.mcp_policy.max_mutations_per_hour,
+        )
+        .await
+        .expect("init mcp rate limit");
+        Arc::new(AppState {
+            pool,
+            config,
             llm_provider: None,
             x_client,
             authenticated_user_id: user_id,
@@ -731,5 +798,143 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
         assert_eq!(parsed["success"], false);
         assert_eq!(parsed["error"]["code"], "x_not_configured");
+    }
+
+    // ── Policy gate tests ──
+
+    use tuitbot_core::config::McpPolicyConfig;
+
+    fn blocked_config() -> Config {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            blocked_tools: vec!["post_tweet".to_string()],
+            require_approval_for: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+        };
+        config
+    }
+
+    fn approval_config() -> Config {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            require_approval_for: vec!["post_tweet".to_string()],
+            blocked_tools: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+        };
+        config
+    }
+
+    fn dry_run_config() -> Config {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            require_approval_for: Vec::new(),
+            blocked_tools: Vec::new(),
+            dry_run_mutations: true,
+            max_mutations_per_hour: 20,
+        };
+        config
+    }
+
+    fn allowed_config() -> Config {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            require_approval_for: Vec::new(),
+            blocked_tools: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+        };
+        config
+    }
+
+    fn composer_config() -> Config {
+        let mut config = Config::default();
+        config.mode = tuitbot_core::config::OperatingMode::Composer;
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            require_approval_for: Vec::new(),
+            blocked_tools: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+        };
+        config
+    }
+
+    #[tokio::test]
+    async fn post_tweet_blocked_by_policy() {
+        let state = make_state_with_config(
+            Some(Box::new(MockXApiClient)),
+            Some("u1".into()),
+            blocked_config(),
+        )
+        .await;
+        let result = post_tweet(&state, "Hello!").await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], false);
+        assert_eq!(parsed["error"]["code"], "policy_denied_blocked");
+    }
+
+    #[tokio::test]
+    async fn post_tweet_routed_to_approval() {
+        let state = make_state_with_config(
+            Some(Box::new(MockXApiClient)),
+            Some("u1".into()),
+            approval_config(),
+        )
+        .await;
+        let result = post_tweet(&state, "Hello!").await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["routed_to_approval"], true);
+        assert!(parsed["data"]["approval_queue_id"].is_number());
+    }
+
+    #[tokio::test]
+    async fn post_tweet_allowed_when_not_gated() {
+        let state = make_state_with_config(
+            Some(Box::new(MockXApiClient)),
+            Some("u1".into()),
+            allowed_config(),
+        )
+        .await;
+        let result = post_tweet(&state, "Hello!").await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["id"], "new_1");
+    }
+
+    #[tokio::test]
+    async fn dry_run_returns_would_execute() {
+        let state = make_state_with_config(
+            Some(Box::new(MockXApiClient)),
+            Some("u1".into()),
+            dry_run_config(),
+        )
+        .await;
+        let result = post_tweet(&state, "Hello!").await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["dry_run"], true);
+        assert_eq!(parsed["data"]["would_execute"], "post_tweet");
+    }
+
+    #[tokio::test]
+    async fn composer_mode_forces_approval_for_all() {
+        let state = make_state_with_config(
+            Some(Box::new(MockXApiClient)),
+            Some("u1".into()),
+            composer_config(),
+        )
+        .await;
+        // unfollow_user is NOT in require_approval_for, but Composer mode forces approval
+        let result = unfollow_user(&state, "target1").await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["routed_to_approval"], true);
     }
 }

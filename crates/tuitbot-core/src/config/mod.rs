@@ -98,6 +98,10 @@ pub struct Config {
     /// Active hours schedule for posting.
     #[serde(default)]
     pub schedule: ScheduleConfig,
+
+    /// MCP mutation policy enforcement.
+    #[serde(default)]
+    pub mcp_policy: McpPolicyConfig,
 }
 
 /// X API credentials.
@@ -381,6 +385,50 @@ impl Default for ScheduleConfig {
             thread_preferred_time: default_thread_preferred_time(),
         }
     }
+}
+
+/// MCP mutation policy configuration.
+///
+/// Controls whether MCP mutation tools (post, reply, like, follow, etc.)
+/// are gated by policy checks before execution.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct McpPolicyConfig {
+    /// Master switch: when false, all mutations are allowed without checks.
+    #[serde(default = "default_true")]
+    pub enforce_for_mutations: bool,
+
+    /// Tool names that require routing through the approval queue.
+    #[serde(default = "default_require_approval_for")]
+    pub require_approval_for: Vec<String>,
+
+    /// Tool names that are completely blocked from execution.
+    #[serde(default)]
+    pub blocked_tools: Vec<String>,
+
+    /// When true, mutations return a dry-run response without executing.
+    #[serde(default)]
+    pub dry_run_mutations: bool,
+
+    /// Maximum MCP mutations allowed per hour (aggregate across all tools).
+    #[serde(default = "default_max_mutations_per_hour")]
+    pub max_mutations_per_hour: u32,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_require_approval_for() -> Vec<String> {
+    vec![
+        "post_tweet".to_string(),
+        "reply_to_tweet".to_string(),
+        "follow_user".to_string(),
+        "like_tweet".to_string(),
+    ]
+}
+
+fn default_max_mutations_per_hour() -> u32 {
+    20
 }
 
 fn default_timezone() -> String {
@@ -713,6 +761,19 @@ impl Config {
             }
         }
 
+        // Validate MCP policy: tools can't be in both blocked_tools and require_approval_for
+        for tool in &self.mcp_policy.blocked_tools {
+            if self.mcp_policy.require_approval_for.contains(tool) {
+                errors.push(ConfigError::InvalidValue {
+                    field: "mcp_policy.blocked_tools".to_string(),
+                    message: format!(
+                        "tool '{tool}' cannot be in both blocked_tools and require_approval_for"
+                    ),
+                });
+                break;
+            }
+        }
+
         // Count effective slots per day vs max_tweets_per_day
         let effective_slots = if self.schedule.preferred_times.is_empty() {
             0
@@ -993,6 +1054,26 @@ impl Config {
         }
         if let Ok(val) = env::var("TUITBOT_SCHEDULE__THREAD_PREFERRED_TIME") {
             self.schedule.thread_preferred_time = val;
+        }
+
+        // MCP Policy
+        if let Ok(val) = env::var("TUITBOT_MCP_POLICY__ENFORCE_FOR_MUTATIONS") {
+            self.mcp_policy.enforce_for_mutations =
+                parse_env_bool("TUITBOT_MCP_POLICY__ENFORCE_FOR_MUTATIONS", &val)?;
+        }
+        if let Ok(val) = env::var("TUITBOT_MCP_POLICY__REQUIRE_APPROVAL_FOR") {
+            self.mcp_policy.require_approval_for = split_csv(&val);
+        }
+        if let Ok(val) = env::var("TUITBOT_MCP_POLICY__BLOCKED_TOOLS") {
+            self.mcp_policy.blocked_tools = split_csv(&val);
+        }
+        if let Ok(val) = env::var("TUITBOT_MCP_POLICY__DRY_RUN_MUTATIONS") {
+            self.mcp_policy.dry_run_mutations =
+                parse_env_bool("TUITBOT_MCP_POLICY__DRY_RUN_MUTATIONS", &val)?;
+        }
+        if let Ok(val) = env::var("TUITBOT_MCP_POLICY__MAX_MUTATIONS_PER_HOUR") {
+            self.mcp_policy.max_mutations_per_hour =
+                parse_env_u32("TUITBOT_MCP_POLICY__MAX_MUTATIONS_PER_HOUR", &val)?;
         }
 
         // Approval mode
