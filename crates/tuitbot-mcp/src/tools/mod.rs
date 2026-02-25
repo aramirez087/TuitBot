@@ -9,6 +9,7 @@ pub mod capabilities;
 pub mod composite;
 pub mod config;
 pub mod content;
+pub mod context;
 pub mod discovery;
 pub mod health;
 pub mod policy_gate;

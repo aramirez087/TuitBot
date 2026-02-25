@@ -184,6 +184,30 @@ pub struct UnfollowUserMcpRequest {
     pub target_user_id: String,
 }
 
+// --- Context Intelligence ---
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetAuthorContextRequest {
+    /// Author username (with or without @) or author ID.
+    pub identifier: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RecommendEngagementRequest {
+    /// Username of the tweet author.
+    pub author_username: String,
+    /// The tweet text to evaluate for engagement.
+    pub tweet_text: String,
+    /// Optional campaign objective (e.g., "grow developer audience").
+    pub campaign_objective: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TopicPerformanceSnapshotRequest {
+    /// Number of days to look back (default: 30).
+    pub lookback_days: Option<u32>,
+}
+
 // --- Composite Tools ---
 
 #[derive(Debug, Deserialize, JsonSchema)]

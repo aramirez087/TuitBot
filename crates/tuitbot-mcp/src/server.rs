@@ -542,6 +542,45 @@ impl TuitbotMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
+    // --- Context Intelligence ---
+
+    /// Get a rich context profile for an author: prior interactions, response rates, topic affinity, and risk signals.
+    #[tool]
+    async fn get_author_context(
+        &self,
+        Parameters(req): Parameters<GetAuthorContextRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::context::get_author_context(&self.state, &req.identifier).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Recommend an engagement action (reply/skip/observe) for a tweet, with confidence score, contributing factors, and policy considerations.
+    #[tool]
+    async fn recommend_engagement_action(
+        &self,
+        Parameters(req): Parameters<RecommendEngagementRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::context::recommend_engagement(
+            &self.state,
+            &req.author_username,
+            &req.tweet_text,
+            req.campaign_objective.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get topics ranked by performance with "double_down/reduce/maintain/experiment" recommendations over a lookback window.
+    #[tool]
+    async fn topic_performance_snapshot(
+        &self,
+        Parameters(req): Parameters<TopicPerformanceSnapshotRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let days = req.lookback_days.unwrap_or(30);
+        let result = tools::context::topic_performance_snapshot(&self.state.pool, days).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
     // --- Composite Tools ---
 
     /// Search X for tweets, score them, persist to DB, and return ranked reply opportunities. Read-only (no posts made).
