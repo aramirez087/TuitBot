@@ -1,7 +1,7 @@
 {
   "id": "tuitbot",
   "name": "Tuitbot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bridges Tuitbot MCP tools into OpenClaw for AI agent integration",
   "entry": "./src/index.ts",
   "configSchema": {
@@ -19,7 +19,28 @@
       "allowedTools": {
         "type": "array",
         "items": { "type": "string" },
-        "description": "Allowlist of MCP tool names to register. Empty or omitted = register all tools."
+        "description": "Allowlist of MCP tool names to register. Empty or omitted = register all tools that pass other filters."
+      },
+      "enableMutations": {
+        "type": "boolean",
+        "default": false,
+        "description": "Enable mutation tools (post, reply, like, follow, approve). Default: false (safe startup)."
+      },
+      "allowCategories": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["read", "mutation", "composite", "ops"] },
+        "description": "Category inclusion filter. Only these categories are registered. Omit to allow all."
+      },
+      "denyCategories": {
+        "type": "array",
+        "items": { "type": "string", "enum": ["read", "mutation", "composite", "ops"] },
+        "description": "Category exclusion filter. These categories are blocked. Omit to deny none."
+      },
+      "maxRiskLevel": {
+        "type": "string",
+        "enum": ["low", "medium", "high"],
+        "default": "high",
+        "description": "Risk ceiling. Tools above this level are blocked. Default: 'high' (no ceiling)."
       }
     },
     "additionalProperties": false

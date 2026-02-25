@@ -8,6 +8,7 @@
 
 import { McpClient } from "./mcp-client.js";
 import { bridgeTools, type OpenClawApi } from "./tool-bridge.js";
+import type { ToolCategory, RiskLevel } from "./tool-catalog.js";
 
 // ---------------------------------------------------------------------------
 // OpenClaw plugin API types (minimal surface)
@@ -17,6 +18,14 @@ interface PluginConfig {
   tuitbotBinaryPath?: string;
   configPath?: string;
   allowedTools?: string[];
+  /** Enable mutation tools. Default: false (safe startup). */
+  enableMutations?: boolean;
+  /** Category inclusion filter. Only these categories are registered. */
+  allowCategories?: ToolCategory[];
+  /** Category exclusion filter. These categories are blocked. */
+  denyCategories?: ToolCategory[];
+  /** Risk ceiling. Tools above this level are blocked. */
+  maxRiskLevel?: RiskLevel;
 }
 
 interface OpenClawPluginApi extends OpenClawApi {
@@ -54,11 +63,18 @@ export default {
 
     await client.start();
 
+    const enableMutations = config.enableMutations ?? false;
+
     const count = await bridgeTools(client, api, {
       allowedTools: config.allowedTools,
+      enableMutations,
+      allowCategories: config.allowCategories,
+      denyCategories: config.denyCategories,
+      maxRiskLevel: config.maxRiskLevel,
     });
 
-    api.log("info", `Tuitbot plugin registered ${count} tools`);
+    const mutLabel = enableMutations ? "enabled" : "disabled";
+    api.log("info", `Tuitbot plugin registered ${count} tools (mutations: ${mutLabel})`);
 
     // Register a service for graceful shutdown.
     api.registerService({
