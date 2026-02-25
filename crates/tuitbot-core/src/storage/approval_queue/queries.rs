@@ -7,11 +7,11 @@ use crate::storage::DbPool;
 /// Standard SELECT columns for approval queue queries.
 const SELECT_COLS: &str = "id, action_type, target_tweet_id, target_author, \
     generated_content, topic, archetype, score, status, created_at, \
-    COALESCE(media_paths, '[]'), reviewed_by, review_notes, reason, \
-    COALESCE(detected_risks, '[]'), COALESCE(qa_report, '{}'), \
-    COALESCE(qa_hard_flags, '[]'), COALESCE(qa_soft_flags, '[]'), \
-    COALESCE(qa_recommendations, '[]'), COALESCE(qa_score, 0), \
-    COALESCE(qa_requires_override, 0), qa_override_by, qa_override_note, qa_override_at";
+    COALESCE(media_paths, '[]') AS media_paths, reviewed_by, review_notes, reason, \
+    COALESCE(detected_risks, '[]') AS detected_risks, COALESCE(qa_report, '{}') AS qa_report, \
+    COALESCE(qa_hard_flags, '[]') AS qa_hard_flags, COALESCE(qa_soft_flags, '[]') AS qa_soft_flags, \
+    COALESCE(qa_recommendations, '[]') AS qa_recommendations, COALESCE(qa_score, 0) AS qa_score, \
+    COALESCE(qa_requires_override, 0) AS qa_requires_override, qa_override_by, qa_override_note, qa_override_at";
 
 /// Insert a new item into the approval queue.
 #[allow(clippy::too_many_arguments)]
