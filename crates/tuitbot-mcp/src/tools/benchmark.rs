@@ -216,11 +216,14 @@ async fn generate_baseline_benchmark() {
         "tools": tool_results,
     });
 
-    let json_path = concat!(
+    let json_path = std::path::PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../docs/roadmap/artifacts/task-01-baseline-benchmark.json"
-    );
-    std::fs::write(json_path, serde_json::to_string_pretty(&report).unwrap())
+    ));
+    if let Some(parent) = json_path.parent() {
+        std::fs::create_dir_all(parent).expect("create benchmark artifacts directory");
+    }
+    std::fs::write(&json_path, serde_json::to_string_pretty(&report).unwrap())
         .expect("write benchmark JSON");
 
     // Build markdown summary
@@ -245,9 +248,12 @@ async fn generate_baseline_benchmark() {
         "\nMigrated: 5 / 27 tools — Schema pass rate: 100%\n"
     ));
 
-    let md_path = concat!(
+    let md_path = std::path::PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../docs/roadmap/artifacts/task-01-summary.md"
-    );
+    ));
+    if let Some(parent) = md_path.parent() {
+        std::fs::create_dir_all(parent).expect("create benchmark artifacts directory");
+    }
     std::fs::write(md_path, md).expect("write benchmark summary");
 }
