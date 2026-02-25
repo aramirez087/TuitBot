@@ -44,14 +44,25 @@ fn tweet_to_out(t: &storage::tweets::DiscoveredTweet) -> DiscoveredTweetOut {
 }
 
 /// List unreplied tweets above a score threshold.
-pub async fn list_unreplied_tweets(pool: &DbPool, threshold: f64) -> String {
+pub async fn list_unreplied_tweets(pool: &DbPool, threshold: f64, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::tweets::get_unreplied_tweets_above_score(pool, threshold).await {
         Ok(tweets) => {
             let out: Vec<DiscoveredTweetOut> = tweets.iter().map(tweet_to_out).collect();
-            serde_json::to_string_pretty(&out)
-                .unwrap_or_else(|e| format!("Error serializing tweets: {e}"))
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(out).with_meta(meta).to_json()
         }
-        Err(e) => format!("Error fetching unreplied tweets: {e}"),
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error fetching unreplied tweets: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }
 
@@ -80,13 +91,9 @@ pub async fn list_unreplied_tweets_with_limit(
             let elapsed = start.elapsed().as_millis() as u64;
             let meta = ToolMeta::new(elapsed)
                 .with_mode(config.mode.to_string(), config.effective_approval_mode());
-            ToolResponse::error(
-                "db_error",
-                format!("Error fetching unreplied tweets: {e}"),
-                true,
-            )
-            .with_meta(meta)
-            .to_json()
+            ToolResponse::db_error(format!("Error fetching unreplied tweets: {e}"))
+                .with_meta(meta)
+                .to_json()
         }
     }
 }

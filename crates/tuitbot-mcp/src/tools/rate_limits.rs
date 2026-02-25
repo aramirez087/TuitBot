@@ -1,9 +1,14 @@
 //! Rate limits tool: get_rate_limits.
 
+use std::time::Instant;
+
 use serde::Serialize;
 
+use tuitbot_core::config::Config;
 use tuitbot_core::storage;
 use tuitbot_core::storage::DbPool;
+
+use super::response::{ToolMeta, ToolResponse};
 
 #[derive(Serialize)]
 struct RateLimitOut {
@@ -16,7 +21,9 @@ struct RateLimitOut {
 }
 
 /// Get current rate limit status for all action types.
-pub async fn get_rate_limits(pool: &DbPool) -> String {
+pub async fn get_rate_limits(pool: &DbPool, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::rate_limits::get_all_rate_limits(pool).await {
         Ok(limits) => {
             let out: Vec<RateLimitOut> = limits
@@ -33,9 +40,18 @@ pub async fn get_rate_limits(pool: &DbPool) -> String {
                     }
                 })
                 .collect();
-            serde_json::to_string_pretty(&out)
-                .unwrap_or_else(|e| format!("Error serializing rate limits: {e}"))
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(out).with_meta(meta).to_json()
         }
-        Err(e) => format!("Error fetching rate limits: {e}"),
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error fetching rate limits: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }

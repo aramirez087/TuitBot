@@ -1,9 +1,13 @@
 //! Scoring tool: score a tweet for reply-worthiness.
 
+use std::time::Instant;
+
 use serde::Serialize;
 
 use tuitbot_core::config::Config;
 use tuitbot_core::scoring::{ScoringEngine, TweetData};
+
+use super::response::{ToolMeta, ToolResponse};
 
 #[derive(Serialize)]
 struct ScoreOut {
@@ -30,6 +34,8 @@ pub struct ScoreTweetInput<'a> {
 
 /// Score a tweet using the 6-signal scoring engine.
 pub fn score_tweet(config: &Config, input: &ScoreTweetInput<'_>) -> String {
+    let start = Instant::now();
+
     let keywords: Vec<String> = config
         .business
         .product_keywords
@@ -66,5 +72,8 @@ pub fn score_tweet(config: &Config, input: &ScoreTweetInput<'_>) -> String {
         meets_threshold: score.meets_threshold,
     };
 
-    serde_json::to_string_pretty(&out).unwrap_or_else(|e| format!("Error serializing score: {e}"))
+    let elapsed = start.elapsed().as_millis() as u64;
+    ToolResponse::success(out)
+        .with_meta(ToolMeta::new(elapsed))
+        .to_json()
 }

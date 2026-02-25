@@ -11,6 +11,7 @@ use rmcp::{tool, tool_handler, tool_router, ServerHandler};
 use crate::requests::*;
 use crate::state::SharedState;
 use crate::tools;
+use crate::tools::response::{ToolMeta, ToolResponse};
 
 /// Tuitbot MCP server.
 #[derive(Clone)]
@@ -51,7 +52,8 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<GetFollowerTrendRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let limit = req.limit.unwrap_or(7);
-        let result = tools::analytics::get_follower_trend(&self.state.pool, limit).await;
+        let result =
+            tools::analytics::get_follower_trend(&self.state.pool, limit, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -64,9 +66,13 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<GetActionLogRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let hours = req.since_hours.unwrap_or(24);
-        let result =
-            tools::actions::get_action_log(&self.state.pool, hours, req.action_type.as_deref())
-                .await;
+        let result = tools::actions::get_action_log(
+            &self.state.pool,
+            hours,
+            req.action_type.as_deref(),
+            &self.state.config,
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -77,7 +83,8 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<SinceHoursRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let hours = req.since_hours.unwrap_or(24);
-        let result = tools::actions::get_action_counts(&self.state.pool, hours).await;
+        let result =
+            tools::actions::get_action_counts(&self.state.pool, hours, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -86,7 +93,8 @@ impl TuitbotMcpServer {
     /// Get current rate limit status for all action types (reply, tweet, thread, search, mention_check).
     #[tool]
     async fn get_rate_limits(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::rate_limits::get_rate_limits(&self.state.pool).await;
+        let result =
+            tools::rate_limits::get_rate_limits(&self.state.pool, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -99,14 +107,16 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<SinceHoursRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let hours = req.since_hours.unwrap_or(24);
-        let result = tools::replies::get_recent_replies(&self.state.pool, hours).await;
+        let result =
+            tools::replies::get_recent_replies(&self.state.pool, hours, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Get count of replies sent today.
     #[tool]
     async fn get_reply_count_today(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::replies::get_reply_count_today(&self.state.pool).await;
+        let result =
+            tools::replies::get_reply_count_today(&self.state.pool, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -115,7 +125,8 @@ impl TuitbotMcpServer {
     /// List active target accounts with engagement stats.
     #[tool]
     async fn list_target_accounts(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::targets::list_target_accounts(&self.state.pool).await;
+        let result =
+            tools::targets::list_target_accounts(&self.state.pool, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -128,7 +139,12 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<ListUnrepliedTweetsRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let threshold = req.threshold.unwrap_or(0.0);
-        let result = tools::discovery::list_unreplied_tweets(&self.state.pool, threshold).await;
+        let result = tools::discovery::list_unreplied_tweets(
+            &self.state.pool,
+            threshold,
+            &self.state.config,
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -165,7 +181,7 @@ impl TuitbotMcpServer {
     /// Get count of pending approval items.
     #[tool]
     async fn get_pending_count(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::approval::get_pending_count(&self.state.pool).await;
+        let result = tools::approval::get_pending_count(&self.state.pool, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -175,7 +191,8 @@ impl TuitbotMcpServer {
         &self,
         Parameters(req): Parameters<ApprovalIdRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::approval::approve_item(&self.state.pool, req.id).await;
+        let result =
+            tools::approval::approve_item(&self.state.pool, req.id, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -185,14 +202,15 @@ impl TuitbotMcpServer {
         &self,
         Parameters(req): Parameters<ApprovalIdRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::approval::reject_item(&self.state.pool, req.id).await;
+        let result =
+            tools::approval::reject_item(&self.state.pool, req.id, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Approve all pending items in the approval queue.
     #[tool]
     async fn approve_all(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::approval::approve_all(&self.state.pool).await;
+        let result = tools::approval::approve_all(&self.state.pool, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -206,7 +224,7 @@ impl TuitbotMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         if self.state.llm_provider.is_none() {
             return Ok(CallToolResult::success(vec![Content::text(
-                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+                ToolResponse::not_configured("llm").to_json(),
             )]));
         }
         let mention = req.mention_product.unwrap_or(false);
@@ -216,6 +234,7 @@ impl TuitbotMcpServer {
             &req.tweet_text,
             &req.tweet_author,
             mention,
+            &self.state.config,
         )
         .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
@@ -229,7 +248,7 @@ impl TuitbotMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         if self.state.llm_provider.is_none() {
             return Ok(CallToolResult::success(vec![Content::text(
-                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+                ToolResponse::not_configured("llm").to_json(),
             )]));
         }
         let topic = req.topic.unwrap_or_else(|| {
@@ -241,8 +260,13 @@ impl TuitbotMcpServer {
                 .cloned()
                 .unwrap_or_else(|| "general industry trends".to_string())
         });
-        let result =
-            tools::content::generate_tweet(&self.state, &self.state.config.business, &topic).await;
+        let result = tools::content::generate_tweet(
+            &self.state,
+            &self.state.config.business,
+            &topic,
+            &self.state.config,
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -254,7 +278,7 @@ impl TuitbotMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         if self.state.llm_provider.is_none() {
             return Ok(CallToolResult::success(vec![Content::text(
-                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+                ToolResponse::not_configured("llm").to_json(),
             )]));
         }
         let topic = req.topic.unwrap_or_else(|| {
@@ -266,8 +290,13 @@ impl TuitbotMcpServer {
                 .cloned()
                 .unwrap_or_else(|| "general industry trends".to_string())
         });
-        let result =
-            tools::content::generate_thread(&self.state, &self.state.config.business, &topic).await;
+        let result = tools::content::generate_thread(
+            &self.state,
+            &self.state.config.business,
+            &topic,
+            &self.state.config,
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -320,15 +349,18 @@ impl TuitbotMcpServer {
     /// Get the current operating mode (autopilot or composer) and effective approval mode.
     #[tool]
     async fn get_mode(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        let start = std::time::Instant::now();
         let mode = self.state.config.mode.to_string();
         let approval = self.state.config.effective_approval_mode();
-        let result = serde_json::json!({
+        let elapsed = start.elapsed().as_millis() as u64;
+        let meta = ToolMeta::new(elapsed).with_mode(&mode, approval);
+        let result = ToolResponse::success(serde_json::json!({
             "mode": mode,
             "approval_mode": approval,
-        });
-        Ok(CallToolResult::success(vec![Content::text(
-            result.to_string(),
-        )]))
+        }))
+        .with_meta(meta)
+        .to_json();
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Get the current MCP mutation policy status: enforcement settings, blocked tools, rate limit usage, and operating mode.
@@ -358,6 +390,7 @@ impl TuitbotMcpServer {
             tools::policy_gate::GateResult::Proceed => {}
         }
         let content_type = req.content_type.as_deref().unwrap_or("tweet");
+        let config = &self.state.config;
         let result = if let Some(scheduled_for) = &req.scheduled_for {
             match tuitbot_core::storage::scheduled_content::insert(
                 &self.state.pool,
@@ -372,9 +405,25 @@ impl TuitbotMcpServer {
                         &self.state.pool,
                     )
                     .await;
-                    format!("Scheduled item created with id={id}")
+                    let elapsed = start.elapsed().as_millis() as u64;
+                    let meta = ToolMeta::new(elapsed)
+                        .with_mode(config.mode.to_string(), config.effective_approval_mode());
+                    ToolResponse::success(serde_json::json!({
+                        "scheduled_item_id": id,
+                        "content_type": content_type,
+                        "scheduled_for": scheduled_for,
+                    }))
+                    .with_meta(meta)
+                    .to_json()
                 }
-                Err(e) => format!("Error: {e}"),
+                Err(e) => {
+                    let elapsed = start.elapsed().as_millis() as u64;
+                    let meta = ToolMeta::new(elapsed)
+                        .with_mode(config.mode.to_string(), config.effective_approval_mode());
+                    ToolResponse::db_error(format!("Error scheduling content: {e}"))
+                        .with_meta(meta)
+                        .to_json()
+                }
             }
         } else {
             match tuitbot_core::storage::scheduled_content::insert_draft(
@@ -390,9 +439,24 @@ impl TuitbotMcpServer {
                         &self.state.pool,
                     )
                     .await;
-                    format!("Draft created with id={id}")
+                    let elapsed = start.elapsed().as_millis() as u64;
+                    let meta = ToolMeta::new(elapsed)
+                        .with_mode(config.mode.to_string(), config.effective_approval_mode());
+                    ToolResponse::success(serde_json::json!({
+                        "draft_id": id,
+                        "content_type": content_type,
+                    }))
+                    .with_meta(meta)
+                    .to_json()
                 }
-                Err(e) => format!("Error: {e}"),
+                Err(e) => {
+                    let elapsed = start.elapsed().as_millis() as u64;
+                    let meta = ToolMeta::new(elapsed)
+                        .with_mode(config.mode.to_string(), config.effective_approval_mode());
+                    ToolResponse::db_error(format!("Error creating draft: {e}"))
+                        .with_meta(meta)
+                        .to_json()
+                }
             }
         };
         Ok(CallToolResult::success(vec![Content::text(result)]))
@@ -419,7 +483,8 @@ impl TuitbotMcpServer {
     /// Get analytics-driven topic recommendations based on past performance.
     #[tool]
     async fn suggest_topics(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::analytics::get_top_topics(&self.state.pool, 10).await;
+        let result =
+            tools::analytics::get_top_topics(&self.state.pool, 10, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -632,7 +697,7 @@ impl TuitbotMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         if self.state.llm_provider.is_none() {
             return Ok(CallToolResult::success(vec![Content::text(
-                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+                ToolResponse::not_configured("llm").to_json(),
             )]));
         }
         let mention = req.mention_product.unwrap_or(false);
@@ -666,7 +731,7 @@ impl TuitbotMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         if self.state.llm_provider.is_none() {
             return Ok(CallToolResult::success(vec![Content::text(
-                "Error: No LLM provider configured. Set up the [llm] section in config.toml.",
+                ToolResponse::not_configured("llm").to_json(),
             )]));
         }
         let result = tools::composite::thread_plan::execute(

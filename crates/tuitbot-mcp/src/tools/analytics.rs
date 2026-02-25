@@ -62,13 +62,9 @@ pub async fn get_stats(pool: &DbPool, days: u32, config: &Config) -> String {
             let elapsed = start.elapsed().as_millis() as u64;
             let meta = ToolMeta::new(elapsed)
                 .with_mode(config.mode.to_string(), config.effective_approval_mode());
-            return ToolResponse::error(
-                "db_error",
-                format!("Error loading analytics summary: {e}"),
-                true,
-            )
-            .with_meta(meta)
-            .to_json();
+            return ToolResponse::db_error(format!("Error loading analytics summary: {e}"))
+                .with_meta(meta)
+                .to_json();
         }
     };
 
@@ -106,42 +102,56 @@ pub async fn get_stats(pool: &DbPool, days: u32, config: &Config) -> String {
 }
 
 /// Get follower snapshots over time.
-pub async fn get_follower_trend(pool: &DbPool, limit: u32) -> String {
-    let snapshots = storage::analytics::get_follower_snapshots(pool, limit)
-        .await
-        .unwrap_or_default();
+pub async fn get_follower_trend(pool: &DbPool, limit: u32, config: &Config) -> String {
+    let start = Instant::now();
 
-    let out: Vec<FollowerSnapshotOut> = snapshots
-        .iter()
-        .rev()
-        .map(|s| FollowerSnapshotOut {
-            date: s.snapshot_date.clone(),
-            follower_count: s.follower_count,
-            following_count: s.following_count,
-            tweet_count: s.tweet_count,
-        })
-        .collect();
-
-    serde_json::to_string_pretty(&out)
-        .unwrap_or_else(|e| format!("Error serializing follower trend: {e}"))
+    match storage::analytics::get_follower_snapshots(pool, limit).await {
+        Ok(snapshots) => {
+            let out: Vec<FollowerSnapshotOut> = snapshots
+                .iter()
+                .rev()
+                .map(|s| FollowerSnapshotOut {
+                    date: s.snapshot_date.clone(),
+                    follower_count: s.follower_count,
+                    following_count: s.following_count,
+                    tweet_count: s.tweet_count,
+                })
+                .collect();
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(out).with_meta(meta).to_json()
+        }
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error fetching follower trend: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
+    }
 }
 
 /// Get top-performing topics from analytics.
-pub async fn get_top_topics(pool: &DbPool, limit: u32) -> String {
+pub async fn get_top_topics(pool: &DbPool, limit: u32, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::analytics::get_top_topics(pool, limit).await {
         Ok(topics) => {
-            let out: Vec<serde_json::Value> = topics
-                .iter()
-                .map(|cs| {
-                    serde_json::json!({
-                        "topic": cs.topic,
-                        "score": cs.avg_performance,
-                    })
-                })
-                .collect();
-            serde_json::to_string_pretty(&out)
-                .unwrap_or_else(|e| format!("Error serializing topics: {e}"))
+            let out = topics_to_out(topics);
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(out).with_meta(meta).to_json()
         }
-        Err(e) => format!("Error fetching top topics: {e}"),
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error fetching top topics: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }

@@ -1,9 +1,14 @@
 //! Target accounts tool: list_target_accounts.
 
+use std::time::Instant;
+
 use serde::Serialize;
 
+use tuitbot_core::config::Config;
 use tuitbot_core::storage;
 use tuitbot_core::storage::DbPool;
+
+use super::response::{ToolMeta, ToolResponse};
 
 #[derive(Serialize)]
 struct TargetAccountOut {
@@ -17,7 +22,9 @@ struct TargetAccountOut {
 }
 
 /// List all active target accounts with engagement stats.
-pub async fn list_target_accounts(pool: &DbPool) -> String {
+pub async fn list_target_accounts(pool: &DbPool, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::target_accounts::get_active_target_accounts(pool).await {
         Ok(accounts) => {
             let out: Vec<TargetAccountOut> = accounts
@@ -32,9 +39,18 @@ pub async fn list_target_accounts(pool: &DbPool) -> String {
                     status: a.status,
                 })
                 .collect();
-            serde_json::to_string_pretty(&out)
-                .unwrap_or_else(|e| format!("Error serializing target accounts: {e}"))
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(out).with_meta(meta).to_json()
         }
-        Err(e) => format!("Error fetching target accounts: {e}"),
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error fetching target accounts: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }

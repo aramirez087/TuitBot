@@ -1,9 +1,7 @@
 //! Unified response envelope for MCP tools.
 //!
-//! Tools that have been migrated wrap their payload inside a [`ToolResponse`]
-//! envelope with `success`, `data`, `error`, and `meta` fields. Non-migrated
-//! tools continue to return their original JSON shape. Agents can detect the
-//! envelope by checking for the top-level `"success"` key.
+//! Every MCP tool wraps its payload inside a [`ToolResponse`] envelope with
+//! `success`, `data`, `error`, and `meta` fields.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -32,6 +30,12 @@ pub struct ToolError {
     pub message: String,
     /// Whether the caller may retry the request.
     pub retryable: bool,
+    /// Unix epoch or ISO-8601 timestamp when a rate limit resets.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit_reset: Option<String>,
+    /// Policy decision label (e.g. `"denied"`, `"routed_to_approval"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub policy_decision: Option<String>,
 }
 
 /// Execution metadata attached to a tool response.
@@ -69,14 +73,52 @@ impl ToolResponse {
                 code: code.into(),
                 message: message.into(),
                 retryable,
+                rate_limit_reset: None,
+                policy_decision: None,
             }),
             meta: None,
         }
     }
 
+    /// Convenience: database error (retryable).
+    pub fn db_error(message: impl Into<String>) -> Self {
+        Self::error("db_error", message, true)
+    }
+
+    /// Convenience: validation error (not retryable).
+    #[allow(dead_code)]
+    pub fn validation_error(message: impl Into<String>) -> Self {
+        Self::error("validation_error", message, false)
+    }
+
+    /// Convenience: resource not configured (not retryable).
+    pub fn not_configured(what: &str) -> Self {
+        Self::error(
+            format!("{what}_not_configured"),
+            format!("{what} is not configured. Check your config.toml."),
+            false,
+        )
+    }
+
     /// Attach metadata to the response (builder pattern).
     pub fn with_meta(mut self, meta: ToolMeta) -> Self {
         self.meta = Some(meta);
+        self
+    }
+
+    /// Attach `rate_limit_reset` to the error payload (builder pattern).
+    pub fn with_rate_limit_reset(mut self, reset: impl Into<String>) -> Self {
+        if let Some(ref mut err) = self.error {
+            err.rate_limit_reset = Some(reset.into());
+        }
+        self
+    }
+
+    /// Attach `policy_decision` to the error payload (builder pattern).
+    pub fn with_policy_decision(mut self, decision: impl Into<String>) -> Self {
+        if let Some(ref mut err) = self.error {
+            err.policy_decision = Some(decision.into());
+        }
         self
     }
 
@@ -189,5 +231,70 @@ mod tests {
         let parsed: Value = serde_json::from_str(&json).unwrap();
         assert!(parsed["data"].is_array());
         assert_eq!(parsed["data"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn rate_limit_reset_present_when_set() {
+        let resp = ToolResponse::error("rate_limited", "too fast", true)
+            .with_rate_limit_reset("2026-02-25T12:00:00Z");
+        let json = resp.to_json();
+        let parsed: Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["error"]["rate_limit_reset"], "2026-02-25T12:00:00Z");
+    }
+
+    #[test]
+    fn rate_limit_reset_absent_when_none() {
+        let json = ToolResponse::error("db_error", "fail", true).to_json();
+        let parsed: Value = serde_json::from_str(&json).unwrap();
+        assert!(parsed["error"].get("rate_limit_reset").is_none());
+    }
+
+    #[test]
+    fn policy_decision_present_when_set() {
+        let resp =
+            ToolResponse::error("policy_denied", "blocked", false).with_policy_decision("denied");
+        let json = resp.to_json();
+        let parsed: Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["error"]["policy_decision"], "denied");
+    }
+
+    #[test]
+    fn policy_decision_absent_when_none() {
+        let json = ToolResponse::error("db_error", "fail", true).to_json();
+        let parsed: Value = serde_json::from_str(&json).unwrap();
+        assert!(parsed["error"].get("policy_decision").is_none());
+    }
+
+    #[test]
+    fn db_error_constructor() {
+        let resp = ToolResponse::db_error("connection refused");
+        assert!(!resp.success);
+        let err = resp.error.as_ref().unwrap();
+        assert_eq!(err.code, "db_error");
+        assert!(err.retryable);
+    }
+
+    #[test]
+    fn validation_error_constructor() {
+        let resp = ToolResponse::validation_error("missing field");
+        let err = resp.error.as_ref().unwrap();
+        assert_eq!(err.code, "validation_error");
+        assert!(!err.retryable);
+    }
+
+    #[test]
+    fn not_configured_constructor() {
+        let resp = ToolResponse::not_configured("llm");
+        let err = resp.error.as_ref().unwrap();
+        assert_eq!(err.code, "llm_not_configured");
+        assert!(!err.retryable);
+    }
+
+    #[test]
+    fn builders_no_op_on_success() {
+        let resp = ToolResponse::success(42)
+            .with_rate_limit_reset("never")
+            .with_policy_decision("none");
+        assert!(resp.error.is_none());
     }
 }

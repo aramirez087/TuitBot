@@ -24,4 +24,6 @@ pub mod x_actions;
 #[cfg(test)]
 mod benchmark;
 #[cfg(test)]
+mod contract_tests;
+#[cfg(test)]
 mod eval_harness;

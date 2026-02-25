@@ -65,7 +65,7 @@ The eval harness (`cargo test -p tuitbot-mcp eval_harness`) enforces two quality
 
 | Gate | Threshold | Description |
 |------|-----------|-------------|
-| Schema validation | >= 95% | All MCP tool responses must conform to the `ToolResponse` envelope (`success` key present) |
+| Schema validation | >= 95% | All MCP tool responses must conform to the `ToolResponse` envelope (`success` key present). As of v1.0, all tools return the envelope. |
 | Unknown errors | <= 5% | Error responses must use typed error codes — unclassified errors indicate missing handling |
 
 **Running the eval harness:**

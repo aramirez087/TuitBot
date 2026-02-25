@@ -122,10 +122,28 @@ pub async fn check_policy(
                 Some("deny"),
             )
             .await;
-            let json = ToolResponse::error(code, format!("Policy denied: {reason}"), false)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json();
-            GateResult::EarlyReturn(json)
+            let mut resp = ToolResponse::error(code, format!("Policy denied: {reason}"), false)
+                .with_policy_decision("denied")
+                .with_meta(ToolMeta::new(elapsed));
+
+            // For rate-limited denials, attach the reset timestamp.
+            if matches!(reason, PolicyDenialReason::RateLimited) {
+                if let Ok(limits) = rate_limits::get_all_rate_limits(&state.pool).await {
+                    if let Some(rl) = limits.iter().find(|l| l.action_type == "mcp_mutation") {
+                        if let Ok(start_ts) = chrono::NaiveDateTime::parse_from_str(
+                            &rl.period_start,
+                            "%Y-%m-%dT%H:%M:%SZ",
+                        ) {
+                            let reset = start_ts + chrono::Duration::seconds(rl.period_seconds);
+                            resp = resp.with_rate_limit_reset(
+                                reset.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                            );
+                        }
+                    }
+                }
+            }
+
+            GateResult::EarlyReturn(resp.to_json())
         }
 
         PolicyDecision::DryRun => {

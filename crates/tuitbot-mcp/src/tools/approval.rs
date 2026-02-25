@@ -55,43 +55,89 @@ pub async fn list_pending(pool: &DbPool, config: &Config) -> String {
             let elapsed = start.elapsed().as_millis() as u64;
             let meta = ToolMeta::new(elapsed)
                 .with_mode(config.mode.to_string(), config.effective_approval_mode());
-            ToolResponse::error(
-                "db_error",
-                format!("Error fetching pending approvals: {e}"),
-                true,
-            )
-            .with_meta(meta)
-            .to_json()
+            ToolResponse::db_error(format!("Error fetching pending approvals: {e}"))
+                .with_meta(meta)
+                .to_json()
         }
     }
 }
 
 /// Get count of pending approval items.
-pub async fn get_pending_count(pool: &DbPool) -> String {
+pub async fn get_pending_count(pool: &DbPool, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::approval_queue::pending_count(pool).await {
-        Ok(count) => serde_json::json!({ "pending_count": count }).to_string(),
-        Err(e) => format!("Error counting pending approvals: {e}"),
+        Ok(count) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(serde_json::json!({ "pending_count": count }))
+                .with_meta(meta)
+                .to_json()
+        }
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error counting pending approvals: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }
 
 /// Approve a specific item by ID.
-pub async fn approve_item(pool: &DbPool, id: i64) -> String {
+pub async fn approve_item(pool: &DbPool, id: i64, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::approval_queue::update_status(pool, id, "approved").await {
-        Ok(()) => serde_json::json!({ "status": "approved", "id": id }).to_string(),
-        Err(e) => format!("Error approving item {id}: {e}"),
+        Ok(()) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(serde_json::json!({ "status": "approved", "id": id }))
+                .with_meta(meta)
+                .to_json()
+        }
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error approving item {id}: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }
 
 /// Reject a specific item by ID.
-pub async fn reject_item(pool: &DbPool, id: i64) -> String {
+pub async fn reject_item(pool: &DbPool, id: i64, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::approval_queue::update_status(pool, id, "rejected").await {
-        Ok(()) => serde_json::json!({ "status": "rejected", "id": id }).to_string(),
-        Err(e) => format!("Error rejecting item {id}: {e}"),
+        Ok(()) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(serde_json::json!({ "status": "rejected", "id": id }))
+                .with_meta(meta)
+                .to_json()
+        }
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error rejecting item {id}: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }
 
 /// Approve all pending items.
-pub async fn approve_all(pool: &DbPool) -> String {
+pub async fn approve_all(pool: &DbPool, config: &Config) -> String {
+    let start = Instant::now();
+
     match storage::approval_queue::get_pending(pool).await {
         Ok(items) => {
             let mut approved = 0i64;
@@ -102,13 +148,24 @@ pub async fn approve_all(pool: &DbPool) -> String {
                     Err(_) => errors += 1,
                 }
             }
-            serde_json::json!({
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::success(serde_json::json!({
                 "approved": approved,
                 "errors": errors,
                 "total": items.len(),
-            })
-            .to_string()
+            }))
+            .with_meta(meta)
+            .to_json()
         }
-        Err(e) => format!("Error fetching pending approvals: {e}"),
+        Err(e) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            let meta = ToolMeta::new(elapsed)
+                .with_mode(config.mode.to_string(), config.effective_approval_mode());
+            ToolResponse::db_error(format!("Error fetching pending approvals: {e}"))
+                .with_meta(meta)
+                .to_json()
+        }
     }
 }

@@ -47,15 +47,14 @@ These tools support user-driven workflows in Composer mode:
 | Tool | Description | Parameters |
 |---|---|---|
 | `get_mode` | Returns the current operating mode (`autopilot` or `composer`) | None |
-| `compose_tweet` | Generate a tweet using AI Assist | `topic` (required), `format` (optional) |
+| `compose_tweet` | Create a draft or scheduled tweet/thread | `content` (required), `content_type` (optional), `scheduled_for` (optional) |
 | `get_discovery_feed` | Retrieve scored tweets from the Discovery Feed | `limit` (optional), `min_score` (optional) |
-| `suggest_topics` | Get topic suggestions based on profile and performance data | `count` (optional) |
+| `suggest_topics` | Get topic suggestions based on profile and performance data | None |
 
 ## Response Envelope (v1.0)
 
-Migrated tools wrap their output in a unified JSON envelope. Non-migrated tools
-continue to return their original JSON shape. Agents can detect the envelope by
-checking for the top-level `"success"` key.
+Every MCP tool wraps its output in a unified JSON envelope with `success`,
+`data`, `error`, and `meta` fields.
 
 ### Example
 
@@ -85,27 +84,35 @@ checking for the top-level `"success"` key.
 | `error.code` | `string` | Machine-readable code (e.g. `db_error`) |
 | `error.message` | `string` | Human-readable description |
 | `error.retryable` | `bool` | Whether the caller may retry |
+| `error.rate_limit_reset` | `string?` | ISO-8601 timestamp when rate limit resets (present on rate-limited errors) |
+| `error.policy_decision` | `string?` | Policy decision label: `"denied"`, `"routed_to_approval"` (present on policy errors) |
 | `meta` | `object?` | Execution metadata (optional) |
 | `meta.tool_version` | `string` | Envelope schema version |
 | `meta.elapsed_ms` | `u64` | Wall-clock execution time in ms |
 | `meta.mode` | `string?` | Operating mode (`autopilot` / `composer`) |
 | `meta.approval_mode` | `bool?` | Effective approval mode flag |
 
-### Detection strategy
+### Error codes
 
-Check for the top-level `"success"` key. If present, the response uses the
-envelope schema. If absent, treat it as a legacy (non-migrated) response.
-
-### Migrated tools (v1.0)
-
-| Tool | Error codes |
-|------|-------------|
-| `get_capabilities` | — (always succeeds) |
-| `health_check` | — (always succeeds; degradation in data) |
-| `get_stats` | `db_error` |
-| `list_pending_approvals` | `db_error` |
-| `get_discovery_feed` | `db_error` |
-| All Direct X API tools | `x_not_configured`, `x_rate_limited`, `x_auth_expired`, `x_forbidden`, `x_account_restricted`, `x_network_error`, `x_api_error` |
+| Code | Meaning | Retryable |
+|------|---------|-----------|
+| `db_error` | Database operation failed | Yes |
+| `validation_error` | Input validation failed | No |
+| `llm_error` | LLM generation failed | Yes |
+| `llm_not_configured` | LLM provider not set up | No |
+| `x_not_configured` | X API client not available (no tokens) | No |
+| `x_rate_limited` | X API rate limit hit (HTTP 429) | Yes |
+| `x_auth_expired` | OAuth token expired (HTTP 401) | No |
+| `x_forbidden` | Forbidden / tier restriction (HTTP 403) | No |
+| `x_account_restricted` | Account suspended or limited | No |
+| `x_network_error` | Network connectivity issue | Yes |
+| `x_api_error` | Other X API errors | No |
+| `policy_denied_blocked` | Tool is in `blocked_tools` configuration | No |
+| `policy_denied_rate_limited` | Hourly MCP mutation rate limit exceeded | No |
+| `policy_error` | Policy evaluation failed (DB error) | Yes |
+| `serialization_error` | Response serialization failed | No |
+| `not_found` | Requested resource not found | No |
+| `invalid_input` | Malformed request parameters | No |
 
 ## Direct X API Tools
 
@@ -133,18 +140,6 @@ via `get_capabilities` → `direct_tools`.
 | `x_like_tweet` | Like a tweet | `tweet_id` (required) |
 | `x_follow_user` | Follow a user | `target_user_id` (required) |
 | `x_unfollow_user` | Unfollow a user | `target_user_id` (required) |
-
-### Error Codes
-
-| Code | Meaning | Retryable |
-|------|---------|-----------|
-| `x_not_configured` | X API client not available (no tokens) | No |
-| `x_rate_limited` | X API rate limit hit (HTTP 429) | Yes |
-| `x_auth_expired` | OAuth token expired (HTTP 401) | No |
-| `x_forbidden` | Forbidden / tier restriction (HTTP 403) | No |
-| `x_account_restricted` | Account suspended or limited | No |
-| `x_network_error` | Network connectivity issue | Yes |
-| `x_api_error` | Other X API errors | No |
 
 ### Example: Get a tweet
 
@@ -200,6 +195,24 @@ Mutation tools may return these additional error codes when policy enforcement i
 | `policy_denied_rate_limited` | Hourly MCP mutation rate limit exceeded | No |
 | `policy_error` | Policy evaluation failed (DB error) | Yes |
 
+Rate-limited policy errors include `error.rate_limit_reset` (ISO-8601 timestamp)
+and `error.policy_decision: "denied"` for intelligent retry scheduling:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "policy_denied_rate_limited",
+    "message": "Policy denied: rate limited",
+    "retryable": false,
+    "rate_limit_reset": "2026-02-25T13:00:00Z",
+    "policy_decision": "denied"
+  },
+  "meta": { "tool_version": "1.0", "elapsed_ms": 3 }
+}
+```
+
 When a mutation is routed to the approval queue, the response is a success envelope:
 
 ```json
@@ -246,8 +259,8 @@ benchmark data.
 | Composite goal-oriented workflows | 4 tools (find → draft → queue, thread planning) | No |
 | Context intelligence (author profiling, recommendations) | 3 tools | No |
 | Growth analytics via MCP | Yes — `get_stats`, `get_mcp_tool_metrics`, `get_mcp_error_breakdown` | No |
-| Structured response envelope | v1.0 with `success`, `data`, `error`, `meta` | Varies |
-| Typed error taxonomy with retryable flag | 10 error codes | Limited |
+| Structured response envelope | v1.0 — all tools return `success`, `data`, `error`, `meta` | Varies |
+| Typed error taxonomy with retryable flag | 17 error codes with optional `rate_limit_reset` and `policy_decision` | Limited |
 | Per-invocation telemetry capture | Yes — latency, success, error code, policy decision | No |
 | Quality gate eval harness | Yes — 3 scenarios, automated CI checks | No |
 | OpenClaw plugin with layered safety filtering | Yes — 5 filter layers, 45 tools cataloged | No |
@@ -304,8 +317,7 @@ Or add to your Claude Code / agent config:
 
 ### Step 4: Adopt the response envelope
 
-TuitBot's migrated tools return a v1.0 envelope. Detect it by checking for
-the top-level `"success"` key:
+All TuitBot tools return a v1.0 envelope:
 
 ```json
 {
@@ -316,7 +328,9 @@ the top-level `"success"` key:
 ```
 
 Error responses include a typed `error` object with `code`, `message`, and
-`retryable` fields — no need to parse unstructured strings.
+`retryable` fields — no need to parse unstructured strings. Rate-limited errors
+additionally include `rate_limit_reset` and `policy_decision` fields for
+intelligent retry scheduling.
 
 ### Step 5: Configure safety policy (recommended)
 
