@@ -150,7 +150,7 @@ impl TweetSearcher for XApiSearchAdapter {
     async fn search_tweets(&self, query: &str) -> Result<Vec<LoopTweet>, LoopError> {
         let response = self
             .client
-            .search_tweets(query, 20, None)
+            .search_tweets(query, 20, None, None)
             .await
             .map_err(xapi_to_loop_error)?;
         Ok(search_response_to_loop_tweets(response))
@@ -177,7 +177,7 @@ impl MentionsFetcher for XApiMentionsAdapter {
     async fn get_mentions(&self, since_id: Option<&str>) -> Result<Vec<LoopTweet>, LoopError> {
         let response = self
             .client
-            .get_mentions(&self.own_user_id, since_id)
+            .get_mentions(&self.own_user_id, since_id, None)
             .await
             .map_err(xapi_to_loop_error)?;
         Ok(search_response_to_loop_tweets(response))
@@ -200,7 +200,7 @@ impl TargetTweetFetcher for XApiTargetAdapter {
     async fn fetch_user_tweets(&self, user_id: &str) -> Result<Vec<LoopTweet>, LoopError> {
         let response = self
             .client
-            .get_user_tweets(user_id, 10)
+            .get_user_tweets(user_id, 10, None)
             .await
             .map_err(xapi_to_loop_error)?;
         Ok(search_response_to_loop_tweets(response))

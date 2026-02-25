@@ -289,12 +289,33 @@ pub struct ActionResultResponse {
     pub data: ActionResultData,
 }
 
-/// Data from an action endpoint (like, follow, unfollow).
+/// Data from an action endpoint (like, follow, unfollow, retweet).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResultData {
-    /// Whether the action was successful (liked/following).
-    #[serde(alias = "liked", alias = "following")]
+    /// Whether the action was successful (liked/following/retweeted).
+    #[serde(alias = "liked", alias = "following", alias = "retweeted")]
     pub result: bool,
+}
+
+/// Request body for retweeting a tweet via X API v2.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetweetRequest {
+    /// The tweet ID to retweet.
+    pub tweet_id: String,
+}
+
+/// Response from deleting a tweet via X API v2.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteTweetResponse {
+    /// The deletion result data.
+    pub data: DeleteTweetData,
+}
+
+/// Data from a tweet deletion response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeleteTweetData {
+    /// Whether the tweet was successfully deleted.
+    pub deleted: bool,
 }
 
 #[cfg(test)]

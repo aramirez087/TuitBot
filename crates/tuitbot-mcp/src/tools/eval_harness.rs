@@ -87,6 +87,7 @@ mod tests {
             _query: &str,
             _max_results: u32,
             _since_id: Option<&str>,
+            _pagination_token: Option<&str>,
         ) -> Result<SearchResponse, XApiError> {
             Ok(SearchResponse {
                 data: self.tweets.clone(),
@@ -110,6 +111,7 @@ mod tests {
             &self,
             _user_id: &str,
             _since_id: Option<&str>,
+            _pagination_token: Option<&str>,
         ) -> Result<MentionResponse, XApiError> {
             Ok(SearchResponse {
                 data: vec![],
@@ -165,6 +167,7 @@ mod tests {
             &self,
             _user_id: &str,
             _max_results: u32,
+            _pagination_token: Option<&str>,
         ) -> Result<SearchResponse, XApiError> {
             Ok(SearchResponse {
                 data: vec![],

@@ -41,13 +41,19 @@ pub fn tool_category(name: &str) -> ToolCategory {
         // Write tools
         "post_tweet" | "compose_tweet" | "reply_to_tweet" | "quote_tweet" | "x_post_tweet"
         | "x_reply_to_tweet" | "x_quote_tweet" => ToolCategory::Write,
+        // Read tools (new)
+        "x_get_home_timeline" | "get_x_usage" => ToolCategory::Read,
         // Engage tools
         "like_tweet" | "x_like_tweet" | "follow_user" | "x_follow_user" | "unfollow_user"
-        | "x_unfollow_user" | "retweet" => ToolCategory::Engage,
+        | "x_unfollow_user" | "retweet" | "x_retweet" | "unretweet" | "x_unretweet" => {
+            ToolCategory::Engage
+        }
         // Media tools
-        "upload_media" | "post_tweet_with_media" => ToolCategory::Media,
+        "upload_media" | "x_upload_media" | "post_tweet_with_media" => ToolCategory::Media,
         // Thread tools
-        "post_thread" | "compose_thread" | "propose_and_queue_replies" => ToolCategory::Thread,
+        "post_thread" | "x_post_thread" | "compose_thread" | "propose_and_queue_replies" => {
+            ToolCategory::Thread
+        }
         // Delete tools
         "delete_tweet" | "x_delete_tweet" => ToolCategory::Delete,
         // Default unknown tools to Write (safest default for mutations)

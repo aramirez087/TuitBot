@@ -41,6 +41,7 @@ impl XApiClient for MockXApiClient {
         _query: &str,
         _max_results: u32,
         _since_id: Option<&str>,
+        _pagination_token: Option<&str>,
     ) -> Result<SearchResponse, XApiError> {
         Ok(SearchResponse {
             data: self.tweets.clone(),
@@ -64,6 +65,7 @@ impl XApiClient for MockXApiClient {
         &self,
         _user_id: &str,
         _since_id: Option<&str>,
+        _pagination_token: Option<&str>,
     ) -> Result<MentionResponse, XApiError> {
         Ok(SearchResponse {
             data: vec![],
@@ -119,6 +121,7 @@ impl XApiClient for MockXApiClient {
         &self,
         _user_id: &str,
         _max_results: u32,
+        _pagination_token: Option<&str>,
     ) -> Result<SearchResponse, XApiError> {
         Ok(SearchResponse {
             data: vec![],

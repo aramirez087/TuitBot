@@ -67,7 +67,7 @@ impl std::fmt::Display for ApiTier {
 /// Falls back to `Free` tier on network errors as the safe default.
 /// Propagates auth errors (do not infer tier from auth failure).
 pub async fn detect_tier(client: &dyn XApiClient) -> Result<ApiTier, XApiError> {
-    match client.search_tweets("test", 10, None).await {
+    match client.search_tweets("test", 10, None, None).await {
         Ok(_) => {
             let tier = ApiTier::Basic;
             log_tier_detection(&tier);
@@ -181,6 +181,7 @@ mod tests {
             _query: &str,
             _max_results: u32,
             _since_id: Option<&str>,
+            _pagination_token: Option<&str>,
         ) -> Result<SearchResponse, XApiError> {
             match &self.search_result {
                 Ok(r) => Ok(r.clone()),
@@ -208,6 +209,7 @@ mod tests {
             &self,
             _user_id: &str,
             _since_id: Option<&str>,
+            _pagination_token: Option<&str>,
         ) -> Result<MentionResponse, XApiError> {
             unimplemented!()
         }
@@ -236,6 +238,7 @@ mod tests {
             &self,
             _user_id: &str,
             _max_results: u32,
+            _pagination_token: Option<&str>,
         ) -> Result<SearchResponse, XApiError> {
             unimplemented!()
         }

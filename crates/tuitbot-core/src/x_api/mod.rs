@@ -30,6 +30,7 @@ pub trait XApiClient: Send + Sync {
         query: &str,
         max_results: u32,
         since_id: Option<&str>,
+        pagination_token: Option<&str>,
     ) -> Result<SearchResponse, XApiError>;
 
     /// Get mentions for the authenticated user.
@@ -39,6 +40,7 @@ pub trait XApiClient: Send + Sync {
         &self,
         user_id: &str,
         since_id: Option<&str>,
+        pagination_token: Option<&str>,
     ) -> Result<MentionResponse, XApiError>;
 
     /// Post a new tweet.
@@ -62,6 +64,7 @@ pub trait XApiClient: Send + Sync {
         &self,
         user_id: &str,
         max_results: u32,
+        pagination_token: Option<&str>,
     ) -> Result<SearchResponse, XApiError>;
 
     /// Look up a user by their username.
@@ -137,6 +140,43 @@ pub trait XApiClient: Send + Sync {
         _user_id: &str,
         _target_user_id: &str,
     ) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Retweet a tweet on behalf of the authenticated user.
+    async fn retweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Undo a retweet on behalf of the authenticated user.
+    async fn unretweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Delete a tweet by its ID.
+    async fn delete_tweet(&self, _tweet_id: &str) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get the authenticated user's home timeline (reverse chronological).
+    async fn get_home_timeline(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
         Err(XApiError::ApiError {
             status: 0,
             message: "not implemented".to_string(),

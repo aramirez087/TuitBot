@@ -521,9 +521,14 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<SearchTweetsRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let max = req.max_results.unwrap_or(10).clamp(10, 100);
-        let result =
-            tools::x_actions::search_tweets(&self.state, &req.query, max, req.since_id.as_deref())
-                .await;
+        let result = tools::x_actions::search_tweets(
+            &self.state,
+            &req.query,
+            max,
+            req.since_id.as_deref(),
+            req.pagination_token.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -533,8 +538,12 @@ impl TuitbotMcpServer {
         &self,
         Parameters(req): Parameters<GetUserMentionsRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result =
-            tools::x_actions::get_user_mentions(&self.state, req.since_id.as_deref()).await;
+        let result = tools::x_actions::get_user_mentions(
+            &self.state,
+            req.since_id.as_deref(),
+            req.pagination_token.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -545,39 +554,56 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<GetUserTweetsRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let max = req.max_results.unwrap_or(10).clamp(5, 100);
-        let result = tools::x_actions::get_user_tweets(&self.state, &req.user_id, max).await;
+        let result = tools::x_actions::get_user_tweets(
+            &self.state,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Post a new tweet to X. Returns the posted tweet data.
+    /// Post a new tweet to X. Returns the posted tweet data. Optionally attach media by providing media_ids from x_upload_media.
     #[tool]
     async fn x_post_tweet(
         &self,
         Parameters(req): Parameters<PostTweetTextRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = tools::x_actions::post_tweet(&self.state, &req.text).await;
+        let result =
+            tools::x_actions::post_tweet(&self.state, &req.text, req.media_ids.as_deref()).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Reply to an existing tweet. Returns the posted reply data.
+    /// Reply to an existing tweet. Returns the posted reply data. Optionally attach media.
     #[tool]
     async fn x_reply_to_tweet(
         &self,
         Parameters(req): Parameters<ReplyToTweetRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result =
-            tools::x_actions::reply_to_tweet(&self.state, &req.text, &req.in_reply_to_id).await;
+        let result = tools::x_actions::reply_to_tweet(
+            &self.state,
+            &req.text,
+            &req.in_reply_to_id,
+            req.media_ids.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Post a quote tweet referencing another tweet. Returns the posted tweet data.
+    /// Post a quote tweet referencing another tweet. Returns the posted tweet data. Optionally attach media.
     #[tool]
     async fn x_quote_tweet(
         &self,
         Parameters(req): Parameters<QuoteTweetRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result =
-            tools::x_actions::quote_tweet(&self.state, &req.text, &req.quoted_tweet_id).await;
+        let result = tools::x_actions::quote_tweet(
+            &self.state,
+            &req.text,
+            &req.quoted_tweet_id,
+            req.media_ids.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -608,6 +634,81 @@ impl TuitbotMcpServer {
         Parameters(req): Parameters<UnfollowUserMcpRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let result = tools::x_actions::unfollow_user(&self.state, &req.target_user_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Retweet a tweet on behalf of the authenticated user.
+    #[tool]
+    async fn x_retweet(
+        &self,
+        Parameters(req): Parameters<RetweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::retweet(&self.state, &req.tweet_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Undo a retweet on behalf of the authenticated user.
+    #[tool]
+    async fn x_unretweet(
+        &self,
+        Parameters(req): Parameters<UnretweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::unretweet(&self.state, &req.tweet_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Delete a tweet by its ID. Always requires policy approval.
+    #[tool]
+    async fn x_delete_tweet(
+        &self,
+        Parameters(req): Parameters<DeleteTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::delete_tweet(&self.state, &req.tweet_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Post a thread (ordered sequence of tweets). Validates all tweets before posting. Returns all posted tweet IDs.
+    #[tool]
+    async fn x_post_thread(
+        &self,
+        Parameters(req): Parameters<PostThreadMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result =
+            tools::x_actions::post_thread(&self.state, &req.tweets, req.media_ids.as_deref()).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Upload a media file (image/gif/video) for attaching to tweets. Returns a media_id.
+    #[tool]
+    async fn x_upload_media(
+        &self,
+        Parameters(req): Parameters<UploadMediaMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::upload_media(&self.state, &req.file_path).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get the authenticated user's home timeline (reverse chronological).
+    #[tool]
+    async fn x_get_home_timeline(
+        &self,
+        Parameters(req): Parameters<GetHomeTimelineRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(20).clamp(1, 100);
+        let result =
+            tools::x_actions::get_home_timeline(&self.state, max, req.pagination_token.as_deref())
+                .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get X API usage statistics: costs, call counts, and endpoint breakdown.
+    #[tool]
+    async fn get_x_usage(
+        &self,
+        Parameters(req): Parameters<GetXUsageRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let days = req.days.unwrap_or(7);
+        let result = tools::x_actions::get_x_usage(&self.state, days).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 

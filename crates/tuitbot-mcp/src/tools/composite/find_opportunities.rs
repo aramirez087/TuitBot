@@ -60,7 +60,7 @@ pub async fn execute(
 
     // Search tweets via X API
     let search_response = match x_client
-        .search_tweets(&search_query, max_results, since_id)
+        .search_tweets(&search_query, max_results, since_id, None)
         .await
     {
         Ok(resp) => resp,

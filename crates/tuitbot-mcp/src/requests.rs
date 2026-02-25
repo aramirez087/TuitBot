@@ -128,12 +128,16 @@ pub struct SearchTweetsRequest {
     pub max_results: Option<u32>,
     /// Only return tweets newer than this tweet ID.
     pub since_id: Option<String>,
+    /// Pagination token for fetching the next page of results.
+    pub pagination_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GetUserMentionsRequest {
     /// Only return mentions newer than this tweet ID.
     pub since_id: Option<String>,
+    /// Pagination token for fetching the next page of results.
+    pub pagination_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -142,12 +146,16 @@ pub struct GetUserTweetsRequest {
     pub user_id: String,
     /// Maximum number of results (5-100, default: 10).
     pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page of results.
+    pub pagination_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct PostTweetTextRequest {
     /// The tweet text content (max 280 characters).
     pub text: String,
+    /// Optional media IDs to attach (from x_upload_media).
+    pub media_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -156,6 +164,8 @@ pub struct ReplyToTweetRequest {
     pub text: String,
     /// The tweet ID to reply to.
     pub in_reply_to_id: String,
+    /// Optional media IDs to attach (from x_upload_media).
+    pub media_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -164,6 +174,8 @@ pub struct QuoteTweetRequest {
     pub text: String,
     /// The tweet ID to quote.
     pub quoted_tweet_id: String,
+    /// Optional media IDs to attach (from x_upload_media).
+    pub media_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -182,6 +194,54 @@ pub struct FollowUserMcpRequest {
 pub struct UnfollowUserMcpRequest {
     /// The user ID to unfollow.
     pub target_user_id: String,
+}
+
+// --- Retweet / Delete / Thread / Media / Timeline / Usage ---
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RetweetMcpRequest {
+    /// The tweet ID to retweet.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UnretweetMcpRequest {
+    /// The tweet ID to unretweet.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct DeleteTweetMcpRequest {
+    /// The tweet ID to delete.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct PostThreadMcpRequest {
+    /// Ordered list of tweet texts forming the thread.
+    pub tweets: Vec<String>,
+    /// Optional media IDs per tweet (outer index matches tweet index).
+    pub media_ids: Option<Vec<Vec<String>>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UploadMediaMcpRequest {
+    /// Local file path of the media to upload.
+    pub file_path: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetHomeTimelineRequest {
+    /// Maximum number of results (1-100, default: 20).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetXUsageRequest {
+    /// Number of days to look back (default: 7).
+    pub days: Option<u32>,
 }
 
 // --- Context Intelligence ---
