@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.5...tuitbot-cli-v0.1.6) - 2026-02-25
+
+### Added
+
+- Implement database backup/restore functionality and add a circuit breaker for X API rate limiting.
+- Implement secret redaction for error messages, enhance X API scope error handling, and update token management to include scopes.
+- Implement multi-account support with account context extraction, role-based access control, and dedicated storage and API routes.
+- Introduce observability dashboard, enhance approval and discovery filters, and add onboarding steps.
+- introduce QA gating system with persistence for reports, flags, scores, and override capabilities for approval queue and scheduled content.
+- Refactor X API tools into structured modules and add pagination support to X API client methods.
+- professionalize approval queue with edit history, dedicated storage, and enhanced dashboard UI
+- implement MCP policy v2 with configurable rules, templates, and a new dashboard UI
+- Standardize tool responses with new metadata and error handling.
+
+### Other
+
+- Convert `ApprovalRow` from a tuple to a named struct and alias `COALESCE` columns in SQL queries for `sqlx::FromRow` compatibility.
+
 ## [0.1.5](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.4...tuitbot-cli-v0.1.5) - 2026-02-25
 
 ### Added
