@@ -3,6 +3,7 @@
 use std::time::Instant;
 
 use tuitbot_core::config::Config;
+use tuitbot_core::safety::redact::mask_secret;
 
 use super::response::{ToolMeta, ToolResponse};
 
@@ -13,14 +14,14 @@ pub fn get_config(config: &Config) -> String {
 
     // Redact sensitive fields
     if !redacted.x_api.client_id.is_empty() {
-        redacted.x_api.client_id = "***REDACTED***".to_string();
+        redacted.x_api.client_id = mask_secret(&redacted.x_api.client_id);
     }
-    if redacted.x_api.client_secret.is_some() {
-        redacted.x_api.client_secret = Some("***REDACTED***".to_string());
-    }
-    if redacted.llm.api_key.is_some() {
-        redacted.llm.api_key = Some("***REDACTED***".to_string());
-    }
+    redacted.x_api.client_secret = redacted
+        .x_api
+        .client_secret
+        .as_ref()
+        .map(|s| mask_secret(s));
+    redacted.llm.api_key = redacted.llm.api_key.as_ref().map(|s| mask_secret(s));
 
     let elapsed = start.elapsed().as_millis() as u64;
     let meta =

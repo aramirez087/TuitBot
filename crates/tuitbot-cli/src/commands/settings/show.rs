@@ -1,6 +1,7 @@
 use anyhow::Result;
 use console::Style;
 use tuitbot_core::config::Config;
+use tuitbot_core::safety::redact::mask_optional_secret;
 
 pub(super) fn show_config(config: &Config) {
     let bold = Style::new().bold();
@@ -90,7 +91,7 @@ pub(super) fn show_config(config: &Config) {
     eprintln!("  Provider:            {}", config.llm.provider);
     eprintln!(
         "  API key:             {}",
-        mask_secret(&config.llm.api_key)
+        mask_optional_secret(&config.llm.api_key)
     );
     eprintln!("  Model:               {}", config.llm.model);
     eprintln!(
@@ -104,7 +105,7 @@ pub(super) fn show_config(config: &Config) {
     eprintln!("  Client ID:           {}", config.x_api.client_id);
     eprintln!(
         "  Client secret:       {}",
-        mask_secret(&config.x_api.client_secret)
+        mask_optional_secret(&config.x_api.client_secret)
     );
 
     // Targets
@@ -293,17 +294,6 @@ pub(super) fn show_config_json(config: &Config) -> Result<()> {
         .map(|_| "***REDACTED***".to_string());
     println!("{}", serde_json::to_string(&config)?);
     Ok(())
-}
-
-pub(super) fn mask_secret(secret: &Option<String>) -> String {
-    match secret {
-        Some(s) if s.len() > 8 => {
-            format!("{}...{}", &s[..4], &s[s.len() - 4..])
-        }
-        Some(s) if !s.is_empty() => "****".to_string(),
-        Some(_) => "(empty)".to_string(),
-        None => "(not set)".to_string(),
-    }
 }
 
 pub(super) fn format_list(items: &[String]) -> String {

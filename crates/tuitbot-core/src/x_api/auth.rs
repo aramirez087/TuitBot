@@ -22,23 +22,13 @@ use tokio::sync::RwLock;
 
 use crate::error::XApiError;
 
+use super::scopes::REQUIRED_SCOPES;
+
 /// X API OAuth 2.0 authorization endpoint.
 const AUTH_URL: &str = "https://x.com/i/oauth2/authorize";
 
 /// X API OAuth 2.0 token endpoint.
 const TOKEN_URL: &str = "https://api.x.com/2/oauth2/token";
-
-/// Required OAuth scopes for the agent.
-const SCOPES: &[&str] = &[
-    "tweet.read",
-    "tweet.write",
-    "users.read",
-    "follows.read",
-    "follows.write",
-    "like.read",
-    "like.write",
-    "offline.access",
-];
 
 /// Pre-expiry refresh window in seconds.
 const REFRESH_WINDOW_SECS: i64 = 300;
@@ -280,7 +270,7 @@ pub async fn authenticate_manual(client_id: &str) -> Result<Tokens, XApiError> {
     let mut auth_builder = client
         .authorize_url(CsrfToken::new_random)
         .set_pkce_challenge(pkce_challenge);
-    for scope in SCOPES {
+    for scope in REQUIRED_SCOPES {
         auth_builder = auth_builder.add_scope(Scope::new(scope.to_string()));
     }
     let (auth_url, csrf_state) = auth_builder.url();
@@ -336,7 +326,7 @@ pub async fn authenticate_callback(
     let mut auth_builder = client
         .authorize_url(CsrfToken::new_random)
         .set_pkce_challenge(pkce_challenge);
-    for scope in SCOPES {
+    for scope in REQUIRED_SCOPES {
         auth_builder = auth_builder.add_scope(Scope::new(scope.to_string()));
     }
     let (auth_url, csrf_state) = auth_builder.url();
@@ -486,7 +476,7 @@ async fn exchange_code(
     let scopes: Vec<String> = token_result
         .scopes()
         .map(|s| s.iter().map(|scope| scope.to_string()).collect())
-        .unwrap_or_else(|| SCOPES.iter().map(|s| s.to_string()).collect());
+        .unwrap_or_else(|| REQUIRED_SCOPES.iter().map(|s| s.to_string()).collect());
 
     let tokens = Tokens {
         access_token,

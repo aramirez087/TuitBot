@@ -1,4 +1,5 @@
 use tuitbot_core::config::Config;
+use tuitbot_core::safety::redact::mask_optional_secret as mask_secret;
 
 use super::helpers::*;
 use super::render::render_config;

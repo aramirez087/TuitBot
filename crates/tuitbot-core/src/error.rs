@@ -69,6 +69,13 @@ pub enum XApiError {
         message: String,
     },
 
+    /// OAuth scope insufficient for the requested operation.
+    #[error("X API scope insufficient: {message}")]
+    ScopeInsufficient {
+        /// Details about missing or insufficient scopes.
+        message: String,
+    },
+
     /// Network-level failure communicating with X API.
     #[error("X API network error: {source}")]
     Network {
@@ -244,6 +251,17 @@ mod tests {
             message: "Forbidden".to_string(),
         };
         assert_eq!(err.to_string(), "X API error (HTTP 403): Forbidden");
+    }
+
+    #[test]
+    fn x_api_error_scope_insufficient_message() {
+        let err = XApiError::ScopeInsufficient {
+            message: "missing tweet.write".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "X API scope insufficient: missing tweet.write"
+        );
     }
 
     #[test]

@@ -7,6 +7,7 @@
 pub mod auth;
 pub mod client;
 pub mod media;
+pub mod scopes;
 pub mod tier;
 pub mod types;
 

@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-02-25T16:36:15.831489+00:00",
+  "timestamp": "2026-02-25T17:13:13.022048+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -16,14 +16,14 @@
         },
         {
           "tool_name": "propose_and_queue_replies",
-          "latency_ms": 4,
+          "latency_ms": 3,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 5,
+      "total_latency_ms": 4,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true

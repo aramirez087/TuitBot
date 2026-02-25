@@ -4,10 +4,11 @@ use anyhow::Result;
 use console::Style;
 use dialoguer::{Input, Select};
 use tuitbot_core::config::Config;
+use tuitbot_core::safety::redact::mask_optional_secret;
 
 use super::helpers::*;
 use super::render::save_flow;
-use super::show::{format_duration, format_list, mask_secret};
+use super::show::{format_duration, format_list};
 
 // ---------------------------------------------------------------------------
 // edit_and_record helpers — reduce 6-8 line blocks to one-liners
@@ -431,7 +432,7 @@ pub(super) fn edit_category_llm(config: &mut Config, tracker: &mut ChangeTracker
 
     let fields = &[
         format!("Provider:  {}", config.llm.provider),
-        format!("API key:   {}", mask_secret(&config.llm.api_key)),
+        format!("API key:   {}", mask_optional_secret(&config.llm.api_key)),
         format!("Model:     {}", config.llm.model),
         format!(
             "Base URL:  {}",
@@ -496,7 +497,7 @@ pub(super) fn edit_category_xapi(config: &mut Config, tracker: &mut ChangeTracke
         format!("Client ID:     {}", config.x_api.client_id),
         format!(
             "Client secret: {}",
-            mask_secret(&config.x_api.client_secret)
+            mask_optional_secret(&config.x_api.client_secret)
         ),
         "Back to categories".to_string(),
     ];

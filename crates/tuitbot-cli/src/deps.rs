@@ -98,7 +98,7 @@ impl RuntimeDeps {
             access_token: stored.access_token.clone(),
             refresh_token: stored.refresh_token.clone().unwrap_or_default(),
             expires_at: stored.expires_at.unwrap_or_else(Utc::now),
-            scopes: Vec::new(),
+            scopes: stored.scopes.clone(),
         };
 
         let token_manager = Arc::new(TokenManager::new(

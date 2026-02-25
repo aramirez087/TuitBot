@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::error::XApiError;
+use crate::safety::redact::redact_secrets;
 use crate::storage::{self, DbPool};
 
 use super::types::{
@@ -113,13 +114,15 @@ impl XApiHttpClient {
         let status = response.status().as_u16();
         let rate_info = Self::parse_rate_limit_headers(response.headers());
 
-        let body = response.text().await.unwrap_or_default();
-        let error_detail = serde_json::from_str::<XApiErrorResponse>(&body).ok();
+        let raw_body = response.text().await.unwrap_or_default();
+        let error_detail = serde_json::from_str::<XApiErrorResponse>(&raw_body).ok();
+        let body = redact_secrets(&raw_body);
 
         let message = error_detail
             .as_ref()
             .and_then(|e| e.detail.clone())
             .unwrap_or_else(|| body.clone());
+        let message = redact_secrets(&message);
 
         match status {
             429 => {
@@ -130,9 +133,21 @@ impl XApiHttpClient {
                 XApiError::RateLimited { retry_after }
             }
             401 => XApiError::AuthExpired,
+            403 if Self::is_scope_insufficient_message(&message) => {
+                XApiError::ScopeInsufficient { message }
+            }
             403 => XApiError::Forbidden { message },
             _ => XApiError::ApiError { status, message },
         }
+    }
+
+    fn is_scope_insufficient_message(message: &str) -> bool {
+        let normalized = message.to_ascii_lowercase();
+        normalized.contains("scope")
+            && (normalized.contains("insufficient")
+                || normalized.contains("missing")
+                || normalized.contains("not granted")
+                || normalized.contains("required"))
     }
 
     /// Record an API call in the usage tracking table (fire-and-forget).
@@ -817,6 +832,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn error_403_scope_message_maps_to_scope_insufficient() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/tweets/search/recent"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(
+                serde_json::json!({"detail": "Missing required OAuth scope: tweet.write"}),
+            ))
+            .mount(&server)
+            .await;
+
+        let result = client.search_tweets("test", 10, None, None).await;
+        match result {
+            Err(XApiError::ScopeInsufficient { message }) => {
+                assert!(message.contains("scope"));
+            }
+            other => panic!("expected ScopeInsufficient, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn error_500_maps_to_api_error() {
         let server = MockServer::start().await;
         let client = setup_client(&server).await;
@@ -833,6 +870,32 @@ mod tests {
         let result = client.get_me().await;
         match result {
             Err(XApiError::ApiError { status, .. }) => assert_eq!(status, 500),
+            other => panic!("expected ApiError, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn error_messages_are_redacted() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users/me"))
+            .respond_with(
+                ResponseTemplate::new(500).set_body_json(
+                    serde_json::json!({"detail": "access_token=abc123 Authorization: Bearer secrettoken"}),
+                ),
+            )
+            .mount(&server)
+            .await;
+
+        let result = client.get_me().await;
+        match result {
+            Err(XApiError::ApiError { message, .. }) => {
+                assert!(!message.contains("abc123"));
+                assert!(!message.contains("secrettoken"));
+                assert!(message.contains("***REDACTED***"));
+            }
             other => panic!("expected ApiError, got: {other:?}"),
         }
     }

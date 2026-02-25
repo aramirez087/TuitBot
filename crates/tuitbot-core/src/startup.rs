@@ -11,6 +11,8 @@ use sha2::{Digest, Sha256};
 use std::fmt;
 use std::path::PathBuf;
 
+use crate::x_api::scopes::{self, ScopeAnalysis, REQUIRED_SCOPES};
+
 // ============================================================================
 // X API OAuth 2.0 endpoints
 // ============================================================================
@@ -23,9 +25,6 @@ pub const X_TOKEN_URL: &str = "https://api.twitter.com/2/oauth2/token";
 
 /// X API users/me endpoint for credential verification.
 pub const X_USERS_ME_URL: &str = "https://api.twitter.com/2/users/me";
-
-/// OAuth scopes required by Tuitbot.
-pub const OAUTH_SCOPES: &str = "tweet.read tweet.write users.read follows.read follows.write like.read like.write offline.access";
 
 // ============================================================================
 // API Tier
@@ -127,6 +126,10 @@ pub struct StoredTokens {
     /// Token expiration timestamp.
     #[serde(default)]
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Granted OAuth scopes returned by X during token exchange.
+    #[serde(default)]
+    pub scopes: Vec<String>,
 }
 
 impl StoredTokens {
@@ -158,6 +161,21 @@ impl StoredTokens {
             Some(_) => "expired".to_string(),
             None => "no expiry set".to_string(),
         }
+    }
+
+    /// Whether this token file includes scope metadata.
+    pub fn has_scope_info(&self) -> bool {
+        !self.scopes.is_empty()
+    }
+
+    /// Check whether a specific scope is granted.
+    pub fn has_scope(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|granted| granted == scope)
+    }
+
+    /// Analyze granted scopes versus required Tuitbot scopes.
+    pub fn analyze_scopes(&self) -> ScopeAnalysis {
+        scopes::analyze_scopes(&self.scopes)
     }
 }
 
@@ -313,12 +331,13 @@ pub fn build_auth_url(
     state: &str,
     code_challenge: &str,
 ) -> String {
+    let oauth_scopes = REQUIRED_SCOPES.join(" ");
     format!(
         "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256",
         X_AUTH_URL,
         url_encode(client_id),
         url_encode(redirect_uri),
-        url_encode(OAUTH_SCOPES),
+        url_encode(&oauth_scopes),
         url_encode(state),
         url_encode(code_challenge),
     )
@@ -361,8 +380,12 @@ pub async fn exchange_auth_code(
     #[derive(Deserialize)]
     struct TokenResponse {
         access_token: String,
+        #[serde(default)]
         refresh_token: Option<String>,
+        #[serde(default)]
         expires_in: Option<i64>,
+        #[serde(default)]
+        scope: Option<String>,
     }
 
     let token_resp: TokenResponse = resp
@@ -373,11 +396,16 @@ pub async fn exchange_auth_code(
     let expires_at = token_resp
         .expires_in
         .map(|secs| chrono::Utc::now() + chrono::TimeDelta::seconds(secs));
+    let scopes = token_resp
+        .scope
+        .map(|s| s.split_whitespace().map(String::from).collect())
+        .unwrap_or_default();
 
     Ok(StoredTokens {
         access_token: token_resp.access_token,
         refresh_token: token_resp.refresh_token,
         expires_at,
+        scopes,
     })
 }
 
@@ -564,6 +592,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: Some(chrono::Utc::now() + chrono::TimeDelta::hours(1)),
+            scopes: vec![],
         };
         assert!(!tokens.is_expired());
     }
@@ -574,6 +603,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: Some(chrono::Utc::now() - chrono::TimeDelta::hours(1)),
+            scopes: vec![],
         };
         assert!(tokens.is_expired());
     }
@@ -584,6 +614,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: None,
+            scopes: vec![],
         };
         assert!(!tokens.is_expired());
     }
@@ -594,6 +625,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: Some(chrono::Utc::now() + chrono::TimeDelta::minutes(102)),
+            scopes: vec![],
         };
         let formatted = tokens.format_expiry();
         assert!(formatted.contains("h"));
@@ -606,6 +638,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: Some(chrono::Utc::now() + chrono::TimeDelta::minutes(30)),
+            scopes: vec![],
         };
         let formatted = tokens.format_expiry();
         assert!(formatted.contains("m"));
@@ -618,6 +651,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: Some(chrono::Utc::now() - chrono::TimeDelta::hours(1)),
+            scopes: vec![],
         };
         assert_eq!(tokens.format_expiry(), "expired");
     }
@@ -628,6 +662,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: None,
+            scopes: vec![],
         };
         assert_eq!(tokens.format_expiry(), "no expiry set");
     }
@@ -642,12 +677,44 @@ mod tests {
                     .expect("valid datetime")
                     .with_timezone(&chrono::Utc),
             ),
+            scopes: vec!["tweet.read".to_string(), "tweet.write".to_string()],
         };
         let json = serde_json::to_string(&tokens).expect("serialize");
         let deserialized: StoredTokens = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.access_token, "access123");
         assert_eq!(deserialized.refresh_token.as_deref(), Some("refresh456"));
         assert!(deserialized.expires_at.is_some());
+        assert_eq!(
+            deserialized.scopes,
+            vec!["tweet.read".to_string(), "tweet.write".to_string()]
+        );
+    }
+
+    #[test]
+    fn stored_tokens_deserialize_without_scopes_defaults_empty() {
+        let json = r#"{
+            "access_token": "access123",
+            "refresh_token": "refresh456",
+            "expires_at": "2026-06-01T12:00:00Z"
+        }"#;
+
+        let tokens: StoredTokens = serde_json::from_str(json).expect("deserialize");
+        assert!(tokens.scopes.is_empty());
+        assert!(!tokens.has_scope_info());
+    }
+
+    #[test]
+    fn stored_tokens_scope_helpers_work() {
+        let tokens = StoredTokens {
+            access_token: "access123".to_string(),
+            refresh_token: Some("refresh456".to_string()),
+            expires_at: None,
+            scopes: vec!["tweet.read".to_string(), "users.read".to_string()],
+        };
+
+        assert!(tokens.has_scope_info());
+        assert!(tokens.has_scope("tweet.read"));
+        assert!(!tokens.has_scope("tweet.write"));
     }
 
     // --- Token File I/O ---
@@ -661,6 +728,7 @@ mod tests {
             access_token: "test_access".to_string(),
             refresh_token: Some("test_refresh".to_string()),
             expires_at: None,
+            scopes: vec!["tweet.read".to_string()],
         };
 
         let json = serde_json::to_string_pretty(&tokens).expect("serialize");
@@ -670,6 +738,7 @@ mod tests {
         let loaded: StoredTokens = serde_json::from_str(&contents).expect("deserialize");
         assert_eq!(loaded.access_token, "test_access");
         assert_eq!(loaded.refresh_token.as_deref(), Some("test_refresh"));
+        assert_eq!(loaded.scopes, vec!["tweet.read".to_string()]);
     }
 
     #[cfg(unix)]
@@ -684,6 +753,7 @@ mod tests {
             access_token: "test".to_string(),
             refresh_token: None,
             expires_at: None,
+            scopes: vec![],
         };
         let json = serde_json::to_string_pretty(&tokens).expect("serialize");
         std::fs::write(&path, &json).expect("write");
