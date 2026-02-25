@@ -1,51 +1,39 @@
 //! Read-only X API tools.
+//!
+//! `get_tweet_by_id`, `get_user_by_username`, and `search_tweets` delegate
+//! to the kernel layer via a [`SocialReadProvider`]. The remaining read tools
+//! still use the X API client directly (to be migrated in future sessions).
 
 use std::time::Instant;
 
+use crate::kernel;
+use crate::provider::x_api::XApiProvider;
 use crate::state::SharedState;
 
 use super::super::response::{ToolMeta, ToolResponse};
-use super::{error_response, no_user_id_response, not_configured_response};
+use super::{no_user_id_response, not_configured_response};
 
-/// Get a single tweet by ID.
+/// Get a single tweet by ID — delegates to kernel.
 pub async fn get_tweet_by_id(state: &SharedState, tweet_id: &str) -> String {
-    let start = Instant::now();
     let client = match state.x_client.as_ref() {
-        Some(c) => c,
-        None => return not_configured_response(start),
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
     };
-
-    match client.get_tweet(tweet_id).await {
-        Ok(tweet) => {
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::success(&tweet)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json()
-        }
-        Err(e) => error_response(&e, start),
-    }
+    let provider = XApiProvider::new(client);
+    kernel::read::get_tweet(&provider, tweet_id).await
 }
 
-/// Look up a user by username.
+/// Look up a user by username — delegates to kernel.
 pub async fn get_user_by_username(state: &SharedState, username: &str) -> String {
-    let start = Instant::now();
     let client = match state.x_client.as_ref() {
-        Some(c) => c,
-        None => return not_configured_response(start),
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
     };
-
-    match client.get_user_by_username(username).await {
-        Ok(user) => {
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::success(&user)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json()
-        }
-        Err(e) => error_response(&e, start),
-    }
+    let provider = XApiProvider::new(client);
+    kernel::read::get_user_by_username(&provider, username).await
 }
 
-/// Search recent tweets.
+/// Search recent tweets — delegates to kernel.
 pub async fn search_tweets(
     state: &SharedState,
     query: &str,
@@ -53,24 +41,12 @@ pub async fn search_tweets(
     since_id: Option<&str>,
     pagination_token: Option<&str>,
 ) -> String {
-    let start = Instant::now();
     let client = match state.x_client.as_ref() {
-        Some(c) => c,
-        None => return not_configured_response(start),
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
     };
-
-    match client
-        .search_tweets(query, max_results, since_id, pagination_token)
-        .await
-    {
-        Ok(resp) => {
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::success(&resp)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json()
-        }
-        Err(e) => error_response(&e, start),
-    }
+    let provider = XApiProvider::new(client);
+    kernel::read::search_tweets(&provider, query, max_results, since_id, pagination_token).await
 }
 
 /// Get mentions for the authenticated user.
@@ -99,7 +75,7 @@ pub async fn get_user_mentions(
                 .with_meta(ToolMeta::new(elapsed))
                 .to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => super::error_response(&e, start),
     }
 }
 
@@ -126,7 +102,7 @@ pub async fn get_user_tweets(
                 .with_meta(ToolMeta::new(elapsed))
                 .to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => super::error_response(&e, start),
     }
 }
 
@@ -156,7 +132,7 @@ pub async fn get_home_timeline(
                 .with_meta(ToolMeta::new(elapsed))
                 .to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => super::error_response(&e, start),
     }
 }
 

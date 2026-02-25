@@ -4,6 +4,9 @@
 //! allowing AI agents to natively discover and call analytics, approval queue,
 //! content generation, scoring, and configuration operations.
 
+pub mod contract;
+mod kernel;
+mod provider;
 mod requests;
 mod server;
 mod state;
