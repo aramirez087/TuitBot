@@ -14,6 +14,7 @@ mod kernel;
 mod provider;
 mod requests;
 mod server;
+pub mod spec;
 mod state;
 mod tools;
 

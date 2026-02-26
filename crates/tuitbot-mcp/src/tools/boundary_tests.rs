@@ -15,6 +15,7 @@ mod tests {
     /// Must stay in sync with `mutation: true` flags in the manifest.
     fn mutation_denylist() -> &'static [&'static str] {
         &[
+            // ── Curated Layer 1 mutations ──
             "x_post_tweet",
             "x_reply_to_tweet",
             "x_quote_tweet",
@@ -37,6 +38,23 @@ mod tests {
             "x_post",
             "x_put",
             "x_delete",
+            // ── Generated Layer 2 mutations ──
+            "x_v2_blocks_create",
+            "x_v2_blocks_delete",
+            "x_v2_lists_create",
+            "x_v2_lists_delete",
+            "x_v2_lists_follow",
+            "x_v2_lists_members_add",
+            "x_v2_lists_members_remove",
+            "x_v2_lists_pin",
+            "x_v2_lists_unfollow",
+            "x_v2_lists_update",
+            "x_v2_mutes_create",
+            "x_v2_mutes_delete",
+            "x_v2_tweets_hide_reply",
+            "x_v2_tweets_unhide_reply",
+            "x_v2_users_pin_tweet",
+            "x_v2_users_unpin_tweet",
         ]
     }
 
@@ -197,7 +215,7 @@ mod tests {
 
     // ── Profile tool counts ─────────────────────────────────────────
 
-    /// Drift guard: Readonly profile tool count (expect 10).
+    /// Drift guard: Readonly profile tool count (10 curated + 4 generated).
     #[test]
     fn readonly_profile_tool_count() {
         let manifest = generate_manifest();
@@ -207,12 +225,12 @@ mod tests {
             .filter(|t| t.profiles.contains(&Profile::Readonly))
             .count();
         assert_eq!(
-            count, 10,
-            "Readonly profile has {count} tools (expected 10)"
+            count, 14,
+            "Readonly profile has {count} tools (expected 14)"
         );
     }
 
-    /// Drift guard: ApiReadonly profile tool count (expect 20).
+    /// Drift guard: ApiReadonly profile tool count (20 curated + 20 generated).
     #[test]
     fn api_readonly_profile_tool_count() {
         let manifest = generate_manifest();
@@ -222,12 +240,12 @@ mod tests {
             .filter(|t| t.profiles.contains(&Profile::ApiReadonly))
             .count();
         assert_eq!(
-            count, 20,
-            "ApiReadonly profile has {count} tools (expected 20)"
+            count, 40,
+            "ApiReadonly profile has {count} tools (expected 40)"
         );
     }
 
-    /// Drift guard: Workflow profile tool count.
+    /// Drift guard: Workflow profile tool count (68 curated + 36 generated).
     #[test]
     fn workflow_profile_tool_count() {
         let manifest = generate_manifest();
@@ -237,8 +255,8 @@ mod tests {
             .filter(|t| t.profiles.contains(&Profile::Workflow))
             .count();
         assert_eq!(
-            wf_count, 68,
-            "Workflow profile has {wf_count} tools (expected 68)"
+            wf_count, 104,
+            "Workflow profile has {wf_count} tools (expected 104)"
         );
     }
 
@@ -674,17 +692,19 @@ mod tests {
         );
     }
 
-    /// tuitbot_version contains '.', mcp_schema_version == "1.0".
+    /// Version triplet: tuitbot_mcp_version is semver, mcp_schema_version
+    /// and x_api_spec_version are non-empty.
     #[test]
-    fn profile_manifest_version_is_semver() {
+    fn profile_manifest_version_triplet() {
         use crate::state::Profile as StateProfile;
         let m = crate::tools::manifest::generate_profile_manifest(StateProfile::Full);
         assert!(
-            m.tuitbot_version.contains('.'),
-            "tuitbot_version '{}' does not look like semver",
-            m.tuitbot_version
+            m.tuitbot_mcp_version.contains('.'),
+            "tuitbot_mcp_version '{}' does not look like semver",
+            m.tuitbot_mcp_version
         );
-        assert_eq!(m.mcp_schema_version, "1.0");
+        assert_eq!(m.mcp_schema_version, crate::spec::MCP_SCHEMA_VERSION);
+        assert_eq!(m.x_api_spec_version, crate::spec::X_API_SPEC_VERSION);
     }
 
     // ── Regression ──────────────────────────────────────────────────

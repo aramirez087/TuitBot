@@ -61,6 +61,8 @@ pub enum ToolCategory {
     Context,
     Composite,
     Meta,
+    List,
+    Moderation,
 }
 
 /// MCP server profile.
@@ -84,9 +86,12 @@ pub enum Lane {
 }
 
 /// Build the complete tool manifest from the source-of-truth lookup table.
+///
+/// Merges curated Layer 1 tools with generated Layer 2 tools from the spec pack.
+/// Output is sorted alphabetically by tool name for determinism.
 pub fn generate_manifest() -> ToolManifest {
     ToolManifest {
-        version: "1.0",
+        version: crate::spec::MCP_SCHEMA_VERSION,
         tools: all_tools(),
     }
 }
@@ -104,10 +109,16 @@ impl From<crate::state::Profile> for Profile {
 }
 
 /// Profile-specific manifest with version metadata and filtered tool list.
+///
+/// Contains a version triplet:
+/// - `tuitbot_mcp_version`: crate version from `CARGO_PKG_VERSION`
+/// - `mcp_schema_version`: manifest format version
+/// - `x_api_spec_version`: spec pack version for generated tools
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ProfileManifest {
-    pub tuitbot_version: String,
+    pub tuitbot_mcp_version: String,
     pub mcp_schema_version: String,
+    pub x_api_spec_version: String,
     pub profile: String,
     pub tool_count: usize,
     pub tools: Vec<ToolEntry>,
@@ -115,19 +126,23 @@ pub struct ProfileManifest {
 
 /// Generate a profile-specific manifest with version metadata.
 ///
-/// Filters `all_tools()` to the requested profile, sorts alphabetically
-/// by tool name for deterministic output, and populates version fields.
+/// Merges curated + generated tools, filters to the requested profile,
+/// sorts alphabetically by tool name for deterministic output, and
+/// populates the version triplet.
 pub fn generate_profile_manifest(profile: crate::state::Profile) -> ProfileManifest {
+    let manifest = generate_manifest();
     let manifest_profile = Profile::from(profile);
-    let mut tools: Vec<ToolEntry> = all_tools()
+    let mut tools: Vec<ToolEntry> = manifest
+        .tools
         .into_iter()
         .filter(|t| t.profiles.contains(&manifest_profile))
         .collect();
     tools.sort_by(|a, b| a.name.cmp(&b.name));
 
     ProfileManifest {
-        tuitbot_version: env!("CARGO_PKG_VERSION").to_string(),
-        mcp_schema_version: "1.0".to_string(),
+        tuitbot_mcp_version: env!("CARGO_PKG_VERSION").to_string(),
+        mcp_schema_version: crate::spec::MCP_SCHEMA_VERSION.to_string(),
+        x_api_spec_version: crate::spec::X_API_SPEC_VERSION.to_string(),
         profile: profile.to_string(),
         tool_count: tools.len(),
         tools,
@@ -242,7 +257,16 @@ const DB_ERR: &[ErrorCode] = &[ErrorCode::DbError];
 /// LLM errors.
 const LLM_ERR: &[ErrorCode] = &[ErrorCode::LlmNotConfigured, ErrorCode::LlmError];
 
-fn all_tools() -> Vec<ToolEntry> {
+/// All tools (curated + generated), sorted by name.
+pub fn all_tools() -> Vec<ToolEntry> {
+    let mut tools = all_curated_tools();
+    tools.extend(crate::spec::generate_spec_tools());
+    tools.sort_by(|a, b| a.name.cmp(&b.name));
+    tools
+}
+
+/// Hand-crafted curated tools (Layer 1).
+fn all_curated_tools() -> Vec<ToolEntry> {
     vec![
         // ── Analytics ────────────────────────────────────────────────
         tool(
@@ -1112,7 +1136,7 @@ mod tests {
     #[test]
     fn manifest_generates_without_panic() {
         let manifest = generate_manifest();
-        assert_eq!(manifest.version, "1.0");
+        assert_eq!(manifest.version, crate::spec::MCP_SCHEMA_VERSION);
         assert!(!manifest.tools.is_empty());
     }
 
