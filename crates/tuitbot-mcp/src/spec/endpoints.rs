@@ -11,9 +11,14 @@ use super::params::{EndpointDef, HttpMethod, ParamDef, ParamType};
 
 // ── Profile shorthands ─────────────────────────────────────────────────
 
-const ALL_THREE: &[Profile] = &[Profile::Workflow, Profile::Readonly, Profile::ApiReadonly];
-const WF_AND_API_RO: &[Profile] = &[Profile::Workflow, Profile::ApiReadonly];
-const WF: &[Profile] = &[Profile::Workflow];
+const ALL_FOUR: &[Profile] = &[
+    Profile::Readonly,
+    Profile::ApiReadonly,
+    Profile::Write,
+    Profile::Admin,
+];
+const WRITE_UP_AND_API_RO: &[Profile] = &[Profile::ApiReadonly, Profile::Write, Profile::Admin];
+const WRITE_UP: &[Profile] = &[Profile::Write, Profile::Admin];
 
 // ── Error code sets ────────────────────────────────────────────────────
 
@@ -137,7 +142,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/tweets",
         category: ToolCategory::Read,
-        profiles: ALL_THREE,
+        profiles: ALL_FOUR,
         scopes: &["tweet.read", "users.read"],
         params: &[
             ParamDef {
@@ -161,7 +166,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/users/by",
         category: ToolCategory::Read,
-        profiles: ALL_THREE,
+        profiles: ALL_FOUR,
         scopes: &["users.read"],
         params: &[
             ParamDef {
@@ -184,7 +189,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/tweets/{id}/retweeted_by",
         category: ToolCategory::Read,
-        profiles: ALL_THREE,
+        profiles: ALL_FOUR,
         scopes: &["tweet.read", "users.read"],
         params: &[
             PARAM_ID,
@@ -203,7 +208,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/tweets/{id}/quote_tweets",
         category: ToolCategory::Read,
-        profiles: ALL_THREE,
+        profiles: ALL_FOUR,
         scopes: &["tweet.read", "users.read"],
         params: &[
             PARAM_ID,
@@ -223,7 +228,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/tweets/counts/recent",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["tweet.read"],
         params: &[
             ParamDef {
@@ -265,7 +270,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Put,
         path: "/2/tweets/{id}/hidden",
         category: ToolCategory::Moderation,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["tweet.read", "tweet.moderate.write"],
         params: &[
             PARAM_ID,
@@ -287,7 +292,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Put,
         path: "/2/tweets/{id}/hidden",
         category: ToolCategory::Moderation,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["tweet.read", "tweet.moderate.write"],
         params: &[
             PARAM_ID,
@@ -310,7 +315,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Put,
         path: "/2/users/{user_id}/pinned_tweet",
         category: ToolCategory::Engage,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["tweet.read", "users.read", "tweet.write"],
         params: &[
             PARAM_USER_ID,
@@ -332,7 +337,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Delete,
         path: "/2/users/{user_id}/pinned_tweet",
         category: ToolCategory::Engage,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["tweet.read", "users.read", "tweet.write"],
         params: &[PARAM_USER_ID],
         error_codes: X_WRITE_ERR,
@@ -346,7 +351,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/lists/{id}",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read"],
         params: &[PARAM_ID, PARAM_LIST_FIELDS, PARAM_EXPANSIONS],
         error_codes: X_READ_ERR,
@@ -359,7 +364,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/users/{user_id}/owned_lists",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -377,7 +382,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Post,
         path: "/2/lists",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write"],
         params: &[
             ParamDef {
@@ -412,7 +417,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Put,
         path: "/2/lists/{id}",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write"],
         params: &[
             PARAM_ID,
@@ -448,7 +453,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Delete,
         path: "/2/lists/{id}",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write"],
         params: &[PARAM_ID],
         error_codes: X_WRITE_ERR,
@@ -461,7 +466,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/lists/{id}/tweets",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read", "tweet.read", "users.read"],
         params: &[
             PARAM_ID,
@@ -481,7 +486,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/lists/{id}/members",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read", "users.read"],
         params: &[
             PARAM_ID,
@@ -499,7 +504,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Post,
         path: "/2/lists/{id}/members",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write", "users.read"],
         params: &[
             PARAM_ID,
@@ -521,7 +526,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Delete,
         path: "/2/lists/{id}/members/{user_id}",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write", "users.read"],
         params: &[PARAM_ID, PARAM_TARGET_USER_ID],
         error_codes: X_WRITE_ERR,
@@ -534,7 +539,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/users/{user_id}/list_memberships",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -552,7 +557,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/lists/{id}/followers",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read", "users.read"],
         params: &[
             PARAM_ID,
@@ -570,7 +575,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Post,
         path: "/2/users/{user_id}/followed_lists",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -592,7 +597,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Delete,
         path: "/2/users/{user_id}/followed_lists/{list_id}",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -614,7 +619,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/users/{user_id}/pinned_lists",
         category: ToolCategory::List,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["list.read", "users.read"],
         params: &[PARAM_USER_ID, PARAM_LIST_FIELDS],
         error_codes: X_READ_ERR,
@@ -627,7 +632,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Post,
         path: "/2/users/{user_id}/pinned_lists",
         category: ToolCategory::List,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["list.write", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -650,7 +655,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/users/{user_id}/muting",
         category: ToolCategory::Moderation,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["mute.read", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -668,7 +673,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Post,
         path: "/2/users/{user_id}/muting",
         category: ToolCategory::Moderation,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["mute.write", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -690,7 +695,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Delete,
         path: "/2/users/{user_id}/muting/{target_user_id}",
         category: ToolCategory::Moderation,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["mute.write", "users.read"],
         params: &[PARAM_USER_ID, PARAM_TARGET_USER_ID],
         error_codes: X_WRITE_ERR,
@@ -704,7 +709,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/users/{user_id}/blocking",
         category: ToolCategory::Moderation,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["block.read", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -722,7 +727,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Post,
         path: "/2/users/{user_id}/blocking",
         category: ToolCategory::Moderation,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["block.write", "users.read"],
         params: &[
             PARAM_USER_ID,
@@ -744,7 +749,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Delete,
         path: "/2/users/{user_id}/blocking/{target_user_id}",
         category: ToolCategory::Moderation,
-        profiles: WF,
+        profiles: WRITE_UP,
         scopes: &["block.write", "users.read"],
         params: &[PARAM_USER_ID, PARAM_TARGET_USER_ID],
         error_codes: X_WRITE_ERR,
@@ -758,7 +763,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/spaces/{id}",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["space.read"],
         params: &[PARAM_ID, PARAM_SPACE_FIELDS, PARAM_EXPANSIONS],
         error_codes: X_READ_ERR,
@@ -771,7 +776,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/spaces",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["space.read"],
         params: &[
             ParamDef {
@@ -794,7 +799,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/spaces/by/creator_ids",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["space.read", "users.read"],
         params: &[
             ParamDef {
@@ -817,7 +822,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/spaces/search",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["space.read"],
         params: &[
             ParamDef {
@@ -847,7 +852,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/spaces/{id}/buyers",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["space.read", "users.read"],
         params: &[PARAM_ID, PARAM_USER_FIELDS],
         error_codes: X_READ_ERR,
@@ -860,7 +865,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         method: HttpMethod::Get,
         path: "/2/spaces/{id}/tweets",
         category: ToolCategory::Read,
-        profiles: WF_AND_API_RO,
+        profiles: WRITE_UP_AND_API_RO,
         scopes: &["space.read", "tweet.read", "users.read"],
         params: &[
             PARAM_ID,

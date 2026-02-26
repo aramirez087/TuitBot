@@ -4,10 +4,11 @@
 //! allowing AI agents to natively discover and call analytics, approval queue,
 //! content generation, scoring, and configuration operations.
 //!
-//! Three runtime profiles are available:
-//! - **`full`** (default): full TuitBot growth features. All 60+ tools.
+//! Four runtime profiles are available:
 //! - **`readonly`**: minimal read-only X tools (10). No DB, no LLM, no mutations.
 //! - **`api-readonly`**: broader read-only X tools (20). No DB, no LLM, no mutations.
+//! - **`write`** (default): standard operating profile. All typed tools including mutations.
+//! - **`admin`**: superset of write. Adds universal request tools. Explicit opt-in.
 
 pub mod contract;
 mod kernel;
@@ -29,7 +30,7 @@ use tuitbot_core::startup;
 use tuitbot_core::storage;
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
-use server::{ApiReadonlyMcpServer, ReadonlyMcpServer, TuitbotMcpServer};
+use server::{AdminMcpServer, ApiReadonlyMcpServer, ReadonlyMcpServer, WriteMcpServer};
 use state::{AppState, ReadonlyState, SharedReadonlyState};
 use tools::idempotency::IdempotencyStore;
 
@@ -41,18 +42,17 @@ pub use tools::manifest::{generate_profile_manifest, ProfileManifest};
 /// Dispatches to the appropriate server implementation based on profile.
 pub async fn run_server(config: Config, profile: Profile) -> anyhow::Result<()> {
     match profile {
-        Profile::Full => run_stdio_server(config).await,
         Profile::Readonly => run_readonly_server(config).await,
         Profile::ApiReadonly => run_api_readonly_server(config).await,
+        Profile::Write => run_write_server(config).await,
+        Profile::Admin => run_admin_server(config).await,
     }
 }
 
-/// Run the full-profile MCP server on stdio transport.
-///
-/// This is the main entry point called by the CLI `tuitbot mcp serve` subcommand
-/// (or `--profile full`). It initializes the database, optionally creates an
-/// LLM provider, and serves MCP tools over stdin/stdout.
-pub async fn run_stdio_server(config: Config) -> anyhow::Result<()> {
+// ── Shared init for write/admin profiles ────────────────────────────────
+
+/// Initialize shared state for write / admin profiles: DB, LLM, X client.
+async fn init_write_state(config: Config) -> anyhow::Result<Arc<AppState>> {
     // Initialize database
     let pool = storage::init_db(&config.storage.db_path).await?;
 
@@ -126,18 +126,44 @@ pub async fn run_stdio_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    let state = Arc::new(AppState {
-        pool: pool.clone(),
+    Ok(Arc::new(AppState {
+        pool,
         config,
         llm_provider,
         x_client,
         authenticated_user_id,
         idempotency: Arc::new(IdempotencyStore::new()),
-    });
+    }))
+}
 
-    let server = TuitbotMcpServer::new(state);
+/// Run the write-profile MCP server on stdio transport (standard operating profile).
+async fn run_write_server(config: Config) -> anyhow::Result<()> {
+    let state = init_write_state(config).await?;
+    let pool = state.pool.clone();
+    let server = WriteMcpServer::new(state);
 
-    tracing::info!("Starting Tuitbot MCP server on stdio (full profile)");
+    tracing::info!("Starting Tuitbot MCP server on stdio (write profile)");
+
+    let service = server
+        .serve(stdio())
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {e}"))?;
+
+    service.waiting().await?;
+
+    // Clean shutdown
+    pool.close().await;
+
+    Ok(())
+}
+
+/// Run the admin-profile MCP server on stdio transport (write + universal requests).
+async fn run_admin_server(config: Config) -> anyhow::Result<()> {
+    let state = init_write_state(config).await?;
+    let pool = state.pool.clone();
+    let server = AdminMcpServer::new(state);
+
+    tracing::info!("Starting Tuitbot MCP server on stdio (admin profile)");
 
     let service = server
         .serve(stdio())

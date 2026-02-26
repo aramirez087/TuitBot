@@ -261,14 +261,14 @@ pub struct McpArgs {
 pub enum McpSubcommand {
     /// Start the MCP server (stdio transport)
     Serve {
-        /// Runtime profile: "full" (default), "readonly" (read-only X tools), or "api-readonly" (broader read-only X tools, no mutations)
-        #[arg(long, default_value = "full")]
+        /// Runtime profile: "write" (default), "readonly", "api-readonly", or "admin"
+        #[arg(long, default_value = "write")]
         profile: String,
     },
     /// Print the tool manifest for a profile (JSON to stdout)
     Manifest {
-        /// Runtime profile: "full" (default), "readonly", or "api-readonly"
-        #[arg(long, default_value = "full")]
+        /// Runtime profile: "write" (default), "readonly", "api-readonly", or "admin"
+        #[arg(long, default_value = "write")]
         profile: String,
     },
 }

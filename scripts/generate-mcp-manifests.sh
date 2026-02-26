@@ -3,14 +3,14 @@
 #
 # Usage: bash scripts/generate-mcp-manifests.sh
 #
-# Produces docs/generated/mcp-manifest-{full,readonly,api-readonly}.json
+# Produces docs/generated/mcp-manifest-{write,admin,readonly,api-readonly}.json
 # Commit these files alongside any tool or profile changes.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$REPO_ROOT/docs/generated"
-PROFILES=(full readonly api-readonly)
+PROFILES=(write admin readonly api-readonly)
 
 mkdir -p "$OUT_DIR"
 

@@ -69,9 +69,10 @@ pub enum ToolCategory {
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum Profile {
-    Workflow,
     Readonly,
     ApiReadonly,
+    Write,
+    Admin,
 }
 
 /// Module lane: whether a tool lives in the shared `tools/` root or
@@ -101,9 +102,10 @@ pub fn generate_manifest() -> ToolManifest {
 impl From<crate::state::Profile> for Profile {
     fn from(p: crate::state::Profile) -> Self {
         match p {
-            crate::state::Profile::Full => Self::Workflow,
             crate::state::Profile::Readonly => Self::Readonly,
             crate::state::Profile::ApiReadonly => Self::ApiReadonly,
+            crate::state::Profile::Write => Self::Write,
+            crate::state::Profile::Admin => Self::Admin,
         }
     }
 }
@@ -177,12 +179,19 @@ fn tool(
     }
 }
 
-/// All three profiles.
-const ALL_THREE: &[Profile] = &[Profile::Workflow, Profile::Readonly, Profile::ApiReadonly];
-/// Workflow + api-readonly (not minimal readonly).
-const WF_AND_API_RO: &[Profile] = &[Profile::Workflow, Profile::ApiReadonly];
-/// Workflow only.
-const WF: &[Profile] = &[Profile::Workflow];
+/// All four profiles.
+const ALL_FOUR: &[Profile] = &[
+    Profile::Readonly,
+    Profile::ApiReadonly,
+    Profile::Write,
+    Profile::Admin,
+];
+/// Write + Admin + ApiReadonly (not minimal readonly).
+const WRITE_UP_AND_API_RO: &[Profile] = &[Profile::ApiReadonly, Profile::Write, Profile::Admin];
+/// Write + Admin (standard operating profiles).
+const WRITE_UP: &[Profile] = &[Profile::Write, Profile::Admin];
+/// Admin only (universal request tools, future ads/admin endpoints).
+const ADMIN_ONLY: &[Profile] = &[Profile::Admin];
 /// Api-readonly only.
 const API_RO: &[Profile] = &[Profile::ApiReadonly];
 
@@ -277,7 +286,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -288,7 +297,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Action Log ───────────────────────────────────────────────
@@ -300,7 +309,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -311,7 +320,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Rate Limits ──────────────────────────────────────────────
@@ -323,7 +332,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Replies ──────────────────────────────────────────────────
@@ -335,7 +344,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -346,7 +355,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Target Accounts ──────────────────────────────────────────
@@ -358,7 +367,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Discovery ────────────────────────────────────────────────
@@ -370,7 +379,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Scoring (pure function on &Config — no DB needed) ────────
@@ -382,7 +391,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             &[ErrorCode::InvalidInput],
         ),
         // ── Approval Queue ───────────────────────────────────────────
@@ -394,7 +403,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -405,7 +414,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -416,7 +425,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::DbError,
                 ErrorCode::NotFound,
@@ -432,7 +441,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[ErrorCode::DbError, ErrorCode::NotFound],
         ),
         tool(
@@ -443,7 +452,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::DbError,
                 ErrorCode::XNotConfigured,
@@ -459,7 +468,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             true,
             true,
-            WF,
+            WRITE_UP,
             LLM_ERR,
         ),
         tool(
@@ -470,7 +479,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             true,
             true,
-            WF,
+            WRITE_UP,
             LLM_ERR,
         ),
         tool(
@@ -481,7 +490,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             true,
             true,
-            WF,
+            WRITE_UP,
             LLM_ERR,
         ),
         // ── Config ───────────────────────────────────────────────────
@@ -493,7 +502,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             &[],
         ),
         tool(
@@ -504,7 +513,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             &[],
         ),
         // ── Capabilities & Health ────────────────────────────────────
@@ -516,7 +525,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             &[],
         ),
         tool(
@@ -527,7 +536,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             &[],
         ),
         // ── Mode & Policy ────────────────────────────────────────────
@@ -539,7 +548,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             &[],
         ),
         tool(
@@ -550,7 +559,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -561,7 +570,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::XApiError,
@@ -584,7 +593,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -595,7 +604,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── X API Core Read (in all 3 profiles) ─────────────────────
@@ -607,7 +616,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_ERR,
         ),
         tool(
@@ -618,7 +627,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_ERR,
         ),
         tool(
@@ -629,7 +638,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_ERR,
         ),
         tool(
@@ -640,7 +649,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_USER_ERR,
         ),
         tool(
@@ -651,7 +660,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_ERR,
         ),
         tool(
@@ -662,7 +671,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_USER_ERR,
         ),
         tool(
@@ -673,7 +682,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            ALL_THREE,
+            ALL_FOUR,
             X_READ_ERR,
         ),
         // ── X API Extended Read (workflow + api-readonly) ────────────
@@ -685,7 +694,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             X_READ_ERR,
         ),
         tool(
@@ -696,7 +705,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             X_READ_ERR,
         ),
         tool(
@@ -707,7 +716,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             X_READ_ERR,
         ),
         tool(
@@ -718,7 +727,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             X_READ_USER_ERR,
         ),
         tool(
@@ -729,7 +738,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             X_READ_ERR,
         ),
         tool(
@@ -740,7 +749,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF_AND_API_RO,
+            WRITE_UP_AND_API_RO,
             X_READ_ERR,
         ),
         tool(
@@ -751,7 +760,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── X API Read (api-readonly only) ──────────────────────────
@@ -775,7 +784,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_WRITE_ERR,
         ),
         tool(
@@ -786,7 +795,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_WRITE_ERR,
         ),
         tool(
@@ -797,7 +806,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_WRITE_ERR,
         ),
         tool(
@@ -808,7 +817,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_WRITE_ERR,
         ),
         tool(
@@ -819,7 +828,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::XRateLimited,
@@ -847,7 +856,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -858,7 +867,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -869,7 +878,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -880,7 +889,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -891,7 +900,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -902,7 +911,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -913,7 +922,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         tool(
@@ -924,7 +933,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             X_ENGAGE_ERR,
         ),
         // ── X API Media (workflow only) ─────────────────────────────
@@ -936,7 +945,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::UnsupportedMediaType,
@@ -955,7 +964,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::ContextError,
@@ -970,7 +979,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::RecommendationError,
@@ -985,7 +994,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[ErrorCode::TopicError, ErrorCode::DbError],
         ),
         // ── Telemetry ────────────────────────────────────────────────
@@ -997,7 +1006,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         tool(
@@ -1008,7 +1017,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             true,
-            WF,
+            WRITE_UP,
             DB_ERR,
         ),
         // ── Composite ────────────────────────────────────────────────
@@ -1020,7 +1029,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::InvalidInput,
@@ -1036,7 +1045,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             true,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::InvalidInput,
                 ErrorCode::LlmNotConfigured,
@@ -1052,7 +1061,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             true,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::InvalidInput,
                 ErrorCode::XNotConfigured,
@@ -1073,14 +1082,14 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             true,
             false,
-            WF,
+            WRITE_UP,
             &[
                 ErrorCode::LlmNotConfigured,
                 ErrorCode::LlmError,
                 ErrorCode::InvalidInput,
             ],
         ),
-        // ── Universal X API Request ──────────────────────────────────
+        // ── Universal X API Request (admin only) ────────────────────
         tool(
             "x_get",
             ToolCategory::Read,
@@ -1089,7 +1098,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF,
+            ADMIN_ONLY,
             X_REQUEST_ERR,
         ),
         tool(
@@ -1100,7 +1109,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF,
+            ADMIN_ONLY,
             X_REQUEST_ERR,
         ),
         tool(
@@ -1111,7 +1120,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF,
+            ADMIN_ONLY,
             X_REQUEST_ERR,
         ),
         tool(
@@ -1122,7 +1131,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             false,
             false,
-            WF,
+            ADMIN_ONLY,
             X_REQUEST_ERR,
         ),
     ]
@@ -1213,7 +1222,7 @@ mod tests {
         let json = serde_json::to_string_pretty(&manifest).unwrap();
         let expected_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../roadmap/artifacts/session-05-tool-manifest.json"
+            "/../../roadmap/artifacts/session-06-tool-manifest.json"
         );
         let expected = std::fs::read_to_string(expected_path);
         match expected {

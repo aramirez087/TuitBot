@@ -1,7 +1,7 @@
-//! MCP server definition with tool routing.
+//! Admin-profile MCP server (all tools including universal requests).
 //!
-//! Implements `ServerHandler` for the Tuitbot MCP server, registering all
-//! tools and dispatching calls to the appropriate tool modules.
+//! Superset of the write profile. Adds `x_get`, `x_post`, `x_put`, `x_delete`
+//! for arbitrary X API endpoint access. Only available when explicitly configured.
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -14,15 +14,15 @@ use crate::tools;
 use crate::tools::response::{ToolMeta, ToolResponse};
 use crate::tools::workflow;
 
-/// Tuitbot MCP server.
+/// Admin-profile MCP server (all tools including universal requests).
 #[derive(Clone)]
-pub struct TuitbotMcpServer {
+pub struct AdminMcpServer {
     state: SharedState,
     tool_router: ToolRouter<Self>,
 }
 
-impl TuitbotMcpServer {
-    /// Create a new MCP server with the given shared state.
+impl AdminMcpServer {
+    /// Create a new admin-profile MCP server with the given shared state.
     pub fn new(state: SharedState) -> Self {
         Self {
             state,
@@ -32,7 +32,7 @@ impl TuitbotMcpServer {
 }
 
 #[tool_router]
-impl TuitbotMcpServer {
+impl AdminMcpServer {
     // --- Analytics ---
 
     /// Get analytics dashboard: follower trend, top topics, engagement rates, and content measurement stats.
@@ -1087,13 +1087,13 @@ fn kv_to_tuples(kv: Option<&[crate::requests::KeyValue]>) -> Option<Vec<(String,
 }
 
 #[tool_handler(router = self.tool_router)]
-impl ServerHandler for TuitbotMcpServer {
+impl ServerHandler for AdminMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Tuitbot MCP Server — autonomous X growth assistant. \
-                 Provides tools for analytics, content generation, approval queue management, \
-                 tweet scoring, and configuration."
+                "Tuitbot Admin MCP Server — full X growth assistant with universal request tools. \
+                 Includes all write-profile tools plus x_get/x_post/x_put/x_delete for \
+                 arbitrary X API endpoint access."
                     .into(),
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),

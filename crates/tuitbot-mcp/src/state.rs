@@ -4,8 +4,8 @@
 //! and optional X API client so that all tool handlers can access
 //! them through the server struct.
 //!
-//! Two state structs exist for three runtime profiles:
-//! - [`AppState`] / [`SharedState`]: full profile (DB + LLM + X client).
+//! Two state structs exist for four runtime profiles:
+//! - [`AppState`] / [`SharedState`]: write / admin profiles (DB + LLM + X client).
 //! - [`ReadonlyState`] / [`SharedReadonlyState`]: readonly / api-readonly profiles (X client only, no DB).
 
 use std::fmt;
@@ -23,22 +23,26 @@ use crate::tools::idempotency::IdempotencyStore;
 
 /// MCP server runtime profile.
 ///
-/// - **`Full`** — full TuitBot growth features. Default. All 60+ tools.
-/// - **`Readonly`** — read-only X tools. No DB, no LLM, no mutations.
+/// - **`Readonly`** — minimal read-only X tools. No DB, no LLM, no mutations.
 /// - **`ApiReadonly`** — broader read-only X tools. No DB, no LLM, no mutations.
+/// - **`Write`** — standard operating profile. All typed tools including mutations. Default.
+/// - **`Admin`** — superset of Write. Adds universal request tools (`x_get`/`x_post`/`x_put`/`x_delete`)
+///   for arbitrary X API endpoint access. Only when explicitly configured.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
-    Full,
     Readonly,
     ApiReadonly,
+    Write,
+    Admin,
 }
 
 impl fmt::Display for Profile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Full => write!(f, "full"),
             Self::Readonly => write!(f, "readonly"),
             Self::ApiReadonly => write!(f, "api-readonly"),
+            Self::Write => write!(f, "write"),
+            Self::Admin => write!(f, "admin"),
         }
     }
 }
@@ -48,19 +52,20 @@ impl FromStr for Profile {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
-            "full" => Ok(Self::Full),
             "readonly" => Ok(Self::Readonly),
             "api-readonly" => Ok(Self::ApiReadonly),
+            "write" | "full" => Ok(Self::Write),
+            "admin" => Ok(Self::Admin),
             other => Err(format!(
-                "unknown profile '{other}'. Valid profiles: full, readonly, api-readonly"
+                "unknown profile '{other}'. Valid profiles: readonly, api-readonly, write, admin"
             )),
         }
     }
 }
 
-// ── Full profile state ──────────────────────────────────────────────
+// ── Write / Admin profile state ─────────────────────────────────────
 
-/// Shared state accessible by all MCP tool handlers (full profile).
+/// Shared state accessible by all MCP tool handlers (write / admin profiles).
 pub struct AppState {
     /// SQLite connection pool.
     pub pool: DbPool,
@@ -104,38 +109,52 @@ mod tests {
 
     #[test]
     fn profile_display() {
-        assert_eq!(Profile::Full.to_string(), "full");
         assert_eq!(Profile::Readonly.to_string(), "readonly");
         assert_eq!(Profile::ApiReadonly.to_string(), "api-readonly");
+        assert_eq!(Profile::Write.to_string(), "write");
+        assert_eq!(Profile::Admin.to_string(), "admin");
     }
 
     #[test]
     fn profile_from_str_valid() {
-        assert_eq!(Profile::from_str("full").unwrap(), Profile::Full);
         assert_eq!(Profile::from_str("readonly").unwrap(), Profile::Readonly);
         assert_eq!(
             Profile::from_str("api-readonly").unwrap(),
             Profile::ApiReadonly
         );
+        assert_eq!(Profile::from_str("write").unwrap(), Profile::Write);
+        assert_eq!(Profile::from_str("admin").unwrap(), Profile::Admin);
         // Case-insensitive variants
-        assert_eq!(Profile::from_str("FULL").unwrap(), Profile::Full);
+        assert_eq!(Profile::from_str("WRITE").unwrap(), Profile::Write);
         assert_eq!(Profile::from_str("ReadOnly").unwrap(), Profile::Readonly);
         assert_eq!(
             Profile::from_str("API-READONLY").unwrap(),
             Profile::ApiReadonly
         );
+        assert_eq!(Profile::from_str("ADMIN").unwrap(), Profile::Admin);
+    }
+
+    #[test]
+    fn profile_from_str_legacy_full_maps_to_write() {
+        assert_eq!(Profile::from_str("full").unwrap(), Profile::Write);
+        assert_eq!(Profile::from_str("FULL").unwrap(), Profile::Write);
     }
 
     #[test]
     fn profile_from_str_invalid() {
         let err = Profile::from_str("unknown").unwrap_err();
         assert!(err.contains("unknown profile"));
-        assert!(err.contains("full, readonly, api-readonly"));
+        assert!(err.contains("readonly, api-readonly, write, admin"));
     }
 
     #[test]
     fn profile_roundtrip() {
-        for variant in [Profile::Full, Profile::Readonly, Profile::ApiReadonly] {
+        for variant in [
+            Profile::Readonly,
+            Profile::ApiReadonly,
+            Profile::Write,
+            Profile::Admin,
+        ] {
             let s = variant.to_string();
             let parsed: Profile = s.parse().unwrap();
             assert_eq!(parsed, variant, "roundtrip failed for {s}");
