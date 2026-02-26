@@ -2,12 +2,12 @@
 
 | Tool | Avg (ms) | P50 (ms) | P95 (ms) | Min (ms) | Max (ms) |
 |------|----------|----------|----------|----------|----------|
-| get_capabilities | 1.068 | 0.975 | 1.685 | 0.654 | 1.685 |
-| health_check | 0.262 | 0.199 | 0.580 | 0.129 | 0.580 |
-| get_stats | 1.562 | 1.346 | 2.735 | 0.983 | 2.735 |
-| list_pending | 0.391 | 0.131 | 1.524 | 0.064 | 1.524 |
-| list_unreplied_tweets_with_limit | 0.290 | 0.113 | 1.036 | 0.072 | 1.036 |
+| get_capabilities | 0.955 | 0.850 | 1.491 | 0.710 | 1.491 |
+| health_check | 0.338 | 0.270 | 0.760 | 0.186 | 0.760 |
+| get_stats | 1.655 | 1.196 | 3.079 | 1.028 | 3.079 |
+| list_pending | 0.313 | 0.134 | 1.059 | 0.094 | 1.059 |
+| list_unreplied_tweets_with_limit | 0.340 | 0.237 | 0.815 | 0.161 | 0.815 |
 
-**Aggregate** — P50: 0.580 ms, P95: 1.685 ms, Min: 0.064 ms, Max: 2.735 ms
+**Aggregate** — P50: 0.710 ms, P95: 1.853 ms, Min: 0.094 ms, Max: 3.079 ms
 
 Migrated: 5 / 27 tools — Schema pass rate: 100%
