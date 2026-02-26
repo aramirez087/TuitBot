@@ -84,6 +84,12 @@ pub struct ToolMeta {
     /// Which provider backend produced this response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_backend: Option<String>,
+    /// Unique correlation ID for mutation audit trail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub correlation_id: Option<String>,
+    /// Advisory rollback guidance for mutation tools.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollback: Option<Value>,
     /// Workflow-specific fields (mode, approval_mode).
     /// Flattened so they appear as top-level keys in JSON.
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
@@ -207,6 +213,8 @@ impl ToolMeta {
             pagination: None,
             retry_count: None,
             provider_backend: None,
+            correlation_id: None,
+            rollback: None,
             workflow: None,
         }
     }
@@ -226,6 +234,18 @@ impl ToolMeta {
     /// Attach retry count to metadata (builder pattern).
     pub fn with_retry_count(mut self, count: u32) -> Self {
         self.retry_count = Some(count);
+        self
+    }
+
+    /// Attach a mutation correlation ID to metadata (builder pattern).
+    pub fn with_correlation_id(mut self, id: impl Into<String>) -> Self {
+        self.correlation_id = Some(id.into());
+        self
+    }
+
+    /// Attach rollback guidance to metadata (builder pattern).
+    pub fn with_rollback(mut self, rollback: Value) -> Self {
+        self.rollback = Some(rollback);
         self
     }
 

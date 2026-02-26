@@ -369,6 +369,29 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             WRITE_UP,
             DB_ERR,
         ),
+        // ── Mutation Audit ──────────────────────────────────────────
+        tool(
+            "get_recent_mutations",
+            ToolCategory::Analytics,
+            Lane::Workflow,
+            false,
+            false,
+            false,
+            true,
+            WRITE_UP,
+            DB_ERR,
+        ),
+        tool(
+            "get_mutation_detail",
+            ToolCategory::Analytics,
+            Lane::Workflow,
+            false,
+            false,
+            false,
+            true,
+            WRITE_UP,
+            DB_ERR,
+        ),
         // ── Rate Limits ──────────────────────────────────────────────
         tool(
             "get_rate_limits",

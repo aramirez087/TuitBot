@@ -12,6 +12,7 @@ pub mod content;
 pub mod context;
 pub mod discovery;
 pub mod health;
+pub mod mutation_audit;
 pub mod policy_gate;
 pub mod rate_limits;
 pub mod replies;

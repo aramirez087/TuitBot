@@ -6,8 +6,9 @@ use serde::Serialize;
 
 use crate::state::SharedState;
 
+use super::audit;
+use super::not_configured_response;
 use super::validate::check_tweet_length;
-use super::{error_response, not_configured_response};
 use crate::tools::response::{ErrorCode, ToolMeta, ToolResponse};
 
 /// Post a new tweet, optionally with media.
@@ -16,13 +17,10 @@ pub async fn post_tweet(state: &SharedState, text: &str, media_ids: Option<&[Str
     if let Some(err) = check_tweet_length(text, start) {
         return err;
     }
-    let params = serde_json::json!({"text": text}).to_string();
-    if let Some(err) = state.idempotency.check_and_record("post_tweet", &params) {
-        return err;
-    }
     if let Some(err) = super::scraper_mutation_guard(state, start) {
         return err;
     }
+    let params = serde_json::json!({"text": text}).to_string();
     match super::super::policy_gate::check_policy(state, "post_tweet", &params, start).await {
         super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
         super::super::policy_gate::GateResult::Proceed => {}
@@ -30,6 +28,10 @@ pub async fn post_tweet(state: &SharedState, text: &str, media_ids: Option<&[Str
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
+    };
+    let guard = match audit::begin_audited_mutation(state, "post_tweet", &params).await {
+        audit::AuditGateResult::Proceed(g) => g,
+        audit::AuditGateResult::EarlyReturn(r) => return r,
     };
 
     let result = match media_ids {
@@ -45,12 +47,11 @@ pub async fn post_tweet(state: &SharedState, text: &str, media_ids: Option<&[Str
                 &state.config.mcp_policy.rate_limits,
             )
             .await;
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::success(&tweet)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json()
+            let result_data = serde_json::to_value(&tweet).unwrap_or_default();
+            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            ToolResponse::success(&tweet).with_meta(meta).to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
     }
 }
 
@@ -65,16 +66,10 @@ pub async fn reply_to_tweet(
     if let Some(err) = check_tweet_length(text, start) {
         return err;
     }
-    let params = serde_json::json!({"text": text, "in_reply_to_id": in_reply_to_id}).to_string();
-    if let Some(err) = state
-        .idempotency
-        .check_and_record("reply_to_tweet", &params)
-    {
-        return err;
-    }
     if let Some(err) = super::scraper_mutation_guard(state, start) {
         return err;
     }
+    let params = serde_json::json!({"text": text, "in_reply_to_id": in_reply_to_id}).to_string();
     match super::super::policy_gate::check_policy(state, "reply_to_tweet", &params, start).await {
         super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
         super::super::policy_gate::GateResult::Proceed => {}
@@ -82,6 +77,10 @@ pub async fn reply_to_tweet(
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
+    };
+    let guard = match audit::begin_audited_mutation(state, "reply_to_tweet", &params).await {
+        audit::AuditGateResult::Proceed(g) => g,
+        audit::AuditGateResult::EarlyReturn(r) => return r,
     };
 
     let result = match media_ids {
@@ -101,12 +100,11 @@ pub async fn reply_to_tweet(
                 &state.config.mcp_policy.rate_limits,
             )
             .await;
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::success(&tweet)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json()
+            let result_data = serde_json::to_value(&tweet).unwrap_or_default();
+            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            ToolResponse::success(&tweet).with_meta(meta).to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
     }
 }
 
@@ -121,13 +119,10 @@ pub async fn quote_tweet(
     if let Some(err) = check_tweet_length(text, start) {
         return err;
     }
-    let params = serde_json::json!({"text": text, "quoted_tweet_id": quoted_tweet_id}).to_string();
-    if let Some(err) = state.idempotency.check_and_record("quote_tweet", &params) {
-        return err;
-    }
     if let Some(err) = super::scraper_mutation_guard(state, start) {
         return err;
     }
+    let params = serde_json::json!({"text": text, "quoted_tweet_id": quoted_tweet_id}).to_string();
     match super::super::policy_gate::check_policy(state, "quote_tweet", &params, start).await {
         super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
         super::super::policy_gate::GateResult::Proceed => {}
@@ -135,6 +130,10 @@ pub async fn quote_tweet(
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
+    };
+    let guard = match audit::begin_audited_mutation(state, "quote_tweet", &params).await {
+        audit::AuditGateResult::Proceed(g) => g,
+        audit::AuditGateResult::EarlyReturn(r) => return r,
     };
 
     // quote_tweet doesn't have a _with_media variant on the trait,
@@ -149,12 +148,11 @@ pub async fn quote_tweet(
                 &state.config.mcp_policy.rate_limits,
             )
             .await;
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::success(&tweet)
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json()
+            let result_data = serde_json::to_value(&tweet).unwrap_or_default();
+            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            ToolResponse::success(&tweet).with_meta(meta).to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
     }
 }
 
@@ -173,6 +171,10 @@ pub async fn delete_tweet(state: &SharedState, tweet_id: &str) -> String {
         Some(c) => c,
         None => return not_configured_response(start),
     };
+    let guard = match audit::begin_audited_mutation(state, "delete_tweet", &params).await {
+        audit::AuditGateResult::Proceed(g) => g,
+        audit::AuditGateResult::EarlyReturn(r) => return r,
+    };
 
     match client.delete_tweet(tweet_id).await {
         Ok(deleted) => {
@@ -182,20 +184,20 @@ pub async fn delete_tweet(state: &SharedState, tweet_id: &str) -> String {
                 &state.config.mcp_policy.rate_limits,
             )
             .await;
-            let elapsed = start.elapsed().as_millis() as u64;
             #[derive(Serialize)]
             struct DeleteResult {
                 deleted: bool,
                 tweet_id: String,
             }
-            ToolResponse::success(DeleteResult {
+            let result = DeleteResult {
                 deleted,
                 tweet_id: tweet_id.to_string(),
-            })
-            .with_meta(ToolMeta::new(elapsed))
-            .to_json()
+            };
+            let result_data = serde_json::to_value(&result).unwrap_or_default();
+            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => error_response(&e, start),
+        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
     }
 }
 
@@ -233,15 +235,13 @@ pub async fn post_thread(
         }
     }
 
-    // Single policy gate for the whole thread.
-    let params =
-        serde_json::json!({"tweet_count": tweets.len(), "first_tweet": tweets[0]}).to_string();
-    if let Some(err) = state.idempotency.check_and_record("post_thread", &params) {
-        return err;
-    }
     if let Some(err) = super::scraper_mutation_guard(state, start) {
         return err;
     }
+
+    // Single policy gate for the whole thread.
+    let params =
+        serde_json::json!({"tweet_count": tweets.len(), "first_tweet": tweets[0]}).to_string();
     match super::super::policy_gate::check_policy(state, "post_thread", &params, start).await {
         super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
         super::super::policy_gate::GateResult::Proceed => {}
@@ -250,6 +250,11 @@ pub async fn post_thread(
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
+    };
+
+    let guard = match audit::begin_audited_mutation(state, "post_thread", &params).await {
+        audit::AuditGateResult::Proceed(g) => g,
+        audit::AuditGateResult::EarlyReturn(r) => return r,
     };
 
     let mut posted_ids: Vec<String> = Vec::with_capacity(tweets.len());
@@ -282,8 +287,14 @@ pub async fn post_thread(
         match result {
             Ok(posted) => posted_ids.push(posted.id),
             Err(e) => {
-                // Partial failure: include posted IDs so agent can resume.
-                let elapsed = start.elapsed().as_millis() as u64;
+                // Partial failure: record in audit trail and include posted IDs.
+                let error_msg = format!(
+                    "Thread failed at tweet {i}: {e}. Posted {}/{} tweets. IDs: {:?}",
+                    posted_ids.len(),
+                    tweets.len(),
+                    posted_ids,
+                );
+                let meta = audit::complete_audited_failure(&guard, state, &error_msg, start).await;
                 let mut resp = ToolResponse::error(
                     ErrorCode::ThreadPartialFailure,
                     format!(
@@ -292,7 +303,7 @@ pub async fn post_thread(
                         tweets.len()
                     ),
                 )
-                .with_meta(ToolMeta::new(elapsed));
+                .with_meta(meta);
                 resp.data = serde_json::json!({
                     "posted_tweet_ids": posted_ids,
                     "failed_at_index": i,
@@ -309,7 +320,6 @@ pub async fn post_thread(
     )
     .await;
 
-    let elapsed = start.elapsed().as_millis() as u64;
     #[derive(Serialize)]
     struct ThreadResult {
         thread_tweet_ids: Vec<String>,
@@ -317,13 +327,14 @@ pub async fn post_thread(
         root_tweet_id: String,
     }
     let root_id = posted_ids[0].clone();
-    ToolResponse::success(ThreadResult {
+    let result = ThreadResult {
         tweet_count: posted_ids.len(),
         thread_tweet_ids: posted_ids,
         root_tweet_id: root_id,
-    })
-    .with_meta(ToolMeta::new(elapsed))
-    .to_json()
+    };
+    let result_data = serde_json::to_value(&result).unwrap_or_default();
+    let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+    ToolResponse::success(result).with_meta(meta).to_json()
 }
 
 // ── Dry-run validation tools ──────────────────────────────────────────

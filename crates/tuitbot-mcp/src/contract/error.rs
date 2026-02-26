@@ -100,10 +100,15 @@ impl ProviderError {
 
 /// Convert a [`ProviderError`] into a [`ToolResponse`] JSON string with elapsed metadata.
 pub fn provider_error_to_response(e: &ProviderError, start: Instant) -> String {
+    provider_error_to_audited_response(e, ToolMeta::new(start.elapsed().as_millis() as u64))
+}
+
+/// Like [`provider_error_to_response`] but with a pre-built [`ToolMeta`]
+/// carrying audit context (correlation ID, etc.).
+pub fn provider_error_to_audited_response(e: &ProviderError, meta: ToolMeta) -> String {
     let code = e.error_code();
     let message = e.error_message();
-    let elapsed = start.elapsed().as_millis() as u64;
-    let mut resp = ToolResponse::error(code, message).with_meta(ToolMeta::new(elapsed));
+    let mut resp = ToolResponse::error(code, message).with_meta(meta);
     // Populate retry_after_ms for rate-limited errors.
     if let ProviderError::RateLimited {
         retry_after: Some(secs),

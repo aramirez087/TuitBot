@@ -15,6 +15,7 @@ pub mod health;
 pub mod llm_usage;
 pub mod mcp_telemetry;
 pub mod media;
+pub mod mutation_audit;
 pub mod rate_limits;
 pub mod replies;
 pub mod scheduled_content;
@@ -169,6 +170,7 @@ mod tests {
         assert!(table_names.contains(&"mcp_telemetry"));
         assert!(table_names.contains(&"approval_edit_history"));
         assert!(table_names.contains(&"media_uploads"));
+        assert!(table_names.contains(&"mutation_audit"));
     }
 
     #[tokio::test]

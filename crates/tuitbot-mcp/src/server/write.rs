@@ -93,6 +93,40 @@ impl WriteMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
+    // --- Mutation Audit ---
+
+    /// Get recent mutation audit entries. Shows what writes the agent has performed, with status and timing.
+    #[tool]
+    async fn get_recent_mutations(
+        &self,
+        Parameters(req): Parameters<GetRecentMutationsRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = workflow::mutation_audit::get_recent_mutations(
+            &self.state.pool,
+            req.limit.unwrap_or(20),
+            req.tool_name.as_deref(),
+            req.status.as_deref(),
+            &self.state.config,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get full detail of a single mutation by correlation ID, including rollback guidance.
+    #[tool]
+    async fn get_mutation_detail(
+        &self,
+        Parameters(req): Parameters<GetMutationDetailRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = workflow::mutation_audit::get_mutation_detail(
+            &self.state.pool,
+            &req.correlation_id,
+            &self.state.config,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
     // --- Rate Limits ---
 
     /// Get current rate limit status for all action types (reply, tweet, thread, search, mention_check).

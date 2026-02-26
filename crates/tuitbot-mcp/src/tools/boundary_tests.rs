@@ -262,8 +262,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Write))
             .count();
-        // 66 curated write + 36 generated - 4 admin-only = 102
-        assert_eq!(count, 102, "Write has {count} tools (expected 102)");
+        // 68 curated write + 36 generated - 4 admin-only = 104
+        assert_eq!(count, 104, "Write has {count} tools (expected 104)");
     }
 
     #[test]
@@ -274,8 +274,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Admin))
             .count();
-        // 70 curated + 36 generated = 106 (superset of write)
-        assert_eq!(count, 106, "Admin has {count} tools (expected 106)");
+        // 72 curated + 36 generated = 108 (superset of write)
+        assert_eq!(count, 108, "Admin has {count} tools (expected 108)");
     }
 
     // ── Mutation safety ─────────────────────────────────────────────
@@ -531,11 +531,11 @@ mod tests {
     fn write_server_tool_count() {
         let source = include_str!("../server/write.rs");
         let fn_names = extract_tool_fn_names(source);
-        // 70 curated - 4 admin-only universal request tools = 66
+        // 72 curated - 4 admin-only universal request tools = 68
         assert_eq!(
             fn_names.len(),
-            66,
-            "write.rs has {} tools (expected 66): {:?}",
+            68,
+            "write.rs has {} tools (expected 68): {:?}",
             fn_names.len(),
             fn_names
         );
@@ -545,11 +545,11 @@ mod tests {
     fn admin_server_tool_count() {
         let source = include_str!("../server/admin.rs");
         let fn_names = extract_tool_fn_names(source);
-        // All 70 curated tools including universal request tools
+        // All 72 curated tools including universal request tools
         assert_eq!(
             fn_names.len(),
-            70,
-            "admin.rs has {} tools (expected 70): {:?}",
+            72,
+            "admin.rs has {} tools (expected 72): {:?}",
             fn_names.len(),
             fn_names
         );

@@ -34,6 +34,24 @@ pub struct SinceHoursRequest {
     pub since_hours: Option<u32>,
 }
 
+// --- Mutation Audit ---
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetRecentMutationsRequest {
+    /// Max entries to return (default: 20, max: 100)
+    pub limit: Option<u32>,
+    /// Filter by tool name (e.g., "post_tweet", "like_tweet")
+    pub tool_name: Option<String>,
+    /// Filter by status: "pending", "success", "failure", "duplicate"
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetMutationDetailRequest {
+    /// The correlation ID of the mutation to look up
+    pub correlation_id: String,
+}
+
 // --- Discovery ---
 
 #[derive(Debug, Deserialize, JsonSchema)]

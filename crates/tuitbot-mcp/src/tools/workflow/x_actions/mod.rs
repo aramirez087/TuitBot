@@ -2,6 +2,7 @@
 //!
 //! Split into submodules by concern: read, write, engage, media, validate.
 
+pub(crate) mod audit;
 mod engage;
 mod media;
 mod read;
@@ -45,6 +46,7 @@ fn not_configured_response(start: Instant) -> String {
 }
 
 /// Helper: build an error response from an XApiError via the ProviderError path.
+#[allow(dead_code)]
 fn error_response(e: &XApiError, start: Instant) -> String {
     provider_error_to_response(&map_x_error(e), start)
 }
