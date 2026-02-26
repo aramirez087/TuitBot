@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.7...tuitbot-cli-v0.1.8) - 2026-02-26
+
+### Added
+
+- Introduce `mcp manifest` command and refactor the MCP server API to include a read-only variant.
+- Introduce and implement `full`, `readonly`, and `api-readonly` MCP profiles with updated routing and tool curation.
+- add comprehensive boundary tests to enforce tool profile safety, mutation restrictions, and read-only integrity, updating artifact reports.
+- Add scripts for generating and checking MCP manifests, update documentation, and refresh evaluation artifacts.
+
+### Other
+
+- update mcp-reference docs tool count back to 64 tools and add update features
+
 ### Added
 
 - Three MCP profiles: `--profile full` (64 tools, default), `--profile readonly` (10 tools), `--profile api-readonly` (20 tools). Read-only profiles are safe by construction — mutation tools are not registered, not policy-blocked.
