@@ -1,0 +1,33 @@
+Session 03 is complete. Here's the summary:
+
+## Session 03 — Expose Flat MCP Utility Profiles
+
+### What was done
+
+**New files created:**
+- `server/toolkit_response.rs` — Shared `ToolkitError` → `CallToolResult` mapping for utility servers
+- `server/utility_readonly.rs` — `UtilityReadonlyMcpServer` (11 direct tool handlers)
+- `server/utility_write.rs` — `UtilityWriteMcpServer` (30+ direct tool handlers)
+- `docs/generated/mcp-manifest-utility-readonly.json` (15 tools)
+- `docs/generated/mcp-manifest-utility-write.json` (67 tools)
+- `docs/roadmap/.../session-03-profiles.md` and `session-03-handoff.md`
+
+**Files modified:**
+- `state.rs` — Added `UtilityReadonly` and `UtilityWrite` profile variants
+- `lib.rs` — 6-profile dispatch, two new server runners using `init_readonly_state()`
+- `server/mod.rs` — New module declarations and re-exports
+- `spec/endpoints.rs` — Updated profile constants for spec-generated tools
+- `spec/generator.rs` — Utility-aware lane/db assignment
+- `tools/manifest.rs` — Profile constants, lane changes, 7 boundary tests, manifest writer
+- Boundary/conformance tests updated for 6-profile model
+
+### CI Status
+- `cargo fmt`: clean
+- `cargo clippy`: clean
+- `cargo test -p tuitbot-mcp`: **414 passed**, 0 failed
+- Workspace: 1 pre-existing flaky test (`env_var_override_approval_mode`) — not introduced by this session
+
+### Key Design Decisions
+- Both utility profiles use `SharedReadonlyState` (no DB, no LLM)
+- Mutation tools in utility profiles use `Lane::Shared` and `requires_db: false`
+- Boundary tests structurally enforce: no workflow tools, no DB/LLM, no mutations in readonly
