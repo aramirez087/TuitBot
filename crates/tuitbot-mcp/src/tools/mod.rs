@@ -13,6 +13,9 @@ pub mod scoring;
 pub mod workflow;
 
 #[cfg(test)]
+pub(crate) mod test_mocks;
+
+#[cfg(test)]
 mod benchmark;
 #[cfg(test)]
 mod boundary_tests;

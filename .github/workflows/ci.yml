@@ -47,6 +47,7 @@ jobs:
           cargo test -p tuitbot-mcp conformance_all -- --exact
           cargo test -p tuitbot-mcp golden_snapshot_matches -- --exact
           cargo test -p tuitbot-mcp session09_expanded_benchmark -- --exact
+          cargo test -p tuitbot-mcp eval_session09_all_scenarios -- --exact
         env:
           RUSTFLAGS: "-D warnings"
 
