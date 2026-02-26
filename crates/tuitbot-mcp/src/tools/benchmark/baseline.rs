@@ -18,7 +18,12 @@ async fn generate_baseline_benchmark() {
         for _ in 0..ITERATIONS {
             let start = Instant::now();
             let result = crate::tools::workflow::capabilities::get_capabilities(
-                &pool, &config, true, false, None,
+                &pool,
+                &config,
+                true,
+                false,
+                None,
+                &[],
             )
             .await;
             times.push(start.elapsed().as_secs_f64() * 1000.0);

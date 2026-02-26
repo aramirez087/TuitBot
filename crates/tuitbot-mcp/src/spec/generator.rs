@@ -57,6 +57,9 @@ fn endpoint_to_tool_entry(ep: &EndpointDef) -> ToolEntry {
         requires_x_client: true,
         requires_llm: false,
         requires_db: ep.method.is_mutation(),
+        requires_scopes: ep.scopes.iter().map(|s| (*s).to_string()).collect(),
+        requires_user_auth: true,
+        requires_elevated_access: false,
         profiles: ep.profiles.to_vec(),
         possible_error_codes: ep.error_codes.to_vec(),
     }

@@ -272,6 +272,7 @@ async fn make_test_state(
         llm_provider,
         x_client,
         authenticated_user_id: Some("u1".to_string()),
+        granted_scopes: vec![],
         idempotency: Arc::new(crate::tools::idempotency::IdempotencyStore::new()),
     })
 }

@@ -40,4 +40,4 @@ pub use params::{EndpointDef, HttpMethod, ParamDef, ParamType};
 pub const X_API_SPEC_VERSION: &str = "1.0.0";
 
 /// Schema version for the manifest format.
-pub const MCP_SCHEMA_VERSION: &str = "1.1";
+pub const MCP_SCHEMA_VERSION: &str = "1.2";

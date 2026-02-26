@@ -75,41 +75,46 @@ async fn init_write_state(config: Config) -> anyhow::Result<Arc<AppState>> {
     };
 
     // Try to initialize X API client (optional — direct X tools won't work without it)
-    let (x_client, authenticated_user_id): (Option<Box<dyn XApiClient>>, Option<String>) =
-        match startup::load_tokens_from_file() {
-            Ok(tokens) if !tokens.is_expired() => {
-                let client = XApiHttpClient::new(tokens.access_token);
-                client.set_pool(pool.clone()).await;
-                match client.get_me().await {
-                    Ok(user) => {
-                        tracing::info!(
-                            username = %user.username,
-                            user_id = %user.id,
-                            "X API client initialized"
-                        );
-                        (Some(Box::new(client)), Some(user.id))
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "X API client created but get_me() failed: {e}. \
-                             Direct X tools will be disabled."
-                        );
-                        (Some(Box::new(client)), None)
-                    }
+    let (x_client, authenticated_user_id, granted_scopes): (
+        Option<Box<dyn XApiClient>>,
+        Option<String>,
+        Vec<String>,
+    ) = match startup::load_tokens_from_file() {
+        Ok(tokens) if !tokens.is_expired() => {
+            let scopes = tokens.scopes.clone();
+            let client = XApiHttpClient::new(tokens.access_token);
+            client.set_pool(pool.clone()).await;
+            match client.get_me().await {
+                Ok(user) => {
+                    tracing::info!(
+                        username = %user.username,
+                        user_id = %user.id,
+                        scopes = ?scopes,
+                        "X API client initialized"
+                    );
+                    (Some(Box::new(client)), Some(user.id), scopes)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "X API client created but get_me() failed: {e}. \
+                         Direct X tools will be disabled."
+                    );
+                    (Some(Box::new(client)), None, scopes)
                 }
             }
-            Ok(_) => {
-                tracing::warn!(
-                    "X API tokens expired. Direct X tools will be disabled. \
-                     Run `tuitbot auth` to re-authenticate."
-                );
-                (None, None)
-            }
-            Err(e) => {
-                tracing::warn!("X API tokens not available: {e}. Direct X tools will be disabled.");
-                (None, None)
-            }
-        };
+        }
+        Ok(_) => {
+            tracing::warn!(
+                "X API tokens expired. Direct X tools will be disabled. \
+                 Run `tuitbot auth` to re-authenticate."
+            );
+            (None, None, vec![])
+        }
+        Err(e) => {
+            tracing::warn!("X API tokens not available: {e}. Direct X tools will be disabled.");
+            (None, None, vec![])
+        }
+    };
 
     // Log provider backend selection.
     let backend = provider::parse_backend(&config.x_api.provider_backend);
@@ -132,6 +137,7 @@ async fn init_write_state(config: Config) -> anyhow::Result<Arc<AppState>> {
         llm_provider,
         x_client,
         authenticated_user_id,
+        granted_scopes,
         idempotency: Arc::new(IdempotencyStore::new()),
     }))
 }

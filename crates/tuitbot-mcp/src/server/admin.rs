@@ -307,8 +307,9 @@ impl AdminMcpServer {
 
     // --- Capabilities ---
 
-    /// Get current capabilities, tier info, rate-limit remaining, and safe recommended max actions.
-    /// Use this before taking actions to know what's available and how many actions are safe.
+    /// Get current capabilities, tier info, scope analysis, endpoint group availability,
+    /// rate-limit remaining, and actionable guidance. Use this before taking actions to know
+    /// what's available, which scopes are missing, and how many actions are safe.
     #[tool]
     async fn get_capabilities(&self) -> Result<CallToolResult, rmcp::ErrorData> {
         let llm_available = self.state.llm_provider.is_some();
@@ -319,6 +320,7 @@ impl AdminMcpServer {
             llm_available,
             x_available,
             self.state.authenticated_user_id.as_deref(),
+            &self.state.granted_scopes,
         )
         .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))

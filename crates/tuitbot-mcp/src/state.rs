@@ -77,6 +77,8 @@ pub struct AppState {
     pub x_client: Option<Box<dyn XApiClient>>,
     /// Authenticated user ID from X API (cached from get_me on startup).
     pub authenticated_user_id: Option<String>,
+    /// OAuth scopes granted by the current token (empty if no token loaded).
+    pub granted_scopes: Vec<String>,
     /// Idempotency guard for mutation dedup.
     pub idempotency: Arc<IdempotencyStore>,
 }

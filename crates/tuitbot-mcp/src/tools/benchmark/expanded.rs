@@ -110,7 +110,8 @@ async fn session09_expanded_benchmark() {
         let p = pool.clone();
         let c = config.clone();
         async move {
-            crate::tools::workflow::capabilities::get_capabilities(&p, &c, true, false, None).await
+            crate::tools::workflow::capabilities::get_capabilities(&p, &c, true, false, None, &[])
+                .await
         }
     })
     .await;
