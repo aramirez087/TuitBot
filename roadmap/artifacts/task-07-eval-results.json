@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-02-26T23:18:48.978721+00:00",
+  "timestamp": "2026-02-26T23:47:23.388377+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -16,14 +16,14 @@
         },
         {
           "tool_name": "propose_and_queue_replies",
-          "latency_ms": 5,
+          "latency_ms": 4,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 8,
+      "total_latency_ms": 7,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true
@@ -50,14 +50,14 @@
         },
         {
           "tool_name": "propose_and_queue_replies",
-          "latency_ms": 5,
+          "latency_ms": 4,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 9,
+      "total_latency_ms": 8,
       "success": true,
       "telemetry_entries": 3,
       "schema_valid": true
@@ -76,14 +76,14 @@
         },
         {
           "tool_name": "get_mcp_error_breakdown",
-          "latency_ms": 0,
+          "latency_ms": 1,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": null
         }
       ],
-      "total_latency_ms": 1,
+      "total_latency_ms": 2,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true

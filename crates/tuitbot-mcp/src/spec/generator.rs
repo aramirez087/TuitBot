@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::tools::manifest::{Lane, ToolEntry};
+use crate::tools::manifest::{Lane, Profile, ToolEntry};
 
 use super::endpoints::SPEC_ENDPOINTS;
 use super::params::{EndpointDef, HttpMethod, ParamType};
@@ -45,18 +45,25 @@ pub struct ToolSchema {
 
 /// Convert one endpoint definition into a manifest [`ToolEntry`].
 fn endpoint_to_tool_entry(ep: &EndpointDef) -> ToolEntry {
+    let has_utility = ep
+        .profiles
+        .iter()
+        .any(|p| matches!(p, Profile::UtilityReadonly | Profile::UtilityWrite));
+    // Mutations that are also in utility profiles use the shared lane and
+    // don't require DB — the DB/audit layer is a write/admin concern only.
+    let (lane, requires_db) = if ep.method.is_mutation() && !has_utility {
+        (Lane::Workflow, true)
+    } else {
+        (Lane::Shared, false)
+    };
     ToolEntry {
         name: ep.tool_name.to_owned(),
         category: ep.category,
-        lane: if ep.method.is_mutation() {
-            Lane::Workflow
-        } else {
-            Lane::Shared
-        },
+        lane,
         mutation: ep.method.is_mutation(),
         requires_x_client: true,
         requires_llm: false,
-        requires_db: ep.method.is_mutation(),
+        requires_db,
         requires_scopes: ep.scopes.iter().map(|s| (*s).to_string()).collect(),
         requires_user_auth: true,
         requires_elevated_access: false,

@@ -28,12 +28,16 @@ use crate::tools::idempotency::IdempotencyStore;
 /// - **`Write`** — standard operating profile. All typed tools including mutations. Default.
 /// - **`Admin`** — superset of Write. Adds universal request tools (`x_get`/`x_post`/`x_put`/`x_delete`)
 ///   for arbitrary X API endpoint access. Only when explicitly configured.
+/// - **`UtilityReadonly`** — flat toolkit surface: stateless X reads + scoring + config. No workflow tools.
+/// - **`UtilityWrite`** — flat toolkit surface: reads + writes + engage. Raw toolkit calls, no policy gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Profile {
     Readonly,
     ApiReadonly,
     Write,
     Admin,
+    UtilityReadonly,
+    UtilityWrite,
 }
 
 impl fmt::Display for Profile {
@@ -43,6 +47,8 @@ impl fmt::Display for Profile {
             Self::ApiReadonly => write!(f, "api-readonly"),
             Self::Write => write!(f, "write"),
             Self::Admin => write!(f, "admin"),
+            Self::UtilityReadonly => write!(f, "utility-readonly"),
+            Self::UtilityWrite => write!(f, "utility-write"),
         }
     }
 }
@@ -56,8 +62,11 @@ impl FromStr for Profile {
             "api-readonly" => Ok(Self::ApiReadonly),
             "write" | "full" => Ok(Self::Write),
             "admin" => Ok(Self::Admin),
+            "utility-readonly" => Ok(Self::UtilityReadonly),
+            "utility-write" => Ok(Self::UtilityWrite),
             other => Err(format!(
-                "unknown profile '{other}'. Valid profiles: readonly, api-readonly, write, admin"
+                "unknown profile '{other}'. Valid profiles: readonly, api-readonly, write, admin, \
+                 utility-readonly, utility-write"
             )),
         }
     }
@@ -115,6 +124,8 @@ mod tests {
         assert_eq!(Profile::ApiReadonly.to_string(), "api-readonly");
         assert_eq!(Profile::Write.to_string(), "write");
         assert_eq!(Profile::Admin.to_string(), "admin");
+        assert_eq!(Profile::UtilityReadonly.to_string(), "utility-readonly");
+        assert_eq!(Profile::UtilityWrite.to_string(), "utility-write");
     }
 
     #[test]
@@ -126,6 +137,14 @@ mod tests {
         );
         assert_eq!(Profile::from_str("write").unwrap(), Profile::Write);
         assert_eq!(Profile::from_str("admin").unwrap(), Profile::Admin);
+        assert_eq!(
+            Profile::from_str("utility-readonly").unwrap(),
+            Profile::UtilityReadonly
+        );
+        assert_eq!(
+            Profile::from_str("utility-write").unwrap(),
+            Profile::UtilityWrite
+        );
         // Case-insensitive variants
         assert_eq!(Profile::from_str("WRITE").unwrap(), Profile::Write);
         assert_eq!(Profile::from_str("ReadOnly").unwrap(), Profile::Readonly);
@@ -134,6 +153,14 @@ mod tests {
             Profile::ApiReadonly
         );
         assert_eq!(Profile::from_str("ADMIN").unwrap(), Profile::Admin);
+        assert_eq!(
+            Profile::from_str("UTILITY-READONLY").unwrap(),
+            Profile::UtilityReadonly
+        );
+        assert_eq!(
+            Profile::from_str("UTILITY-WRITE").unwrap(),
+            Profile::UtilityWrite
+        );
     }
 
     #[test]
@@ -146,7 +173,7 @@ mod tests {
     fn profile_from_str_invalid() {
         let err = Profile::from_str("unknown").unwrap_err();
         assert!(err.contains("unknown profile"));
-        assert!(err.contains("readonly, api-readonly, write, admin"));
+        assert!(err.contains("utility-readonly, utility-write"));
     }
 
     #[test]
@@ -156,6 +183,8 @@ mod tests {
             Profile::ApiReadonly,
             Profile::Write,
             Profile::Admin,
+            Profile::UtilityReadonly,
+            Profile::UtilityWrite,
         ] {
             let s = variant.to_string();
             let parsed: Profile = s.parse().unwrap();

@@ -197,8 +197,14 @@ mod tests {
     fn write_admin_only_tools_have_workflow_lane() {
         let manifest = generate_manifest();
         for t in &manifest.tools {
+            // "write/admin-only" means: in write or admin, but NOT in any
+            // readonly or utility profile. Tools also in utility profiles
+            // use Lane::Shared because they bypass the workflow layer.
+            let has_utility = t.profiles.contains(&Profile::UtilityReadonly)
+                || t.profiles.contains(&Profile::UtilityWrite);
             let write_admin_only = !t.profiles.contains(&Profile::Readonly)
                 && !t.profiles.contains(&Profile::ApiReadonly)
+                && !has_utility
                 && (t.profiles.contains(&Profile::Write) || t.profiles.contains(&Profile::Admin));
             if write_admin_only {
                 assert_eq!(

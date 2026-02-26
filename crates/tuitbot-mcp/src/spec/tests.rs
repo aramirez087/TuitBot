@@ -174,9 +174,16 @@ fn schema_output_is_deterministic() {
 
 #[test]
 fn mutation_tools_require_db_in_generated_entries() {
+    use crate::tools::manifest::Profile;
     let tools = generate_spec_tools();
     for t in &tools {
-        if t.mutation {
+        // Mutation tools in utility profiles bypass the DB audit layer,
+        // so only check workflow-only mutations (no utility profiles).
+        let has_utility = t
+            .profiles
+            .iter()
+            .any(|p| matches!(p, Profile::UtilityReadonly | Profile::UtilityWrite));
+        if t.mutation && !has_utility {
             assert!(
                 t.requires_db,
                 "mutation tool {} should require db for policy/idempotency",
