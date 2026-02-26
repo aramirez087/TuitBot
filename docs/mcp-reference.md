@@ -1,17 +1,17 @@
 # MCP Reference
 
 Tuitbot ships with an MCP server so AI agents can call tools with typed inputs.
-The server exposes up to **104 tools** across four profiles — from minimal
-read-only surfaces to the full autonomous growth co-pilot with universal
-X API access.
+The server exposes up to **109 tools** across four profiles — from minimal
+read-only surfaces to the full autonomous growth co-pilot with maximum
+coverage of the X API v2 public surface.
 
 ## Quick Start
 
 ```bash
-# Write profile (100 tools, default)
+# Write profile (104 tools, default)
 tuitbot mcp serve
 
-# Admin profile (104 tools — adds universal X API request tools)
+# Admin profile (108 tools — adds universal X API request tools)
 tuitbot mcp serve --profile admin
 
 # Read-only profile (14 tools)
@@ -30,8 +30,8 @@ Profile-specific tool manifests are generated from source and committed as JSON:
 
 | Profile | File | Tools |
 |---------|------|-------|
-| `write` | [`docs/generated/mcp-manifest-write.json`](generated/mcp-manifest-write.json) | 100 |
-| `admin` | [`docs/generated/mcp-manifest-admin.json`](generated/mcp-manifest-admin.json) | 104 |
+| `write` | [`docs/generated/mcp-manifest-write.json`](generated/mcp-manifest-write.json) | 104 |
+| `admin` | [`docs/generated/mcp-manifest-admin.json`](generated/mcp-manifest-admin.json) | 108 |
 | `readonly` | [`docs/generated/mcp-manifest-readonly.json`](generated/mcp-manifest-readonly.json) | 14 |
 | `api-readonly` | [`docs/generated/mcp-manifest-api-readonly.json`](generated/mcp-manifest-api-readonly.json) | 40 |
 
@@ -45,8 +45,8 @@ TuitBot's MCP server offers four profiles, each exposing a curated set of tools:
 
 | Profile | Command | Tools | Use Case |
 |---------|---------|-------|----------|
-| **Write** (default) | `tuitbot mcp serve` | 100 | Standard operating profile — reads, writes, analytics, content gen, approval workflows, generated X API tools |
-| **Admin** | `tuitbot mcp serve --profile admin` | 104 | Superset of Write — adds universal request tools (`x_get`/`x_post`/`x_put`/`x_delete`) for arbitrary X API access |
+| **Write** (default) | `tuitbot mcp serve` | 104 | Standard operating profile — reads, writes, analytics, content gen, approval workflows, generated X API tools |
+| **Admin** | `tuitbot mcp serve --profile admin` | 108 | Superset of Write — adds universal request tools (`x_get`/`x_post`/`x_put`/`x_delete`) for ad-hoc X API v2 access |
 | **Read-only** | `tuitbot mcp serve --profile readonly` | 14 | Minimal safe surface — utility, config, health, scoring tools only |
 | **API read-only** | `tuitbot mcp serve --profile api-readonly` | 40 | X API reads + utility tools — no mutations, no workflow tools |
 
@@ -473,7 +473,7 @@ Multi-step operations that replace complex agent orchestration loops:
 
 ## Admin-Only Tools (4)
 
-These universal request tools are available only in the Admin profile (`--profile admin`). They allow arbitrary X API endpoint access and are intended for power users, debugging, and ad-hoc API exploration.
+These universal request tools are available only in the Admin profile (`--profile admin`). They allow access to any X API v2 endpoint reachable with your credentials and are intended for power users, debugging, and ad-hoc API exploration.
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -483,6 +483,66 @@ These universal request tools are available only in the Admin profile (`--profil
 | `x_delete` | Send a DELETE request to any X API v2 endpoint | `endpoint` (required) |
 
 These tools bypass the typed tool layer and send raw requests to the X API. They are excluded from the Write profile to prevent unintended mutations through unstructured API calls.
+
+### Admin Profile Scope
+
+The Admin profile is a **superset of the Write profile**. It adds the 4 universal request tools above — nothing else. Specifically:
+
+**What "admin" means:**
+- Full access to all 104+ Write-profile tools (reads, writes, engagements, analytics, content generation, approval workflows, discovery, policy, telemetry, composite workflows, and generated spec-pack tools).
+- Plus 4 universal request tools (`x_get`, `x_post`, `x_put`, `x_delete`) that can reach any X API v2 endpoint your credentials authorize.
+- Universal request tools are constrained to approved hosts (`api.x.com`, `upload.x.com`, `upload.twitter.com`) — no arbitrary outbound HTTP.
+- All universal request mutations are subject to the same policy engine (approval routing, rate limiting, dry-run mode) as typed tools.
+- All universal request invocations are logged to the `mcp_telemetry` table and the `mutation_audit_log` for mutations.
+
+**What "admin" does NOT mean:**
+- It does not grant X platform admin privileges (account suspension, content moderation at scale, etc.).
+- It does not bypass X API tier restrictions — your API plan's rate limits and endpoint access still apply.
+- It does not grant access to X Ads API, X DM API, or any endpoint outside the v2 public API surface (see [API Coverage Boundaries](#api-coverage-boundaries) below).
+- It does not disable TuitBot's safety policy engine — mutations are still gated.
+
+**When to use Admin:**
+- Exploring X API v2 endpoints that lack a dedicated typed tool (e.g., new endpoints X releases before TuitBot adds typed support).
+- Debugging API responses at the raw HTTP level.
+- One-off operations that don't justify a dedicated tool.
+
+**When not to use Admin:**
+- Standard growth operations — the Write profile covers all normal workflows.
+- Untrusted agents — use `write`, `api-readonly`, or `readonly` to limit blast radius.
+
+---
+
+## API Coverage Boundaries
+
+TuitBot provides maximum coverage of the **X API v2 public surface** — the endpoints available to standard developer accounts. The following surfaces are explicitly out of scope:
+
+### Not Supported
+
+| Surface | Status | Reason |
+|---------|--------|--------|
+| **X Ads API** | Not available | Requires a separate Ads account and Ads API access. TuitBot has no Ads-specific tools and the universal request tools do not route to the Ads API host (`ads-api.x.com`). |
+| **X DM API** | Not available | DM endpoints (`/2/dm_conversations`, `/2/dm_events`) are not implemented as typed tools. The universal request tools could theoretically reach them, but DM automation violates X's Automation Rules and TuitBot enforces this boundary by design. |
+| **X Premium/Enterprise-only endpoints** | Partial | Some v2 endpoints (e.g., full-archive search, Compliance streams, filtered stream rules beyond basic tier) require Premium or Enterprise API plans. TuitBot's typed tools cover standard-tier endpoints. If your plan grants access, the admin-profile universal request tools can reach these endpoints — but TuitBot provides no typed abstractions or safety wrappers for them. |
+| **X API v1.1 (legacy)** | Not targeted | TuitBot targets v2 exclusively. The universal request tools accept v1.1 paths but provide no v1.1-specific handling, pagination, or error mapping. |
+| **Account administration** | Not available | Suspend/unsuspend accounts, manage app permissions, or modify developer portal settings. These are platform-level operations, not API operations. |
+
+### Supported Surface Summary
+
+TuitBot's **109 typed tools** cover the following X API v2 areas:
+
+| Area | Typed Tools | Coverage |
+|------|-------------|----------|
+| Tweet reads (lookup, search, timelines, counts) | 26 | Comprehensive |
+| Tweet writes (post, reply, quote, delete, threads) | 11 | Comprehensive |
+| Engagements (like, retweet, bookmark, follow, pin) | 10 | Comprehensive |
+| User reads (lookup, followers, following) | 6 | Comprehensive |
+| Lists (CRUD, members, followers, pins) | 15 | Comprehensive |
+| Moderation (mutes, blocks, hide replies) | 8 | Comprehensive |
+| Spaces (lookup, search, buyers, tweets) | 6 | Comprehensive |
+| Media (upload) | 1 | Basic |
+| Universal request (admin, any v2 endpoint) | 4 | Escape hatch |
+
+TuitBot aims for **maximum public API coverage** — every standard-tier X API v2 endpoint should have either a typed tool or be reachable via the admin-profile universal request tools.
 
 ---
 
@@ -615,7 +675,7 @@ Dry-run mode:
 | Context intelligence | 3 tools (author profiling, recommendations, topic analysis) | No |
 | Growth analytics via MCP | 7 tools | No |
 | Content generation (LLM-powered) | 4 tools | No |
-| Structured response envelope | v1.0 — all 104 tools return `success`, `data`, `error`, `meta` | Varies |
+| Structured response envelope | v1.0 — all 109 tools return `success`, `data`, `error`, `meta` | Varies |
 | Typed error taxonomy | 28 error codes with `retryable`, `rate_limit_reset`, `policy_decision` | Limited |
 | Per-invocation telemetry | Yes — latency, success, error code, policy decision | No |
 | Operating mode awareness | Yes — Autopilot / Composer mode-specific behavior | No |
@@ -635,8 +695,8 @@ tuitbot auth        # OAuth 2.0 PKCE flow for X
 ### Step 2: Start the MCP server
 
 ```bash
-tuitbot mcp serve                          # Write profile (default, 100 tools)
-tuitbot mcp serve --profile admin          # Admin profile (104 tools, adds universal request tools)
+tuitbot mcp serve                          # Write profile (default, 104 tools)
+tuitbot mcp serve --profile admin          # Admin profile (108 tools, adds universal request tools)
 tuitbot mcp serve --profile api-readonly   # API read-only (40 tools, no mutations)
 tuitbot mcp serve --profile readonly       # Read-only (14 tools, minimal surface)
 ```
@@ -699,7 +759,8 @@ Start with `dry_run_mutations = true` to verify agent behavior.
 - Prefer Composer mode for agents that should assist rather than act autonomously.
 - Prefer JSON outputs for deterministic agent behavior.
 - Use `--profile api-readonly` for agents that only need X API reads without workflow overhead, or `--profile readonly` for the minimal safe surface.
-- Use `--profile admin` only when you need universal X API access (`x_get`/`x_post`/`x_put`/`x_delete`). The default `write` profile covers all standard operations.
+- Use `--profile admin` only when you need universal X API v2 access (`x_get`/`x_post`/`x_put`/`x_delete`). The default `write` profile covers all standard operations.
+- Ads API, DM API, and platform-admin endpoints are not supported. See [API Coverage Boundaries](#api-coverage-boundaries) for details.
 - Scraper backend carries elevated risk of account restrictions — use for read-heavy, experimental integrations only.
 
 ---
@@ -708,7 +769,7 @@ Start with `dry_run_mutations = true` to verify agent behavior.
 
 ### Completed Tasks
 
-1. Four MCP profiles (`write`/100, `admin`/104, `readonly`/14, `api-readonly`/40) with curated tool routing — read-only profiles are safe by construction (mutation tools not registered); admin tools structurally absent from write profile.
+1. Four MCP profiles (`write`/104, `admin`/108, `readonly`/14, `api-readonly`/40) with curated tool routing — read-only profiles are safe by construction (mutation tools not registered); admin tools structurally absent from write profile.
 2. `mcp manifest` CLI command for machine-readable profile introspection (`--format json|table`).
 3. Generated JSON manifest artifacts in `docs/generated/` (`write.json`, `admin.json`, `readonly.json`, `api-readonly.json`).
 4. Boundary tests covering isolation, mutation denylists, lane constraints, dependency validation, error codes, and admin-only tool exclusion from write profile.

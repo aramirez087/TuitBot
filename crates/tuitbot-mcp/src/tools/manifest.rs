@@ -236,7 +236,7 @@ const ALL_FOUR: &[Profile] = &[
 const WRITE_UP_AND_API_RO: &[Profile] = &[Profile::ApiReadonly, Profile::Write, Profile::Admin];
 /// Write + Admin (standard operating profiles).
 const WRITE_UP: &[Profile] = &[Profile::Write, Profile::Admin];
-/// Admin only (universal request tools, future ads/admin endpoints).
+/// Admin only — universal request tools for ad-hoc X API v2 access.
 const ADMIN_ONLY: &[Profile] = &[Profile::Admin];
 /// Api-readonly only.
 const API_RO: &[Profile] = &[Profile::ApiReadonly];

@@ -124,13 +124,16 @@ Use this runbook to verify MCP profile integrity after deployments, profile chan
 Confirm each profile exposes the expected number of tools:
 
 ```bash
-# Full profile (expect 64)
-cargo run -p tuitbot-cli -- mcp manifest --profile full --format json | jq '.tool_count'
+# Write profile (expect 104)
+cargo run -p tuitbot-cli -- mcp manifest --profile write --format json | jq '.tool_count'
 
-# Read-only profile (expect 10)
+# Admin profile (expect 108)
+cargo run -p tuitbot-cli -- mcp manifest --profile admin --format json | jq '.tool_count'
+
+# Read-only profile (expect 14)
 cargo run -p tuitbot-cli -- mcp manifest --profile readonly --format json | jq '.tool_count'
 
-# API read-only profile (expect 20)
+# API read-only profile (expect 40)
 cargo run -p tuitbot-cli -- mcp manifest --profile api-readonly --format json | jq '.tool_count'
 ```
 

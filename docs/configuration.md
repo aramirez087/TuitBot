@@ -132,6 +132,8 @@ max_mutations_per_hour = 20
 
 **Composer mode**: All mutations require approval regardless of `require_approval_for`.
 
+**Admin profile**: When running `tuitbot mcp serve --profile admin`, the universal request tools (`x_get`, `x_post`, `x_put`, `x_delete`) are also subject to this policy engine. Mutations through universal request tools are rate-limited and logged to the mutation audit trail. The admin profile does not bypass safety policy — it only extends the set of available tools. See the [MCP Reference](mcp-reference.md) for profile details.
+
 ## Validation
 
 After any config change, verify with:

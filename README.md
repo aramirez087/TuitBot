@@ -127,7 +127,8 @@ Tuitbot is designed to operate within X's [Automation Rules](https://help.x.com/
 | **Duplicate or near-duplicate content** | The dedup engine (Jaccard similarity >= 0.8) blocks repetitive phrasing across all posts. |
 | **Mass-reply patterns** | Hard cap of 5 replies/day (default) and 1 reply per author per day. |
 | **Engagement manipulation** | No coordinated behavior, vote manipulation, or artificial amplification. |
-| **DM automation** | Not implemented. |
+| **DM automation** | Not implemented and not planned. DM endpoints are not exposed as tools. |
+| **Ads automation** | Not implemented. TuitBot does not connect to the X Ads API (`ads-api.x.com`). |
 
 All generated content is original — created per-request by your configured LLM, not from templates or recycled text.
 
@@ -204,26 +205,28 @@ tuitbot backup                             # back up database
 tuitbot update                             # check for updates
 
 # AI agent integration (MCP)
-tuitbot mcp serve                          # Full profile (64 tools, default)
-tuitbot mcp serve --profile readonly       # Read-only (10 tools)
-tuitbot mcp serve --profile api-readonly   # API read-only (20 tools)
+tuitbot mcp serve                          # Write profile (104 tools, default)
+tuitbot mcp serve --profile admin          # Admin profile (108 tools)
+tuitbot mcp serve --profile api-readonly   # API read-only (40 tools)
+tuitbot mcp serve --profile readonly       # Read-only (14 tools)
 ```
 
 ---
 
 ## AI Agent Integration (MCP)
 
-Tuitbot includes an MCP server that exposes up to **64 tools** for AI agents (Claude Code, custom agents, etc.). Three profiles serve different use cases:
+Tuitbot includes an MCP server that exposes up to **109 tools** for AI agents (Claude Code, custom agents, etc.), covering the X API v2 public surface. Four profiles serve different use cases:
 
 | Profile | Command | Tools | Use Case |
 |---------|---------|-------|----------|
-| **Full** (default) | `tuitbot mcp serve` | 64 | Full growth co-pilot: analytics, content gen, approval workflows |
-| **Read-only** | `tuitbot mcp serve --profile readonly` | 10 | Safe read surface — utility, config, and health tools only |
-| **API read-only** | `tuitbot mcp serve --profile api-readonly` | 20 | X API reads + utility tools, no mutations |
+| **Write** (default) | `tuitbot mcp serve` | 104 | Full growth co-pilot: reads, writes, analytics, content gen, approval workflows, generated X API tools |
+| **Admin** | `tuitbot mcp serve --profile admin` | 108 | Superset of Write — adds universal request tools for ad-hoc X API v2 access |
+| **API read-only** | `tuitbot mcp serve --profile api-readonly` | 40 | X API reads + utility tools, no mutations |
+| **Read-only** | `tuitbot mcp serve --profile readonly` | 14 | Minimal safe surface — utility, config, and health tools only |
 
 Read-only profiles are safe by construction — mutation tools are never registered, not policy-blocked. You get typed schemas, structured errors, rate-limit awareness, retry/backoff, and stable output formats with zero mutation risk.
 
-**Claude Code config (Full — default, recommended):**
+**Claude Code config (Write — default, recommended):**
 
 ```json
 {
@@ -249,9 +252,9 @@ Read-only profiles are safe by construction — mutation tools are never registe
 }
 ```
 
-All tools return structured `{ success, data, error, meta }` envelopes with 28 typed error codes, retryable flags, and per-invocation telemetry. Mutations (full profile only) are policy-gated with approval routing, dry-run mode, and hourly rate limiting.
+All tools return structured `{ success, data, error, meta }` envelopes with 28 typed error codes, retryable flags, and per-invocation telemetry. Mutations are policy-gated with approval routing, dry-run mode, and hourly rate limiting.
 
-Full reference: [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/).
+**Coverage note:** TuitBot targets maximum coverage of the X API v2 public surface. Ads API, DM API, and platform-admin endpoints are not supported. See the [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) for the full API coverage boundary documentation.
 
 ---
 
