@@ -23,6 +23,7 @@ const GITHUB_RELEASES_URL: &str =
     "https://api.github.com/repos/aramirez087/TuitBot/releases?per_page=50";
 
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+const UPDATE_TARGET_ENV: &str = "TUITBOT_UPDATE_TARGET";
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -433,47 +434,49 @@ fn available_asset_names(release: &GitHubRelease) -> String {
 // ---------------------------------------------------------------------------
 
 /// Returns the platform target triple for asset name construction.
-fn platform_target() -> Option<&'static str> {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
-        Some("x86_64-unknown-linux-gnu")
+fn platform_target_for(os: &str, arch: &str) -> Option<&'static str> {
+    match (os, arch) {
+        ("linux", "x86_64") => Some("x86_64-unknown-linux-gnu"),
+        ("linux", "aarch64") => Some("aarch64-unknown-linux-gnu"),
+        ("macos", "x86_64") => Some("x86_64-apple-darwin"),
+        ("macos", "aarch64") => Some("aarch64-apple-darwin"),
+        ("windows", "x86_64") => Some("x86_64-pc-windows-msvc"),
+        _ => None,
     }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    {
-        Some("aarch64-unknown-linux-gnu")
+}
+
+fn resolve_platform_target(override_target: Option<&str>, os: &str, arch: &str) -> Option<String> {
+    if let Some(target) = override_target {
+        let trimmed = target.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
     }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    {
-        Some("x86_64-apple-darwin")
-    }
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    {
-        Some("aarch64-apple-darwin")
-    }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    {
-        Some("x86_64-pc-windows-msvc")
-    }
-    #[cfg(not(any(
-        all(target_os = "linux", target_arch = "x86_64"),
-        all(target_os = "linux", target_arch = "aarch64"),
-        all(target_os = "macos", target_arch = "x86_64"),
-        all(target_os = "macos", target_arch = "aarch64"),
-        all(target_os = "windows", target_arch = "x86_64"),
-    )))]
-    {
-        None
+
+    platform_target_for(os, arch).map(str::to_string)
+}
+
+fn platform_target() -> Option<String> {
+    let override_target = std::env::var(UPDATE_TARGET_ENV).ok();
+    resolve_platform_target(
+        override_target.as_deref(),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )
+}
+
+fn archive_extension_for_target(target: &str) -> &'static str {
+    if target.contains("-windows-") {
+        "zip"
+    } else {
+        "tar.gz"
     }
 }
 
 /// Build the expected asset filename for this platform.
 fn platform_asset_name() -> Option<String> {
     let target = platform_target()?;
-    let ext = if cfg!(target_os = "windows") {
-        "zip"
-    } else {
-        "tar.gz"
-    };
+    let ext = archive_extension_for_target(&target);
     Some(format!("tuitbot-{target}.{ext}"))
 }
 
@@ -859,6 +862,51 @@ mod tests {
         .expect("compatible release");
 
         assert_eq!(version, Version::new(0, 1, 4));
+    }
+
+    #[test]
+    fn platform_target_for_maps_known_targets() {
+        assert_eq!(
+            platform_target_for("linux", "aarch64"),
+            Some("aarch64-unknown-linux-gnu")
+        );
+        assert_eq!(
+            platform_target_for("linux", "x86_64"),
+            Some("x86_64-unknown-linux-gnu")
+        );
+        assert_eq!(
+            platform_target_for("macos", "aarch64"),
+            Some("aarch64-apple-darwin")
+        );
+        assert_eq!(
+            platform_target_for("windows", "x86_64"),
+            Some("x86_64-pc-windows-msvc")
+        );
+        assert_eq!(platform_target_for("linux", "armv7"), None);
+    }
+
+    #[test]
+    fn resolve_platform_target_prefers_override() {
+        let target = resolve_platform_target(Some("aarch64-unknown-linux-gnu"), "macos", "aarch64");
+        assert_eq!(target.as_deref(), Some("aarch64-unknown-linux-gnu"));
+    }
+
+    #[test]
+    fn resolve_platform_target_ignores_empty_override() {
+        let target = resolve_platform_target(Some("   "), "linux", "aarch64");
+        assert_eq!(target.as_deref(), Some("aarch64-unknown-linux-gnu"));
+    }
+
+    #[test]
+    fn archive_extension_for_windows_target_is_zip() {
+        assert_eq!(
+            archive_extension_for_target("x86_64-pc-windows-msvc"),
+            "zip"
+        );
+        assert_eq!(
+            archive_extension_for_target("aarch64-unknown-linux-gnu"),
+            "tar.gz"
+        );
     }
 
     #[test]

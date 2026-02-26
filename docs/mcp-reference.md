@@ -1,7 +1,7 @@
 # MCP Reference
 
 Tuitbot ships with an MCP server so AI agents can call tools with typed inputs.
-The server exposes **65 tools** across three lanes — from raw X API access to
+The server exposes **64 tools** across three lanes — from raw X API access to
 full autonomous growth workflows.
 
 ## Quick Start
@@ -537,7 +537,7 @@ Dry-run mode:
 | Context intelligence | 3 tools (author profiling, recommendations, topic analysis) | No |
 | Growth analytics via MCP | 7 tools | No |
 | Content generation (LLM-powered) | 4 tools | No |
-| Structured response envelope | v1.0 — all 65 tools return `success`, `data`, `error`, `meta` | Varies |
+| Structured response envelope | v1.0 — all 64 tools return `success`, `data`, `error`, `meta` | Varies |
 | Typed error taxonomy | 28 error codes with `retryable`, `rate_limit_reset`, `policy_decision` | Limited |
 | Per-invocation telemetry | Yes — latency, success, error code, policy decision | No |
 | Operating mode awareness | Yes — Autopilot / Composer mode-specific behavior | No |

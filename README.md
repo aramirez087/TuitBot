@@ -203,7 +203,7 @@ tuitbot mcp serve --profile api    # API profile (34 tools)
 
 ## AI Agent Integration (MCP)
 
-Tuitbot includes an MCP server that exposes **65 tools** for AI agents (Claude Code, custom agents, etc.). Three integration lanes serve different use cases:
+Tuitbot includes an MCP server that exposes **64 tools** for AI agents (Claude Code, custom agents, etc.). Three integration lanes serve different use cases:
 
 | Lane | Command | Tools | Use Case |
 |------|---------|-------|----------|
