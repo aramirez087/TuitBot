@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.8...tuitbot-cli-v0.1.9) - 2026-02-26
+
+### Added
+
+- Session 5 — strict 4-profile model (write/admin/readonly/api-readonly)
+- Session 2 — CLI broken pipe hardening
+- Improve initial user onboarding with guided `init`, `test`, and `tick` commands, and introduce profile enrichment features.
+- Overhaul CLI init for simplified setup, expand API surface, and add new documentation and roadmap artifacts.
+- Session 8 — idempotency & auditable mutation history
+- Session 7 — media upload tracking and dry-run validation
+- Session 3 — universal X API request layer (x_get/x_post/x_put/x_delete)
+- Session 11 — release readiness go no go
+- Session 10 — admin ads dm boundaries and positioning
+- Session 9 — conformance harness and coverage report
+- Session 6 — capability discovery and auth metadata
+- Session 4 — spec pack and tool generation pipeline
+
+### Other
+
+- Fix for Windows CI crashes.
+
 ## [0.1.8](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.7...tuitbot-cli-v0.1.8) - 2026-02-26
 
 ### Added
