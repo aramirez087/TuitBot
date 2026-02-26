@@ -1,6 +1,6 @@
 [package]
 name = "tuitbot-cli"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 rust-version = "1.75"
 description = "CLI for Tuitbot autonomous X growth assistant"
@@ -15,8 +15,8 @@ name = "tuitbot"
 path = "src/main.rs"
 
 [dependencies]
-tuitbot-core = { version = "0.1.6", path = "../tuitbot-core" }
-tuitbot-mcp = { version = "0.1.6", path = "../tuitbot-mcp" }
+tuitbot-core = { version = "0.1.7", path = "../tuitbot-core" }
+tuitbot-mcp = { version = "0.1.7", path = "../tuitbot-mcp" }
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 chrono = "0.4"

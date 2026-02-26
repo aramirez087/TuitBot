@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.6...tuitbot-cli-v0.1.7) - 2026-02-26
+
+### Added
+
+- expand X API integration with new methods for users, likes, and bookmarks, and update related scopes and tools.
+- introduce runtime profiles for MCP, decoupling kernel tools for API-only usage
+- improve self-update logic to find the latest compatible release for the current platform from recent GitHub releases.
+- Add comprehensive market domination roadmap content and implement a new scraper provider with mutation guard integration into workflow actions.
+- introduce comprehensive evaluation harness, conformance tests, and benchmarking tools, while restructuring roadmap artifacts
+- Implement golden fixture and conformance tests for tool response schema drift detection, adding session 09 evaluation tools and artifacts, and updating CI.
+- Implement retry logic for social provider calls, introduce idempotency tools, and add new testing utilities.
+- Implement provider-level retry, idempotency, refined error handling, and normalized pagination for improved reliability.
+
+### Other
+
+- Merge branch 'main' into feat/mcp_improvements_new
+- Update performance benchmarks, evaluation results, and report timestamps, and refine test mock comments.
+- introduce `ErrorCode` enum for standardized error handling and update tool contract definitions and metadata.
+- introduce contract, provider, and kernel modules to decouple MCP logic and update related tools and roadmap artifacts.
+
 ## [0.1.6](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.5...tuitbot-cli-v0.1.6) - 2026-02-25
 
 ### Added
