@@ -1,6 +1,6 @@
 # Session 09 — Schema Golden Report
 
-**Generated:** 2026-02-26 16:41 UTC
+**Generated:** 2026-02-26 17:16 UTC
 
 | Family | Tools | Keys | Pagination | Status |
 |--------|-------|------|------------|--------|
