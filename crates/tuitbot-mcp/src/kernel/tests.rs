@@ -6,7 +6,7 @@
 use crate::contract::ProviderError;
 use crate::provider::SocialReadProvider;
 use tuitbot_core::error::XApiError;
-use tuitbot_core::x_api::types::*;
+use tuitbot_core::x_api::types::{self, *};
 use tuitbot_core::x_api::XApiClient;
 
 use super::{engage, read, utils, write};
@@ -146,6 +146,148 @@ impl SocialReadProvider for MockProvider {
             public_metrics: UserMetrics::default(),
         })
     }
+
+    async fn get_followers(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<types::UsersResponse, ProviderError> {
+        Ok(types::UsersResponse {
+            data: vec![User {
+                id: "f1".to_string(),
+                username: "follower1".to_string(),
+                name: "Follower One".to_string(),
+                public_metrics: UserMetrics::default(),
+            }],
+            meta: types::UsersMeta {
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_following(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<types::UsersResponse, ProviderError> {
+        Ok(types::UsersResponse {
+            data: vec![User {
+                id: "fw1".to_string(),
+                username: "following1".to_string(),
+                name: "Following One".to_string(),
+                public_metrics: UserMetrics::default(),
+            }],
+            meta: types::UsersMeta {
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_user_by_id(&self, user_id: &str) -> Result<User, ProviderError> {
+        Ok(User {
+            id: user_id.to_string(),
+            username: "iduser".to_string(),
+            name: "ID User".to_string(),
+            public_metrics: UserMetrics::default(),
+        })
+    }
+
+    async fn get_liked_tweets(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, ProviderError> {
+        Ok(SearchResponse {
+            data: vec![Tweet {
+                id: "liked_1".to_string(),
+                text: "Liked tweet".to_string(),
+                author_id: "a1".to_string(),
+                created_at: String::new(),
+                public_metrics: PublicMetrics::default(),
+                conversation_id: None,
+            }],
+            includes: None,
+            meta: SearchMeta {
+                newest_id: Some("liked_1".to_string()),
+                oldest_id: Some("liked_1".to_string()),
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_bookmarks(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, ProviderError> {
+        Ok(SearchResponse {
+            data: vec![Tweet {
+                id: "bk_1".to_string(),
+                text: "Bookmarked tweet".to_string(),
+                author_id: "a1".to_string(),
+                created_at: String::new(),
+                public_metrics: PublicMetrics::default(),
+                conversation_id: None,
+            }],
+            includes: None,
+            meta: SearchMeta {
+                newest_id: Some("bk_1".to_string()),
+                oldest_id: Some("bk_1".to_string()),
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_users_by_ids(
+        &self,
+        user_ids: &[&str],
+    ) -> Result<types::UsersResponse, ProviderError> {
+        let users = user_ids
+            .iter()
+            .map(|id| User {
+                id: id.to_string(),
+                username: format!("user_{id}"),
+                name: format!("User {id}"),
+                public_metrics: UserMetrics::default(),
+            })
+            .collect::<Vec<_>>();
+        let count = users.len() as u32;
+        Ok(types::UsersResponse {
+            data: users,
+            meta: types::UsersMeta {
+                result_count: count,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_tweet_liking_users(
+        &self,
+        _tweet_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<types::UsersResponse, ProviderError> {
+        Ok(types::UsersResponse {
+            data: vec![User {
+                id: "lu1".to_string(),
+                username: "liker1".to_string(),
+                name: "Liker One".to_string(),
+                public_metrics: UserMetrics::default(),
+            }],
+            meta: types::UsersMeta {
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
 }
 
 // ── Mock provider (errors) ──────────────────────────────────────────
@@ -275,6 +417,18 @@ impl XApiClient for MockXApiClient {
             text: text.to_string(),
         })
     }
+
+    async fn unlike_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Ok(false)
+    }
+
+    async fn bookmark_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Ok(true)
+    }
+
+    async fn unbookmark_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Ok(false)
+    }
 }
 
 // ── Mock X API client (errors) ──────────────────────────────────────
@@ -346,6 +500,22 @@ impl XApiClient for ErrorXApiClient {
     async fn follow_user(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
         Err(XApiError::Forbidden {
             message: "not allowed to follow".to_string(),
+        })
+    }
+
+    async fn unlike_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Err(XApiError::AuthExpired)
+    }
+
+    async fn bookmark_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Err(XApiError::Forbidden {
+            message: "not allowed to bookmark".to_string(),
+        })
+    }
+
+    async fn unbookmark_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Err(XApiError::RateLimited {
+            retry_after: Some(30),
         })
     }
 }
@@ -650,4 +820,130 @@ async fn engage_unretweet_success() {
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed["success"], true);
     assert_eq!(parsed["data"]["retweeted"], false);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// New read tests (followers, following, user_by_id, liked_tweets,
+//                 bookmarks, users_by_ids, tweet_liking_users)
+// ══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn get_followers_success() {
+    let json = read::get_followers(&MockProvider, "u1", 10, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["data"][0]["username"], "follower1");
+    assert_eq!(parsed["data"]["meta"]["result_count"], 1);
+}
+
+#[tokio::test]
+async fn get_following_success() {
+    let json = read::get_following(&MockProvider, "u1", 10, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["data"][0]["username"], "following1");
+}
+
+#[tokio::test]
+async fn get_user_by_id_success() {
+    let json = read::get_user_by_id(&MockProvider, "u42").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["id"], "u42");
+    assert_eq!(parsed["data"]["username"], "iduser");
+}
+
+#[tokio::test]
+async fn get_liked_tweets_success() {
+    let json = read::get_liked_tweets(&MockProvider, "u1", 10, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["data"][0]["id"], "liked_1");
+}
+
+#[tokio::test]
+async fn get_bookmarks_success() {
+    let json = read::get_bookmarks(&MockProvider, "u1", 10, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["data"][0]["id"], "bk_1");
+}
+
+#[tokio::test]
+async fn get_users_by_ids_success() {
+    let json = read::get_users_by_ids(&MockProvider, &["u1", "u2"]).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["data"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn get_users_by_ids_empty_input_error() {
+    let json = read::get_users_by_ids(&MockProvider, &[]).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "invalid_input");
+}
+
+#[tokio::test]
+async fn get_tweet_liking_users_success() {
+    let json = read::get_tweet_liking_users(&MockProvider, "t1", 10, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["data"][0]["username"], "liker1");
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// New engage tests (unlike, bookmark, unbookmark)
+// ══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn engage_unlike_tweet_success() {
+    let json = engage::unlike_tweet(&MockXApiClient, "u1", "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["liked"], false);
+    assert_eq!(parsed["data"]["tweet_id"], "t1");
+}
+
+#[tokio::test]
+async fn engage_unlike_tweet_auth_error() {
+    let json = engage::unlike_tweet(&ErrorXApiClient, "u1", "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_auth_expired");
+}
+
+#[tokio::test]
+async fn engage_bookmark_tweet_success() {
+    let json = engage::bookmark_tweet(&MockXApiClient, "u1", "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["bookmarked"], true);
+    assert_eq!(parsed["data"]["tweet_id"], "t1");
+}
+
+#[tokio::test]
+async fn engage_bookmark_tweet_forbidden_error() {
+    let json = engage::bookmark_tweet(&ErrorXApiClient, "u1", "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_forbidden");
+}
+
+#[tokio::test]
+async fn engage_unbookmark_tweet_success() {
+    let json = engage::unbookmark_tweet(&MockXApiClient, "u1", "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["bookmarked"], false);
+}
+
+#[tokio::test]
+async fn engage_unbookmark_tweet_rate_limited() {
+    let json = engage::unbookmark_tweet(&ErrorXApiClient, "u1", "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_rate_limited");
+    assert_eq!(parsed["error"]["retryable"], true);
 }

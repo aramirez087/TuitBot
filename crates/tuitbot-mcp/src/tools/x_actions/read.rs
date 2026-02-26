@@ -99,6 +99,104 @@ pub async fn get_home_timeline(
     kernel::read::get_home_timeline(&provider, user_id, max_results, pagination_token).await
 }
 
+/// Get followers of a user — delegates to kernel.
+pub async fn get_followers(
+    state: &SharedState,
+    user_id: &str,
+    max_results: u32,
+    pagination_token: Option<&str>,
+) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_followers(&provider, user_id, max_results, pagination_token).await
+}
+
+/// Get accounts a user is following — delegates to kernel.
+pub async fn get_following(
+    state: &SharedState,
+    user_id: &str,
+    max_results: u32,
+    pagination_token: Option<&str>,
+) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_following(&provider, user_id, max_results, pagination_token).await
+}
+
+/// Get a user by their ID — delegates to kernel.
+pub async fn get_user_by_id(state: &SharedState, user_id: &str) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_user_by_id(&provider, user_id).await
+}
+
+/// Get tweets liked by a user — delegates to kernel.
+pub async fn get_liked_tweets(
+    state: &SharedState,
+    user_id: &str,
+    max_results: u32,
+    pagination_token: Option<&str>,
+) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_liked_tweets(&provider, user_id, max_results, pagination_token).await
+}
+
+/// Get the authenticated user's bookmarks — delegates to kernel.
+pub async fn get_bookmarks(
+    state: &SharedState,
+    max_results: u32,
+    pagination_token: Option<&str>,
+) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let user_id = match state.authenticated_user_id.as_deref() {
+        Some(id) => id,
+        None => return no_user_id_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_bookmarks(&provider, user_id, max_results, pagination_token).await
+}
+
+/// Get multiple users by their IDs — delegates to kernel.
+pub async fn get_users_by_ids(state: &SharedState, user_ids: &[&str]) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_users_by_ids(&provider, user_ids).await
+}
+
+/// Get users who liked a specific tweet — delegates to kernel.
+pub async fn get_tweet_liking_users(
+    state: &SharedState,
+    tweet_id: &str,
+    max_results: u32,
+    pagination_token: Option<&str>,
+) -> String {
+    let client = match state.x_client.as_ref() {
+        Some(c) => c.as_ref(),
+        None => return not_configured_response(Instant::now()),
+    };
+    let provider = XApiProvider::new(client);
+    kernel::read::get_tweet_liking_users(&provider, tweet_id, max_results, pagination_token).await
+}
+
 /// Get X API usage statistics.
 pub async fn get_x_usage(state: &SharedState, days: u32) -> String {
     let start = Instant::now();

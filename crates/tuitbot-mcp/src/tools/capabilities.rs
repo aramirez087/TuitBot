@@ -153,6 +153,23 @@ pub async fn get_capabilities(
             },
         ),
         ("x_get_user_tweets", x_available, None),
+        ("x_get_followers", x_available, None),
+        ("x_get_following", x_available, None),
+        ("x_get_user_by_id", x_available, None),
+        ("x_get_liked_tweets", x_available, None),
+        (
+            "x_get_bookmarks",
+            x_available && has_user_id,
+            if !x_available {
+                Some(not_configured)
+            } else if !has_user_id {
+                Some(no_user_id)
+            } else {
+                None
+            },
+        ),
+        ("x_get_users_by_ids", x_available, None),
+        ("x_get_tweet_liking_users", x_available, None),
     ];
 
     // Mutation tools
@@ -162,6 +179,17 @@ pub async fn get_capabilities(
         ("x_quote_tweet", x_available, None),
         (
             "x_like_tweet",
+            x_available && has_user_id,
+            if !x_available {
+                Some(not_configured)
+            } else if !has_user_id {
+                Some(no_user_id)
+            } else {
+                None
+            },
+        ),
+        (
+            "x_unlike_tweet",
             x_available && has_user_id,
             if !x_available {
                 Some(not_configured)
@@ -184,6 +212,28 @@ pub async fn get_capabilities(
         ),
         (
             "x_unfollow_user",
+            x_available && has_user_id,
+            if !x_available {
+                Some(not_configured)
+            } else if !has_user_id {
+                Some(no_user_id)
+            } else {
+                None
+            },
+        ),
+        (
+            "x_bookmark_tweet",
+            x_available && has_user_id,
+            if !x_available {
+                Some(not_configured)
+            } else if !has_user_id {
+                Some(no_user_id)
+            } else {
+                None
+            },
+        ),
+        (
+            "x_unbookmark_tweet",
             x_available && has_user_id,
             if !x_available {
                 Some(not_configured)
@@ -339,7 +389,7 @@ mod tests {
         assert_eq!(dt["x_client_available"], false);
         assert!(dt["authenticated_user_id"].is_null());
         let tools = dt["tools"].as_array().expect("tools array");
-        assert_eq!(tools.len(), 11);
+        assert_eq!(tools.len(), 21);
         for tool in tools {
             assert_eq!(tool["available"], false);
             assert!(tool["reason"].is_string());
@@ -359,7 +409,7 @@ mod tests {
         assert_eq!(dt["x_client_available"], true);
         assert_eq!(dt["authenticated_user_id"], "u1");
         let tools = dt["tools"].as_array().expect("tools array");
-        assert_eq!(tools.len(), 11);
+        assert_eq!(tools.len(), 21);
         for tool in tools {
             assert_eq!(
                 tool["available"], true,

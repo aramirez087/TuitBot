@@ -12,10 +12,10 @@ use crate::safety::redact::redact_secrets;
 use crate::storage::{self, DbPool};
 
 use super::types::{
-    ActionResultResponse, DeleteTweetResponse, FollowUserRequest, LikeTweetRequest, MediaId,
-    MediaPayload, MediaType, MentionResponse, PostTweetRequest, PostTweetResponse, PostedTweet,
-    RateLimitInfo, ReplyTo, RetweetRequest, SearchResponse, SingleTweetResponse, Tweet, User,
-    UserResponse, XApiErrorResponse,
+    ActionResultResponse, BookmarkTweetRequest, DeleteTweetResponse, FollowUserRequest,
+    LikeTweetRequest, MediaId, MediaPayload, MediaType, MentionResponse, PostTweetRequest,
+    PostTweetResponse, PostedTweet, RateLimitInfo, ReplyTo, RetweetRequest, SearchResponse,
+    SingleTweetResponse, Tweet, User, UserResponse, UsersResponse, XApiErrorResponse,
 };
 use super::XApiClient;
 
@@ -656,6 +656,209 @@ impl XApiClient for XApiHttpClient {
             .await
             .map_err(|e| XApiError::Network { source: e })
     }
+
+    async fn unlike_tweet(&self, user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
+        tracing::debug!(user_id = %user_id, tweet_id = %tweet_id, "Unliking tweet");
+        let path = format!("/users/{user_id}/likes/{tweet_id}");
+
+        let response = self.delete(&path).await?;
+        let resp: ActionResultResponse = response
+            .json()
+            .await
+            .map_err(|e| XApiError::Network { source: e })?;
+        Ok(resp.data.result)
+    }
+
+    async fn get_followers(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        tracing::debug!(user_id = %user_id, max_results = max_results, "Getting followers");
+        let path = format!("/users/{user_id}/followers");
+        let max_str = max_results.to_string();
+        let mut params = vec![
+            ("max_results", max_str.as_str()),
+            ("user.fields", USER_FIELDS),
+        ];
+
+        let pagination_token_owned;
+        if let Some(pt) = pagination_token {
+            pagination_token_owned = pt.to_string();
+            params.push(("pagination_token", &pagination_token_owned));
+        }
+
+        let response = self.get(&path, &params).await?;
+        response
+            .json::<UsersResponse>()
+            .await
+            .map_err(|e| XApiError::Network { source: e })
+    }
+
+    async fn get_following(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        tracing::debug!(user_id = %user_id, max_results = max_results, "Getting following");
+        let path = format!("/users/{user_id}/following");
+        let max_str = max_results.to_string();
+        let mut params = vec![
+            ("max_results", max_str.as_str()),
+            ("user.fields", USER_FIELDS),
+        ];
+
+        let pagination_token_owned;
+        if let Some(pt) = pagination_token {
+            pagination_token_owned = pt.to_string();
+            params.push(("pagination_token", &pagination_token_owned));
+        }
+
+        let response = self.get(&path, &params).await?;
+        response
+            .json::<UsersResponse>()
+            .await
+            .map_err(|e| XApiError::Network { source: e })
+    }
+
+    async fn get_user_by_id(&self, user_id: &str) -> Result<User, XApiError> {
+        tracing::debug!(user_id = %user_id, "Getting user by ID");
+        let path = format!("/users/{user_id}");
+        let params = [("user.fields", USER_FIELDS)];
+
+        let response = self.get(&path, &params).await?;
+        let resp: UserResponse = response
+            .json()
+            .await
+            .map_err(|e| XApiError::Network { source: e })?;
+        Ok(resp.data)
+    }
+
+    async fn get_liked_tweets(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        tracing::debug!(user_id = %user_id, max_results = max_results, "Getting liked tweets");
+        let path = format!("/users/{user_id}/liked_tweets");
+        let max_str = max_results.to_string();
+        let mut params = vec![
+            ("max_results", max_str.as_str()),
+            ("tweet.fields", TWEET_FIELDS),
+            ("expansions", EXPANSIONS),
+            ("user.fields", USER_FIELDS),
+        ];
+
+        let pagination_token_owned;
+        if let Some(pt) = pagination_token {
+            pagination_token_owned = pt.to_string();
+            params.push(("pagination_token", &pagination_token_owned));
+        }
+
+        let response = self.get(&path, &params).await?;
+        response
+            .json::<SearchResponse>()
+            .await
+            .map_err(|e| XApiError::Network { source: e })
+    }
+
+    async fn get_bookmarks(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        tracing::debug!(user_id = %user_id, max_results = max_results, "Getting bookmarks");
+        let path = format!("/users/{user_id}/bookmarks");
+        let max_str = max_results.to_string();
+        let mut params = vec![
+            ("max_results", max_str.as_str()),
+            ("tweet.fields", TWEET_FIELDS),
+            ("expansions", EXPANSIONS),
+            ("user.fields", USER_FIELDS),
+        ];
+
+        let pagination_token_owned;
+        if let Some(pt) = pagination_token {
+            pagination_token_owned = pt.to_string();
+            params.push(("pagination_token", &pagination_token_owned));
+        }
+
+        let response = self.get(&path, &params).await?;
+        response
+            .json::<SearchResponse>()
+            .await
+            .map_err(|e| XApiError::Network { source: e })
+    }
+
+    async fn bookmark_tweet(&self, user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
+        tracing::debug!(user_id = %user_id, tweet_id = %tweet_id, "Bookmarking tweet");
+        let path = format!("/users/{user_id}/bookmarks");
+        let body = BookmarkTweetRequest {
+            tweet_id: tweet_id.to_string(),
+        };
+
+        let response = self.post_json(&path, &body).await?;
+        let resp: ActionResultResponse = response
+            .json()
+            .await
+            .map_err(|e| XApiError::Network { source: e })?;
+        Ok(resp.data.result)
+    }
+
+    async fn unbookmark_tweet(&self, user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
+        tracing::debug!(user_id = %user_id, tweet_id = %tweet_id, "Unbookmarking tweet");
+        let path = format!("/users/{user_id}/bookmarks/{tweet_id}");
+
+        let response = self.delete(&path).await?;
+        let resp: ActionResultResponse = response
+            .json()
+            .await
+            .map_err(|e| XApiError::Network { source: e })?;
+        Ok(resp.data.result)
+    }
+
+    async fn get_users_by_ids(&self, user_ids: &[&str]) -> Result<UsersResponse, XApiError> {
+        tracing::debug!(count = user_ids.len(), "Getting users by IDs");
+        let ids = user_ids.join(",");
+        let params = [("ids", ids.as_str()), ("user.fields", USER_FIELDS)];
+
+        let response = self.get("/users", &params).await?;
+        response
+            .json::<UsersResponse>()
+            .await
+            .map_err(|e| XApiError::Network { source: e })
+    }
+
+    async fn get_tweet_liking_users(
+        &self,
+        tweet_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        tracing::debug!(tweet_id = %tweet_id, max_results = max_results, "Getting liking users");
+        let path = format!("/tweets/{tweet_id}/liking_users");
+        let max_str = max_results.to_string();
+        let mut params = vec![
+            ("max_results", max_str.as_str()),
+            ("user.fields", USER_FIELDS),
+        ];
+
+        let pagination_token_owned;
+        if let Some(pt) = pagination_token {
+            pagination_token_owned = pt.to_string();
+            params.push(("pagination_token", &pagination_token_owned));
+        }
+
+        let response = self.get(&path, &params).await?;
+        response
+            .json::<UsersResponse>()
+            .await
+            .map_err(|e| XApiError::Network { source: e })
+    }
 }
 
 #[cfg(test)]
@@ -1152,6 +1355,229 @@ mod tests {
             .expect("home timeline");
         assert_eq!(resp.data.len(), 1);
         assert_eq!(resp.data[0].text, "Home tweet");
+    }
+
+    #[tokio::test]
+    async fn unlike_tweet_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/users/u1/likes/t1"))
+            .and(header("Authorization", "Bearer test-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": {"liked": false}
+            })))
+            .mount(&server)
+            .await;
+
+        let result = client.unlike_tweet("u1", "t1").await.expect("unlike");
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn get_followers_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users/u1/followers"))
+            .and(query_param("max_results", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [{"id": "f1", "username": "follower1", "name": "Follower One"}],
+                "meta": {"result_count": 1}
+            })))
+            .mount(&server)
+            .await;
+
+        let resp = client
+            .get_followers("u1", 10, None)
+            .await
+            .expect("followers");
+        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.data[0].username, "follower1");
+    }
+
+    #[tokio::test]
+    async fn get_following_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users/u1/following"))
+            .and(query_param("max_results", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [{"id": "fw1", "username": "following1", "name": "Following One"}],
+                "meta": {"result_count": 1}
+            })))
+            .mount(&server)
+            .await;
+
+        let resp = client
+            .get_following("u1", 10, None)
+            .await
+            .expect("following");
+        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.data[0].username, "following1");
+    }
+
+    #[tokio::test]
+    async fn get_user_by_id_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users/u123"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": {
+                    "id": "u123",
+                    "username": "iduser",
+                    "name": "ID User",
+                    "public_metrics": {"followers_count": 42, "following_count": 10, "tweet_count": 99}
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let user = client.get_user_by_id("u123").await.expect("user by id");
+        assert_eq!(user.id, "u123");
+        assert_eq!(user.username, "iduser");
+        assert_eq!(user.public_metrics.followers_count, 42);
+    }
+
+    #[tokio::test]
+    async fn get_liked_tweets_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users/u1/liked_tweets"))
+            .and(query_param("max_results", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [{"id": "lt1", "text": "Liked tweet", "author_id": "a1"}],
+                "meta": {"result_count": 1}
+            })))
+            .mount(&server)
+            .await;
+
+        let resp = client
+            .get_liked_tweets("u1", 10, None)
+            .await
+            .expect("liked tweets");
+        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.data[0].text, "Liked tweet");
+    }
+
+    #[tokio::test]
+    async fn get_bookmarks_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users/u1/bookmarks"))
+            .and(query_param("max_results", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [{"id": "bk1", "text": "Bookmarked tweet", "author_id": "a1"}],
+                "meta": {"result_count": 1}
+            })))
+            .mount(&server)
+            .await;
+
+        let resp = client
+            .get_bookmarks("u1", 10, None)
+            .await
+            .expect("bookmarks");
+        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.data[0].text, "Bookmarked tweet");
+    }
+
+    #[tokio::test]
+    async fn bookmark_tweet_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/users/u1/bookmarks"))
+            .and(header("Authorization", "Bearer test-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": {"bookmarked": true}
+            })))
+            .mount(&server)
+            .await;
+
+        let result = client.bookmark_tweet("u1", "t1").await.expect("bookmark");
+        assert!(result);
+    }
+
+    #[tokio::test]
+    async fn unbookmark_tweet_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/users/u1/bookmarks/t1"))
+            .and(header("Authorization", "Bearer test-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": {"bookmarked": false}
+            })))
+            .mount(&server)
+            .await;
+
+        let result = client
+            .unbookmark_tweet("u1", "t1")
+            .await
+            .expect("unbookmark");
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn get_users_by_ids_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/users"))
+            .and(query_param("ids", "u1,u2,u3"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [
+                    {"id": "u1", "username": "alice", "name": "Alice"},
+                    {"id": "u2", "username": "bob", "name": "Bob"},
+                    {"id": "u3", "username": "carol", "name": "Carol"}
+                ],
+                "meta": {"result_count": 3}
+            })))
+            .mount(&server)
+            .await;
+
+        let resp = client
+            .get_users_by_ids(&["u1", "u2", "u3"])
+            .await
+            .expect("users by ids");
+        assert_eq!(resp.data.len(), 3);
+        assert_eq!(resp.data[0].username, "alice");
+    }
+
+    #[tokio::test]
+    async fn get_tweet_liking_users_success() {
+        let server = MockServer::start().await;
+        let client = setup_client(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/tweets/t1/liking_users"))
+            .and(query_param("max_results", "10"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": [{"id": "lu1", "username": "liker1", "name": "Liker One"}],
+                "meta": {"result_count": 1}
+            })))
+            .mount(&server)
+            .await;
+
+        let resp = client
+            .get_tweet_liking_users("t1", 10, None)
+            .await
+            .expect("liking users");
+        assert_eq!(resp.data.len(), 1);
+        assert_eq!(resp.data[0].username, "liker1");
     }
 
     #[tokio::test]

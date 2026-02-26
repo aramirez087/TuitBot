@@ -428,6 +428,8 @@ mod tests {
                 "follows.write".to_string(),
                 "like.read".to_string(),
                 "like.write".to_string(),
+                "bookmark.read".to_string(),
+                "bookmark.write".to_string(),
                 "offline.access".to_string(),
             ],
         }

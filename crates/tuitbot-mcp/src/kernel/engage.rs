@@ -121,3 +121,69 @@ pub async fn unretweet(client: &dyn XApiClient, user_id: &str, tweet_id: &str) -
         Err(e) => provider_error_to_response(&map_x_error(&e), start),
     }
 }
+
+/// Unlike a tweet.
+pub async fn unlike_tweet(client: &dyn XApiClient, user_id: &str, tweet_id: &str) -> String {
+    let start = Instant::now();
+    match client.unlike_tweet(user_id, tweet_id).await {
+        Ok(liked) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            #[derive(Serialize)]
+            struct UnlikeResult {
+                liked: bool,
+                tweet_id: String,
+            }
+            ToolResponse::success(UnlikeResult {
+                liked,
+                tweet_id: tweet_id.to_string(),
+            })
+            .with_meta(ToolMeta::new(elapsed))
+            .to_json()
+        }
+        Err(e) => provider_error_to_response(&map_x_error(&e), start),
+    }
+}
+
+/// Bookmark a tweet.
+pub async fn bookmark_tweet(client: &dyn XApiClient, user_id: &str, tweet_id: &str) -> String {
+    let start = Instant::now();
+    match client.bookmark_tweet(user_id, tweet_id).await {
+        Ok(bookmarked) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            #[derive(Serialize)]
+            struct BookmarkResult {
+                bookmarked: bool,
+                tweet_id: String,
+            }
+            ToolResponse::success(BookmarkResult {
+                bookmarked,
+                tweet_id: tweet_id.to_string(),
+            })
+            .with_meta(ToolMeta::new(elapsed))
+            .to_json()
+        }
+        Err(e) => provider_error_to_response(&map_x_error(&e), start),
+    }
+}
+
+/// Remove a bookmark.
+pub async fn unbookmark_tweet(client: &dyn XApiClient, user_id: &str, tweet_id: &str) -> String {
+    let start = Instant::now();
+    match client.unbookmark_tweet(user_id, tweet_id).await {
+        Ok(bookmarked) => {
+            let elapsed = start.elapsed().as_millis() as u64;
+            #[derive(Serialize)]
+            struct UnbookmarkResult {
+                bookmarked: bool,
+                tweet_id: String,
+            }
+            ToolResponse::success(UnbookmarkResult {
+                bookmarked,
+                tweet_id: tweet_id.to_string(),
+            })
+            .with_meta(ToolMeta::new(elapsed))
+            .to_json()
+        }
+        Err(e) => provider_error_to_response(&map_x_error(&e), start),
+    }
+}

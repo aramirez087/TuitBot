@@ -3,7 +3,7 @@
 use crate::contract::ProviderError;
 use crate::provider::SocialReadProvider;
 use tuitbot_core::error::XApiError;
-use tuitbot_core::x_api::types::{MentionResponse, SearchResponse, Tweet, User};
+use tuitbot_core::x_api::types::{MentionResponse, SearchResponse, Tweet, User, UsersResponse};
 use tuitbot_core::x_api::XApiClient;
 
 /// Wraps a `dyn XApiClient` reference to implement [`SocialReadProvider`].
@@ -84,6 +84,80 @@ impl SocialReadProvider for XApiProvider<'_> {
 
     async fn get_me(&self) -> Result<User, ProviderError> {
         self.client.get_me().await.map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_followers(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, ProviderError> {
+        self.client
+            .get_followers(user_id, max_results, pagination_token)
+            .await
+            .map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_following(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, ProviderError> {
+        self.client
+            .get_following(user_id, max_results, pagination_token)
+            .await
+            .map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_user_by_id(&self, user_id: &str) -> Result<User, ProviderError> {
+        self.client
+            .get_user_by_id(user_id)
+            .await
+            .map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_liked_tweets(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, ProviderError> {
+        self.client
+            .get_liked_tweets(user_id, max_results, pagination_token)
+            .await
+            .map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_bookmarks(
+        &self,
+        user_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, ProviderError> {
+        self.client
+            .get_bookmarks(user_id, max_results, pagination_token)
+            .await
+            .map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_users_by_ids(&self, user_ids: &[&str]) -> Result<UsersResponse, ProviderError> {
+        self.client
+            .get_users_by_ids(user_ids)
+            .await
+            .map_err(|e| map_x_error(&e))
+    }
+
+    async fn get_tweet_liking_users(
+        &self,
+        tweet_id: &str,
+        max_results: u32,
+        pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, ProviderError> {
+        self.client
+            .get_tweet_liking_users(tweet_id, max_results, pagination_token)
+            .await
+            .map_err(|e| map_x_error(&e))
     }
 }
 

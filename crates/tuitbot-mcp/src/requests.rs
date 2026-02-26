@@ -196,6 +196,86 @@ pub struct UnfollowUserMcpRequest {
     pub target_user_id: String,
 }
 
+// --- New Direct X API (Session 04) ---
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UnlikeTweetMcpRequest {
+    /// The tweet ID to unlike.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetFollowersRequest {
+    /// The user ID whose followers to fetch.
+    pub user_id: String,
+    /// Maximum number of results (1-1000, default: 100).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetFollowingRequest {
+    /// The user ID whose following list to fetch.
+    pub user_id: String,
+    /// Maximum number of results (1-1000, default: 100).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetUserByIdRequest {
+    /// The user ID to look up.
+    pub user_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetLikedTweetsRequest {
+    /// The user ID whose liked tweets to fetch.
+    pub user_id: String,
+    /// Maximum number of results (1-100, default: 10).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetBookmarksRequest {
+    /// Maximum number of results (1-100, default: 10).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct BookmarkTweetMcpRequest {
+    /// The tweet ID to bookmark.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UnbookmarkTweetMcpRequest {
+    /// The tweet ID to unbookmark.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetUsersByIdsRequest {
+    /// List of user IDs to look up (1-100).
+    pub user_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetTweetLikingUsersRequest {
+    /// The tweet ID to get liking users for.
+    pub tweet_id: String,
+    /// Maximum number of results (1-100, default: 100).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
 // --- Retweet / Delete / Thread / Media / Timeline / Usage ---
 
 #[derive(Debug, Deserialize, JsonSchema)]

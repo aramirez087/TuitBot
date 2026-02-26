@@ -268,6 +268,27 @@ pub struct UserResponse {
     pub data: User,
 }
 
+/// Response from endpoints returning a list of users (followers, following, batch lookup).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsersResponse {
+    /// List of users.
+    #[serde(default)]
+    pub data: Vec<User>,
+    /// Pagination and result metadata.
+    pub meta: UsersMeta,
+}
+
+/// Metadata from a users list response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsersMeta {
+    /// Number of users returned in this response.
+    #[serde(default)]
+    pub result_count: u32,
+    /// Pagination token for fetching the next page.
+    #[serde(default)]
+    pub next_token: Option<String>,
+}
+
 /// Request body for liking a tweet via X API v2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LikeTweetRequest {
@@ -289,12 +310,24 @@ pub struct ActionResultResponse {
     pub data: ActionResultData,
 }
 
-/// Data from an action endpoint (like, follow, unfollow, retweet).
+/// Data from an action endpoint (like, follow, unfollow, retweet, bookmark).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionResultData {
-    /// Whether the action was successful (liked/following/retweeted).
-    #[serde(alias = "liked", alias = "following", alias = "retweeted")]
+    /// Whether the action was successful (liked/following/retweeted/bookmarked).
+    #[serde(
+        alias = "liked",
+        alias = "following",
+        alias = "retweeted",
+        alias = "bookmarked"
+    )]
     pub result: bool,
+}
+
+/// Request body for bookmarking a tweet via X API v2.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookmarkTweetRequest {
+    /// The tweet ID to bookmark.
+    pub tweet_id: String,
 }
 
 /// Request body for retweeting a tweet via X API v2.
@@ -518,6 +551,62 @@ mod tests {
         let err: XApiErrorResponse = serde_json::from_str(json).expect("deserialize");
         assert_eq!(err.detail, Some("Too Many Requests".to_string()));
         assert_eq!(err.status, Some(429));
+    }
+
+    #[test]
+    fn deserialize_users_response() {
+        let json = r#"{
+            "data": [
+                {
+                    "id": "u1",
+                    "username": "alice",
+                    "name": "Alice",
+                    "public_metrics": {
+                        "followers_count": 500,
+                        "following_count": 200,
+                        "tweet_count": 1000
+                    }
+                },
+                {
+                    "id": "u2",
+                    "username": "bob",
+                    "name": "Bob"
+                }
+            ],
+            "meta": {
+                "result_count": 2,
+                "next_token": "page2"
+            }
+        }"#;
+
+        let resp: UsersResponse = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(resp.data.len(), 2);
+        assert_eq!(resp.data[0].username, "alice");
+        assert_eq!(resp.data[0].public_metrics.followers_count, 500);
+        assert_eq!(resp.data[1].username, "bob");
+        assert_eq!(resp.meta.result_count, 2);
+        assert_eq!(resp.meta.next_token, Some("page2".to_string()));
+    }
+
+    #[test]
+    fn deserialize_users_response_empty() {
+        let json = r#"{
+            "meta": {
+                "result_count": 0
+            }
+        }"#;
+
+        let resp: UsersResponse = serde_json::from_str(json).expect("deserialize");
+        assert!(resp.data.is_empty());
+        assert_eq!(resp.meta.result_count, 0);
+        assert!(resp.meta.next_token.is_none());
+    }
+
+    #[test]
+    fn action_result_data_bookmarked_alias() {
+        let json = r#"{"bookmarked": true}"#;
+        let data: ActionResultData = serde_json::from_str(json).expect("deserialize");
+        assert!(data.result);
     }
 
     #[test]

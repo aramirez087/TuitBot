@@ -177,6 +177,132 @@ pub async fn retweet(state: &SharedState, tweet_id: &str) -> String {
     }
 }
 
+/// Unlike a tweet.
+pub async fn unlike_tweet(state: &SharedState, tweet_id: &str) -> String {
+    let start = Instant::now();
+    let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
+    match super::super::policy_gate::check_policy(state, "unlike_tweet", &params, start).await {
+        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::super::policy_gate::GateResult::Proceed => {}
+    }
+    let client = match state.x_client.as_ref() {
+        Some(c) => c,
+        None => return not_configured_response(start),
+    };
+    let user_id = match state.authenticated_user_id.as_deref() {
+        Some(id) => id,
+        None => return no_user_id_response(start),
+    };
+
+    match client.unlike_tweet(user_id, tweet_id).await {
+        Ok(liked) => {
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "unlike_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
+            let elapsed = start.elapsed().as_millis() as u64;
+            #[derive(Serialize)]
+            struct UnlikeResult {
+                liked: bool,
+                tweet_id: String,
+            }
+            ToolResponse::success(UnlikeResult {
+                liked,
+                tweet_id: tweet_id.to_string(),
+            })
+            .with_meta(ToolMeta::new(elapsed))
+            .to_json()
+        }
+        Err(e) => error_response(&e, start),
+    }
+}
+
+/// Bookmark a tweet.
+pub async fn bookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
+    let start = Instant::now();
+    let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
+    match super::super::policy_gate::check_policy(state, "bookmark_tweet", &params, start).await {
+        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::super::policy_gate::GateResult::Proceed => {}
+    }
+    let client = match state.x_client.as_ref() {
+        Some(c) => c,
+        None => return not_configured_response(start),
+    };
+    let user_id = match state.authenticated_user_id.as_deref() {
+        Some(id) => id,
+        None => return no_user_id_response(start),
+    };
+
+    match client.bookmark_tweet(user_id, tweet_id).await {
+        Ok(bookmarked) => {
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "bookmark_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
+            let elapsed = start.elapsed().as_millis() as u64;
+            #[derive(Serialize)]
+            struct BookmarkResult {
+                bookmarked: bool,
+                tweet_id: String,
+            }
+            ToolResponse::success(BookmarkResult {
+                bookmarked,
+                tweet_id: tweet_id.to_string(),
+            })
+            .with_meta(ToolMeta::new(elapsed))
+            .to_json()
+        }
+        Err(e) => error_response(&e, start),
+    }
+}
+
+/// Remove a bookmark.
+pub async fn unbookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
+    let start = Instant::now();
+    let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
+    match super::super::policy_gate::check_policy(state, "unbookmark_tweet", &params, start).await {
+        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
+        super::super::policy_gate::GateResult::Proceed => {}
+    }
+    let client = match state.x_client.as_ref() {
+        Some(c) => c,
+        None => return not_configured_response(start),
+    };
+    let user_id = match state.authenticated_user_id.as_deref() {
+        Some(id) => id,
+        None => return no_user_id_response(start),
+    };
+
+    match client.unbookmark_tweet(user_id, tweet_id).await {
+        Ok(bookmarked) => {
+            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
+                &state.pool,
+                "unbookmark_tweet",
+                &state.config.mcp_policy.rate_limits,
+            )
+            .await;
+            let elapsed = start.elapsed().as_millis() as u64;
+            #[derive(Serialize)]
+            struct UnbookmarkResult {
+                bookmarked: bool,
+                tweet_id: String,
+            }
+            ToolResponse::success(UnbookmarkResult {
+                bookmarked,
+                tweet_id: tweet_id.to_string(),
+            })
+            .with_meta(ToolMeta::new(elapsed))
+            .to_json()
+        }
+        Err(e) => error_response(&e, start),
+    }
+}
+
 /// Undo a retweet.
 pub async fn unretweet(state: &SharedState, tweet_id: &str) -> String {
     let start = Instant::now();

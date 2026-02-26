@@ -16,6 +16,8 @@ pub const REQUIRED_SCOPES: &[&str] = &[
     "follows.write",
     "like.read",
     "like.write",
+    "bookmark.read",
+    "bookmark.write",
     "offline.access",
 ];
 
@@ -56,6 +58,11 @@ pub const FEATURE_SCOPE_MAP: &[FeatureScopeMapping] = &[
         feature: "Read mentions",
         description: "Read @mentions for mention-reply workflows.",
         required_scopes: &["tweet.read", "users.read"],
+    },
+    FeatureScopeMapping {
+        feature: "Bookmarks",
+        description: "Bookmark and unbookmark tweets, read bookmarked tweets.",
+        required_scopes: &["bookmark.read", "bookmark.write", "users.read"],
     },
     FeatureScopeMapping {
         feature: "Token refresh",
@@ -186,12 +193,12 @@ mod tests {
     #[test]
     fn extra_scopes_are_reported_without_error() {
         let mut scopes = all_required_scopes();
-        scopes.push("bookmark.read".to_string());
+        scopes.push("mute.read".to_string());
 
         let analysis = analyze_scopes(&scopes);
 
         assert!(analysis.all_required_present);
         assert!(analysis.missing.is_empty());
-        assert_eq!(analysis.extra, vec!["bookmark.read".to_string()]);
+        assert_eq!(analysis.extra, vec!["mute.read".to_string()]);
     }
 }

@@ -701,6 +701,138 @@ impl TuitbotMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
+    /// Get followers of a user by user ID. Returns paginated user list.
+    #[tool]
+    async fn x_get_followers(
+        &self,
+        Parameters(req): Parameters<GetFollowersRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(100).clamp(1, 1000);
+        let result = tools::x_actions::get_followers(
+            &self.state,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get accounts a user is following by user ID. Returns paginated user list.
+    #[tool]
+    async fn x_get_following(
+        &self,
+        Parameters(req): Parameters<GetFollowingRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(100).clamp(1, 1000);
+        let result = tools::x_actions::get_following(
+            &self.state,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Look up an X user profile by user ID. Returns user data with public metrics.
+    #[tool]
+    async fn x_get_user_by_id(
+        &self,
+        Parameters(req): Parameters<GetUserByIdRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::get_user_by_id(&self.state, &req.user_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get tweets liked by a user. Returns paginated tweet list.
+    #[tool]
+    async fn x_get_liked_tweets(
+        &self,
+        Parameters(req): Parameters<GetLikedTweetsRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(10).clamp(1, 100);
+        let result = tools::x_actions::get_liked_tweets(
+            &self.state,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get the authenticated user's bookmarks. Returns paginated tweet list.
+    #[tool]
+    async fn x_get_bookmarks(
+        &self,
+        Parameters(req): Parameters<GetBookmarksRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(10).clamp(1, 100);
+        let result =
+            tools::x_actions::get_bookmarks(&self.state, max, req.pagination_token.as_deref())
+                .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Look up multiple X users by their IDs (batch, 1-100). Returns user list.
+    #[tool]
+    async fn x_get_users_by_ids(
+        &self,
+        Parameters(req): Parameters<GetUsersByIdsRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let ids_refs: Vec<&str> = req.user_ids.iter().map(|s| s.as_str()).collect();
+        let result = tools::x_actions::get_users_by_ids(&self.state, &ids_refs).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get users who liked a specific tweet. Returns paginated user list.
+    #[tool]
+    async fn x_get_tweet_liking_users(
+        &self,
+        Parameters(req): Parameters<GetTweetLikingUsersRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(100).clamp(1, 100);
+        let result = tools::x_actions::get_tweet_liking_users(
+            &self.state,
+            &req.tweet_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Unlike a tweet on behalf of the authenticated user.
+    #[tool]
+    async fn x_unlike_tweet(
+        &self,
+        Parameters(req): Parameters<UnlikeTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::unlike_tweet(&self.state, &req.tweet_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Bookmark a tweet on behalf of the authenticated user.
+    #[tool]
+    async fn x_bookmark_tweet(
+        &self,
+        Parameters(req): Parameters<BookmarkTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::bookmark_tweet(&self.state, &req.tweet_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Remove a bookmark on behalf of the authenticated user.
+    #[tool]
+    async fn x_unbookmark_tweet(
+        &self,
+        Parameters(req): Parameters<UnbookmarkTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = tools::x_actions::unbookmark_tweet(&self.state, &req.tweet_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
     /// Get X API usage statistics: costs, call counts, and endpoint breakdown.
     #[tool]
     async fn get_x_usage(

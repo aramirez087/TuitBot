@@ -36,7 +36,7 @@ impl ApiMcpServer {
 
 #[tool_router]
 impl ApiMcpServer {
-    // ── Read (7) ────────────────────────────────────────────────────
+    // ── Read (14) ───────────────────────────────────────────────────
 
     /// Get a single tweet by its ID. Returns full tweet data with metrics.
     #[tool]
@@ -140,6 +140,119 @@ impl ApiMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
+    /// Get followers of a user by user ID. Returns paginated user list.
+    #[tool]
+    async fn x_get_followers(
+        &self,
+        Parameters(req): Parameters<GetFollowersRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(100).clamp(1, 1000);
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_followers(
+            &provider,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get accounts a user is following by user ID. Returns paginated user list.
+    #[tool]
+    async fn x_get_following(
+        &self,
+        Parameters(req): Parameters<GetFollowingRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(100).clamp(1, 1000);
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_following(
+            &provider,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Look up an X user profile by user ID. Returns user data with public metrics.
+    #[tool]
+    async fn x_get_user_by_id(
+        &self,
+        Parameters(req): Parameters<GetUserByIdRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_user_by_id(&provider, &req.user_id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get tweets liked by a user. Returns paginated tweet list.
+    #[tool]
+    async fn x_get_liked_tweets(
+        &self,
+        Parameters(req): Parameters<GetLikedTweetsRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(10).clamp(1, 100);
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_liked_tweets(
+            &provider,
+            &req.user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get the authenticated user's bookmarks. Returns paginated tweet list.
+    #[tool]
+    async fn x_get_bookmarks(
+        &self,
+        Parameters(req): Parameters<GetBookmarksRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(10).clamp(1, 100);
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_bookmarks(
+            &provider,
+            &self.state.authenticated_user_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Look up multiple X users by their IDs (batch, 1-100). Returns user list.
+    #[tool]
+    async fn x_get_users_by_ids(
+        &self,
+        Parameters(req): Parameters<GetUsersByIdsRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let ids_refs: Vec<&str> = req.user_ids.iter().map(|s| s.as_str()).collect();
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_users_by_ids(&provider, &ids_refs).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Get users who liked a specific tweet. Returns paginated user list.
+    #[tool]
+    async fn x_get_tweet_liking_users(
+        &self,
+        Parameters(req): Parameters<GetTweetLikingUsersRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let max = req.max_results.unwrap_or(100).clamp(1, 100);
+        let provider = XApiProvider::new(self.state.x_client.as_ref());
+        let result = kernel::read::get_tweet_liking_users(
+            &provider,
+            &req.tweet_id,
+            max,
+            req.pagination_token.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
     // ── Write (5) ───────────────────────────────────────────────────
 
     /// Post a new tweet to X. Returns the posted tweet data. Optionally attach media by providing media_ids from x_upload_media.
@@ -213,7 +326,7 @@ impl ApiMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    // ── Engage (5) ──────────────────────────────────────────────────
+    // ── Engage (8) ──────────────────────────────────────────────────
 
     /// Like a tweet on behalf of the authenticated user.
     #[tool]
@@ -282,6 +395,51 @@ impl ApiMcpServer {
         Parameters(req): Parameters<UnretweetMcpRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let result = kernel::engage::unretweet(
+            self.state.x_client.as_ref(),
+            &self.state.authenticated_user_id,
+            &req.tweet_id,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Unlike a tweet on behalf of the authenticated user.
+    #[tool]
+    async fn x_unlike_tweet(
+        &self,
+        Parameters(req): Parameters<UnlikeTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = kernel::engage::unlike_tweet(
+            self.state.x_client.as_ref(),
+            &self.state.authenticated_user_id,
+            &req.tweet_id,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Bookmark a tweet on behalf of the authenticated user.
+    #[tool]
+    async fn x_bookmark_tweet(
+        &self,
+        Parameters(req): Parameters<BookmarkTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = kernel::engage::bookmark_tweet(
+            self.state.x_client.as_ref(),
+            &self.state.authenticated_user_id,
+            &req.tweet_id,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Remove a bookmark on behalf of the authenticated user.
+    #[tool]
+    async fn x_unbookmark_tweet(
+        &self,
+        Parameters(req): Parameters<UnbookmarkTweetMcpRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = kernel::engage::unbookmark_tweet(
             self.state.x_client.as_ref(),
             &self.state.authenticated_user_id,
             &req.tweet_id,

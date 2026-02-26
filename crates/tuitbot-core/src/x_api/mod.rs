@@ -183,4 +183,109 @@ pub trait XApiClient: Send + Sync {
             message: "not implemented".to_string(),
         })
     }
+
+    /// Unlike a tweet on behalf of the authenticated user.
+    async fn unlike_tweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get followers of a user.
+    async fn get_followers(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get accounts a user is following.
+    async fn get_following(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get a user by their ID.
+    async fn get_user_by_id(&self, _user_id: &str) -> Result<User, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get tweets liked by a user.
+    async fn get_liked_tweets(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get the authenticated user's bookmarks.
+    async fn get_bookmarks(
+        &self,
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Bookmark a tweet.
+    async fn bookmark_tweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Remove a bookmark.
+    async fn unbookmark_tweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get multiple users by their IDs.
+    async fn get_users_by_ids(&self, _user_ids: &[&str]) -> Result<UsersResponse, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
+
+    /// Get users who liked a specific tweet.
+    async fn get_tweet_liking_users(
+        &self,
+        _tweet_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        Err(XApiError::ApiError {
+            status: 0,
+            message: "not implemented".to_string(),
+        })
+    }
 }

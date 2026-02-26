@@ -21,8 +21,16 @@ pub fn estimate_cost(endpoint: &str, method: &str) -> f64 {
         ("GET", e) if e.contains("/mentions") => 0.005,
         ("GET", e) if e.contains("/tweets") && e.starts_with("/users/") => 0.005,
 
+        // Bookmarks reads
+        ("GET", e) if e.contains("/bookmarks") => 0.005,
+        // Liked tweets reads
+        ("GET", e) if e.contains("/liked_tweets") => 0.005,
+        // Liking users reads
+        ("GET", e) if e.contains("/liking_users") => 0.005,
+
         // User profile lookups
         ("GET", "/users/me") => 0.010,
+        ("GET", "/users") => 0.010, // batch user lookup
         ("GET", e) if e.starts_with("/users/by/username/") => 0.010,
         ("GET", e)
             if e.starts_with("/users/") && !e.contains("/tweets") && !e.contains("/mentions") =>
@@ -40,6 +48,10 @@ pub fn estimate_cost(endpoint: &str, method: &str) -> f64 {
         // Follow/unfollow a user
         ("POST", e) if e.contains("/following") => 0.010,
         ("DELETE", e) if e.contains("/following") => 0.010,
+
+        // Bookmark/unbookmark a tweet
+        ("POST", e) if e.contains("/bookmarks") => 0.010,
+        ("DELETE", e) if e.contains("/bookmarks") => 0.010,
 
         // Unknown — default to zero until pricing is published
         _ => 0.0,

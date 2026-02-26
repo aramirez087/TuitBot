@@ -196,6 +196,157 @@ impl XApiClient for MockXApiClient {
             },
         })
     }
+
+    async fn unlike_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Ok(false)
+    }
+
+    async fn bookmark_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Ok(true)
+    }
+
+    async fn unbookmark_tweet(&self, _uid: &str, _tid: &str) -> Result<bool, XApiError> {
+        Ok(false)
+    }
+
+    async fn get_followers(
+        &self,
+        _uid: &str,
+        _max: u32,
+        _pt: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        Ok(UsersResponse {
+            data: vec![User {
+                id: "f1".to_string(),
+                username: "follower1".to_string(),
+                name: "Follower One".to_string(),
+                public_metrics: UserMetrics::default(),
+            }],
+            meta: UsersMeta {
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_following(
+        &self,
+        _uid: &str,
+        _max: u32,
+        _pt: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        Ok(UsersResponse {
+            data: vec![User {
+                id: "fw1".to_string(),
+                username: "following1".to_string(),
+                name: "Following One".to_string(),
+                public_metrics: UserMetrics::default(),
+            }],
+            meta: UsersMeta {
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_user_by_id(&self, user_id: &str) -> Result<User, XApiError> {
+        Ok(User {
+            id: user_id.to_string(),
+            username: "iduser".to_string(),
+            name: "ID User".to_string(),
+            public_metrics: UserMetrics::default(),
+        })
+    }
+
+    async fn get_liked_tweets(
+        &self,
+        _uid: &str,
+        _max: u32,
+        _pt: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        Ok(SearchResponse {
+            data: vec![Tweet {
+                id: "lt1".to_string(),
+                text: "Liked tweet".to_string(),
+                author_id: "a1".to_string(),
+                created_at: String::new(),
+                public_metrics: PublicMetrics::default(),
+                conversation_id: None,
+            }],
+            includes: None,
+            meta: SearchMeta {
+                newest_id: Some("lt1".to_string()),
+                oldest_id: Some("lt1".to_string()),
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_bookmarks(
+        &self,
+        _uid: &str,
+        _max: u32,
+        _pt: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        Ok(SearchResponse {
+            data: vec![Tweet {
+                id: "bk1".to_string(),
+                text: "Bookmarked tweet".to_string(),
+                author_id: "a1".to_string(),
+                created_at: String::new(),
+                public_metrics: PublicMetrics::default(),
+                conversation_id: None,
+            }],
+            includes: None,
+            meta: SearchMeta {
+                newest_id: Some("bk1".to_string()),
+                oldest_id: Some("bk1".to_string()),
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_users_by_ids(&self, ids: &[&str]) -> Result<UsersResponse, XApiError> {
+        let users = ids
+            .iter()
+            .map(|id| User {
+                id: id.to_string(),
+                username: format!("user_{id}"),
+                name: format!("User {id}"),
+                public_metrics: UserMetrics::default(),
+            })
+            .collect::<Vec<_>>();
+        let count = users.len() as u32;
+        Ok(UsersResponse {
+            data: users,
+            meta: UsersMeta {
+                result_count: count,
+                next_token: None,
+            },
+        })
+    }
+
+    async fn get_tweet_liking_users(
+        &self,
+        _tid: &str,
+        _max: u32,
+        _pt: Option<&str>,
+    ) -> Result<UsersResponse, XApiError> {
+        Ok(UsersResponse {
+            data: vec![User {
+                id: "lu1".to_string(),
+                username: "liker1".to_string(),
+                name: "Liker One".to_string(),
+                public_metrics: UserMetrics::default(),
+            }],
+            meta: UsersMeta {
+                result_count: 1,
+                next_token: None,
+            },
+        })
+    }
 }
 
 /// Mock that returns errors.

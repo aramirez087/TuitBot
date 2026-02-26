@@ -18,11 +18,15 @@ use tuitbot_core::error::XApiError;
 use super::response::{ToolMeta, ToolResponse};
 
 // Re-export all public tool functions.
-pub use engage::{follow_user, like_tweet, retweet, unfollow_user, unretweet};
+pub use engage::{
+    bookmark_tweet, follow_user, like_tweet, retweet, unbookmark_tweet, unfollow_user,
+    unlike_tweet, unretweet,
+};
 pub use media::upload_media;
 pub use read::{
-    get_home_timeline, get_tweet_by_id, get_user_by_username, get_user_mentions, get_user_tweets,
-    get_x_usage, search_tweets,
+    get_bookmarks, get_followers, get_following, get_home_timeline, get_liked_tweets,
+    get_tweet_by_id, get_tweet_liking_users, get_user_by_id, get_user_by_username,
+    get_user_mentions, get_user_tweets, get_users_by_ids, get_x_usage, search_tweets,
 };
 pub use write::{delete_tweet, post_thread, post_tweet, quote_tweet, reply_to_tweet};
 
