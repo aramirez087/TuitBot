@@ -492,14 +492,14 @@ The Admin profile is a **superset of the Write profile**. It adds the 4 universa
 - Full access to all 104+ Write-profile tools (reads, writes, engagements, analytics, content generation, approval workflows, discovery, policy, telemetry, composite workflows, and generated spec-pack tools).
 - Plus 4 universal request tools (`x_get`, `x_post`, `x_put`, `x_delete`) that can reach any X API v2 endpoint your credentials authorize.
 - Universal request tools are constrained to approved hosts (`api.x.com`, `upload.x.com`, `upload.twitter.com`) — no arbitrary outbound HTTP.
-- All universal request mutations are subject to the same policy engine (approval routing, rate limiting, dry-run mode) as typed tools.
-- All universal request invocations are logged to the `mcp_telemetry` table and the `mutation_audit_log` for mutations.
+- Universal request mutations are constrained by SSRF guards, path validation, and header blocklist but are **not** currently subject to the MCP policy engine (approval routing, rate limiting, dry-run mode). Policy integration is planned as a post-launch enhancement.
+- Universal request invocations are logged to the `mcp_telemetry` table. Mutation audit logging for universal requests is planned as a post-launch enhancement.
 
 **What "admin" does NOT mean:**
 - It does not grant X platform admin privileges (account suspension, content moderation at scale, etc.).
 - It does not bypass X API tier restrictions — your API plan's rate limits and endpoint access still apply.
 - It does not grant access to X Ads API, X DM API, or any endpoint outside the v2 public API surface (see [API Coverage Boundaries](#api-coverage-boundaries) below).
-- It does not disable TuitBot's safety policy engine — mutations are still gated.
+- It does not disable TuitBot's safety policy engine for typed tools. Note: universal request mutations bypass the policy engine (constrained instead by host allowlist and SSRF guards).
 
 **When to use Admin:**
 - Exploring X API v2 endpoints that lack a dedicated typed tool (e.g., new endpoints X releases before TuitBot adds typed support).

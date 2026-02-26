@@ -32,9 +32,10 @@ Any behavior, config, or CLI change should update docs in the same PR.
 The files in `docs/generated/` are auto-generated from Rust source and must not
 be edited by hand:
 
-- `mcp-manifest-full.json` — full profile tool manifest
-- `mcp-manifest-readonly.json` — readonly profile tool manifest
-- `mcp-manifest-api-readonly.json` — api-readonly profile tool manifest
+- `mcp-manifest-write.json` — write profile tool manifest (104 tools)
+- `mcp-manifest-admin.json` — admin profile tool manifest (108 tools)
+- `mcp-manifest-readonly.json` — readonly profile tool manifest (14 tools)
+- `mcp-manifest-api-readonly.json` — api-readonly profile tool manifest (40 tools)
 
 After changing MCP tools or profiles, regenerate and commit in the same PR:
 

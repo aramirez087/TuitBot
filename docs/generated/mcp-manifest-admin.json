@@ -1,9 +1,9 @@
 {
   "tuitbot_mcp_version": "0.1.8",
-  "mcp_schema_version": "1.1",
+  "mcp_schema_version": "1.2",
   "x_api_spec_version": "1.0.0",
-  "profile": "full",
-  "tool_count": 104,
+  "profile": "admin",
+  "tool_count": 108,
   "tools": [
     {
       "name": "approve_all",
@@ -14,7 +14,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error",
@@ -31,7 +32,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error",
@@ -49,7 +51,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -73,7 +76,8 @@
       "requires_llm": true,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "invalid_input",
@@ -91,7 +95,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -109,7 +114,8 @@
       "requires_llm": true,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "llm_not_configured",
@@ -125,7 +131,8 @@
       "requires_llm": true,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "llm_not_configured",
@@ -141,7 +148,8 @@
       "requires_llm": true,
       "requires_db": false,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "llm_not_configured",
@@ -158,7 +166,8 @@
       "requires_llm": true,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "llm_not_configured",
@@ -174,7 +183,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -189,7 +199,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -204,7 +215,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -221,8 +233,9 @@
       "requires_llm": false,
       "requires_db": false,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": []
     },
@@ -235,9 +248,10 @@
       "requires_llm": false,
       "requires_db": false,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": []
     },
@@ -250,7 +264,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -265,7 +280,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -280,7 +296,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -295,7 +312,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -310,10 +328,27 @@
       "requires_llm": false,
       "requires_db": false,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": []
+    },
+    {
+      "name": "get_mutation_detail",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
     },
     {
       "name": "get_pending_count",
@@ -324,7 +359,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -339,7 +375,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -354,7 +391,24 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_recent_mutations",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -369,7 +423,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -384,7 +439,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -399,7 +455,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -413,10 +470,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -436,7 +499,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -451,9 +515,10 @@
       "requires_llm": false,
       "requires_db": false,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": []
     },
@@ -466,7 +531,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -481,7 +547,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -496,7 +563,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -511,7 +579,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "invalid_input",
@@ -534,7 +603,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -551,7 +621,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error",
@@ -567,9 +638,10 @@
       "requires_llm": false,
       "requires_db": false,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "invalid_input"
@@ -584,7 +656,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "db_error"
@@ -599,7 +672,8 @@
       "requires_llm": false,
       "requires_db": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "topic_error",
@@ -615,8 +689,9 @@
       "requires_llm": false,
       "requires_db": false,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": []
     },
@@ -628,8 +703,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "bookmark.read",
+        "bookmark.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -654,8 +736,10 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
       "profiles": [
-        "workflow"
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -675,8 +759,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -702,8 +793,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "follows.read",
+        "follows.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -728,8 +826,10 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
       "profiles": [
-        "workflow"
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -749,9 +849,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "bookmark.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -770,9 +876,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "follows.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -791,9 +903,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "follows.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -812,10 +930,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -834,9 +958,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "like.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -855,9 +985,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -876,10 +1012,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -898,10 +1039,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -920,10 +1066,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -942,10 +1094,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -964,9 +1122,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -985,8 +1148,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "like.read",
+        "like.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1011,8 +1181,10 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
       "profiles": [
-        "workflow"
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1032,8 +1204,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1054,6 +1233,24 @@
       ]
     },
     {
+      "name": "x_post_thread_dry_run",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "tweet_too_long",
+        "invalid_input",
+        "policy_error"
+      ]
+    },
+    {
       "name": "x_post_tweet",
       "category": "write",
       "lane": "workflow",
@@ -1061,8 +1258,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1081,6 +1285,24 @@
       ]
     },
     {
+      "name": "x_post_tweet_dry_run",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "tweet_too_long",
+        "invalid_input",
+        "policy_error"
+      ]
+    },
+    {
       "name": "x_put",
       "category": "write",
       "lane": "workflow",
@@ -1088,8 +1310,10 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
       "profiles": [
-        "workflow"
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1109,8 +1333,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1136,8 +1367,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1163,8 +1401,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1189,10 +1434,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1211,8 +1462,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "bookmark.read",
+        "bookmark.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1237,8 +1495,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "follows.read",
+        "follows.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1263,8 +1528,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "like.read",
+        "like.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1289,8 +1561,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1315,8 +1594,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1335,8 +1620,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "block.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1361,8 +1652,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "block.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1387,9 +1684,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "block.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1408,8 +1711,13 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1434,8 +1742,13 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1460,8 +1773,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1486,9 +1805,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1507,9 +1832,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1528,9 +1858,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1549,8 +1885,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1575,8 +1917,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1601,9 +1949,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1622,9 +1976,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1643,8 +2003,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1669,9 +2035,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1690,9 +2062,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1711,8 +2090,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1737,8 +2122,13 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "list.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1763,8 +2153,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "mute.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1789,8 +2185,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "mute.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1815,9 +2217,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "mute.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1836,9 +2244,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "space.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1857,9 +2271,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "space.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1878,9 +2298,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "space.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1899,9 +2324,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "space.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1920,9 +2350,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "space.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1941,9 +2376,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "space.read",
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1962,9 +2404,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1983,8 +2430,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.moderate.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2009,10 +2462,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2031,10 +2490,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2053,10 +2518,16 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2075,8 +2546,14 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.moderate.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2101,10 +2578,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow",
         "readonly",
-        "api_readonly"
+        "api_readonly",
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2123,8 +2605,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read",
+        "tweet.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2149,8 +2638,15 @@
       "requires_x_client": true,
       "requires_llm": false,
       "requires_db": true,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read",
+        "tweet.write"
+      ],
+      "requires_user_auth": true,
       "profiles": [
-        "workflow"
+        "write",
+        "admin"
       ],
       "possible_error_codes": [
         "x_not_configured",

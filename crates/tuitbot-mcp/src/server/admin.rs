@@ -1088,7 +1088,7 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Send a POST request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — policy-gated.
+    /// Send a POST request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — admin-only, host-constrained.
     #[tool]
     async fn x_post(
         &self,
@@ -1108,7 +1108,7 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Send a PUT request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — policy-gated.
+    /// Send a PUT request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — admin-only, host-constrained.
     #[tool]
     async fn x_put(
         &self,
@@ -1128,7 +1128,7 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Send a DELETE request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — policy-gated.
+    /// Send a DELETE request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — admin-only, host-constrained.
     #[tool]
     async fn x_delete(
         &self,

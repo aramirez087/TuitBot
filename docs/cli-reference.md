@@ -176,11 +176,12 @@ tuitbot update --non-interactive  # skip all prompts
 ## MCP Server
 
 ```bash
-tuitbot mcp serve                          # Full profile (64 tools, default)
-tuitbot mcp serve --profile readonly       # Read-only (10 tools)
-tuitbot mcp serve --profile api-readonly   # API read-only (20 tools)
-tuitbot mcp manifest                       # emit tool manifest JSON (full)
-tuitbot mcp manifest --profile readonly    # emit manifest for a profile
+tuitbot mcp serve                          # Write profile (104 tools, default)
+tuitbot mcp serve --profile admin          # Admin profile (108 tools)
+tuitbot mcp serve --profile api-readonly   # API read-only (40 tools)
+tuitbot mcp serve --profile readonly       # Read-only (14 tools)
+tuitbot mcp manifest                       # emit tool manifest JSON (write)
+tuitbot mcp manifest --profile admin       # emit manifest for a profile
 ```
 
 See the [MCP Reference](mcp-reference.md) for tool details.
