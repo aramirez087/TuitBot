@@ -1221,6 +1221,24 @@
       ]
     },
     {
+      "name": "x_post_thread_dry_run",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "tweet_too_long",
+        "invalid_input",
+        "policy_error"
+      ]
+    },
+    {
       "name": "x_post_tweet",
       "category": "write",
       "lane": "workflow",
@@ -1251,6 +1269,24 @@
         "policy_denied_rate_limited",
         "policy_denied_hard_rule",
         "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_post_tweet_dry_run",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "tweet_too_long",
+        "invalid_input",
         "policy_error"
       ]
     },

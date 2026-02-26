@@ -325,3 +325,158 @@ pub async fn post_thread(
     .with_meta(ToolMeta::new(elapsed))
     .to_json()
 }
+
+// ── Dry-run validation tools ──────────────────────────────────────────
+
+/// Validate a tweet without posting. Runs all checks (length, policy) but
+/// never calls the X API. Returns what *would* be posted.
+pub async fn post_tweet_dry_run(
+    state: &SharedState,
+    text: &str,
+    media_ids: Option<&[String]>,
+) -> String {
+    let start = Instant::now();
+
+    // Length validation.
+    if let Some(err) = check_tweet_length(text, start) {
+        return err;
+    }
+
+    // Policy check (will return DryRun decision if dry_run_mutations is on,
+    // but we also want dry-run even when policy is off).
+    let params = serde_json::json!({"text": text}).to_string();
+    let policy_would_allow =
+        match super::super::policy_gate::check_policy(state, "post_tweet", &params, start).await {
+            super::super::policy_gate::GateResult::Proceed => true,
+            super::super::policy_gate::GateResult::EarlyReturn(_) => false,
+        };
+
+    let has_media = media_ids.is_some_and(|ids| !ids.is_empty());
+    let media_count = media_ids.map_or(0, |ids| ids.len());
+    let x_available = state.x_client.is_some();
+
+    let elapsed = start.elapsed().as_millis() as u64;
+    #[derive(Serialize)]
+    struct DryRunTweetResult {
+        dry_run: bool,
+        valid: bool,
+        text: String,
+        text_length: usize,
+        has_media: bool,
+        media_count: usize,
+        media_ids: Vec<String>,
+        policy_would_allow: bool,
+        x_client_available: bool,
+    }
+    ToolResponse::success(DryRunTweetResult {
+        dry_run: true,
+        valid: true,
+        text: text.to_string(),
+        text_length: text.len(),
+        has_media,
+        media_count,
+        media_ids: media_ids.map(|ids| ids.to_vec()).unwrap_or_default(),
+        policy_would_allow,
+        x_client_available: x_available,
+    })
+    .with_meta(ToolMeta::new(elapsed))
+    .to_json()
+}
+
+/// Validate a thread without posting. Runs all checks (lengths, policy) but
+/// never calls the X API. Returns what *would* be posted with reply chain plan.
+pub async fn post_thread_dry_run(
+    state: &SharedState,
+    tweets: &[String],
+    media_ids: Option<&[Vec<String>]>,
+) -> String {
+    let start = Instant::now();
+
+    if tweets.is_empty() {
+        let elapsed = start.elapsed().as_millis() as u64;
+        return ToolResponse::error(
+            ErrorCode::InvalidInput,
+            "Thread must contain at least one tweet.",
+        )
+        .with_meta(ToolMeta::new(elapsed))
+        .to_json();
+    }
+
+    // Validate all tweet lengths up front.
+    let mut validation_results: Vec<TweetValidation> = Vec::with_capacity(tweets.len());
+
+    for (i, tweet_text) in tweets.iter().enumerate() {
+        let tweet_media = media_ids
+            .and_then(|m| m.get(i))
+            .cloned()
+            .unwrap_or_default();
+
+        if let Some(err_json) = check_tweet_length(tweet_text, start) {
+            let mut parsed: serde_json::Value = serde_json::from_str(&err_json).unwrap_or_default();
+            if let Some(err_obj) = parsed.get_mut("error") {
+                err_obj["tweet_index"] = serde_json::json!(i);
+            }
+            // On first validation failure, return immediately like the real tool.
+            return serde_json::to_string(&parsed).unwrap_or(err_json);
+        }
+
+        let chain_action = if i == 0 {
+            "post_tweet".to_string()
+        } else {
+            format!("reply_to_tweet(parent=tweet_{})", i - 1)
+        };
+
+        validation_results.push(TweetValidation {
+            index: i,
+            text: tweet_text.clone(),
+            text_length: tweet_text.len(),
+            valid: true,
+            has_media: !tweet_media.is_empty(),
+            media_ids: tweet_media,
+            chain_action,
+        });
+    }
+
+    // Policy check.
+    let params =
+        serde_json::json!({"tweet_count": tweets.len(), "first_tweet": tweets[0]}).to_string();
+    let policy_would_allow =
+        match super::super::policy_gate::check_policy(state, "post_thread", &params, start).await {
+            super::super::policy_gate::GateResult::Proceed => true,
+            super::super::policy_gate::GateResult::EarlyReturn(_) => false,
+        };
+
+    let x_available = state.x_client.is_some();
+    let elapsed = start.elapsed().as_millis() as u64;
+
+    #[derive(Serialize)]
+    struct DryRunThreadResult {
+        dry_run: bool,
+        valid: bool,
+        tweet_count: usize,
+        tweets: Vec<TweetValidation>,
+        policy_would_allow: bool,
+        x_client_available: bool,
+    }
+    ToolResponse::success(DryRunThreadResult {
+        dry_run: true,
+        valid: true,
+        tweet_count: tweets.len(),
+        tweets: validation_results,
+        policy_would_allow,
+        x_client_available: x_available,
+    })
+    .with_meta(ToolMeta::new(elapsed))
+    .to_json()
+}
+
+#[derive(Serialize)]
+struct TweetValidation {
+    index: usize,
+    text: String,
+    text_length: usize,
+    valid: bool,
+    has_media: bool,
+    media_ids: Vec<String>,
+    chain_action: String,
+}

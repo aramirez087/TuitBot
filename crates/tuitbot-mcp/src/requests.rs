@@ -308,6 +308,27 @@ pub struct PostThreadMcpRequest {
 pub struct UploadMediaMcpRequest {
     /// Local file path of the media to upload.
     pub file_path: String,
+    /// Optional alt text for accessibility.
+    pub alt_text: Option<String>,
+    /// If true, validate the file without uploading (default: false).
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct PostTweetDryRunRequest {
+    /// The tweet text content (max 280 characters).
+    pub text: String,
+    /// Optional media IDs to attach (from x_upload_media).
+    pub media_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct PostThreadDryRunRequest {
+    /// Ordered list of tweet texts forming the thread.
+    pub tweets: Vec<String>,
+    /// Optional media IDs per tweet (outer index matches tweet index).
+    pub media_ids: Option<Vec<Vec<String>>>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

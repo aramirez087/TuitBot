@@ -1029,6 +1029,37 @@ fn all_curated_tools() -> Vec<ToolEntry> {
                 ErrorCode::ScraperMutationBlocked,
             ],
         ),
+        // ── Dry-run validation tools ──────────────────────────────────
+        tool(
+            "x_post_tweet_dry_run",
+            ToolCategory::Write,
+            Lane::Workflow,
+            false, // dry-run is not a mutation
+            false,
+            false,
+            true,
+            WRITE_UP,
+            &[
+                ErrorCode::TweetTooLong,
+                ErrorCode::InvalidInput,
+                ErrorCode::PolicyError,
+            ],
+        ),
+        tool(
+            "x_post_thread_dry_run",
+            ToolCategory::Write,
+            Lane::Workflow,
+            false,
+            false,
+            false,
+            true,
+            WRITE_UP,
+            &[
+                ErrorCode::TweetTooLong,
+                ErrorCode::InvalidInput,
+                ErrorCode::PolicyError,
+            ],
+        ),
         // ── Context Intelligence ─────────────────────────────────────
         tool(
             "get_author_context",

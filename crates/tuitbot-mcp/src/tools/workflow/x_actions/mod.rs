@@ -31,7 +31,10 @@ pub use read::{
     get_tweet_by_id, get_tweet_liking_users, get_user_by_id, get_user_by_username,
     get_user_mentions, get_user_tweets, get_users_by_ids, get_x_usage, search_tweets,
 };
-pub use write::{delete_tweet, post_thread, post_tweet, quote_tweet, reply_to_tweet};
+pub use write::{
+    delete_tweet, post_thread, post_thread_dry_run, post_tweet, post_tweet_dry_run, quote_tweet,
+    reply_to_tweet,
+};
 
 /// Return an error response when the X client is not configured.
 fn not_configured_response(start: Instant) -> String {

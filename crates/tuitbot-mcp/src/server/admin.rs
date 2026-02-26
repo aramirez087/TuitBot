@@ -688,13 +688,49 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Upload a media file (image/gif/video) for attaching to tweets. Returns a media_id.
+    /// Upload a media file (image/gif/video) for attaching to tweets. Returns a media_id with upload metadata. Set dry_run=true to validate without uploading.
     #[tool]
     async fn x_upload_media(
         &self,
         Parameters(req): Parameters<UploadMediaMcpRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = workflow::x_actions::upload_media(&self.state, &req.file_path).await;
+        let result = workflow::x_actions::upload_media(
+            &self.state,
+            &req.file_path,
+            req.alt_text.as_deref(),
+            req.dry_run,
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Validate a tweet without posting. Checks length, media IDs, and policy. Returns what would be posted.
+    #[tool]
+    async fn x_post_tweet_dry_run(
+        &self,
+        Parameters(req): Parameters<PostTweetDryRunRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = workflow::x_actions::post_tweet_dry_run(
+            &self.state,
+            &req.text,
+            req.media_ids.as_deref(),
+        )
+        .await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
+
+    /// Validate a thread without posting. Checks all lengths, media per tweet, policy, and reply chain plan. Returns deterministic validation result.
+    #[tool]
+    async fn x_post_thread_dry_run(
+        &self,
+        Parameters(req): Parameters<PostThreadDryRunRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = workflow::x_actions::post_thread_dry_run(
+            &self.state,
+            &req.tweets,
+            req.media_ids.as_deref(),
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 

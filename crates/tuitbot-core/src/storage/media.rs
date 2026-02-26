@@ -1,13 +1,15 @@
-//! Local media file management for the approval queue.
+//! Local media file management and upload tracking.
 //!
 //! Stores uploaded media files on disk under `{data_dir}/media/` and
-//! provides read/cleanup helpers. Media files are temporary — they exist
-//! between upload and approval/rejection, then get cleaned up.
+//! provides read/cleanup helpers. Also tracks media uploads in SQLite
+//! for idempotent re-uploads and agent observability.
 
 use std::path::{Path, PathBuf};
 
 use crate::error::StorageError;
 use crate::x_api::types::{ImageFormat, MediaType};
+
+use super::DbPool;
 
 /// A locally stored media file.
 #[derive(Debug, Clone)]
@@ -129,6 +131,122 @@ fn uuid_v4() -> String {
     )
 }
 
+// ── DB-backed upload tracking ──────────────────────────────────────
+
+/// A tracked media upload record from the database.
+#[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
+pub struct MediaUploadRecord {
+    pub id: i64,
+    pub file_hash: String,
+    pub file_name: String,
+    pub file_size_bytes: i64,
+    pub media_type: String,
+    pub upload_strategy: String,
+    pub segment_count: i64,
+    pub x_media_id: Option<String>,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub alt_text: Option<String>,
+    pub created_at: String,
+    pub finalized_at: Option<String>,
+    pub expires_at: Option<String>,
+}
+
+/// Compute SHA-256 hash of file content for idempotency checks.
+pub fn compute_file_hash(data: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(data);
+    format!("{hash:x}")
+}
+
+/// Find a non-expired, ready upload with the same file hash (idempotent re-upload).
+pub async fn find_ready_upload_by_hash(
+    pool: &DbPool,
+    file_hash: &str,
+) -> Result<Option<MediaUploadRecord>, StorageError> {
+    let row: Option<MediaUploadRecord> = sqlx::query_as(
+        "SELECT id, file_hash, file_name, file_size_bytes, media_type, \
+                upload_strategy, segment_count, x_media_id, status, \
+                error_message, alt_text, created_at, finalized_at, expires_at \
+         FROM media_uploads \
+         WHERE file_hash = ? \
+           AND status = 'ready' \
+           AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%SZ', 'now')) \
+         ORDER BY created_at DESC \
+         LIMIT 1",
+    )
+    .bind(file_hash)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+    Ok(row)
+}
+
+/// Insert a new media upload tracking record. Returns the row ID.
+pub async fn insert_media_upload(
+    pool: &DbPool,
+    file_hash: &str,
+    file_name: &str,
+    file_size_bytes: i64,
+    media_type: &str,
+    upload_strategy: &str,
+    segment_count: i64,
+) -> Result<i64, StorageError> {
+    let result = sqlx::query(
+        "INSERT INTO media_uploads (file_hash, file_name, file_size_bytes, media_type, upload_strategy, segment_count, status) \
+         VALUES (?, ?, ?, ?, ?, ?, 'uploading')",
+    )
+    .bind(file_hash)
+    .bind(file_name)
+    .bind(file_size_bytes)
+    .bind(media_type)
+    .bind(upload_strategy)
+    .bind(segment_count)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+    Ok(result.last_insert_rowid())
+}
+
+/// Mark a media upload as ready with its X API media ID.
+pub async fn finalize_media_upload(
+    pool: &DbPool,
+    id: i64,
+    x_media_id: &str,
+    alt_text: Option<&str>,
+) -> Result<(), StorageError> {
+    // X media IDs expire 24 hours after upload.
+    sqlx::query(
+        "UPDATE media_uploads \
+         SET x_media_id = ?, status = 'ready', alt_text = ?, \
+             finalized_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), \
+             expires_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+24 hours') \
+         WHERE id = ?",
+    )
+    .bind(x_media_id)
+    .bind(alt_text)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+    Ok(())
+}
+
+/// Mark a media upload as failed.
+pub async fn fail_media_upload(
+    pool: &DbPool,
+    id: i64,
+    error_message: &str,
+) -> Result<(), StorageError> {
+    sqlx::query("UPDATE media_uploads SET status = 'failed', error_message = ? WHERE id = ?")
+        .bind(error_message)
+        .bind(id)
+        .execute(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+    Ok(())
+}
+
 /// Validate that a file path is under the expected media directory (path traversal protection).
 pub fn is_safe_media_path(path: &str, data_dir: &Path) -> bool {
     let media_dir = data_dir.join("media");
@@ -220,5 +338,60 @@ mod tests {
         assert!(Path::new(&media.path).exists());
         cleanup_media(&[media.path.clone()]).await;
         assert!(!Path::new(&media.path).exists());
+    }
+
+    #[test]
+    fn compute_file_hash_deterministic() {
+        let data = b"hello world";
+        let h1 = compute_file_hash(data);
+        let h2 = compute_file_hash(data);
+        assert_eq!(h1, h2);
+        assert_eq!(h1.len(), 64); // SHA-256 hex is 64 chars
+    }
+
+    #[tokio::test]
+    async fn insert_and_find_media_upload() {
+        let pool = crate::storage::init_test_db().await.expect("db");
+        let hash = compute_file_hash(b"test data");
+
+        // No record yet.
+        let found = find_ready_upload_by_hash(&pool, &hash).await.expect("find");
+        assert!(found.is_none());
+
+        // Insert and finalize.
+        let id = insert_media_upload(&pool, &hash, "test.jpg", 1024, "image/jpeg", "simple", 1)
+            .await
+            .expect("insert");
+        assert!(id > 0);
+
+        finalize_media_upload(&pool, id, "x_media_123", None)
+            .await
+            .expect("finalize");
+
+        // Now findable.
+        let found = find_ready_upload_by_hash(&pool, &hash)
+            .await
+            .expect("find")
+            .expect("should exist");
+        assert_eq!(found.x_media_id.as_deref(), Some("x_media_123"));
+        assert_eq!(found.status, "ready");
+    }
+
+    #[tokio::test]
+    async fn fail_media_upload_records_error() {
+        let pool = crate::storage::init_test_db().await.expect("db");
+        let hash = compute_file_hash(b"bad data");
+
+        let id = insert_media_upload(&pool, &hash, "fail.mp4", 999, "video/mp4", "chunked", 3)
+            .await
+            .expect("insert");
+
+        fail_media_upload(&pool, id, "upload timed out")
+            .await
+            .expect("fail");
+
+        // Should NOT be found as ready.
+        let found = find_ready_upload_by_hash(&pool, &hash).await.expect("find");
+        assert!(found.is_none());
     }
 }
