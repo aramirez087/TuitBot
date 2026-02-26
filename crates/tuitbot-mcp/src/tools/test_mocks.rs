@@ -1,12 +1,7 @@
 //! Shared mock providers for MCP tool tests.
-//!
-//! Centralises `MockProvider`, `ErrorProvider`, `MockXApiClient`, and
-//! `MockLlmProvider` so that conformance, golden-fixture, eval, and
-//! benchmark tests can import them instead of duplicating ~300 lines each.
-
-use std::path::PathBuf;
 
 use serde_json::Value;
+use std::path::PathBuf;
 
 use crate::contract::ProviderError;
 use crate::provider::SocialReadProvider;
@@ -15,8 +10,6 @@ use tuitbot_core::llm::{GenerationParams, LlmProvider, LlmResponse};
 use tuitbot_core::x_api::types::*;
 use tuitbot_core::x_api::XApiClient;
 use tuitbot_core::LlmError;
-
-// ── Artifact path helper ─────────────────────────────────────────────
 
 /// Canonical artifacts directory: `<repo_root>/roadmap/artifacts`.
 pub fn artifacts_dir() -> PathBuf {
@@ -28,8 +21,6 @@ pub fn artifacts_dir() -> PathBuf {
         .join("roadmap/artifacts")
 }
 
-// ── Schema validation helpers ────────────────────────────────────────
-
 /// Returns `true` if `json` parses and contains a top-level `success` key.
 pub fn validate_schema(json: &str) -> bool {
     let parsed: Value = match serde_json::from_str(json) {
@@ -39,7 +30,6 @@ pub fn validate_schema(json: &str) -> bool {
     parsed.get("success").is_some()
 }
 
-/// Assert that a JSON response is a conformant success envelope.
 pub fn assert_conformant_success(json: &str, tool: &str) {
     let parsed: Value =
         serde_json::from_str(json).unwrap_or_else(|e| panic!("{tool}: invalid JSON: {e}"));
@@ -85,8 +75,6 @@ pub fn assert_conformant_error(json: &str, tool: &str, expected_code: &str) {
         "{tool}: retryable flag mismatch for {expected_code}"
     );
 }
-
-// ── MockProvider (full SocialReadProvider, success paths) ─────────────
 
 pub struct MockProvider;
 
@@ -324,8 +312,6 @@ impl SocialReadProvider for MockProvider {
     }
 }
 
-// ── ErrorProvider (SocialReadProvider returning various errors) ────────
-
 pub struct ErrorProvider;
 
 #[async_trait::async_trait]
@@ -367,8 +353,6 @@ impl SocialReadProvider for ErrorProvider {
         })
     }
 }
-
-// ── MockXApiClient (full XApiClient, success paths) ──────────────────
 
 pub struct MockXApiClient;
 
@@ -471,8 +455,6 @@ impl XApiClient for MockXApiClient {
         Ok(false)
     }
 }
-
-// ── MockLlmProvider (configurable reply text) ────────────────────────
 
 pub struct MockLlmProvider {
     pub reply_text: String,

@@ -44,10 +44,10 @@ jobs:
 
       - name: Conformance gates
         run: |
-          cargo test -p tuitbot-mcp conformance_all -- --exact
-          cargo test -p tuitbot-mcp golden_snapshot_matches -- --exact
-          cargo test -p tuitbot-mcp session09_expanded_benchmark -- --exact
-          cargo test -p tuitbot-mcp eval_session09_all_scenarios -- --exact
+          cargo test -p tuitbot-mcp conformance_all_kernel_tools
+          cargo test -p tuitbot-mcp golden_snapshot_matches
+          cargo test -p tuitbot-mcp session09_expanded_benchmark
+          cargo test -p tuitbot-mcp eval_session09_all_scenarios
         env:
           RUSTFLAGS: "-D warnings"
 
