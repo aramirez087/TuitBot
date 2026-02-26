@@ -4,9 +4,10 @@
 //! allowing AI agents to natively discover and call analytics, approval queue,
 //! content generation, scoring, and configuration operations.
 //!
-//! Two runtime profiles are available:
-//! - **`workflow`** (default): full TuitBot growth features. All 60+ tools.
-//! - **`api`**: generic X client tools only. No DB, no LLM, no policy gating. ~24 tools.
+//! Three runtime profiles are available:
+//! - **`full`** (default): full TuitBot growth features. All 60+ tools.
+//! - **`readonly`**: read-only X tools. No DB, no LLM, no mutations.
+//! - **`api-readonly`**: broader read-only X tools. No DB, no LLM, no mutations.
 
 pub mod contract;
 mod kernel;
@@ -35,18 +36,18 @@ pub use state::Profile;
 
 /// Run the MCP server with the specified profile.
 ///
-/// Dispatches to `run_stdio_server` (workflow) or `run_api_server` (api).
+/// Dispatches to `run_stdio_server` (full) or `run_api_server` (readonly / api-readonly).
 pub async fn run_server(config: Config, profile: Profile) -> anyhow::Result<()> {
     match profile {
-        Profile::Workflow => run_stdio_server(config).await,
-        Profile::Api => run_api_server(config).await,
+        Profile::Full => run_stdio_server(config).await,
+        Profile::Readonly | Profile::ApiReadonly => run_api_server(config, profile).await,
     }
 }
 
-/// Run the full workflow MCP server on stdio transport.
+/// Run the full-profile MCP server on stdio transport.
 ///
 /// This is the main entry point called by the CLI `tuitbot mcp serve` subcommand
-/// (or `--profile workflow`). It initializes the database, optionally creates an
+/// (or `--profile full`). It initializes the database, optionally creates an
 /// LLM provider, and serves MCP tools over stdin/stdout.
 pub async fn run_stdio_server(config: Config) -> anyhow::Result<()> {
     // Initialize database
@@ -133,7 +134,7 @@ pub async fn run_stdio_server(config: Config) -> anyhow::Result<()> {
 
     let server = TuitbotMcpServer::new(state);
 
-    tracing::info!("Starting Tuitbot MCP server on stdio (workflow profile)");
+    tracing::info!("Starting Tuitbot MCP server on stdio (full profile)");
 
     let service = server
         .serve(stdio())
@@ -148,22 +149,23 @@ pub async fn run_stdio_server(config: Config) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Run the lightweight API-profile MCP server on stdio transport.
+/// Run a readonly-profile MCP server on stdio transport.
 ///
-/// Fails fast if X API tokens are missing or expired — an API profile
-/// with no X client has zero usable tools.
-pub async fn run_api_server(config: Config) -> anyhow::Result<()> {
-    // Load X API tokens (required for API profile)
+/// Used for both `readonly` and `api-readonly` profiles. Fails fast if
+/// X API tokens are missing or expired — a readonly profile with no X client
+/// has zero usable tools.
+pub async fn run_api_server(config: Config, profile: Profile) -> anyhow::Result<()> {
+    // Load X API tokens (required for readonly profiles)
     let tokens = startup::load_tokens_from_file().map_err(|e| {
         anyhow::anyhow!(
-            "API profile requires X API tokens but they are not available: {e}. \
+            "{profile} profile requires X API tokens but they are not available: {e}. \
              Run `tuitbot auth` to authenticate."
         )
     })?;
 
     if tokens.is_expired() {
         anyhow::bail!(
-            "API profile requires valid X API tokens but they are expired. \
+            "{profile} profile requires valid X API tokens but they are expired. \
              Run `tuitbot auth` to re-authenticate."
         );
     }
@@ -173,7 +175,7 @@ pub async fn run_api_server(config: Config) -> anyhow::Result<()> {
     // Verify connectivity and get authenticated user ID
     let user = client.get_me().await.map_err(|e| {
         anyhow::anyhow!(
-            "API profile requires a working X API client but get_me() failed: {e}. \
+            "{profile} profile requires a working X API client but get_me() failed: {e}. \
              Check your network connection or re-authenticate with `tuitbot auth`."
         )
     })?;
@@ -181,7 +183,8 @@ pub async fn run_api_server(config: Config) -> anyhow::Result<()> {
     tracing::info!(
         username = %user.username,
         user_id = %user.id,
-        "X API client initialized (api profile)"
+        profile = %profile,
+        "X API client initialized ({profile} profile)"
     );
 
     // Log provider backend selection.
@@ -208,7 +211,7 @@ pub async fn run_api_server(config: Config) -> anyhow::Result<()> {
 
     let server = ApiMcpServer::new(state);
 
-    tracing::info!("Starting Tuitbot MCP server on stdio (api profile)");
+    tracing::info!("Starting Tuitbot MCP server on stdio ({profile} profile)");
 
     let service = server
         .serve(stdio())
