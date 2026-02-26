@@ -1,0 +1,33 @@
+## Session 10 Completion Summary
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `docs/mcp-reference.md` | Added "Admin Profile Scope" section, "API Coverage Boundaries" section, updated tool counts (100→104, 104→108, 109 total), updated positioning language |
+| `README.md` | Updated MCP section from 3 stale profiles to 4 current profiles with correct counts; added Ads/DMs to compliance table |
+| `docs/operations.md` | Updated profile verification runbook: Full→Write/Admin, added admin profile smoke test, fixed tool counts |
+| `docs/configuration.md` | Added admin profile note to MCP policy section |
+| `crates/tuitbot-mcp/src/tools/manifest.rs` | Fixed speculative comment: "future ads/admin endpoints" → "ad-hoc X API v2 access" |
+| `docs/roadmap/x-api-surface-expansion/session-10-handoff.md` | New: handoff with support matrix, non-goals, risk notes |
+
+### Tests Run
+
+- `cargo fmt --all && cargo fmt --all --check` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- `RUSTFLAGS="-D warnings" cargo test --workspace -- --test-threads=1` — 1288 passed, 0 failed, 10 ignored
+
+### Key Decisions
+
+1. **Ads API exclusion is structural**: The `ads-api.x.com` host is not in the universal request handler's allowlist, so admin profile cannot reach Ads endpoints even if credentials authorize it.
+
+2. **DM API exclusion is documentation-level**: DM endpoints live on `api.x.com` (which is in the allowlist), so the admin profile *could* technically reach them. The boundary is enforced by documentation and compliance policy, not code. Recommended follow-up: add an explicit path-prefix denylist for `/2/dm_*`.
+
+3. **Tool counts updated to match coverage report**: Session 09's coverage report shows 109 total / write 104 / admin 108 / api_readonly 40 / readonly 14. All docs now use these numbers consistently.
+
+4. **Positioning language**: All docs now use "maximum coverage of the X API v2 public surface" — ambitious but truthful. No promises about Ads, DMs, or enterprise-only endpoints.
+
+### Warnings for Next Session
+
+- The `env_var_override_approval_mode` test in tuitbot-core is flaky under multi-threaded execution due to env var race conditions. Use `--test-threads=1` for reliable results. Pre-existing issue.
+- The roadmap/artifacts timestamps will drift on every test run. Consider `.gitignore`-ing them or making timestamps deterministic.
