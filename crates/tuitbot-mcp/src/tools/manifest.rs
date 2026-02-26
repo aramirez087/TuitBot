@@ -1359,9 +1359,11 @@ mod tests {
         let expected = std::fs::read_to_string(expected_path);
         match expected {
             Ok(content) => {
+                // Normalize CRLF/LF so snapshot checks are stable across OSes.
+                let normalize_newlines = |s: &str| s.replace("\r\n", "\n");
                 assert_eq!(
-                    json.trim(),
-                    content.trim(),
+                    normalize_newlines(&json).trim(),
+                    normalize_newlines(&content).trim(),
                     "Tool manifest has drifted from snapshot. \
                      Regenerate with: cargo test -p tuitbot-mcp manifest -- --ignored"
                 );
