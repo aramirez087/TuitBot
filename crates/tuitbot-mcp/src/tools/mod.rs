@@ -17,6 +17,12 @@ mod benchmark;
 #[cfg(test)]
 mod boundary_tests;
 #[cfg(test)]
+mod conformance_tests;
+#[cfg(test)]
 mod contract_tests;
 #[cfg(test)]
 mod eval_harness;
+#[cfg(test)]
+mod eval_session09;
+#[cfg(test)]
+mod golden_fixtures;

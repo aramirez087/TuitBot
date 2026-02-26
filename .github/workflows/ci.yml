@@ -36,9 +36,19 @@ jobs:
 
       - name: Run tests
         run: cargo test --workspace
+        env:
+          RUSTFLAGS: "-D warnings"
 
       - name: Run clippy
         run: cargo clippy --workspace -- -D warnings
+
+      - name: Conformance gates
+        run: |
+          cargo test -p tuitbot-mcp conformance_all -- --exact
+          cargo test -p tuitbot-mcp golden_snapshot_matches -- --exact
+          cargo test -p tuitbot-mcp session09_expanded_benchmark -- --exact
+        env:
+          RUSTFLAGS: "-D warnings"
 
   fmt:
     name: Formatting
