@@ -1,11 +1,16 @@
 //! Media upload X API tool with DB tracking and idempotency.
+//!
+//! Media type inference, size validation, and raw upload delegate to
+//! `tuitbot_core::toolkit::media`. File I/O, hashing, DB tracking,
+//! idempotency, and dry-run support remain here (workflow concerns).
 
 use std::time::Instant;
 
 use serde::Serialize;
 
 use tuitbot_core::storage::media as media_storage;
-use tuitbot_core::x_api::types::{ImageFormat, MediaType};
+use tuitbot_core::toolkit::media as toolkit_media;
+use tuitbot_core::x_api::types::MediaType;
 
 use crate::state::SharedState;
 
@@ -34,13 +39,13 @@ pub async fn upload_media(
         Some(c) => c,
         None if dry_run => {
             // In dry-run, we don't need the client — just validate.
-            return upload_media_dry_run(state, file_path, alt_text, start).await;
+            return upload_media_dry_run(file_path, alt_text, start).await;
         }
         None => return not_configured_response(start),
     };
 
-    // Infer media type from file extension.
-    let media_type = match infer_media_type(file_path) {
+    // Infer media type from file extension via toolkit.
+    let media_type = match toolkit_media::infer_media_type(file_path) {
         Some(mt) => mt,
         None => {
             let elapsed = start.elapsed().as_millis() as u64;
@@ -75,7 +80,7 @@ pub async fn upload_media(
 
     // Dry-run: validate without uploading.
     if dry_run {
-        return dry_run_response(file_path, &data, media_type, alt_text, &file_hash, start);
+        return dry_run_response(&data, media_type, alt_text, start);
     }
 
     // Idempotency: check for existing upload with same hash.
@@ -100,19 +105,15 @@ pub async fn upload_media(
         }
     }
 
-    // Determine upload strategy.
-    let requires_chunked = media_type.requires_chunked(file_size as u64);
-    let strategy = if requires_chunked {
-        "chunked"
-    } else {
-        "simple"
-    };
-    let segment_count = if requires_chunked {
+    // Determine upload strategy via toolkit.
+    let strategy = toolkit_media::upload_strategy(media_type, file_size as u64);
+    let is_chunked = toolkit_media::requires_chunked(media_type, file_size as u64);
+    let segment_count = if is_chunked {
         file_size.div_ceil(CHUNK_SIZE)
     } else {
         1
     };
-    let processing_required = matches!(media_type, MediaType::Gif | MediaType::Video);
+    let processing_required = toolkit_media::requires_processing(media_type);
 
     // Track in DB.
     let tracking_id = media_storage::insert_media_upload(
@@ -127,7 +128,8 @@ pub async fn upload_media(
     .await
     .ok();
 
-    match client.upload_media(&data, media_type).await {
+    // Upload via toolkit (includes size validation).
+    match toolkit_media::upload_media(client.as_ref(), &data, media_type).await {
         Ok(media_id) => {
             // Record success.
             if let Some(tid) = tracking_id {
@@ -150,30 +152,19 @@ pub async fn upload_media(
             .with_meta(ToolMeta::new(elapsed))
             .to_json()
         }
-        Err(e) => {
+        Err(ref e) => {
             // Record failure.
             if let Some(tid) = tracking_id {
                 let _ = media_storage::fail_media_upload(&state.pool, tid, &e.to_string()).await;
             }
-            let elapsed = start.elapsed().as_millis() as u64;
-            ToolResponse::error(
-                ErrorCode::MediaUploadError,
-                format!("Media upload failed: {e}"),
-            )
-            .with_meta(ToolMeta::new(elapsed))
-            .to_json()
+            super::toolkit_error_response(e, start)
         }
     }
 }
 
 /// Dry-run for upload_media when no X client is available.
-async fn upload_media_dry_run(
-    _state: &SharedState,
-    file_path: &str,
-    alt_text: Option<&str>,
-    start: Instant,
-) -> String {
-    let media_type = match infer_media_type(file_path) {
+async fn upload_media_dry_run(file_path: &str, alt_text: Option<&str>, start: Instant) -> String {
+    let media_type = match toolkit_media::infer_media_type(file_path) {
         Some(mt) => mt,
         None => {
             let elapsed = start.elapsed().as_millis() as u64;
@@ -193,27 +184,12 @@ async fn upload_media_dry_run(
     match tokio::fs::metadata(file_path).await {
         Ok(meta) => {
             let file_size = meta.len();
-            if file_size > media_type.max_size() {
-                let elapsed = start.elapsed().as_millis() as u64;
-                return ToolResponse::error(
-                    ErrorCode::MediaUploadError,
-                    format!(
-                        "File size {}B exceeds maximum {}B for {}",
-                        file_size,
-                        media_type.max_size(),
-                        media_type.mime_type()
-                    ),
-                )
-                .with_meta(ToolMeta::new(elapsed))
-                .to_json();
+            if let Err(ref e) = toolkit_media::validate_media_size(file_size, media_type) {
+                return super::toolkit_error_response(e, start);
             }
-            let requires_chunked = media_type.requires_chunked(file_size);
-            let strategy = if requires_chunked {
-                "chunked"
-            } else {
-                "simple"
-            };
-            let segment_count = if requires_chunked {
+            let strategy = toolkit_media::upload_strategy(media_type, file_size);
+            let is_chunked = toolkit_media::requires_chunked(media_type, file_size);
+            let segment_count = if is_chunked {
                 (file_size as usize).div_ceil(CHUNK_SIZE)
             } else {
                 1
@@ -226,7 +202,7 @@ async fn upload_media_dry_run(
                 file_size_bytes: file_size as usize,
                 upload_strategy: strategy.to_string(),
                 segment_count,
-                processing_required: matches!(media_type, MediaType::Gif | MediaType::Video),
+                processing_required: toolkit_media::requires_processing(media_type),
                 alt_text: alt_text.map(|s| s.to_string()),
             })
             .with_meta(ToolMeta::new(elapsed))
@@ -246,21 +222,15 @@ async fn upload_media_dry_run(
 
 /// Build a dry-run response for an already-read file.
 fn dry_run_response(
-    _file_path: &str,
     data: &[u8],
     media_type: MediaType,
     alt_text: Option<&str>,
-    _file_hash: &str,
     start: Instant,
 ) -> String {
     let file_size = data.len();
-    let requires_chunked = media_type.requires_chunked(file_size as u64);
-    let strategy = if requires_chunked {
-        "chunked"
-    } else {
-        "simple"
-    };
-    let segment_count = if requires_chunked {
+    let strategy = toolkit_media::upload_strategy(media_type, file_size as u64);
+    let is_chunked = toolkit_media::requires_chunked(media_type, file_size as u64);
+    let segment_count = if is_chunked {
         file_size.div_ceil(CHUNK_SIZE)
     } else {
         1
@@ -273,24 +243,11 @@ fn dry_run_response(
         file_size_bytes: file_size,
         upload_strategy: strategy.to_string(),
         segment_count,
-        processing_required: matches!(media_type, MediaType::Gif | MediaType::Video),
+        processing_required: toolkit_media::requires_processing(media_type),
         alt_text: alt_text.map(|s| s.to_string()),
     })
     .with_meta(ToolMeta::new(elapsed))
     .to_json()
-}
-
-/// Infer `MediaType` from a file path extension.
-pub(crate) fn infer_media_type(path: &str) -> Option<MediaType> {
-    let ext = path.rsplit('.').next()?.to_ascii_lowercase();
-    match ext.as_str() {
-        "jpg" | "jpeg" => Some(MediaType::Image(ImageFormat::Jpeg)),
-        "png" => Some(MediaType::Image(ImageFormat::Png)),
-        "webp" => Some(MediaType::Image(ImageFormat::Webp)),
-        "gif" => Some(MediaType::Gif),
-        "mp4" => Some(MediaType::Video),
-        _ => None,
-    }
 }
 
 #[derive(Serialize)]
@@ -320,7 +277,8 @@ struct DryRunUploadResult {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use tuitbot_core::toolkit::media::infer_media_type;
+    use tuitbot_core::x_api::types::{ImageFormat, MediaType};
 
     #[test]
     fn infer_jpeg() {

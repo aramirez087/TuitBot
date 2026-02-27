@@ -61,6 +61,86 @@ Use `--check` to see if an update is available without installing. Use `--config
 
 After updating, run `tuitbot test` to validate auth and connectivity.
 
+## Architecture Layer Guide
+
+Tuitbot's core follows a three-layer architecture: Toolkit, Workflow, and Autopilot. Each layer has specific operational characteristics.
+
+### Profile Selection Guide
+
+Choose the right MCP profile based on your use case:
+
+| Scenario | Recommended Profile | Rationale |
+|----------|-------------------|-----------|
+| AI agent that reads tweets and scores them | `api-readonly` | Full read access, zero mutation risk |
+| Agent that needs config/health checks only | `readonly` | Minimal 14-tool surface |
+| Growth co-pilot that drafts and queues content | `write` | All 104 tools including content gen and approval |
+| Debugging raw X API responses | `admin` | Universal request tools for ad-hoc endpoints |
+| New integration, testing phase | `api-readonly` | Start read-only, upgrade to `write` after validation |
+| Production autonomous agent | `write` with `approval_mode = true` | Human review before posting |
+
+**Progression path:** Start with `readonly` or `api-readonly` to verify connectivity and tool behavior. Graduate to `write` with `dry_run_mutations = true` to preview mutations without executing them. Enable live mutations only after reviewing dry-run output.
+
+### Safe Mutation Checklist
+
+Before enabling mutations for any consumer (MCP agent, automation, CLI):
+
+1. **Enable approval mode** — all mutations route to the approval queue for human review:
+   ```toml
+   [general]
+   approval_mode = true
+   ```
+
+2. **Start with dry-run** — mutations are logged but not executed:
+   ```toml
+   [mcp_policy]
+   dry_run_mutations = true
+   ```
+
+3. **Set conservative rate limits** — default is 20 mutations/hour:
+   ```toml
+   [mcp_policy]
+   max_mutations_per_hour = 10
+   ```
+
+4. **Require approval for critical tools** — route specific tools through the queue:
+   ```toml
+   [mcp_policy]
+   require_approval_for = ["x_post_tweet", "x_reply_to_tweet", "x_post_thread"]
+   ```
+
+5. **Block tools you don't need** — remove tools from the available surface:
+   ```toml
+   [mcp_policy]
+   blocked_tools = ["x_delete_tweet", "x_follow_user", "x_unfollow_user"]
+   ```
+
+6. **Review the approval queue** before approving:
+   ```bash
+   tuitbot approve --list
+   ```
+
+### Layer-Specific Operational Notes
+
+**Toolkit layer** (`core::toolkit/`):
+- Stateless — safe to call in any context without initialization overhead
+- No rate limiting or policy enforcement at this layer
+- Errors are typed (`ToolkitError`) and map directly to MCP error codes
+- Use for testing, debugging, and admin operations
+
+**Workflow layer** (`core::workflow/`):
+- Requires DB connection and optionally LLM provider
+- Policy enforcement and safety checks live here
+- Composite operations (discover → draft → queue) are deterministic
+- All workflow errors propagate through `WorkflowError`
+
+**Autopilot layer** (`core::automation/`):
+- Scheduled loops with jitter and circuit breaking
+- Loops call workflow and toolkit — never X API directly
+- Mode-aware: Autopilot mode runs all loops, Composer mode runs read-only + posting
+- Graceful shutdown via `CancellationToken`
+
+---
+
 ## MCP Observability & Quality Gates
 
 ### Telemetry

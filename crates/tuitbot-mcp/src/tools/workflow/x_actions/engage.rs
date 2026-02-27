@@ -1,4 +1,8 @@
 //! Engagement X API tools: like, follow, unfollow, retweet, unretweet.
+//!
+//! All raw X API calls go through `tuitbot_core::toolkit::engage`.
+//! All mutation governance (policy, idempotency, audit, rate recording) goes
+//! through the unified gateway in `policy_gate::run_gateway`.
 
 use std::time::Instant;
 
@@ -6,9 +10,11 @@ use serde::Serialize;
 
 use crate::state::SharedState;
 
-use super::audit;
 use super::{no_user_id_response, not_configured_response};
 use crate::tools::response::ToolResponse;
+use crate::tools::workflow::policy_gate::{
+    complete_gateway_failure, complete_gateway_success, run_gateway, GatewayResult,
+};
 
 /// Like a tweet.
 pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
@@ -17,10 +23,10 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "like_tweet", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "like_tweet", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -29,19 +35,9 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "like_tweet", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.like_tweet(user_id, tweet_id).await {
+    match tuitbot_core::toolkit::engage::like_tweet(client.as_ref(), user_id, tweet_id).await {
         Ok(liked) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "like_tweet",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct LikeResult {
                 liked: bool,
@@ -52,10 +48,14 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
                 tweet_id: tweet_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -66,10 +66,10 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"target_user_id": target_user_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "follow_user", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "follow_user", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -78,19 +78,10 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "follow_user", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.follow_user(user_id, target_user_id).await {
+    match tuitbot_core::toolkit::engage::follow_user(client.as_ref(), user_id, target_user_id).await
+    {
         Ok(following) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "follow_user",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct FollowResult {
                 following: bool,
@@ -101,10 +92,14 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
                 target_user_id: target_user_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -115,10 +110,10 @@ pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String 
         return err;
     }
     let params = serde_json::json!({"target_user_id": target_user_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "unfollow_user", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "unfollow_user", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -127,19 +122,11 @@ pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String 
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "unfollow_user", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.unfollow_user(user_id, target_user_id).await {
+    match tuitbot_core::toolkit::engage::unfollow_user(client.as_ref(), user_id, target_user_id)
+        .await
+    {
         Ok(following) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "unfollow_user",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct UnfollowResult {
                 following: bool,
@@ -150,10 +137,14 @@ pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String 
                 target_user_id: target_user_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -164,10 +155,10 @@ pub async fn retweet(state: &SharedState, tweet_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "retweet", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "retweet", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -176,19 +167,9 @@ pub async fn retweet(state: &SharedState, tweet_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "retweet", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.retweet(user_id, tweet_id).await {
+    match tuitbot_core::toolkit::engage::retweet(client.as_ref(), user_id, tweet_id).await {
         Ok(retweeted) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "retweet",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct RetweetResult {
                 retweeted: bool,
@@ -199,10 +180,14 @@ pub async fn retweet(state: &SharedState, tweet_id: &str) -> String {
                 tweet_id: tweet_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -213,10 +198,10 @@ pub async fn unlike_tweet(state: &SharedState, tweet_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "unlike_tweet", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "unlike_tweet", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -225,19 +210,9 @@ pub async fn unlike_tweet(state: &SharedState, tweet_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "unlike_tweet", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.unlike_tweet(user_id, tweet_id).await {
+    match tuitbot_core::toolkit::engage::unlike_tweet(client.as_ref(), user_id, tweet_id).await {
         Ok(liked) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "unlike_tweet",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct UnlikeResult {
                 liked: bool,
@@ -248,10 +223,14 @@ pub async fn unlike_tweet(state: &SharedState, tweet_id: &str) -> String {
                 tweet_id: tweet_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -262,10 +241,10 @@ pub async fn bookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "bookmark_tweet", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "bookmark_tweet", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -274,19 +253,9 @@ pub async fn bookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "bookmark_tweet", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.bookmark_tweet(user_id, tweet_id).await {
+    match tuitbot_core::toolkit::engage::bookmark_tweet(client.as_ref(), user_id, tweet_id).await {
         Ok(bookmarked) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "bookmark_tweet",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct BookmarkResult {
                 bookmarked: bool,
@@ -297,10 +266,14 @@ pub async fn bookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
                 tweet_id: tweet_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -311,10 +284,10 @@ pub async fn unbookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "unbookmark_tweet", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "unbookmark_tweet", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -323,19 +296,10 @@ pub async fn unbookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "unbookmark_tweet", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.unbookmark_tweet(user_id, tweet_id).await {
+    match tuitbot_core::toolkit::engage::unbookmark_tweet(client.as_ref(), user_id, tweet_id).await
+    {
         Ok(bookmarked) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "unbookmark_tweet",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct UnbookmarkResult {
                 bookmarked: bool,
@@ -346,10 +310,14 @@ pub async fn unbookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
                 tweet_id: tweet_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }
 
@@ -360,10 +328,10 @@ pub async fn unretweet(state: &SharedState, tweet_id: &str) -> String {
         return err;
     }
     let params = serde_json::json!({"tweet_id": tweet_id}).to_string();
-    match super::super::policy_gate::check_policy(state, "unretweet", &params, start).await {
-        super::super::policy_gate::GateResult::EarlyReturn(r) => return r,
-        super::super::policy_gate::GateResult::Proceed => {}
-    }
+    let ticket = match run_gateway(state, "unretweet", &params, start).await {
+        GatewayResult::Proceed(t) => t,
+        GatewayResult::EarlyReturn(r) => return r,
+    };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
         None => return not_configured_response(start),
@@ -372,19 +340,9 @@ pub async fn unretweet(state: &SharedState, tweet_id: &str) -> String {
         Some(id) => id,
         None => return no_user_id_response(start),
     };
-    let guard = match audit::begin_audited_mutation(state, "unretweet", &params).await {
-        audit::AuditGateResult::Proceed(g) => g,
-        audit::AuditGateResult::EarlyReturn(r) => return r,
-    };
 
-    match client.unretweet(user_id, tweet_id).await {
+    match tuitbot_core::toolkit::engage::unretweet(client.as_ref(), user_id, tweet_id).await {
         Ok(retweeted) => {
-            let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                &state.pool,
-                "unretweet",
-                &state.config.mcp_policy.rate_limits,
-            )
-            .await;
             #[derive(Serialize)]
             struct UnretweetResult {
                 retweeted: bool,
@@ -395,9 +353,13 @@ pub async fn unretweet(state: &SharedState, tweet_id: &str) -> String {
                 tweet_id: tweet_id.to_string(),
             };
             let result_data = serde_json::to_value(&result).unwrap_or_default();
-            let meta = audit::complete_audited_success(&guard, state, &result_data, start).await;
+            let meta = complete_gateway_success(state, &ticket, &result_data, start).await;
             ToolResponse::success(result).with_meta(meta).to_json()
         }
-        Err(e) => audit::audited_x_error_response(&guard, state, &e, start).await,
+        Err(ref e) => {
+            let msg = e.to_string();
+            let meta = complete_gateway_failure(state, &ticket, &msg, start).await;
+            super::format_toolkit_error_with_meta(e, meta)
+        }
     }
 }

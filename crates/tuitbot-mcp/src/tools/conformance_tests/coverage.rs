@@ -197,6 +197,8 @@ fn profile_str(p: Profile) -> &'static str {
         Profile::ApiReadonly => "api_readonly",
         Profile::Write => "write",
         Profile::Admin => "admin",
+        Profile::UtilityReadonly => "utility_readonly",
+        Profile::UtilityWrite => "utility_write",
     }
 }
 

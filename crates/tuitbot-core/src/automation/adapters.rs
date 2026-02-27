@@ -16,7 +16,8 @@ use crate::error::{LlmError, XApiError};
 use crate::safety::SafetyGuard;
 use crate::scoring::{self, ScoringEngine, TweetData};
 use crate::storage::{self, DbPool};
-use crate::x_api::{SearchResponse, XApiClient, XApiHttpClient};
+use crate::toolkit::ToolkitError;
+use crate::x_api::{SearchResponse, XApiClient};
 
 use super::analytics_loop::{AnalyticsError, AnalyticsStorage, EngagementFetcher, ProfileFetcher};
 use super::loop_helpers::{
@@ -64,32 +65,38 @@ fn search_response_to_loop_tweets(response: SearchResponse) -> Vec<LoopTweet> {
         .collect()
 }
 
-/// Map `XApiError` to `LoopError`.
-fn xapi_to_loop_error(e: XApiError) -> LoopError {
+/// Map `ToolkitError` to `LoopError`.
+fn toolkit_to_loop_error(e: ToolkitError) -> LoopError {
     match e {
-        XApiError::RateLimited { retry_after } => LoopError::RateLimited { retry_after },
-        XApiError::AuthExpired => LoopError::AuthExpired,
-        XApiError::Network { source } => LoopError::NetworkError(source.to_string()),
+        ToolkitError::XApi(xe) => match xe {
+            XApiError::RateLimited { retry_after } => LoopError::RateLimited { retry_after },
+            XApiError::AuthExpired => LoopError::AuthExpired,
+            XApiError::Network { source } => LoopError::NetworkError(source.to_string()),
+            other => LoopError::Other(other.to_string()),
+        },
         other => LoopError::Other(other.to_string()),
     }
 }
 
-/// Map `XApiError` to `ContentLoopError`.
-fn xapi_to_content_error(e: XApiError) -> ContentLoopError {
+/// Map `ToolkitError` to `ContentLoopError`.
+fn toolkit_to_content_error(e: ToolkitError) -> ContentLoopError {
     match e {
-        XApiError::RateLimited { retry_after } => ContentLoopError::PostFailed(format!(
-            "rate limited{}",
-            retry_after
-                .map(|s| format!(", retry after {s}s"))
-                .unwrap_or_default()
-        )),
-        XApiError::Network { source } => ContentLoopError::NetworkError(source.to_string()),
+        ToolkitError::XApi(xe) => match xe {
+            XApiError::RateLimited { retry_after } => ContentLoopError::PostFailed(format!(
+                "rate limited{}",
+                retry_after
+                    .map(|s| format!(", retry after {s}s"))
+                    .unwrap_or_default()
+            )),
+            XApiError::Network { source } => ContentLoopError::NetworkError(source.to_string()),
+            other => ContentLoopError::PostFailed(other.to_string()),
+        },
         other => ContentLoopError::PostFailed(other.to_string()),
     }
 }
 
-/// Map `XApiError` to `AnalyticsError`.
-fn xapi_to_analytics_error(e: XApiError) -> AnalyticsError {
+/// Map `ToolkitError` to `AnalyticsError`.
+fn toolkit_to_analytics_error(e: ToolkitError) -> AnalyticsError {
     AnalyticsError::ApiError(e.to_string())
 }
 
@@ -134,13 +141,13 @@ fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
 // X API adapters
 // ============================================================================
 
-/// Adapts `XApiHttpClient` to the `TweetSearcher` port trait.
+/// Adapts `XApiClient` to the `TweetSearcher` port trait via toolkit.
 pub struct XApiSearchAdapter {
-    client: Arc<XApiHttpClient>,
+    client: Arc<dyn XApiClient>,
 }
 
 impl XApiSearchAdapter {
-    pub fn new(client: Arc<XApiHttpClient>) -> Self {
+    pub fn new(client: Arc<dyn XApiClient>) -> Self {
         Self { client }
     }
 }
@@ -148,23 +155,21 @@ impl XApiSearchAdapter {
 #[async_trait::async_trait]
 impl TweetSearcher for XApiSearchAdapter {
     async fn search_tweets(&self, query: &str) -> Result<Vec<LoopTweet>, LoopError> {
-        let response = self
-            .client
-            .search_tweets(query, 20, None, None)
+        let response = crate::toolkit::read::search_tweets(&*self.client, query, 20, None, None)
             .await
-            .map_err(xapi_to_loop_error)?;
+            .map_err(toolkit_to_loop_error)?;
         Ok(search_response_to_loop_tweets(response))
     }
 }
 
-/// Adapts `XApiHttpClient` to the `MentionsFetcher` port trait.
+/// Adapts `XApiClient` to the `MentionsFetcher` port trait via toolkit.
 pub struct XApiMentionsAdapter {
-    client: Arc<XApiHttpClient>,
+    client: Arc<dyn XApiClient>,
     own_user_id: String,
 }
 
 impl XApiMentionsAdapter {
-    pub fn new(client: Arc<XApiHttpClient>, own_user_id: String) -> Self {
+    pub fn new(client: Arc<dyn XApiClient>, own_user_id: String) -> Self {
         Self {
             client,
             own_user_id,
@@ -175,22 +180,21 @@ impl XApiMentionsAdapter {
 #[async_trait::async_trait]
 impl MentionsFetcher for XApiMentionsAdapter {
     async fn get_mentions(&self, since_id: Option<&str>) -> Result<Vec<LoopTweet>, LoopError> {
-        let response = self
-            .client
-            .get_mentions(&self.own_user_id, since_id, None)
-            .await
-            .map_err(xapi_to_loop_error)?;
+        let response =
+            crate::toolkit::read::get_mentions(&*self.client, &self.own_user_id, since_id, None)
+                .await
+                .map_err(toolkit_to_loop_error)?;
         Ok(search_response_to_loop_tweets(response))
     }
 }
 
-/// Adapts `XApiHttpClient` to `TargetTweetFetcher` and `TargetUserManager`.
+/// Adapts `XApiClient` to `TargetTweetFetcher` and `TargetUserManager` via toolkit.
 pub struct XApiTargetAdapter {
-    client: Arc<XApiHttpClient>,
+    client: Arc<dyn XApiClient>,
 }
 
 impl XApiTargetAdapter {
-    pub fn new(client: Arc<XApiHttpClient>) -> Self {
+    pub fn new(client: Arc<dyn XApiClient>) -> Self {
         Self { client }
     }
 }
@@ -198,11 +202,9 @@ impl XApiTargetAdapter {
 #[async_trait::async_trait]
 impl TargetTweetFetcher for XApiTargetAdapter {
     async fn fetch_user_tweets(&self, user_id: &str) -> Result<Vec<LoopTweet>, LoopError> {
-        let response = self
-            .client
-            .get_user_tweets(user_id, 10, None)
+        let response = crate::toolkit::read::get_user_tweets(&*self.client, user_id, 10, None)
             .await
-            .map_err(xapi_to_loop_error)?;
+            .map_err(toolkit_to_loop_error)?;
         Ok(search_response_to_loop_tweets(response))
     }
 }
@@ -210,22 +212,20 @@ impl TargetTweetFetcher for XApiTargetAdapter {
 #[async_trait::async_trait]
 impl TargetUserManager for XApiTargetAdapter {
     async fn lookup_user(&self, username: &str) -> Result<(String, String), LoopError> {
-        let user = self
-            .client
-            .get_user_by_username(username)
+        let user = crate::toolkit::read::get_user_by_username(&*self.client, username)
             .await
-            .map_err(xapi_to_loop_error)?;
+            .map_err(toolkit_to_loop_error)?;
         Ok((user.id, user.username))
     }
 }
 
-/// Adapts `XApiHttpClient` to `ProfileFetcher` and `EngagementFetcher`.
+/// Adapts `XApiClient` to `ProfileFetcher` and `EngagementFetcher` via toolkit.
 pub struct XApiProfileAdapter {
-    client: Arc<XApiHttpClient>,
+    client: Arc<dyn XApiClient>,
 }
 
 impl XApiProfileAdapter {
-    pub fn new(client: Arc<XApiHttpClient>) -> Self {
+    pub fn new(client: Arc<dyn XApiClient>) -> Self {
         Self { client }
     }
 }
@@ -235,11 +235,9 @@ impl ProfileFetcher for XApiProfileAdapter {
     async fn get_profile_metrics(
         &self,
     ) -> Result<super::analytics_loop::ProfileMetrics, AnalyticsError> {
-        let user = self
-            .client
-            .get_me()
+        let user = crate::toolkit::read::get_me(&*self.client)
             .await
-            .map_err(xapi_to_analytics_error)?;
+            .map_err(toolkit_to_analytics_error)?;
         Ok(super::analytics_loop::ProfileMetrics {
             follower_count: user.public_metrics.followers_count as i64,
             following_count: user.public_metrics.following_count as i64,
@@ -254,11 +252,9 @@ impl EngagementFetcher for XApiProfileAdapter {
         &self,
         tweet_id: &str,
     ) -> Result<super::analytics_loop::TweetMetrics, AnalyticsError> {
-        let tweet = self
-            .client
-            .get_tweet(tweet_id)
+        let tweet = crate::toolkit::read::get_tweet(&*self.client, tweet_id)
             .await
-            .map_err(xapi_to_analytics_error)?;
+            .map_err(toolkit_to_analytics_error)?;
         Ok(super::analytics_loop::TweetMetrics {
             likes: tweet.public_metrics.like_count as i64,
             retweets: tweet.public_metrics.retweet_count as i64,
@@ -268,13 +264,13 @@ impl EngagementFetcher for XApiProfileAdapter {
     }
 }
 
-/// Adapts `XApiHttpClient` to `PostExecutor` (for the posting queue).
+/// Adapts `XApiClient` to `PostExecutor` (for the posting queue) via toolkit.
 pub struct XApiPostExecutorAdapter {
-    client: Arc<XApiHttpClient>,
+    client: Arc<dyn XApiClient>,
 }
 
 impl XApiPostExecutorAdapter {
-    pub fn new(client: Arc<XApiHttpClient>) -> Self {
+    pub fn new(client: Arc<dyn XApiClient>) -> Self {
         Self { client }
     }
 }
@@ -287,45 +283,37 @@ impl PostExecutor for XApiPostExecutorAdapter {
         content: &str,
         media_ids: &[String],
     ) -> Result<String, String> {
-        if media_ids.is_empty() {
-            self.client
-                .reply_to_tweet(content, tweet_id)
-                .await
-                .map(|posted| posted.id)
-                .map_err(|e| e.to_string())
+        let media = if media_ids.is_empty() {
+            None
         } else {
-            self.client
-                .reply_to_tweet_with_media(content, tweet_id, media_ids)
-                .await
-                .map(|posted| posted.id)
-                .map_err(|e| e.to_string())
-        }
+            Some(media_ids)
+        };
+        crate::toolkit::write::reply_to_tweet(&*self.client, content, tweet_id, media)
+            .await
+            .map(|posted| posted.id)
+            .map_err(|e| e.to_string())
     }
 
     async fn execute_tweet(&self, content: &str, media_ids: &[String]) -> Result<String, String> {
-        if media_ids.is_empty() {
-            self.client
-                .post_tweet(content)
-                .await
-                .map(|posted| posted.id)
-                .map_err(|e| e.to_string())
+        let media = if media_ids.is_empty() {
+            None
         } else {
-            self.client
-                .post_tweet_with_media(content, media_ids)
-                .await
-                .map(|posted| posted.id)
-                .map_err(|e| e.to_string())
-        }
+            Some(media_ids)
+        };
+        crate::toolkit::write::post_tweet(&*self.client, content, media)
+            .await
+            .map(|posted| posted.id)
+            .map_err(|e| e.to_string())
     }
 }
 
-/// Adapts `XApiHttpClient` to `ThreadPoster` (for direct thread posting).
+/// Adapts `XApiClient` to `ThreadPoster` (for direct thread posting) via toolkit.
 pub struct XApiThreadPosterAdapter {
-    client: Arc<XApiHttpClient>,
+    client: Arc<dyn XApiClient>,
 }
 
 impl XApiThreadPosterAdapter {
-    pub fn new(client: Arc<XApiHttpClient>) -> Self {
+    pub fn new(client: Arc<dyn XApiClient>) -> Self {
         Self { client }
     }
 }
@@ -333,11 +321,10 @@ impl XApiThreadPosterAdapter {
 #[async_trait::async_trait]
 impl ThreadPoster for XApiThreadPosterAdapter {
     async fn post_tweet(&self, content: &str) -> Result<String, ContentLoopError> {
-        self.client
-            .post_tweet(content)
+        crate::toolkit::write::post_tweet(&*self.client, content, None)
             .await
             .map(|posted| posted.id)
-            .map_err(xapi_to_content_error)
+            .map_err(toolkit_to_content_error)
     }
 
     async fn reply_to_tweet(
@@ -345,11 +332,10 @@ impl ThreadPoster for XApiThreadPosterAdapter {
         in_reply_to: &str,
         content: &str,
     ) -> Result<String, ContentLoopError> {
-        self.client
-            .reply_to_tweet(content, in_reply_to)
+        crate::toolkit::write::reply_to_tweet(&*self.client, content, in_reply_to, None)
             .await
             .map(|posted| posted.id)
-            .map_err(xapi_to_content_error)
+            .map_err(toolkit_to_content_error)
     }
 }
 
@@ -1264,5 +1250,296 @@ impl StatusQuerier for StatusQuerierAdapter {
             tweets_posted: *counts.get("tweet_posted").unwrap_or(&0) as u64,
             threads_posted: *counts.get("thread_posted").unwrap_or(&0) as u64,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::x_api::types::*;
+
+    /// Mock XApiClient that returns deterministic responses.
+    /// Used to verify adapters route through toolkit functions.
+    struct MockXApiClient;
+
+    #[async_trait::async_trait]
+    impl XApiClient for MockXApiClient {
+        async fn search_tweets(
+            &self,
+            query: &str,
+            _: u32,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Ok(SearchResponse {
+                data: vec![Tweet {
+                    id: "st1".into(),
+                    text: query.into(),
+                    author_id: "a1".into(),
+                    created_at: String::new(),
+                    public_metrics: PublicMetrics::default(),
+                    conversation_id: None,
+                }],
+                includes: None,
+                meta: SearchMeta {
+                    newest_id: None,
+                    oldest_id: None,
+                    result_count: 1,
+                    next_token: None,
+                },
+            })
+        }
+
+        async fn get_mentions(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<MentionResponse, XApiError> {
+            Ok(SearchResponse {
+                data: vec![Tweet {
+                    id: "m1".into(),
+                    text: "mention".into(),
+                    author_id: "a2".into(),
+                    created_at: String::new(),
+                    public_metrics: PublicMetrics::default(),
+                    conversation_id: None,
+                }],
+                includes: None,
+                meta: SearchMeta {
+                    newest_id: None,
+                    oldest_id: None,
+                    result_count: 1,
+                    next_token: None,
+                },
+            })
+        }
+
+        async fn post_tweet(&self, text: &str) -> Result<PostedTweet, XApiError> {
+            Ok(PostedTweet {
+                id: "pt1".into(),
+                text: text.into(),
+            })
+        }
+
+        async fn reply_to_tweet(&self, text: &str, _: &str) -> Result<PostedTweet, XApiError> {
+            Ok(PostedTweet {
+                id: "rt1".into(),
+                text: text.into(),
+            })
+        }
+
+        async fn get_tweet(&self, id: &str) -> Result<Tweet, XApiError> {
+            Ok(Tweet {
+                id: id.into(),
+                text: "tweet text".into(),
+                author_id: "a1".into(),
+                created_at: String::new(),
+                public_metrics: PublicMetrics::default(),
+                conversation_id: None,
+            })
+        }
+
+        async fn get_me(&self) -> Result<User, XApiError> {
+            Ok(User {
+                id: "me".into(),
+                username: "testuser".into(),
+                name: "Test".into(),
+                public_metrics: UserMetrics::default(),
+            })
+        }
+
+        async fn get_user_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Ok(SearchResponse {
+                data: vec![],
+                includes: None,
+                meta: SearchMeta {
+                    newest_id: None,
+                    oldest_id: None,
+                    result_count: 0,
+                    next_token: None,
+                },
+            })
+        }
+
+        async fn get_user_by_username(&self, u: &str) -> Result<User, XApiError> {
+            Ok(User {
+                id: format!("uid_{u}"),
+                username: u.into(),
+                name: "Test".into(),
+                public_metrics: UserMetrics::default(),
+            })
+        }
+    }
+
+    fn mock_client() -> Arc<dyn XApiClient> {
+        Arc::new(MockXApiClient) as Arc<dyn XApiClient>
+    }
+
+    // --- TweetSearcher (routes through toolkit::read::search_tweets) ---
+
+    #[tokio::test]
+    async fn search_adapter_routes_through_toolkit() {
+        let adapter = XApiSearchAdapter::new(mock_client());
+        let tweets = adapter.search_tweets("rust").await.unwrap();
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0].id, "st1");
+        assert_eq!(tweets[0].text, "rust");
+    }
+
+    // --- MentionsFetcher (routes through toolkit::read::get_mentions) ---
+
+    #[tokio::test]
+    async fn mentions_adapter_routes_through_toolkit() {
+        let adapter = XApiMentionsAdapter::new(mock_client(), "me".into());
+        let tweets = adapter.get_mentions(None).await.unwrap();
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0].id, "m1");
+    }
+
+    // --- TargetTweetFetcher (routes through toolkit::read::get_user_tweets) ---
+
+    #[tokio::test]
+    async fn target_adapter_fetch_routes_through_toolkit() {
+        let adapter = XApiTargetAdapter::new(mock_client());
+        let tweets = adapter.fetch_user_tweets("u1").await.unwrap();
+        assert!(tweets.is_empty()); // mock returns empty
+    }
+
+    // --- TargetUserManager (routes through toolkit::read::get_user_by_username) ---
+
+    #[tokio::test]
+    async fn target_adapter_lookup_routes_through_toolkit() {
+        let adapter = XApiTargetAdapter::new(mock_client());
+        let (id, username) = adapter.lookup_user("alice").await.unwrap();
+        assert_eq!(id, "uid_alice");
+        assert_eq!(username, "alice");
+    }
+
+    // --- ProfileFetcher (routes through toolkit::read::get_me) ---
+
+    #[tokio::test]
+    async fn profile_adapter_routes_through_toolkit() {
+        let adapter = XApiProfileAdapter::new(mock_client());
+        let metrics = adapter.get_profile_metrics().await.unwrap();
+        // MockXApiClient returns default UserMetrics (all zeros)
+        assert_eq!(metrics.follower_count, 0);
+    }
+
+    // --- EngagementFetcher (routes through toolkit::read::get_tweet) ---
+
+    #[tokio::test]
+    async fn engagement_adapter_routes_through_toolkit() {
+        let adapter = XApiProfileAdapter::new(mock_client());
+        let metrics = adapter.get_tweet_metrics("t123").await.unwrap();
+        assert_eq!(metrics.likes, 0);
+    }
+
+    // --- PostExecutor (routes through toolkit::write) ---
+
+    #[tokio::test]
+    async fn post_executor_reply_routes_through_toolkit() {
+        let adapter = XApiPostExecutorAdapter::new(mock_client());
+        let id = adapter.execute_reply("t0", "hello", &[]).await.unwrap();
+        assert_eq!(id, "rt1");
+    }
+
+    #[tokio::test]
+    async fn post_executor_tweet_routes_through_toolkit() {
+        let adapter = XApiPostExecutorAdapter::new(mock_client());
+        let id = adapter.execute_tweet("hello", &[]).await.unwrap();
+        assert_eq!(id, "pt1");
+    }
+
+    // --- ThreadPoster (routes through toolkit::write) ---
+
+    #[tokio::test]
+    async fn thread_poster_post_routes_through_toolkit() {
+        let adapter = XApiThreadPosterAdapter::new(mock_client());
+        let id = adapter.post_tweet("thread start").await.unwrap();
+        assert_eq!(id, "pt1");
+    }
+
+    #[tokio::test]
+    async fn thread_poster_reply_routes_through_toolkit() {
+        let adapter = XApiThreadPosterAdapter::new(mock_client());
+        let id = adapter.reply_to_tweet("t0", "thread cont").await.unwrap();
+        assert_eq!(id, "rt1");
+    }
+
+    // --- Error mapping: ToolkitError → LoopError ---
+
+    #[tokio::test]
+    async fn toolkit_error_maps_to_loop_error() {
+        struct FailClient;
+        #[async_trait::async_trait]
+        impl XApiClient for FailClient {
+            async fn search_tweets(
+                &self,
+                _: &str,
+                _: u32,
+                _: Option<&str>,
+                _: Option<&str>,
+            ) -> Result<SearchResponse, XApiError> {
+                Err(XApiError::RateLimited {
+                    retry_after: Some(30),
+                })
+            }
+            async fn get_mentions(
+                &self,
+                _: &str,
+                _: Option<&str>,
+                _: Option<&str>,
+            ) -> Result<MentionResponse, XApiError> {
+                unimplemented!()
+            }
+            async fn post_tweet(&self, _: &str) -> Result<PostedTweet, XApiError> {
+                unimplemented!()
+            }
+            async fn reply_to_tweet(&self, _: &str, _: &str) -> Result<PostedTweet, XApiError> {
+                unimplemented!()
+            }
+            async fn get_tweet(&self, _: &str) -> Result<Tweet, XApiError> {
+                unimplemented!()
+            }
+            async fn get_me(&self) -> Result<User, XApiError> {
+                unimplemented!()
+            }
+            async fn get_user_tweets(
+                &self,
+                _: &str,
+                _: u32,
+                _: Option<&str>,
+            ) -> Result<SearchResponse, XApiError> {
+                unimplemented!()
+            }
+            async fn get_user_by_username(&self, _: &str) -> Result<User, XApiError> {
+                unimplemented!()
+            }
+        }
+
+        let client: Arc<dyn XApiClient> = Arc::new(FailClient);
+        let adapter = XApiSearchAdapter::new(client);
+        let err = adapter.search_tweets("q").await.unwrap_err();
+        assert!(matches!(
+            err,
+            LoopError::RateLimited {
+                retry_after: Some(30)
+            }
+        ));
+    }
+
+    // --- Toolkit input validation propagates as LoopError ---
+
+    #[tokio::test]
+    async fn empty_id_triggers_toolkit_validation() {
+        let adapter = XApiTargetAdapter::new(mock_client());
+        let err = adapter.fetch_user_tweets("").await.unwrap_err();
+        assert!(matches!(err, LoopError::Other(_)));
     }
 }

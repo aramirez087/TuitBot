@@ -79,10 +79,24 @@ dashboard/         — Svelte 5 + SvelteKit + Tauri frontend
 migrations/        — SQLite migrations (shared across crates)
 ```
 
+### Three-Layer Model (tuitbot-core)
+
+Business logic in `tuitbot-core` follows a strict three-layer architecture:
+
+| Layer | Module | Role | Dependencies |
+|-------|--------|------|--------------|
+| **Toolkit** (L1) | `core/toolkit/` | Stateless X API utilities (`read.rs`, `write.rs`, `engage.rs`, `media.rs`) | `&dyn XApiClient` only — no DB, no LLM |
+| **Workflow** (L2) | `core/workflow/` | Stateful composites (`discover`, `draft`, `queue`, `publish`, `thread_plan`, `orchestrate`) | DB + optional LLM. Calls Toolkit only. |
+| **Autopilot** (L3) | `core/automation/` | Scheduled loops with jitter, circuit breaking, graceful shutdown | Calls Workflow + Toolkit. Never XApiClient directly. |
+
+Dependency rules: Toolkit ← Workflow ← Autopilot. No upward or skip-level imports. MCP handlers are thin adapters (param parse → delegate → envelope).
+
 ### Key Modules
 
 | Module | Notes |
 |--------|-------|
+| `core/toolkit/` | Stateless X API wrappers: `read.rs`, `write.rs`, `engage.rs`, `media.rs` over `&dyn XApiClient` |
+| `core/workflow/` | Stateful composites: `discover.rs`, `draft.rs`, `queue.rs`, `publish.rs`, `thread_plan.rs`, `orchestrate.rs` |
 | `core/config/` | Defaults → TOML → env vars (`TUITBOT_` prefix, `__` separator) |
 | `core/x_api/` | `XApiClient` trait; OAuth 2.0 PKCE; tier detection |
 | `core/llm/` | `LlmProvider` trait; `OpenAiCompatProvider` (OpenAI + Ollama), `AnthropicProvider` |

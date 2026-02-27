@@ -15,6 +15,7 @@ use tuitbot_core::automation::{
 };
 use tuitbot_core::config::{Config, OperatingMode};
 use tuitbot_core::startup::format_startup_banner;
+use tuitbot_core::x_api::XApiClient;
 
 use crate::deps::RuntimeDeps;
 
@@ -85,7 +86,7 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
     {
         let cancel = runtime.cancel_token();
         let pool = deps.pool.clone();
-        let xc = deps.x_client.clone();
+        let xc = deps.x_client.clone() as Arc<dyn XApiClient>;
         runtime.spawn(
             "approval-poster",
             run_approval_poster(pool, xc, min_delay, max_delay, cancel),

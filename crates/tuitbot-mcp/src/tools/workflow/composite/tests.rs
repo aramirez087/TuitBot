@@ -352,7 +352,7 @@ mod find_opportunities {
 
         assert_eq!(parsed["success"], true);
         assert!(parsed["data"]["candidates"].is_array());
-        assert!(parsed["data"]["total_found"].as_u64().unwrap() > 0);
+        assert!(parsed["data"]["total_searched"].as_u64().unwrap() > 0);
     }
 
     #[tokio::test]

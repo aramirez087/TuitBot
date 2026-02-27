@@ -11,7 +11,7 @@ use rand::Rng;
 use tokio_util::sync::CancellationToken;
 
 use crate::storage::{self, DbPool};
-use crate::x_api::XApiHttpClient;
+use crate::x_api::XApiClient;
 
 /// Run the approval poster loop.
 ///
@@ -19,7 +19,7 @@ use crate::x_api::XApiHttpClient;
 /// Uses randomized delay between `min_delay` and `max_delay` to appear human-like.
 pub async fn run_approval_poster(
     pool: DbPool,
-    x_client: Arc<XApiHttpClient>,
+    x_client: Arc<dyn XApiClient>,
     min_delay: Duration,
     max_delay: Duration,
     cancel: CancellationToken,
@@ -55,7 +55,7 @@ pub async fn run_approval_poster(
                 let media_ids = if media_paths.is_empty() {
                     vec![]
                 } else {
-                    match upload_media(&x_client, &media_paths).await {
+                    match upload_media(&*x_client, &media_paths).await {
                         Ok(ids) => ids,
                         Err(e) => {
                             tracing::warn!(
@@ -71,7 +71,7 @@ pub async fn run_approval_poster(
                 let result = match item.action_type.as_str() {
                     "reply" if !item.target_tweet_id.is_empty() => {
                         post_reply(
-                            &x_client,
+                            &*x_client,
                             &item.target_tweet_id,
                             &item.generated_content,
                             &media_ids,
@@ -80,7 +80,7 @@ pub async fn run_approval_poster(
                     }
                     _ => {
                         // tweet, thread_tweet, or reply with empty target
-                        post_tweet(&x_client, &item.generated_content, &media_ids).await
+                        post_tweet(&*x_client, &item.generated_content, &media_ids).await
                     }
                 };
 
@@ -145,62 +145,47 @@ pub async fn run_approval_poster(
     tracing::info!("Approval poster loop stopped");
 }
 
-/// Post a reply to a tweet.
+/// Post a reply to a tweet via toolkit.
 async fn post_reply(
-    client: &XApiHttpClient,
+    client: &dyn XApiClient,
     tweet_id: &str,
     content: &str,
     media_ids: &[String],
 ) -> Result<String, String> {
-    use crate::x_api::XApiClient;
-
-    if media_ids.is_empty() {
-        client
-            .reply_to_tweet(content, tweet_id)
-            .await
-            .map(|posted| posted.id)
-            .map_err(|e| e.to_string())
+    let media = if media_ids.is_empty() {
+        None
     } else {
-        client
-            .reply_to_tweet_with_media(content, tweet_id, media_ids)
-            .await
-            .map(|posted| posted.id)
-            .map_err(|e| e.to_string())
-    }
+        Some(media_ids)
+    };
+    crate::toolkit::write::reply_to_tweet(client, content, tweet_id, media)
+        .await
+        .map(|posted| posted.id)
+        .map_err(|e| e.to_string())
 }
 
-/// Post an original tweet.
+/// Post an original tweet via toolkit.
 async fn post_tweet(
-    client: &XApiHttpClient,
+    client: &dyn XApiClient,
     content: &str,
     media_ids: &[String],
 ) -> Result<String, String> {
-    use crate::x_api::XApiClient;
-
-    if media_ids.is_empty() {
-        client
-            .post_tweet(content)
-            .await
-            .map(|posted| posted.id)
-            .map_err(|e| e.to_string())
+    let media = if media_ids.is_empty() {
+        None
     } else {
-        client
-            .post_tweet_with_media(content, media_ids)
-            .await
-            .map(|posted| posted.id)
-            .map_err(|e| e.to_string())
-    }
+        Some(media_ids)
+    };
+    crate::toolkit::write::post_tweet(client, content, media)
+        .await
+        .map(|posted| posted.id)
+        .map_err(|e| e.to_string())
 }
 
-/// Upload local media files to X and return their media IDs.
+/// Upload local media files to X via toolkit and return their media IDs.
 async fn upload_media(
-    client: &XApiHttpClient,
+    client: &dyn XApiClient,
     media_paths: &[String],
 ) -> Result<Vec<String>, String> {
-    use crate::x_api::XApiClient;
-
     use crate::x_api::types::{ImageFormat, MediaType};
-    use std::path::Path;
 
     let mut media_ids = Vec::with_capacity(media_paths.len());
     for path in media_paths {
@@ -209,21 +194,11 @@ async fn upload_media(
             .await
             .map_err(|e| format!("Failed to read media file {}: {}", path, e))?;
 
-        // Guess media type from extension.
-        let ext = Path::new(&expanded)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
-        let media_type = match ext {
-            "png" => MediaType::Image(ImageFormat::Png),
-            "gif" => MediaType::Gif,
-            "mp4" => MediaType::Video,
-            "webp" => MediaType::Image(ImageFormat::Webp),
-            _ => MediaType::Image(ImageFormat::Jpeg),
-        };
+        // Infer media type via toolkit, falling back to JPEG.
+        let media_type = crate::toolkit::media::infer_media_type(&expanded)
+            .unwrap_or(MediaType::Image(ImageFormat::Jpeg));
 
-        let media_id = client
-            .upload_media(&data, media_type)
+        let media_id = crate::toolkit::media::upload_media(client, &data, media_type)
             .await
             .map_err(|e| format!("Failed to upload media {}: {}", path, e))?;
         media_ids.push(media_id.0);

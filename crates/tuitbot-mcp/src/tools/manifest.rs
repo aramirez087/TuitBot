@@ -86,6 +86,8 @@ pub enum Profile {
     ApiReadonly,
     Write,
     Admin,
+    UtilityReadonly,
+    UtilityWrite,
 }
 
 /// Module lane: whether a tool lives in the shared `tools/` root or
@@ -119,6 +121,8 @@ impl From<crate::state::Profile> for Profile {
             crate::state::Profile::ApiReadonly => Self::ApiReadonly,
             crate::state::Profile::Write => Self::Write,
             crate::state::Profile::Admin => Self::Admin,
+            crate::state::Profile::UtilityReadonly => Self::UtilityReadonly,
+            crate::state::Profile::UtilityWrite => Self::UtilityWrite,
         }
     }
 }
@@ -225,17 +229,36 @@ fn x_tool(
     }
 }
 
-/// All four profiles.
+/// All six profiles.
+const ALL_SIX: &[Profile] = &[
+    Profile::Readonly,
+    Profile::ApiReadonly,
+    Profile::Write,
+    Profile::Admin,
+    Profile::UtilityReadonly,
+    Profile::UtilityWrite,
+];
+/// All four original profiles (no utility profiles).
 const ALL_FOUR: &[Profile] = &[
     Profile::Readonly,
     Profile::ApiReadonly,
     Profile::Write,
     Profile::Admin,
 ];
+/// Write + Admin + ApiReadonly + UtilityWrite (extended reads).
+const WRITE_UP_AND_API_RO_AND_UTIL_WRITE: &[Profile] = &[
+    Profile::ApiReadonly,
+    Profile::Write,
+    Profile::Admin,
+    Profile::UtilityWrite,
+];
 /// Write + Admin + ApiReadonly (not minimal readonly).
 const WRITE_UP_AND_API_RO: &[Profile] = &[Profile::ApiReadonly, Profile::Write, Profile::Admin];
 /// Write + Admin (standard operating profiles).
 const WRITE_UP: &[Profile] = &[Profile::Write, Profile::Admin];
+/// Write + Admin + UtilityWrite (mutation tools).
+const WRITE_UP_AND_UTIL_WRITE: &[Profile] =
+    &[Profile::Write, Profile::Admin, Profile::UtilityWrite];
 /// Admin only — universal request tools for ad-hoc X API v2 access.
 const ADMIN_ONLY: &[Profile] = &[Profile::Admin];
 /// Api-readonly only.
@@ -460,7 +483,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             &[ErrorCode::InvalidInput],
         ),
         // ── Approval Queue ───────────────────────────────────────────
@@ -571,7 +594,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             &[],
         ),
         tool(
@@ -582,7 +605,13 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            WRITE_UP_AND_API_RO,
+            &[
+                Profile::ApiReadonly,
+                Profile::Write,
+                Profile::Admin,
+                Profile::UtilityReadonly,
+                Profile::UtilityWrite,
+            ],
             &[],
         ),
         // ── Capabilities & Health ────────────────────────────────────
@@ -605,7 +634,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             false,
             false,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             &[],
         ),
         // ── Mode & Policy ────────────────────────────────────────────
@@ -676,7 +705,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             WRITE_UP,
             DB_ERR,
         ),
-        // ── X API Core Read (in all 3 profiles) ─────────────────────
+        // ── X API Core Read (all profiles including utility) ─────────
         x_tool(
             "get_tweet_by_id",
             ToolCategory::Read,
@@ -686,7 +715,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["tweet.read", "users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_ERR,
         ),
         x_tool(
@@ -698,7 +727,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_ERR,
         ),
         x_tool(
@@ -710,7 +739,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["tweet.read", "users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_ERR,
         ),
         x_tool(
@@ -722,7 +751,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["tweet.read", "users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_USER_ERR,
         ),
         x_tool(
@@ -734,7 +763,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["tweet.read", "users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_ERR,
         ),
         x_tool(
@@ -746,7 +775,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["tweet.read", "users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_USER_ERR,
         ),
         x_tool(
@@ -758,10 +787,10 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["users.read"],
             true,
             false,
-            ALL_FOUR,
+            ALL_SIX,
             X_READ_ERR,
         ),
-        // ── X API Extended Read (workflow + api-readonly) ────────────
+        // ── X API Extended Read (workflow + api-readonly + utility-write) ──
         x_tool(
             "x_get_followers",
             ToolCategory::Read,
@@ -771,7 +800,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["follows.read", "users.read"],
             true,
             false,
-            WRITE_UP_AND_API_RO,
+            WRITE_UP_AND_API_RO_AND_UTIL_WRITE,
             X_READ_ERR,
         ),
         x_tool(
@@ -783,7 +812,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["follows.read", "users.read"],
             true,
             false,
-            WRITE_UP_AND_API_RO,
+            WRITE_UP_AND_API_RO_AND_UTIL_WRITE,
             X_READ_ERR,
         ),
         x_tool(
@@ -795,7 +824,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["like.read", "users.read"],
             true,
             false,
-            WRITE_UP_AND_API_RO,
+            WRITE_UP_AND_API_RO_AND_UTIL_WRITE,
             X_READ_ERR,
         ),
         x_tool(
@@ -807,7 +836,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["bookmark.read", "users.read"],
             true,
             false,
-            WRITE_UP_AND_API_RO,
+            WRITE_UP_AND_API_RO_AND_UTIL_WRITE,
             X_READ_USER_ERR,
         ),
         x_tool(
@@ -819,7 +848,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["users.read"],
             true,
             false,
-            WRITE_UP_AND_API_RO,
+            WRITE_UP_AND_API_RO_AND_UTIL_WRITE,
             X_READ_ERR,
         ),
         x_tool(
@@ -831,7 +860,7 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             &["tweet.read", "users.read"],
             true,
             false,
-            WRITE_UP_AND_API_RO,
+            WRITE_UP_AND_API_RO_AND_UTIL_WRITE,
             X_READ_ERR,
         ),
         tool(
@@ -858,65 +887,65 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             API_RO,
             X_READ_ERR,
         ),
-        // ── X API Write (workflow only) ─────────────────────────────
+        // ── X API Write (shared: workflow in write/admin, toolkit in utility) ──
         x_tool(
             "x_post_tweet",
             ToolCategory::Write,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_WRITE_ERR,
         ),
         x_tool(
             "x_reply_to_tweet",
             ToolCategory::Write,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_WRITE_ERR,
         ),
         x_tool(
             "x_quote_tweet",
             ToolCategory::Write,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_WRITE_ERR,
         ),
         x_tool(
             "x_delete_tweet",
             ToolCategory::Write,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_WRITE_ERR,
         ),
         x_tool(
             "x_post_thread",
             ToolCategory::Write,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::XRateLimited,
@@ -935,114 +964,114 @@ fn all_curated_tools() -> Vec<ToolEntry> {
                 ErrorCode::PolicyError,
             ],
         ),
-        // ── X API Engage (workflow only) ─────────────────────────────
+        // ── X API Engage (shared: workflow in write/admin, toolkit in utility) ──
         x_tool(
             "x_like_tweet",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["like.read", "like.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_unlike_tweet",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["like.read", "like.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_follow_user",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["follows.read", "follows.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_unfollow_user",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["follows.read", "follows.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_retweet",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_unretweet",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["tweet.read", "tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_bookmark_tweet",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["bookmark.read", "bookmark.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
         x_tool(
             "x_unbookmark_tweet",
             ToolCategory::Engage,
-            Lane::Workflow,
+            Lane::Shared,
             true,
-            true,
+            false,
             &["bookmark.read", "bookmark.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             X_ENGAGE_ERR,
         ),
-        // ── X API Media (workflow only) ─────────────────────────────
+        // ── X API Media (shared: workflow in write/admin, toolkit in utility) ──
         x_tool(
             "x_upload_media",
             ToolCategory::Media,
-            Lane::Workflow,
+            Lane::Shared,
             true,
             false,
             &["tweet.write", "users.read"],
             true,
             false,
-            WRITE_UP,
+            WRITE_UP_AND_UTIL_WRITE,
             &[
                 ErrorCode::XNotConfigured,
                 ErrorCode::UnsupportedMediaType,
@@ -1346,6 +1375,116 @@ mod tests {
             "expected at least 10 categories, got {}",
             cats.len()
         );
+    }
+
+    // ── Utility profile boundary tests ────────────────────────────
+
+    #[test]
+    fn utility_readonly_contains_no_workflow_tools() {
+        let manifest = generate_profile_manifest(crate::state::Profile::UtilityReadonly);
+        for t in &manifest.tools {
+            assert_ne!(
+                t.lane,
+                Lane::Workflow,
+                "utility-readonly profile must not include workflow tool: {}",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn utility_write_contains_no_workflow_tools() {
+        let manifest = generate_profile_manifest(crate::state::Profile::UtilityWrite);
+        for t in &manifest.tools {
+            assert_ne!(
+                t.lane,
+                Lane::Workflow,
+                "utility-write profile must not include workflow tool: {}",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn utility_profiles_require_no_db_or_llm() {
+        for profile in [
+            crate::state::Profile::UtilityReadonly,
+            crate::state::Profile::UtilityWrite,
+        ] {
+            let manifest = generate_profile_manifest(profile);
+            for t in &manifest.tools {
+                assert!(!t.requires_db, "{profile} tool {} requires DB", t.name);
+                assert!(!t.requires_llm, "{profile} tool {} requires LLM", t.name);
+            }
+        }
+    }
+
+    #[test]
+    fn utility_readonly_contains_no_mutations() {
+        let manifest = generate_profile_manifest(crate::state::Profile::UtilityReadonly);
+        for t in &manifest.tools {
+            assert!(
+                !t.mutation,
+                "utility-readonly tool {} is marked as mutation",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn utility_profile_tool_counts() {
+        let ro = generate_profile_manifest(crate::state::Profile::UtilityReadonly);
+        let rw = generate_profile_manifest(crate::state::Profile::UtilityWrite);
+        // utility-readonly: core reads + scoring + config + health
+        assert!(
+            ro.tool_count >= 10,
+            "utility-readonly should have >=10 tools, got {}",
+            ro.tool_count
+        );
+        // utility-write: superset of utility-readonly + writes + engages + extended reads
+        assert!(
+            rw.tool_count > ro.tool_count,
+            "utility-write ({}) should have more tools than utility-readonly ({})",
+            rw.tool_count,
+            ro.tool_count
+        );
+    }
+
+    #[test]
+    fn utility_write_is_superset_of_utility_readonly_tools() {
+        let ro = generate_profile_manifest(crate::state::Profile::UtilityReadonly);
+        let rw = generate_profile_manifest(crate::state::Profile::UtilityWrite);
+        let rw_names: HashSet<&str> = rw.tools.iter().map(|t| t.name.as_str()).collect();
+        // Every tool in utility-readonly manifest should also be in utility-write manifest
+        for t in &ro.tools {
+            assert!(
+                rw_names.contains(t.name.as_str()),
+                "utility-readonly tool {} is missing from utility-write profile",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    #[ignore] // Run with: cargo test -p tuitbot-mcp write_utility_manifests -- --ignored
+    fn write_utility_manifests() {
+        let docs_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/generated");
+        for (profile, filename) in [
+            (
+                crate::state::Profile::UtilityReadonly,
+                "mcp-manifest-utility-readonly.json",
+            ),
+            (
+                crate::state::Profile::UtilityWrite,
+                "mcp-manifest-utility-write.json",
+            ),
+        ] {
+            let manifest = generate_profile_manifest(profile);
+            let json = serde_json::to_string_pretty(&manifest).unwrap();
+            let path = format!("{docs_dir}/{filename}");
+            std::fs::write(&path, format!("{json}\n")).unwrap();
+            eprintln!("Wrote {path} ({} tools)", manifest.tool_count);
+        }
     }
 
     #[test]

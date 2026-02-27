@@ -258,6 +258,22 @@ All tools return structured `{ success, data, error, meta }` envelopes with 28 t
 
 ---
 
+## Architecture
+
+Tuitbot's core is organized into three layers with strict dependency rules:
+
+| Layer | Module | Role | Dependencies |
+|-------|--------|------|-------------|
+| **Toolkit** | `core::toolkit/` | Stateless X API utilities (read, write, engage, media) | `&dyn XApiClient` only |
+| **Workflow** | `core::workflow/` | Stateful composites (discover, draft, queue, publish, orchestrate) | DB + LLM + Toolkit |
+| **Autopilot** | `core::automation/` | Scheduled loops (discovery, mentions, content, threads, analytics) | Workflow + Toolkit |
+
+Every layer only calls the layer below it. Toolkit functions are usable from any context (MCP, CLI, tests) without DB or LLM initialization. Workflow functions compose toolkit calls with state. Autopilot schedules workflow cycles on timers. MCP handlers and HTTP routes are thin adapters over these layers.
+
+Four workspace crates: `tuitbot-core` (all business logic), `tuitbot-cli` (CLI), `tuitbot-mcp` (MCP server, 109 tools), `tuitbot-server` (HTTP/WS API). Full details in [Architecture](https://aramirez087.github.io/TuitBot/architecture/).
+
+---
+
 ## Documentation
 
 This README is intentionally concise. The full system docs are on GitHub Pages:

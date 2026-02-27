@@ -1,20 +1,19 @@
 //! `propose_and_queue_replies` — safety-check, then queue or execute replies.
+//!
+//! Delegates to `tuitbot_core::workflow::queue` for the actual logic,
+//! adding only MCP response envelope wrapping, policy gate check, and telemetry.
 
 use std::sync::Arc;
 use std::time::Instant;
 
-use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::mcp_policy::McpPolicyEvaluator;
-use tuitbot_core::safety::{contains_banned_phrase, DedupChecker};
-use tuitbot_core::storage;
+use tuitbot_core::workflow::queue::{self, QueueInput};
+use tuitbot_core::workflow::{ProposeResult, QueueItem, WorkflowError};
 
 use crate::requests::ProposeItem;
 use crate::state::SharedState;
 use crate::tools::response::{ErrorCode, ToolMeta, ToolResponse};
-use crate::tools::workflow::content::ArcProvider;
 use crate::tools::workflow::policy_gate::{self, GateResult};
-
-use super::ProposeResult;
 
 /// Execute the `propose_and_queue_replies` composite tool.
 pub async fn execute(state: &SharedState, items: &[ProposeItem], mention_product: bool) -> String {
@@ -27,7 +26,7 @@ pub async fn execute(state: &SharedState, items: &[ProposeItem], mention_product
             .to_json();
     }
 
-    // Global policy gate check
+    // Global policy gate check (MCP-specific)
     let params = serde_json::json!({
         "item_count": items.len(),
         "mention_product": mention_product,
@@ -38,146 +37,38 @@ pub async fn execute(state: &SharedState, items: &[ProposeItem], mention_product
         GateResult::Proceed => {}
     }
 
-    let approval_mode = state.config.effective_approval_mode();
-    let dedup = DedupChecker::new(state.pool.clone());
-    let banned = &state.config.limits.banned_phrases;
+    // Build LLM provider Arc (for auto-generation)
+    let llm: Option<Arc<dyn tuitbot_core::llm::LlmProvider>> =
+        state.llm_provider.as_ref().map(|_| {
+            Arc::new(crate::tools::workflow::content::ArcProvider {
+                state: Arc::clone(state),
+            }) as Arc<dyn tuitbot_core::llm::LlmProvider>
+        });
 
-    let provider = Box::new(ArcProvider {
-        state: Arc::clone(state),
-    });
-    let gen = ContentGenerator::new(provider, state.config.business.clone());
+    // Convert ProposeItem → QueueItem
+    let queue_items: Vec<QueueItem> = items
+        .iter()
+        .map(|i| QueueItem {
+            candidate_id: i.candidate_id.clone(),
+            pre_drafted_text: i.pre_drafted_text.clone(),
+        })
+        .collect();
 
-    let mut results = Vec::with_capacity(items.len());
+    // Delegate to core workflow step
+    let x_client = state.x_client.as_deref();
+    let result = queue::execute(
+        &state.pool,
+        x_client,
+        llm.as_ref(),
+        &state.config,
+        QueueInput {
+            items: queue_items,
+            mention_product,
+        },
+    )
+    .await;
 
-    for item in items {
-        // Fetch tweet from DB
-        let tweet = match storage::tweets::get_tweet_by_id(&state.pool, &item.candidate_id).await {
-            Ok(Some(t)) => t,
-            Ok(None) => {
-                results.push(ProposeResult::Blocked {
-                    candidate_id: item.candidate_id.clone(),
-                    reason: format!("Tweet {} not found in discovery DB.", item.candidate_id),
-                });
-                continue;
-            }
-            Err(e) => {
-                results.push(ProposeResult::Blocked {
-                    candidate_id: item.candidate_id.clone(),
-                    reason: format!("DB error: {e}"),
-                });
-                continue;
-            }
-        };
-
-        // Determine reply text: pre-drafted or auto-generate
-        let reply_text = if let Some(text) = &item.pre_drafted_text {
-            text.clone()
-        } else {
-            match gen
-                .generate_reply(&tweet.content, &tweet.author_username, mention_product)
-                .await
-            {
-                Ok(output) => output.text,
-                Err(e) => {
-                    results.push(ProposeResult::Blocked {
-                        candidate_id: item.candidate_id.clone(),
-                        reason: format!("LLM generation failed: {e}"),
-                    });
-                    continue;
-                }
-            }
-        };
-
-        // Safety checks
-        if let Ok(true) = dedup.has_replied_to(&item.candidate_id).await {
-            results.push(ProposeResult::Blocked {
-                candidate_id: item.candidate_id.clone(),
-                reason: "Already replied to this tweet.".to_string(),
-            });
-            continue;
-        }
-
-        if let Some(phrase) = contains_banned_phrase(&reply_text, banned) {
-            results.push(ProposeResult::Blocked {
-                candidate_id: item.candidate_id.clone(),
-                reason: format!("Contains banned phrase: {phrase}"),
-            });
-            continue;
-        }
-
-        if let Ok(true) = dedup.is_phrasing_similar(&reply_text, 20).await {
-            results.push(ProposeResult::Blocked {
-                candidate_id: item.candidate_id.clone(),
-                reason: "Reply too similar to a recent reply.".to_string(),
-            });
-            continue;
-        }
-
-        // Route: approval queue or direct execution
-        if approval_mode {
-            match storage::approval_queue::enqueue(
-                &state.pool,
-                "reply",
-                &item.candidate_id,
-                &tweet.author_username,
-                &reply_text,
-                "composite",
-                "auto",
-                tweet.relevance_score.unwrap_or(0.0),
-                "[]",
-            )
-            .await
-            {
-                Ok(id) => {
-                    results.push(ProposeResult::Queued {
-                        candidate_id: item.candidate_id.clone(),
-                        approval_queue_id: id,
-                    });
-                }
-                Err(e) => {
-                    results.push(ProposeResult::Blocked {
-                        candidate_id: item.candidate_id.clone(),
-                        reason: format!("Failed to enqueue: {e}"),
-                    });
-                }
-            }
-        } else {
-            // Direct execution requires X client
-            let x_client = match state.x_client.as_ref() {
-                Some(c) => c,
-                None => {
-                    results.push(ProposeResult::Blocked {
-                        candidate_id: item.candidate_id.clone(),
-                        reason: "X API client not available.".to_string(),
-                    });
-                    continue;
-                }
-            };
-
-            match x_client
-                .reply_to_tweet(&reply_text, &item.candidate_id)
-                .await
-            {
-                Ok(posted) => {
-                    // Mark as replied in DB
-                    let _ =
-                        storage::tweets::mark_tweet_replied(&state.pool, &item.candidate_id).await;
-                    results.push(ProposeResult::Executed {
-                        candidate_id: item.candidate_id.clone(),
-                        reply_tweet_id: posted.id,
-                    });
-                }
-                Err(e) => {
-                    results.push(ProposeResult::Blocked {
-                        candidate_id: item.candidate_id.clone(),
-                        reason: format!("X API error: {e}"),
-                    });
-                }
-            }
-        }
-    }
-
-    // Record one mutation for the batch
+    // Record batch mutation for rate limiting
     let _ = McpPolicyEvaluator::record_mutation(
         &state.pool,
         "propose_and_queue_replies",
@@ -186,27 +77,52 @@ pub async fn execute(state: &SharedState, items: &[ProposeItem], mention_product
     .await;
 
     let elapsed = start.elapsed().as_millis() as u64;
-    let has_error = results
-        .iter()
-        .any(|r| matches!(r, ProposeResult::Blocked { .. }));
-    crate::tools::workflow::telemetry::record(
-        &state.pool,
-        "propose_and_queue_replies",
-        "composite_mutation",
-        elapsed,
-        !has_error
-            || results
+
+    match result {
+        Ok(results) => {
+            let has_error = results
                 .iter()
-                .any(|r| !matches!(r, ProposeResult::Blocked { .. })),
-        None,
-        Some("allow"),
-        None,
-    )
-    .await;
-    ToolResponse::success(&results)
-        .with_meta(ToolMeta::new(elapsed).with_workflow(
-            state.config.mode.to_string(),
-            state.config.effective_approval_mode(),
-        ))
-        .to_json()
+                .any(|r| matches!(r, ProposeResult::Blocked { .. }));
+            crate::tools::workflow::telemetry::record(
+                &state.pool,
+                "propose_and_queue_replies",
+                "composite_mutation",
+                elapsed,
+                !has_error
+                    || results
+                        .iter()
+                        .any(|r| !matches!(r, ProposeResult::Blocked { .. })),
+                None,
+                Some("allow"),
+                None,
+            )
+            .await;
+            ToolResponse::success(&results)
+                .with_meta(ToolMeta::new(elapsed).with_workflow(
+                    state.config.mode.to_string(),
+                    state.config.effective_approval_mode(),
+                ))
+                .to_json()
+        }
+        Err(e) => {
+            let code = workflow_error_to_code(&e);
+            ToolResponse::error(code, e.to_string())
+                .with_meta(ToolMeta::new(elapsed))
+                .to_json()
+        }
+    }
+}
+
+fn workflow_error_to_code(e: &WorkflowError) -> ErrorCode {
+    match e {
+        WorkflowError::InvalidInput(_) => ErrorCode::InvalidInput,
+        WorkflowError::XNotConfigured => ErrorCode::XNotConfigured,
+        WorkflowError::LlmNotConfigured => ErrorCode::LlmNotConfigured,
+        WorkflowError::Llm(_) => ErrorCode::LlmError,
+        WorkflowError::Database(_) | WorkflowError::Storage(_) => ErrorCode::DbError,
+        WorkflowError::Toolkit(te) => match te {
+            tuitbot_core::toolkit::ToolkitError::XApi(_) => ErrorCode::XApiError,
+            _ => ErrorCode::XApiError,
+        },
+    }
 }

@@ -1,7 +1,8 @@
 //! Implementation of the `tuitbot mcp` command.
 //!
 //! Starts the MCP server on stdio transport for AI agent integration.
-//! Supports four runtime profiles: `write` (default), `readonly`, `api-readonly`, and `admin`.
+//! Supports six runtime profiles: `write` (default), `readonly`, `api-readonly`, `admin`,
+//! `utility-readonly`, and `utility-write`.
 
 use tuitbot_core::config::Config;
 use tuitbot_mcp::Profile;

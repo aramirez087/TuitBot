@@ -1,5 +1,5 @@
 {
-  "tuitbot_mcp_version": "0.1.8",
+  "tuitbot_mcp_version": "0.1.9",
   "mcp_schema_version": "1.2",
   "x_api_spec_version": "1.0.0",
   "profile": "api-readonly",
@@ -32,7 +32,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": []
     },
@@ -68,7 +70,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -91,7 +95,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": []
     },
@@ -107,7 +113,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "invalid_input"
@@ -124,7 +132,9 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": []
     },
@@ -144,7 +154,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -171,7 +182,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -198,7 +210,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -226,7 +239,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -253,7 +268,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -304,7 +320,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -331,7 +348,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -358,7 +377,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -386,7 +407,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -414,7 +437,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -440,7 +465,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -468,7 +494,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -495,7 +523,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -522,7 +551,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -548,7 +578,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -575,7 +606,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -602,7 +634,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -629,7 +662,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -656,7 +690,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -684,7 +719,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -711,7 +747,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -738,7 +775,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -765,7 +803,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -791,7 +830,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -817,7 +857,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -843,7 +884,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -871,7 +913,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -897,7 +940,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -925,7 +969,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -953,7 +999,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -981,7 +1029,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1008,7 +1058,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",

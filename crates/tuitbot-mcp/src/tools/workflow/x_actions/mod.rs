@@ -2,7 +2,6 @@
 //!
 //! Split into submodules by concern: read, write, engage, media, validate.
 
-pub(crate) mod audit;
 mod engage;
 mod media;
 mod read;
@@ -19,7 +18,57 @@ use crate::contract::error::provider_error_to_response;
 use crate::provider::x_api::map_x_error;
 use tuitbot_core::error::XApiError;
 
-use crate::tools::response::{ToolMeta, ToolResponse};
+use crate::tools::response::{ErrorCode, ToolMeta, ToolResponse};
+
+/// Convert a `ToolkitError` to a JSON error response string.
+///
+/// Used by read operations that don't have an audit guard.
+fn toolkit_error_response(e: &tuitbot_core::toolkit::ToolkitError, start: Instant) -> String {
+    use tuitbot_core::toolkit::ToolkitError;
+    match e {
+        ToolkitError::XApi(xe) => provider_error_to_response(&map_x_error(xe), start),
+        other => {
+            let code = match other {
+                ToolkitError::UnsupportedMediaType { .. } => ErrorCode::UnsupportedMediaType,
+                ToolkitError::MediaTooLarge { .. } => ErrorCode::MediaUploadError,
+                ToolkitError::ThreadPartialFailure { .. } => ErrorCode::ThreadPartialFailure,
+                _ => ErrorCode::InvalidInput,
+            };
+            let elapsed = start.elapsed().as_millis() as u64;
+            ToolResponse::error(code, other.to_string())
+                .with_meta(ToolMeta::new(elapsed))
+                .to_json()
+        }
+    }
+}
+
+/// Convert a `ToolkitError` to a JSON error response with pre-built metadata.
+///
+/// Used by write/engage operations after the gateway has already recorded
+/// the failure in the audit trail and produced a `ToolMeta`.
+fn format_toolkit_error_with_meta(
+    e: &tuitbot_core::toolkit::ToolkitError,
+    meta: ToolMeta,
+) -> String {
+    use tuitbot_core::toolkit::ToolkitError;
+    match e {
+        ToolkitError::XApi(xe) => {
+            let provider_err = crate::provider::x_api::map_x_error(xe);
+            crate::contract::error::provider_error_to_audited_response(&provider_err, meta)
+        }
+        other => {
+            let code = match other {
+                ToolkitError::UnsupportedMediaType { .. } => ErrorCode::UnsupportedMediaType,
+                ToolkitError::MediaTooLarge { .. } => ErrorCode::MediaUploadError,
+                ToolkitError::ThreadPartialFailure { .. } => ErrorCode::ThreadPartialFailure,
+                _ => ErrorCode::InvalidInput,
+            };
+            ToolResponse::error(code, other.to_string())
+                .with_meta(meta)
+                .to_json()
+        }
+    }
+}
 
 // Re-export all public tool functions.
 pub use engage::{

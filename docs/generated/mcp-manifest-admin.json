@@ -1,5 +1,5 @@
 {
-  "tuitbot_mcp_version": "0.1.8",
+  "tuitbot_mcp_version": "0.1.9",
   "mcp_schema_version": "1.2",
   "x_api_spec_version": "1.0.0",
   "profile": "admin",
@@ -251,7 +251,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": []
     },
@@ -479,7 +481,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -518,7 +522,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": []
     },
@@ -641,7 +647,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "invalid_input"
@@ -691,18 +699,20 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": []
     },
     {
       "name": "x_bookmark_tweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "bookmark.read",
         "bookmark.write",
@@ -711,7 +721,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -754,11 +765,11 @@
     {
       "name": "x_delete_tweet",
       "category": "write",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -767,7 +778,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -788,11 +800,11 @@
     {
       "name": "x_follow_user",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "follows.read",
         "follows.write",
@@ -801,7 +813,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -857,7 +870,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -884,7 +898,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -911,7 +926,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -939,7 +955,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -966,7 +984,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -993,7 +1012,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1020,7 +1040,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1047,7 +1069,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1075,7 +1099,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1103,7 +1129,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1129,7 +1157,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1143,11 +1172,11 @@
     {
       "name": "x_like_tweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "like.read",
         "like.write",
@@ -1156,7 +1185,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1199,11 +1229,11 @@
     {
       "name": "x_post_thread",
       "category": "write",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -1212,7 +1242,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1253,11 +1284,11 @@
     {
       "name": "x_post_tweet",
       "category": "write",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -1266,7 +1297,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1328,11 +1360,11 @@
     {
       "name": "x_quote_tweet",
       "category": "write",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -1341,7 +1373,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1362,11 +1395,11 @@
     {
       "name": "x_reply_to_tweet",
       "category": "write",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -1375,7 +1408,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1396,11 +1430,11 @@
     {
       "name": "x_retweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -1409,7 +1443,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1443,7 +1478,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1457,11 +1494,11 @@
     {
       "name": "x_unbookmark_tweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "bookmark.read",
         "bookmark.write",
@@ -1470,7 +1507,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1490,11 +1528,11 @@
     {
       "name": "x_unfollow_user",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "follows.read",
         "follows.write",
@@ -1503,7 +1541,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1523,11 +1562,11 @@
     {
       "name": "x_unlike_tweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "like.read",
         "like.write",
@@ -1536,7 +1575,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1556,11 +1596,11 @@
     {
       "name": "x_unretweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.write",
@@ -1569,7 +1609,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1589,7 +1630,7 @@
     {
       "name": "x_upload_media",
       "category": "media",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
@@ -1601,7 +1642,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1615,11 +1657,11 @@
     {
       "name": "x_v2_blocks_create",
       "category": "moderation",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "block.write",
         "users.read"
@@ -1627,7 +1669,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1647,11 +1690,11 @@
     {
       "name": "x_v2_blocks_delete",
       "category": "moderation",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "block.write",
         "users.read"
@@ -1659,7 +1702,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1692,7 +1736,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1706,18 +1751,19 @@
     {
       "name": "x_v2_lists_create",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write"
       ],
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1737,18 +1783,19 @@
     {
       "name": "x_v2_lists_delete",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write"
       ],
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1768,11 +1815,11 @@
     {
       "name": "x_v2_lists_follow",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write",
         "users.read"
@@ -1780,7 +1827,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1813,7 +1861,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1839,7 +1888,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1866,7 +1916,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1880,11 +1931,11 @@
     {
       "name": "x_v2_lists_members_add",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write",
         "users.read"
@@ -1892,7 +1943,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1912,11 +1964,11 @@
     {
       "name": "x_v2_lists_members_remove",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write",
         "users.read"
@@ -1924,7 +1976,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1957,7 +2010,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1984,7 +2038,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -1998,11 +2053,11 @@
     {
       "name": "x_v2_lists_pin",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write",
         "users.read"
@@ -2010,7 +2065,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2043,7 +2099,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2071,7 +2128,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2085,11 +2143,11 @@
     {
       "name": "x_v2_lists_unfollow",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write",
         "users.read"
@@ -2097,7 +2155,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2117,18 +2176,19 @@
     {
       "name": "x_v2_lists_update",
       "category": "list",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "list.write"
       ],
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2148,11 +2208,11 @@
     {
       "name": "x_v2_mutes_create",
       "category": "moderation",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "mute.write",
         "users.read"
@@ -2160,7 +2220,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2180,11 +2241,11 @@
     {
       "name": "x_v2_mutes_delete",
       "category": "moderation",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "mute.write",
         "users.read"
@@ -2192,7 +2253,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2225,7 +2287,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2252,7 +2315,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2279,7 +2343,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2305,7 +2370,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2331,7 +2397,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2357,7 +2424,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2385,7 +2453,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2411,7 +2480,8 @@
       "profiles": [
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2425,11 +2495,11 @@
     {
       "name": "x_v2_tweets_hide_reply",
       "category": "moderation",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.moderate.write"
@@ -2437,7 +2507,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2471,7 +2542,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2499,7 +2572,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2527,7 +2602,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2541,11 +2618,11 @@
     {
       "name": "x_v2_tweets_unhide_reply",
       "category": "moderation",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "tweet.moderate.write"
@@ -2553,7 +2630,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2586,7 +2664,9 @@
         "readonly",
         "api_readonly",
         "write",
-        "admin"
+        "admin",
+        "utility_readonly",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2600,11 +2680,11 @@
     {
       "name": "x_v2_users_pin_tweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "users.read",
@@ -2613,7 +2693,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",
@@ -2633,11 +2714,11 @@
     {
       "name": "x_v2_users_unpin_tweet",
       "category": "engage",
-      "lane": "workflow",
+      "lane": "shared",
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": true,
+      "requires_db": false,
       "requires_scopes": [
         "tweet.read",
         "users.read",
@@ -2646,7 +2727,8 @@
       "requires_user_auth": true,
       "profiles": [
         "write",
-        "admin"
+        "admin",
+        "utility_write"
       ],
       "possible_error_codes": [
         "x_not_configured",

@@ -4,11 +4,13 @@
 //! allowing AI agents to natively discover and call analytics, approval queue,
 //! content generation, scoring, and configuration operations.
 //!
-//! Four runtime profiles are available:
+//! Six runtime profiles are available:
 //! - **`readonly`**: minimal read-only X tools (10). No DB, no LLM, no mutations.
 //! - **`api-readonly`**: broader read-only X tools (20). No DB, no LLM, no mutations.
 //! - **`write`** (default): standard operating profile. All typed tools including mutations.
 //! - **`admin`**: superset of write. Adds universal request tools. Explicit opt-in.
+//! - **`utility-readonly`**: flat toolkit surface — stateless reads + scoring + config. No workflow.
+//! - **`utility-write`**: flat toolkit surface — reads + writes + engages. No workflow, no policy gate.
 
 pub mod contract;
 mod kernel;
@@ -30,7 +32,10 @@ use tuitbot_core::startup;
 use tuitbot_core::storage;
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
-use server::{AdminMcpServer, ApiReadonlyMcpServer, ReadonlyMcpServer, WriteMcpServer};
+use server::{
+    AdminMcpServer, ApiReadonlyMcpServer, ReadonlyMcpServer, UtilityReadonlyMcpServer,
+    UtilityWriteMcpServer, WriteMcpServer,
+};
 use state::{AppState, ReadonlyState, SharedReadonlyState};
 use tools::idempotency::IdempotencyStore;
 
@@ -46,6 +51,8 @@ pub async fn run_server(config: Config, profile: Profile) -> anyhow::Result<()> 
         Profile::ApiReadonly => run_api_readonly_server(config).await,
         Profile::Write => run_write_server(config).await,
         Profile::Admin => run_admin_server(config).await,
+        Profile::UtilityReadonly => run_utility_readonly_server(config).await,
+        Profile::UtilityWrite => run_utility_write_server(config).await,
     }
 }
 
@@ -267,6 +274,40 @@ async fn run_api_readonly_server(config: Config) -> anyhow::Result<()> {
     let server = ApiReadonlyMcpServer::new(state);
 
     tracing::info!("Starting Tuitbot MCP server on stdio (api-readonly profile)");
+
+    let service = server
+        .serve(stdio())
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {e}"))?;
+
+    service.waiting().await?;
+    Ok(())
+}
+
+// ── Utility profile servers ─────────────────────────────────────────────
+
+/// Run the utility-readonly MCP server on stdio transport (flat toolkit reads).
+async fn run_utility_readonly_server(config: Config) -> anyhow::Result<()> {
+    let state = init_readonly_state(config, Profile::UtilityReadonly).await?;
+    let server = UtilityReadonlyMcpServer::new(state);
+
+    tracing::info!("Starting Tuitbot MCP server on stdio (utility-readonly profile)");
+
+    let service = server
+        .serve(stdio())
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to start MCP server: {e}"))?;
+
+    service.waiting().await?;
+    Ok(())
+}
+
+/// Run the utility-write MCP server on stdio transport (flat toolkit reads + writes + engages).
+async fn run_utility_write_server(config: Config) -> anyhow::Result<()> {
+    let state = init_readonly_state(config, Profile::UtilityWrite).await?;
+    let server = UtilityWriteMcpServer::new(state);
+
+    tracing::info!("Starting Tuitbot MCP server on stdio (utility-write profile)");
 
     let service = server
         .serve(stdio())

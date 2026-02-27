@@ -9,11 +9,14 @@ pub mod context;
 pub mod error;
 pub mod llm;
 pub mod mcp_policy;
+pub mod mutation_gateway;
 pub mod safety;
 pub mod scoring;
 pub mod startup;
 pub mod storage;
 pub mod strategy;
+pub mod toolkit;
+pub mod workflow;
 pub mod x_api;
 
 pub use error::*;
