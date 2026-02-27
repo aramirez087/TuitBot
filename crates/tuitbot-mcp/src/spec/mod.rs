@@ -37,7 +37,7 @@ pub use params::{EndpointDef, HttpMethod, ParamDef, ParamType};
 /// Semantic version of the X API spec pack.
 ///
 /// Bump when endpoints are added, removed, or modified.
-pub const X_API_SPEC_VERSION: &str = "1.2.0";
+pub const X_API_SPEC_VERSION: &str = "1.3.0";
 
 /// Schema version for the manifest format.
 pub const MCP_SCHEMA_VERSION: &str = "1.2";

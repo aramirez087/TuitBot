@@ -67,6 +67,10 @@ mod tests {
             "x_ads_promoted_tweet_create",
             "x_ads_targeting_create",
             "x_ads_targeting_delete",
+            // ── Generated Layer 2 Compliance/Stream mutations (Admin-only) ──
+            "x_v2_compliance_job_create",
+            "x_v2_stream_rules_add",
+            "x_v2_stream_rules_delete",
         ]
     }
 
@@ -295,8 +299,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Admin))
             .count();
-        // 72 curated + 44 generated + 16 ads = 132 (superset of write)
-        assert_eq!(count, 132, "Admin has {count} tools (expected 132)");
+        // 72 curated + 44 generated + 16 ads + 7 compliance/stream = 139 (superset of write)
+        assert_eq!(count, 139, "Admin has {count} tools (expected 139)");
     }
 
     // ── Mutation safety ─────────────────────────────────────────────

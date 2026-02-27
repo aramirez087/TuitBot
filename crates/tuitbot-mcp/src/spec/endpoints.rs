@@ -199,6 +199,56 @@ const PARAM_ADS_COUNT: ParamDef = ParamDef {
     default: Some("200"),
 };
 
+// ── Compliance-specific parameter definitions ─────────────────────────
+
+const PARAM_COMPLIANCE_TYPE: ParamDef = ParamDef {
+    name: "type",
+    param_type: ParamType::String,
+    required: true,
+    description: "Compliance job type: tweets or users",
+    default: None,
+};
+
+const PARAM_COMPLIANCE_STATUS: ParamDef = ParamDef {
+    name: "status",
+    param_type: ParamType::String,
+    required: false,
+    description: "Filter jobs by status: created, in_progress, complete, expired, failed",
+    default: None,
+};
+
+const PARAM_USAGE_DAYS: ParamDef = ParamDef {
+    name: "days",
+    param_type: ParamType::Integer,
+    required: false,
+    description: "Number of days of usage data to retrieve (default: 7)",
+    default: Some("7"),
+};
+
+const PARAM_STREAM_RULE_VALUE: ParamDef = ParamDef {
+    name: "value",
+    param_type: ParamType::String,
+    required: true,
+    description: "The stream rule filter expression (e.g. 'cat has:images')",
+    default: None,
+};
+
+const PARAM_STREAM_RULE_TAG: ParamDef = ParamDef {
+    name: "tag",
+    param_type: ParamType::String,
+    required: false,
+    description: "Optional label/tag for the stream rule",
+    default: None,
+};
+
+const PARAM_STREAM_RULE_IDS: ParamDef = ParamDef {
+    name: "rule_ids",
+    param_type: ParamType::StringArray,
+    required: true,
+    description: "Comma-separated rule IDs to delete",
+    default: None,
+};
+
 // ── The spec pack ──────────────────────────────────────────────────────
 
 /// All X API endpoint definitions in the spec pack.
@@ -1667,5 +1717,121 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         api_version: "ads-v12",
         group: "ads",
         host: Some("ads-api.x.com"),
+    },
+    // ── Compliance (4) ────────────────────────────────────────────────
+    EndpointDef {
+        tool_name: "x_v2_compliance_jobs",
+        description: "List compliance jobs for GDPR and data deletion tracking",
+        method: HttpMethod::Get,
+        path: "/2/compliance/jobs",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["compliance.write"],
+        params: &[PARAM_COMPLIANCE_TYPE, PARAM_COMPLIANCE_STATUS],
+        error_codes: X_READ_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
+    },
+    EndpointDef {
+        tool_name: "x_v2_compliance_job_by_id",
+        description: "Get a single compliance job by ID",
+        method: HttpMethod::Get,
+        path: "/2/compliance/jobs/{id}",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["compliance.write"],
+        params: &[PARAM_ID],
+        error_codes: X_READ_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
+    },
+    EndpointDef {
+        tool_name: "x_v2_compliance_job_create",
+        description: "Create a new compliance job for batch user or tweet lookups",
+        method: HttpMethod::Post,
+        path: "/2/compliance/jobs",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["compliance.write"],
+        params: &[
+            PARAM_COMPLIANCE_TYPE,
+            ParamDef {
+                name: "name",
+                param_type: ParamType::String,
+                required: false,
+                description: "Optional human-readable name for the compliance job",
+                default: None,
+            },
+            ParamDef {
+                name: "resumable",
+                param_type: ParamType::Boolean,
+                required: false,
+                description: "Whether the job should be resumable (default: false)",
+                default: Some("false"),
+            },
+        ],
+        error_codes: X_WRITE_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
+    },
+    EndpointDef {
+        tool_name: "x_v2_usage_tweets",
+        description: "Get tweet usage data for the authenticated app (cap consumption)",
+        method: HttpMethod::Get,
+        path: "/2/usage/tweets",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["usage.read"],
+        params: &[PARAM_USAGE_DAYS],
+        error_codes: X_READ_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
+    },
+    // ── Stream Rules (3) ──────────────────────────────────────────────
+    EndpointDef {
+        tool_name: "x_v2_stream_rules_list",
+        description: "List active filtered stream rules",
+        method: HttpMethod::Get,
+        path: "/2/tweets/search/stream/rules",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["tweet.read"],
+        params: &[],
+        error_codes: X_READ_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
+    },
+    EndpointDef {
+        tool_name: "x_v2_stream_rules_add",
+        description: "Add rules to the filtered stream (max 25 rules per request)",
+        method: HttpMethod::Post,
+        path: "/2/tweets/search/stream/rules",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["tweet.read"],
+        params: &[PARAM_STREAM_RULE_VALUE, PARAM_STREAM_RULE_TAG],
+        error_codes: X_WRITE_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
+    },
+    EndpointDef {
+        tool_name: "x_v2_stream_rules_delete",
+        description: "Delete rules from the filtered stream by rule IDs",
+        method: HttpMethod::Post,
+        path: "/2/tweets/search/stream/rules",
+        category: ToolCategory::Compliance,
+        profiles: ADMIN_ONLY,
+        scopes: &["tweet.read"],
+        params: &[PARAM_STREAM_RULE_IDS],
+        error_codes: X_WRITE_ERR,
+        api_version: "v2",
+        group: "compliance",
+        host: None,
     },
 ];

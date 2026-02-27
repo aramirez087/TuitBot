@@ -25,8 +25,8 @@ fn spec_version_is_valid_semver() {
 fn spec_has_expected_endpoint_count() {
     assert_eq!(
         SPEC_ENDPOINTS.len(),
-        60,
-        "expected 60 spec endpoints (36 original + 8 DM + 16 Ads tools)"
+        67,
+        "expected 67 spec endpoints (36 original + 8 DM + 16 Ads + 7 Compliance/Stream tools)"
     );
 }
 
@@ -234,6 +234,7 @@ fn groups_match_expected_set() {
         "spaces",
         "direct_messages",
         "ads",
+        "compliance",
     ]
     .iter()
     .copied()
@@ -323,4 +324,59 @@ fn category_distribution() {
         cats.len() >= 3,
         "expected at least 3 categories in generated tools"
     );
+}
+
+#[test]
+fn compliance_endpoints_are_admin_only() {
+    use crate::tools::manifest::{Profile, ToolCategory};
+    for ep in SPEC_ENDPOINTS {
+        if ep.category == ToolCategory::Compliance {
+            assert_eq!(
+                ep.profiles,
+                &[Profile::Admin],
+                "Compliance tool {} must be Admin-only, got {:?}",
+                ep.tool_name,
+                ep.profiles
+            );
+        }
+    }
+}
+
+#[test]
+fn compliance_endpoints_use_default_host() {
+    use crate::tools::manifest::ToolCategory;
+    for ep in SPEC_ENDPOINTS {
+        if ep.category == ToolCategory::Compliance {
+            assert_eq!(
+                ep.host, None,
+                "Compliance tool {} should use default api.x.com host",
+                ep.tool_name
+            );
+            assert_eq!(
+                ep.api_version, "v2",
+                "Compliance tool {} must use v2 API version",
+                ep.tool_name
+            );
+        }
+    }
+}
+
+#[test]
+fn compliance_mutations_are_elevated_access() {
+    use crate::tools::manifest::ToolCategory;
+    let tools = generate_spec_tools();
+    for t in &tools {
+        if t.category == ToolCategory::Compliance && t.mutation {
+            assert!(
+                t.requires_elevated_access,
+                "Compliance mutation {} should require elevated access",
+                t.name
+            );
+            assert!(
+                t.requires_db,
+                "Compliance mutation {} should require DB for audit",
+                t.name
+            );
+        }
+    }
 }

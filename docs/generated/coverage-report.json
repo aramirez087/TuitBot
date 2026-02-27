@@ -1,22 +1,22 @@
 {
-  "generated_at": "2026-02-27T03:15:44.344516+00:00",
+  "generated_at": "2026-02-27T03:27:22.661056+00:00",
   "mcp_schema_version": "1.2",
-  "x_api_spec_version": "1.2.0",
+  "x_api_spec_version": "1.3.0",
   "summary": {
-    "total_tools": 133,
+    "total_tools": 140,
     "curated_tools": 73,
-    "generated_tools": 60,
-    "mutation_tools": 48,
-    "readonly_tools": 85,
-    "x_client_required": 99,
+    "generated_tools": 67,
+    "mutation_tools": 51,
+    "readonly_tools": 89,
+    "x_client_required": 106,
     "llm_required": 5,
-    "db_required": 44,
-    "user_auth_required": 92,
-    "elevated_access_required": 20,
+    "db_required": 47,
+    "user_auth_required": 99,
+    "elevated_access_required": 27,
     "kernel_conformance_tested": 27,
     "contract_tested": 18,
     "live_tested": 9,
-    "untested": 88
+    "untested": 95
   },
   "categories": [
     {
@@ -42,6 +42,14 @@
       "generated": 0,
       "mutation_count": 3,
       "tested_count": 2
+    },
+    {
+      "category": "compliance",
+      "total": 7,
+      "curated": 0,
+      "generated": 7,
+      "mutation_count": 3,
+      "tested_count": 0
     },
     {
       "category": "composite",
@@ -201,9 +209,9 @@
     },
     {
       "profile": "admin",
-      "tool_count": 132,
-      "mutation_count": 48,
-      "read_count": 84
+      "tool_count": 139,
+      "mutation_count": 51,
+      "read_count": 88
     }
   ],
   "tools": [
@@ -2243,6 +2251,69 @@
       "tier_gate": "api_readonly+"
     },
     {
+      "name": "x_v2_compliance_job_by_id",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "compliance.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_v2_compliance_job_create",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "compliance.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_v2_compliance_jobs",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "compliance.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
       "name": "x_v2_dm_conversation_by_id",
       "category": "direct_message",
       "layer": "generated (L2)",
@@ -3028,6 +3099,69 @@
       "tier_gate": "api_readonly+"
     },
     {
+      "name": "x_v2_stream_rules_add",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "tweet.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_v2_stream_rules_delete",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "tweet.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_v2_stream_rules_list",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "tweet.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
       "name": "x_v2_tweets_counts_recent",
       "category": "read",
       "layer": "generated (L2)",
@@ -3181,6 +3315,27 @@
       "tier_gate": "write+"
     },
     {
+      "name": "x_v2_usage_tweets",
+      "category": "compliance",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "usage.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
       "name": "x_v2_users_lookup_by_usernames",
       "category": "read",
       "layer": "generated (L2)",
@@ -3305,6 +3460,9 @@
     "x_v2_blocks_create (moderation)",
     "x_v2_blocks_delete (moderation)",
     "x_v2_blocks_list (moderation)",
+    "x_v2_compliance_job_by_id (compliance)",
+    "x_v2_compliance_job_create (compliance)",
+    "x_v2_compliance_jobs (compliance)",
     "x_v2_dm_conversation_by_id (direct_message)",
     "x_v2_dm_conversations (direct_message)",
     "x_v2_dm_create_group (direct_message)",
@@ -3337,12 +3495,16 @@
     "x_v2_spaces_lookup (read)",
     "x_v2_spaces_search (read)",
     "x_v2_spaces_tweets (read)",
+    "x_v2_stream_rules_add (compliance)",
+    "x_v2_stream_rules_delete (compliance)",
+    "x_v2_stream_rules_list (compliance)",
     "x_v2_tweets_counts_recent (read)",
     "x_v2_tweets_hide_reply (moderation)",
     "x_v2_tweets_lookup (read)",
     "x_v2_tweets_quote_tweets (read)",
     "x_v2_tweets_retweeted_by (read)",
     "x_v2_tweets_unhide_reply (moderation)",
+    "x_v2_usage_tweets (compliance)",
     "x_v2_users_lookup_by_usernames (read)",
     "x_v2_users_pin_tweet (engage)",
     "x_v2_users_unpin_tweet (engage)"
@@ -3430,6 +3592,9 @@
     "x_v2_blocks_create: write+",
     "x_v2_blocks_delete: write+",
     "x_v2_blocks_list: api_readonly+",
+    "x_v2_compliance_job_by_id: admin only",
+    "x_v2_compliance_job_create: admin only",
+    "x_v2_compliance_jobs: admin only",
     "x_v2_dm_conversation_by_id: api_readonly+",
     "x_v2_dm_conversations: api_readonly+",
     "x_v2_dm_create_group: write+",
@@ -3462,9 +3627,13 @@
     "x_v2_spaces_lookup: api_readonly+",
     "x_v2_spaces_search: api_readonly+",
     "x_v2_spaces_tweets: api_readonly+",
+    "x_v2_stream_rules_add: admin only",
+    "x_v2_stream_rules_delete: admin only",
+    "x_v2_stream_rules_list: admin only",
     "x_v2_tweets_counts_recent: api_readonly+",
     "x_v2_tweets_hide_reply: write+",
     "x_v2_tweets_unhide_reply: write+",
+    "x_v2_usage_tweets: admin only",
     "x_v2_users_pin_tweet: write+",
     "x_v2_users_unpin_tweet: write+"
   ],
@@ -3520,6 +3689,9 @@
     "x_v2_blocks_create: [user_auth, scoped]",
     "x_v2_blocks_delete: [user_auth, scoped]",
     "x_v2_blocks_list: [user_auth, scoped]",
+    "x_v2_compliance_job_by_id: [user_auth, elevated_access, scoped]",
+    "x_v2_compliance_job_create: [user_auth, elevated_access, scoped]",
+    "x_v2_compliance_jobs: [user_auth, elevated_access, scoped]",
     "x_v2_dm_conversation_by_id: [user_auth, scoped]",
     "x_v2_dm_conversations: [user_auth, scoped]",
     "x_v2_dm_create_group: [user_auth, scoped]",
@@ -3552,12 +3724,16 @@
     "x_v2_spaces_lookup: [user_auth, scoped]",
     "x_v2_spaces_search: [user_auth, scoped]",
     "x_v2_spaces_tweets: [user_auth, scoped]",
+    "x_v2_stream_rules_add: [user_auth, elevated_access, scoped]",
+    "x_v2_stream_rules_delete: [user_auth, elevated_access, scoped]",
+    "x_v2_stream_rules_list: [user_auth, elevated_access, scoped]",
     "x_v2_tweets_counts_recent: [user_auth, scoped]",
     "x_v2_tweets_hide_reply: [user_auth, scoped]",
     "x_v2_tweets_lookup: [user_auth, scoped]",
     "x_v2_tweets_quote_tweets: [user_auth, scoped]",
     "x_v2_tweets_retweeted_by: [user_auth, scoped]",
     "x_v2_tweets_unhide_reply: [user_auth, scoped]",
+    "x_v2_usage_tweets: [user_auth, elevated_access, scoped]",
     "x_v2_users_lookup_by_usernames: [user_auth, scoped]",
     "x_v2_users_pin_tweet: [user_auth, scoped]",
     "x_v2_users_unpin_tweet: [user_auth, scoped]"

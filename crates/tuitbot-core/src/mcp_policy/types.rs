@@ -19,6 +19,8 @@ pub enum ToolCategory {
     Delete,
     /// Universal request mutations via x_post/x_put/x_delete.
     UniversalRequest,
+    /// Enterprise admin mutations (compliance jobs, stream rules).
+    EnterpriseAdmin,
 }
 
 impl std::fmt::Display for ToolCategory {
@@ -31,6 +33,7 @@ impl std::fmt::Display for ToolCategory {
             ToolCategory::Thread => write!(f, "thread"),
             ToolCategory::Delete => write!(f, "delete"),
             ToolCategory::UniversalRequest => write!(f, "universal_request"),
+            ToolCategory::EnterpriseAdmin => write!(f, "enterprise_admin"),
         }
     }
 }
@@ -61,6 +64,10 @@ pub fn tool_category(name: &str) -> ToolCategory {
         "delete_tweet" | "x_delete_tweet" => ToolCategory::Delete,
         // Universal request mutations (admin-only)
         "x_post" | "x_put" | "x_delete" => ToolCategory::UniversalRequest,
+        // Enterprise admin mutations (compliance jobs, stream rules)
+        "x_v2_compliance_job_create" | "x_v2_stream_rules_add" | "x_v2_stream_rules_delete" => {
+            ToolCategory::EnterpriseAdmin
+        }
         // Default unknown tools to Write (safest default for mutations)
         _ => ToolCategory::Write,
     }
@@ -235,10 +242,30 @@ mod tests {
     }
 
     #[test]
+    fn tool_category_enterprise_admin_tools() {
+        assert_eq!(
+            tool_category("x_v2_compliance_job_create"),
+            ToolCategory::EnterpriseAdmin
+        );
+        assert_eq!(
+            tool_category("x_v2_stream_rules_add"),
+            ToolCategory::EnterpriseAdmin
+        );
+        assert_eq!(
+            tool_category("x_v2_stream_rules_delete"),
+            ToolCategory::EnterpriseAdmin
+        );
+    }
+
+    #[test]
     fn tool_category_display() {
         assert_eq!(
             ToolCategory::UniversalRequest.to_string(),
             "universal_request"
+        );
+        assert_eq!(
+            ToolCategory::EnterpriseAdmin.to_string(),
+            "enterprise_admin"
         );
         assert_eq!(ToolCategory::Read.to_string(), "read");
         assert_eq!(ToolCategory::Write.to_string(), "write");
@@ -250,5 +277,13 @@ mod tests {
         assert_eq!(json, "\"universal_request\"");
         let parsed: ToolCategory = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, ToolCategory::UniversalRequest);
+    }
+
+    #[test]
+    fn tool_category_enterprise_admin_serde_roundtrip() {
+        let json = serde_json::to_string(&ToolCategory::EnterpriseAdmin).unwrap();
+        assert_eq!(json, "\"enterprise_admin\"");
+        let parsed: ToolCategory = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, ToolCategory::EnterpriseAdmin);
     }
 }

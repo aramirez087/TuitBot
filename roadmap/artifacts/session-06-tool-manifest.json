@@ -2233,6 +2233,87 @@
       ]
     },
     {
+      "name": "x_v2_compliance_job_by_id",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "compliance.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_compliance_job_create",
+      "category": "compliance",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "compliance.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_compliance_jobs",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "compliance.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
       "name": "x_v2_dm_conversation_by_id",
       "category": "direct_message",
       "lane": "shared",
@@ -3192,6 +3273,93 @@
       ]
     },
     {
+      "name": "x_v2_stream_rules_add",
+      "category": "compliance",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_stream_rules_delete",
+      "category": "compliance",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_stream_rules_list",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
       "name": "x_v2_tweets_counts_recent",
       "category": "read",
       "lane": "shared",
@@ -3372,6 +3540,31 @@
         "policy_denied_hard_rule",
         "policy_denied_user_rule",
         "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_usage_tweets",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "usage.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
       ]
     },
     {

@@ -1,13 +1,13 @@
 # Task 07 — Observability Eval Results
 
-**Generated:** 2026-02-27 03:15 UTC
+**Generated:** 2026-02-27 03:27 UTC
 
 ## Scenarios
 
 | Scenario | Description | Steps | Total (ms) | Success | Schema Valid | Telemetry Entries |
 |----------|-------------|-------|------------|---------|--------------|-------------------|
-| A | Raw direct reply flow: draft -> queue | 2 | 8 | PASS | PASS | 1 |
-| B | Composite flow: find -> draft -> queue | 3 | 8 | PASS | PASS | 3 |
+| A | Raw direct reply flow: draft -> queue | 2 | 6 | PASS | PASS | 1 |
+| B | Composite flow: find -> draft -> queue | 3 | 6 | PASS | PASS | 3 |
 | C | Blocked-by-policy mutation with telemetry verification | 2 | 0 | PASS | PASS | 1 |
 
 ## Step Details
@@ -16,7 +16,7 @@
 
 | Tool | Latency (ms) | Success | Schema Valid | Error | Policy |
 |------|-------------|---------|--------------|-------|--------|
-| draft_replies_for_candidates | 4 | PASS | PASS | - | - |
+| draft_replies_for_candidates | 2 | PASS | PASS | - | - |
 | propose_and_queue_replies | 4 | PASS | PASS | - | allow |
 
 ### Scenario B: Composite flow: find -> draft -> queue
@@ -24,8 +24,8 @@
 | Tool | Latency (ms) | Success | Schema Valid | Error | Policy |
 |------|-------------|---------|--------------|-------|--------|
 | find_reply_opportunities | 2 | PASS | PASS | - | - |
-| draft_replies_for_candidates | 2 | PASS | PASS | - | - |
-| propose_and_queue_replies | 4 | PASS | PASS | - | allow |
+| draft_replies_for_candidates | 1 | PASS | PASS | - | - |
+| propose_and_queue_replies | 3 | PASS | PASS | - | allow |
 
 ### Scenario C: Blocked-by-policy mutation with telemetry verification
 

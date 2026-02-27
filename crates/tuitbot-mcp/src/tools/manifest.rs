@@ -78,6 +78,7 @@ pub enum ToolCategory {
     Moderation,
     DirectMessage,
     Ads,
+    Compliance,
 }
 
 /// MCP server profile.
@@ -1489,6 +1490,16 @@ mod tests {
     fn write_utility_manifests() {
         let docs_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/generated");
         for (profile, filename) in [
+            (
+                crate::state::Profile::Readonly,
+                "mcp-manifest-readonly.json",
+            ),
+            (
+                crate::state::Profile::ApiReadonly,
+                "mcp-manifest-api-readonly.json",
+            ),
+            (crate::state::Profile::Write, "mcp-manifest-write.json"),
+            (crate::state::Profile::Admin, "mcp-manifest-admin.json"),
             (
                 crate::state::Profile::UtilityReadonly,
                 "mcp-manifest-utility-readonly.json",
