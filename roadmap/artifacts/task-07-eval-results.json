@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-02-27T03:39:22.131240+00:00",
+  "timestamp": "2026-02-27T03:44:19.788479+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -8,7 +8,7 @@
       "steps": [
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 2,
+          "latency_ms": 3,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -16,7 +16,7 @@
         },
         {
           "tool_name": "propose_and_queue_replies",
-          "latency_ms": 4,
+          "latency_ms": 3,
           "success": true,
           "response_valid": true,
           "error_code": null,

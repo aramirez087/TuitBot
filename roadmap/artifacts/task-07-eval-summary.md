@@ -1,6 +1,6 @@
 # Task 07 — Observability Eval Results
 
-**Generated:** 2026-02-27 03:39 UTC
+**Generated:** 2026-02-27 03:44 UTC
 
 ## Scenarios
 
@@ -16,8 +16,8 @@
 
 | Tool | Latency (ms) | Success | Schema Valid | Error | Policy |
 |------|-------------|---------|--------------|-------|--------|
-| draft_replies_for_candidates | 2 | PASS | PASS | - | - |
-| propose_and_queue_replies | 4 | PASS | PASS | - | allow |
+| draft_replies_for_candidates | 3 | PASS | PASS | - | - |
+| propose_and_queue_replies | 3 | PASS | PASS | - | allow |
 
 ### Scenario B: Composite flow: find -> draft -> queue
 
