@@ -1,7 +1,8 @@
 //! Tests for the universal X API request layer.
 //!
 //! Covers: host allowlist, header blocklist, path validation, SSRF guards,
-//! retry behavior, pagination, and JSON/non-JSON response handling.
+//! retry behavior, pagination, JSON/non-JSON response handling, and
+//! request family classification.
 
 use super::*;
 
@@ -9,11 +10,29 @@ use super::*;
 
 #[test]
 fn allowed_hosts_accepted() {
-    for host in &["api.x.com", "upload.x.com", "upload.twitter.com"] {
+    for host in &[
+        "api.x.com",
+        "upload.x.com",
+        "upload.twitter.com",
+        "ads-api.x.com",
+    ] {
         let result = validate_and_build_url(Some(host), "/2/tweets");
         assert!(result.is_ok(), "expected {host} to be allowed");
         assert_eq!(result.unwrap(), format!("https://{host}/2/tweets"));
     }
+}
+
+#[test]
+fn ads_api_host_accepted() {
+    let result = validate_and_build_url(Some("ads-api.x.com"), "/12/accounts");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "https://ads-api.x.com/12/accounts");
+}
+
+#[test]
+fn ads_api_host_case_insensitive() {
+    let result = validate_and_build_url(Some("ADS-API.X.COM"), "/12/accounts");
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -338,4 +357,150 @@ fn rate_limit_in_response_data() {
     let parsed: Value = serde_json::from_str(&json_str).unwrap();
     assert_eq!(parsed["data"]["rate_limit"]["remaining"], 99);
     assert_eq!(parsed["data"]["rate_limit"]["reset_at"], 1700000000);
+}
+
+// ── Request family classification ───────────────────────────────────
+
+#[test]
+fn classify_public_api_default_host() {
+    assert_eq!(
+        classify_request_family(None, "/2/tweets"),
+        RequestFamily::PublicApi
+    );
+}
+
+#[test]
+fn classify_public_api_explicit_host() {
+    assert_eq!(
+        classify_request_family(Some("api.x.com"), "/2/tweets/123"),
+        RequestFamily::PublicApi
+    );
+}
+
+#[test]
+fn classify_dm_conversations() {
+    assert_eq!(
+        classify_request_family(Some("api.x.com"), "/2/dm_conversations"),
+        RequestFamily::DirectMessage
+    );
+    assert_eq!(
+        classify_request_family(None, "/2/dm_conversations/123/messages"),
+        RequestFamily::DirectMessage
+    );
+}
+
+#[test]
+fn classify_dm_events() {
+    assert_eq!(
+        classify_request_family(None, "/2/dm_events"),
+        RequestFamily::DirectMessage
+    );
+    assert_eq!(
+        classify_request_family(Some("api.x.com"), "/2/dm_conversations/with/456/dm_events"),
+        RequestFamily::DirectMessage
+    );
+}
+
+#[test]
+fn classify_ads_api() {
+    assert_eq!(
+        classify_request_family(Some("ads-api.x.com"), "/12/accounts"),
+        RequestFamily::Ads
+    );
+    assert_eq!(
+        classify_request_family(Some("ads-api.x.com"), "/12/accounts/abc/campaigns"),
+        RequestFamily::Ads
+    );
+}
+
+#[test]
+fn classify_ads_api_case_insensitive() {
+    assert_eq!(
+        classify_request_family(Some("ADS-API.X.COM"), "/12/accounts"),
+        RequestFamily::Ads
+    );
+}
+
+#[test]
+fn classify_compliance() {
+    assert_eq!(
+        classify_request_family(None, "/2/compliance/jobs"),
+        RequestFamily::EnterpriseAdmin
+    );
+    assert_eq!(
+        classify_request_family(None, "/2/compliance/jobs/123"),
+        RequestFamily::EnterpriseAdmin
+    );
+}
+
+#[test]
+fn classify_usage() {
+    assert_eq!(
+        classify_request_family(None, "/2/usage/tweets"),
+        RequestFamily::EnterpriseAdmin
+    );
+}
+
+#[test]
+fn classify_media_upload() {
+    assert_eq!(
+        classify_request_family(Some("upload.x.com"), "/1.1/media/upload.json"),
+        RequestFamily::MediaUpload
+    );
+    assert_eq!(
+        classify_request_family(Some("upload.twitter.com"), "/1.1/media/upload.json"),
+        RequestFamily::MediaUpload
+    );
+}
+
+#[test]
+fn classify_lists_as_public_api() {
+    assert_eq!(
+        classify_request_family(None, "/2/lists/123"),
+        RequestFamily::PublicApi
+    );
+}
+
+#[test]
+fn request_family_display() {
+    assert_eq!(RequestFamily::PublicApi.to_string(), "public_api");
+    assert_eq!(RequestFamily::DirectMessage.to_string(), "direct_message");
+    assert_eq!(RequestFamily::Ads.to_string(), "ads");
+    assert_eq!(
+        RequestFamily::EnterpriseAdmin.to_string(),
+        "enterprise_admin"
+    );
+    assert_eq!(RequestFamily::MediaUpload.to_string(), "media_upload");
+}
+
+#[test]
+fn request_family_serializes_to_snake_case() {
+    let json = serde_json::to_string(&RequestFamily::DirectMessage).unwrap();
+    assert_eq!(json, "\"direct_message\"");
+    let json = serde_json::to_string(&RequestFamily::EnterpriseAdmin).unwrap();
+    assert_eq!(json, "\"enterprise_admin\"");
+}
+
+// ── Enterprise host with path restrictions still enforced ───────────
+
+#[test]
+fn ads_host_still_validates_path() {
+    // Path traversal must be blocked even on enterprise hosts.
+    let result = validate_and_build_url(Some("ads-api.x.com"), "/12/../etc/passwd");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("traversal"));
+}
+
+#[test]
+fn ads_host_query_in_path_blocked() {
+    let result = validate_and_build_url(Some("ads-api.x.com"), "/12/accounts?id=1");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("query"));
+}
+
+#[test]
+fn ads_host_control_chars_blocked() {
+    let result = validate_and_build_url(Some("ads-api.x.com"), "/12/accounts\x00");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("control"));
 }

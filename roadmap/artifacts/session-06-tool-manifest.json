@@ -742,7 +742,7 @@
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": false,
+      "requires_db": true,
       "requires_user_auth": true,
       "requires_elevated_access": true,
       "profiles": [
@@ -755,7 +755,12 @@
         "x_forbidden",
         "x_network_error",
         "x_api_error",
-        "x_request_blocked"
+        "x_request_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
       ]
     },
     {
@@ -1230,7 +1235,7 @@
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": false,
+      "requires_db": true,
       "requires_user_auth": true,
       "requires_elevated_access": true,
       "profiles": [
@@ -1243,7 +1248,12 @@
         "x_forbidden",
         "x_network_error",
         "x_api_error",
-        "x_request_blocked"
+        "x_request_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
       ]
     },
     {
@@ -1361,7 +1371,7 @@
       "mutation": true,
       "requires_x_client": true,
       "requires_llm": false,
-      "requires_db": false,
+      "requires_db": true,
       "requires_user_auth": true,
       "requires_elevated_access": true,
       "profiles": [
@@ -1374,7 +1384,12 @@
         "x_forbidden",
         "x_network_error",
         "x_api_error",
-        "x_request_blocked"
+        "x_request_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
       ]
     },
     {

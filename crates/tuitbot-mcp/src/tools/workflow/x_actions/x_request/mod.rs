@@ -5,10 +5,13 @@
 //! and predictably, without needing a dedicated tool per endpoint.
 //!
 //! Safety constraints enforced by construction:
-//! - Hard host allowlist: only `api.x.com`, `upload.x.com`, `upload.twitter.com`
+//! - Hard host allowlist: `api.x.com`, `upload.x.com`, `upload.twitter.com`,
+//!   `ads-api.x.com` (enterprise Ads API)
 //! - Path validation: must start with `/`, no `..` traversal, no query in path
 //! - Header blocklist: `authorization`, `host`, `cookie`, `transfer-encoding`
 //! - SSRF protection: reject non-HTTPS schemes, reject IP-literal hosts
+//! - Mutation requests (`x_post`, `x_put`, `x_delete`) are policy-gated and
+//!   audit-recorded via the unified mutation gateway
 
 use std::collections::HashMap;
 use std::time::Instant;
@@ -26,7 +29,12 @@ use crate::tools::response::{ErrorCode, ToolMeta, ToolResponse};
 // ── Host allowlist ──────────────────────────────────────────────────
 
 /// Hard-coded allowlist of X API hosts. Requests to any other host are blocked.
-const ALLOWED_HOSTS: &[&str] = &["api.x.com", "upload.x.com", "upload.twitter.com"];
+const ALLOWED_HOSTS: &[&str] = &[
+    "api.x.com",
+    "upload.x.com",
+    "upload.twitter.com",
+    "ads-api.x.com", // Enterprise Ads API
+];
 
 /// Headers that callers may not override (case-insensitive).
 const BLOCKED_HEADERS: &[&str] = &[
@@ -41,6 +49,13 @@ const BLOCKED_HEADERS: &[&str] = &[
 
 /// Maximum number of auto-paginated pages to fetch in a single call.
 const MAX_AUTO_PAGES: u32 = 10;
+
+// ── Request family classification (in `family.rs`) ───────────────────
+
+mod family;
+pub(crate) use family::classify_request_family;
+#[cfg(test)]
+pub(crate) use family::RequestFamily;
 
 // ── Validation ──────────────────────────────────────────────────────
 
@@ -191,79 +206,10 @@ pub async fn x_get(
     .await
 }
 
-/// Execute a POST request against the X API.
-pub async fn x_post(
-    state: &SharedState,
-    path: &str,
-    host: Option<&str>,
-    query: Option<&[(String, String)]>,
-    body: Option<&str>,
-    headers: Option<&[(String, String)]>,
-) -> String {
-    execute_request(
-        state,
-        RequestParams {
-            method: "POST",
-            path,
-            host,
-            query,
-            body,
-            headers,
-            auto_paginate: false,
-            max_pages: None,
-        },
-    )
-    .await
-}
+// ── Policy-gated mutation variants (in `audited.rs`) ─────────────────
 
-/// Execute a PUT request against the X API.
-pub async fn x_put(
-    state: &SharedState,
-    path: &str,
-    host: Option<&str>,
-    query: Option<&[(String, String)]>,
-    body: Option<&str>,
-    headers: Option<&[(String, String)]>,
-) -> String {
-    execute_request(
-        state,
-        RequestParams {
-            method: "PUT",
-            path,
-            host,
-            query,
-            body,
-            headers,
-            auto_paginate: false,
-            max_pages: None,
-        },
-    )
-    .await
-}
-
-/// Execute a DELETE request against the X API.
-pub async fn x_delete(
-    state: &SharedState,
-    path: &str,
-    host: Option<&str>,
-    query: Option<&[(String, String)]>,
-    headers: Option<&[(String, String)]>,
-) -> String {
-    execute_request(
-        state,
-        RequestParams {
-            method: "DELETE",
-            path,
-            host,
-            query,
-            body: None,
-            headers,
-            auto_paginate: false,
-            max_pages: None,
-        },
-    )
-    .await
-}
+mod audited;
+pub use audited::{x_delete_audited, x_post_audited, x_put_audited};
 
 /// Core request execution with validation, retry, and optional pagination.
 async fn execute_request(state: &SharedState, params: RequestParams<'_>) -> String {

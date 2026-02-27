@@ -17,6 +17,8 @@ pub enum ToolCategory {
     Media,
     Thread,
     Delete,
+    /// Universal request mutations via x_post/x_put/x_delete.
+    UniversalRequest,
 }
 
 impl std::fmt::Display for ToolCategory {
@@ -28,6 +30,7 @@ impl std::fmt::Display for ToolCategory {
             ToolCategory::Media => write!(f, "media"),
             ToolCategory::Thread => write!(f, "thread"),
             ToolCategory::Delete => write!(f, "delete"),
+            ToolCategory::UniversalRequest => write!(f, "universal_request"),
         }
     }
 }
@@ -56,6 +59,8 @@ pub fn tool_category(name: &str) -> ToolCategory {
         }
         // Delete tools
         "delete_tweet" | "x_delete_tweet" => ToolCategory::Delete,
+        // Universal request mutations (admin-only)
+        "x_post" | "x_put" | "x_delete" => ToolCategory::UniversalRequest,
         // Default unknown tools to Write (safest default for mutations)
         _ => ToolCategory::Write,
     }
@@ -201,4 +206,49 @@ pub struct PolicyAuditRecordV2 {
     pub matched_rule_id: Option<String>,
     pub matched_rule_label: Option<String>,
     pub rate_limit_key: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_category_universal_request_tools() {
+        assert_eq!(tool_category("x_post"), ToolCategory::UniversalRequest);
+        assert_eq!(tool_category("x_put"), ToolCategory::UniversalRequest);
+        assert_eq!(tool_category("x_delete"), ToolCategory::UniversalRequest);
+    }
+
+    #[test]
+    fn tool_category_standard_tools() {
+        assert_eq!(tool_category("post_tweet"), ToolCategory::Write);
+        assert_eq!(tool_category("like_tweet"), ToolCategory::Engage);
+        assert_eq!(tool_category("get_tweet"), ToolCategory::Read);
+        assert_eq!(tool_category("delete_tweet"), ToolCategory::Delete);
+        assert_eq!(tool_category("upload_media"), ToolCategory::Media);
+        assert_eq!(tool_category("post_thread"), ToolCategory::Thread);
+    }
+
+    #[test]
+    fn tool_category_unknown_defaults_to_write() {
+        assert_eq!(tool_category("some_future_tool"), ToolCategory::Write);
+    }
+
+    #[test]
+    fn tool_category_display() {
+        assert_eq!(
+            ToolCategory::UniversalRequest.to_string(),
+            "universal_request"
+        );
+        assert_eq!(ToolCategory::Read.to_string(), "read");
+        assert_eq!(ToolCategory::Write.to_string(), "write");
+    }
+
+    #[test]
+    fn tool_category_serde_roundtrip() {
+        let json = serde_json::to_string(&ToolCategory::UniversalRequest).unwrap();
+        assert_eq!(json, "\"universal_request\"");
+        let parsed: ToolCategory = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, ToolCategory::UniversalRequest);
+    }
 }
