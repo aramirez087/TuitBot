@@ -245,6 +245,10 @@
 					.map((b, i) => ({ ...b, text: b.text.trim(), order: i }));
 				data.content = JSON.stringify(validBlocks.map((b) => b.text));
 				data.blocks = validBlocks;
+				const allMedia = validBlocks.flatMap((b) => b.media_paths);
+				if (allMedia.length > 0) {
+					data.media_paths = allMedia;
+				}
 			}
 
 			if (selectedTime) {
