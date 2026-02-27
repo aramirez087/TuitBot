@@ -6,12 +6,17 @@ use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tuitbot_core::content::{tweet_weighted_len, MAX_TWEET_CHARS};
+use tuitbot_core::content::{
+    serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
+    MAX_TWEET_CHARS,
+};
 use tuitbot_core::storage::{approval_queue, scheduled_content};
 
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
+
+use super::compose::ThreadBlockRequest;
 
 #[derive(Deserialize)]
 pub struct CreateDraftRequest {
@@ -19,6 +24,8 @@ pub struct CreateDraftRequest {
     pub content: String,
     #[serde(default = "default_source")]
     pub source: String,
+    #[serde(default)]
+    pub blocks: Option<Vec<ThreadBlockRequest>>,
 }
 
 fn default_source() -> String {
@@ -38,32 +45,34 @@ pub async fn list_drafts(
 pub async fn create_draft(
     State(state): State<Arc<AppState>>,
     ctx: AccountContext,
-    Json(body): Json<CreateDraftRequest>,
+    Json(mut body): Json<CreateDraftRequest>,
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
 
-    // Validate content.
-    if body.content.trim().is_empty() {
-        return Err(ApiError::BadRequest(
-            "content must not be empty".to_string(),
-        ));
-    }
+    let blocks = body.blocks.take();
 
-    if body.content_type == "tweet"
-        && !tuitbot_core::content::validate_tweet_length(&body.content, MAX_TWEET_CHARS)
-    {
-        return Err(ApiError::BadRequest(format!(
-            "Tweet exceeds {} characters (weighted length: {})",
-            MAX_TWEET_CHARS,
-            tweet_weighted_len(&body.content)
-        )));
-    }
+    // When blocks are provided for a thread, use them.
+    let content = if body.content_type == "thread" {
+        if let Some(block_requests) = blocks {
+            let core_blocks: Vec<ThreadBlock> =
+                block_requests.into_iter().map(|b| b.into_core()).collect();
+            validate_thread_blocks(&core_blocks)
+                .map_err(|e| ApiError::BadRequest(e.api_message()))?;
+            serialize_blocks_for_storage(&core_blocks)
+        } else {
+            validate_draft_content(&body.content_type, &body.content)?;
+            body.content.clone()
+        }
+    } else {
+        validate_draft_content(&body.content_type, &body.content)?;
+        body.content.clone()
+    };
 
     let id = scheduled_content::insert_draft_for(
         &state.db,
         &ctx.account_id,
         &body.content_type,
-        &body.content,
+        &content,
         &body.source,
     )
     .await
@@ -72,9 +81,33 @@ pub async fn create_draft(
     Ok(Json(json!({ "id": id, "status": "draft" })))
 }
 
+/// Validate draft content for legacy (non-blocks) payloads.
+fn validate_draft_content(content_type: &str, content: &str) -> Result<(), ApiError> {
+    if content.trim().is_empty() {
+        return Err(ApiError::BadRequest(
+            "content must not be empty".to_string(),
+        ));
+    }
+
+    if content_type == "tweet"
+        && !tuitbot_core::content::validate_tweet_length(content, MAX_TWEET_CHARS)
+    {
+        return Err(ApiError::BadRequest(format!(
+            "Tweet exceeds {} characters (weighted length: {})",
+            MAX_TWEET_CHARS,
+            tweet_weighted_len(content)
+        )));
+    }
+
+    Ok(())
+}
+
 #[derive(Deserialize)]
 pub struct EditDraftRequest {
-    pub content: String,
+    #[serde(default)]
+    pub content: Option<String>,
+    #[serde(default)]
+    pub blocks: Option<Vec<ThreadBlockRequest>>,
 }
 
 pub async fn edit_draft(
@@ -85,13 +118,25 @@ pub async fn edit_draft(
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
 
-    if body.content.trim().is_empty() {
+    let content = if let Some(block_requests) = body.blocks {
+        let core_blocks: Vec<ThreadBlock> =
+            block_requests.into_iter().map(|b| b.into_core()).collect();
+        validate_thread_blocks(&core_blocks).map_err(|e| ApiError::BadRequest(e.api_message()))?;
+        serialize_blocks_for_storage(&core_blocks)
+    } else if let Some(ref text) = body.content {
+        if text.trim().is_empty() {
+            return Err(ApiError::BadRequest(
+                "content must not be empty".to_string(),
+            ));
+        }
+        text.clone()
+    } else {
         return Err(ApiError::BadRequest(
-            "content must not be empty".to_string(),
+            "must provide either 'content' or 'blocks'".to_string(),
         ));
-    }
+    };
 
-    scheduled_content::update_draft_for(&state.db, &ctx.account_id, id, &body.content)
+    scheduled_content::update_draft_for(&state.db, &ctx.account_id, id, &content)
         .await
         .map_err(ApiError::Storage)?;
 

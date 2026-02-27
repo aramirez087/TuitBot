@@ -8,10 +8,15 @@
 pub mod frameworks;
 pub mod generator;
 pub mod length;
+pub mod thread;
 
 pub use frameworks::{ReplyArchetype, ThreadStructure, TweetFormat};
 pub use generator::{ContentGenerator, GenerationOutput, ThreadGenerationOutput};
 pub use length::{
     truncate_at_sentence, tweet_weighted_len, validate_tweet_length, MAX_TWEET_CHARS,
     TCO_URL_LENGTH,
+};
+pub use thread::{
+    deserialize_blocks_from_content, serialize_blocks_for_storage, validate_thread_blocks,
+    ThreadBlock, ThreadBlockError, ThreadBlocksPayload, MAX_MEDIA_PER_BLOCK,
 };

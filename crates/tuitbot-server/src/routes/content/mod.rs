@@ -22,7 +22,7 @@ pub use scheduled::{cancel_scheduled, edit_scheduled};
 
 // Re-export types used by route registration (if any).
 pub use calendar::{CalendarItem, CalendarQuery};
-pub use compose::{ComposeRequest, ComposeThreadRequest, ComposeTweetRequest};
+pub use compose::{ComposeRequest, ComposeThreadRequest, ComposeTweetRequest, ThreadBlockRequest};
 pub use drafts::{CreateDraftRequest, EditDraftRequest, ScheduleDraftRequest};
 pub use list::{ThreadsQuery, TweetsQuery};
 pub use scheduled::EditScheduledRequest;

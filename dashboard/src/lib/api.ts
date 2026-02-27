@@ -188,11 +188,55 @@ export interface ScheduleConfig {
 	thread_time: string;
 }
 
+export interface ThreadBlock {
+	id: string;
+	text: string;
+	media_paths: string[];
+	order: number;
+}
+
+export interface ThreadBlocksPayload {
+	version: number;
+	blocks: ThreadBlock[];
+}
+
 export interface ComposeRequest {
 	content_type: string;
 	content: string;
 	scheduled_for?: string;
 	media_paths?: string[];
+	blocks?: ThreadBlock[];
+}
+
+/**
+ * Parse stored thread content, detecting new blocks format vs legacy string array.
+ * Returns `ThreadBlock[]` for blocks format, `string[]` for legacy format.
+ */
+export function parseThreadContent(content: string): ThreadBlock[] | string[] {
+	try {
+		const parsed = JSON.parse(content);
+		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.blocks) {
+			return (parsed as ThreadBlocksPayload).blocks;
+		}
+		if (Array.isArray(parsed)) {
+			return parsed as string[];
+		}
+	} catch {
+		// Not JSON — return as single-item array
+	}
+	return [content];
+}
+
+/**
+ * Check whether stored content uses the versioned blocks payload format.
+ */
+export function isBlocksPayload(content: string): boolean {
+	try {
+		const parsed = JSON.parse(content);
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'blocks' in parsed;
+	} catch {
+		return false;
+	}
 }
 
 export interface ScheduledContentItem {
@@ -850,15 +894,28 @@ export const api = {
 
 	drafts: {
 		list: () => request<ScheduledContentItem[]>('/api/content/drafts'),
-		create: (contentType: string, content: string, source: string = 'manual') =>
+		create: (
+			contentType: string,
+			content: string,
+			source: string = 'manual',
+			blocks?: ThreadBlock[]
+		) =>
 			request<{ id: number; status: string }>('/api/content/drafts', {
 				method: 'POST',
-				body: JSON.stringify({ content_type: contentType, content, source })
+				body: JSON.stringify({
+					content_type: contentType,
+					content,
+					source,
+					...(blocks && { blocks })
+				})
 			}),
-		edit: (id: number, content: string) =>
+		edit: (id: number, content?: string, blocks?: ThreadBlock[]) =>
 			request<{ id: number; status: string }>(`/api/content/drafts/${id}`, {
 				method: 'PATCH',
-				body: JSON.stringify({ content })
+				body: JSON.stringify({
+					...(content !== undefined && { content }),
+					...(blocks && { blocks })
+				})
 			}),
 		delete: (id: number) =>
 			request<{ id: number; status: string }>(`/api/content/drafts/${id}`, {
