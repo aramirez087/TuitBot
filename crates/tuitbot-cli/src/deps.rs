@@ -193,19 +193,21 @@ impl RuntimeDeps {
         let (post_tx, post_rx) = create_posting_queue();
 
         // 10. Create adapter structs.
-        let searcher: Arc<XApiSearchAdapter> = Arc::new(XApiSearchAdapter::new(x_client.clone()));
+        // Cast to trait object once for all adapters (AD-06).
+        let dyn_client: Arc<dyn XApiClient> = x_client.clone() as Arc<dyn XApiClient>;
+        let searcher: Arc<XApiSearchAdapter> = Arc::new(XApiSearchAdapter::new(dyn_client.clone()));
         let mentions_fetcher: Arc<XApiMentionsAdapter> = Arc::new(XApiMentionsAdapter::new(
-            x_client.clone(),
+            dyn_client.clone(),
             own_user_id.clone(),
         ));
         let target_adapter: Arc<XApiTargetAdapter> =
-            Arc::new(XApiTargetAdapter::new(x_client.clone()));
+            Arc::new(XApiTargetAdapter::new(dyn_client.clone()));
         let profile_adapter: Arc<XApiProfileAdapter> =
-            Arc::new(XApiProfileAdapter::new(x_client.clone()));
+            Arc::new(XApiProfileAdapter::new(dyn_client.clone()));
         let post_executor: Arc<XApiPostExecutorAdapter> =
-            Arc::new(XApiPostExecutorAdapter::new(x_client.clone()));
+            Arc::new(XApiPostExecutorAdapter::new(dyn_client.clone()));
         let thread_poster: Arc<XApiThreadPosterAdapter> =
-            Arc::new(XApiThreadPosterAdapter::new(x_client.clone()));
+            Arc::new(XApiThreadPosterAdapter::new(dyn_client));
 
         let reply_gen: Arc<LlmReplyAdapter> =
             Arc::new(LlmReplyAdapter::new(content_gen.clone(), pool.clone()));
