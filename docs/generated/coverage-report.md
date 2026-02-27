@@ -1,6 +1,6 @@
 # MCP Endpoint Coverage Report
 
-**Generated:** 2026-02-27T00:59:01.664564+00:00
+**Generated:** 2026-02-27T01:03:46.383814+00:00
 
 **MCP Schema:** 1.2 | **X API Spec:** 1.0.0
 
