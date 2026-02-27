@@ -1,27 +1,27 @@
 # MCP Endpoint Coverage Report
 
-**Generated:** 2026-02-27T03:02:37.965201+00:00
+**Generated:** 2026-02-27T03:15:44.344516+00:00
 
-**MCP Schema:** 1.2 | **X API Spec:** 1.1.0
+**MCP Schema:** 1.2 | **X API Spec:** 1.2.0
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total tools | 117 |
+| Total tools | 133 |
 | Curated (L1) | 73 |
-| Generated (L2) | 44 |
-| Mutation tools | 41 |
-| Read-only tools | 76 |
-| Requires X client | 83 |
+| Generated (L2) | 60 |
+| Mutation tools | 48 |
+| Read-only tools | 85 |
+| Requires X client | 99 |
 | Requires LLM | 5 |
-| Requires DB | 37 |
-| Requires user auth | 76 |
-| Requires elevated access | 4 |
+| Requires DB | 44 |
+| Requires user auth | 92 |
+| Requires elevated access | 20 |
 
 ## Test Coverage
 
-**45/117 tools have at least one test (38.5%)**
+**45/133 tools have at least one test (33.8%)**
 
 | Test Type | Count |
 |-----------|-------|
@@ -29,12 +29,13 @@
 | Contract envelope | 18 |
 | Live (sandbox) | 9 |
 | Total test touches | 54 |
-| Untested | 72 |
+| Untested | 88 |
 
 ## By Category
 
 | Category | Total | Curated | Generated | Mutations | Tested |
 |----------|-------|---------|-----------|-----------|--------|
+| ads | 16 | 0 | 16 | 7 | 0 |
 | analytics | 9 | 9 | 0 | 0 | 7 |
 | approval | 5 | 5 | 0 | 3 | 2 |
 | composite | 4 | 4 | 0 | 1 | 0 |
@@ -62,46 +63,46 @@
 | readonly | 14 | 0 | 14 |
 | api_readonly | 45 | 0 | 45 |
 | write | 112 | 38 | 74 |
-| admin | 116 | 41 | 75 |
+| admin | 132 | 48 | 84 |
 
 ## Tier-Gated Areas
 
 Tools restricted to specific profiles:
 
-- **admin only**: 4 tools
+- **admin only**: 20 tools
 - **all tiers**: 14 tools
 - **api_readonly+**: 31 tools
 - **write+**: 68 tools
 
 ## Credential-Gated Areas
 
-76 tools require specific credentials:
+92 tools require specific credentials:
 
 - get_tweet_by_id: [user_auth, scoped]
+- x_ads_account_by_id: [user_auth, elevated_access, scoped]
+- x_ads_accounts: [user_auth, elevated_access, scoped]
+- x_ads_analytics: [user_auth, elevated_access, scoped]
+- x_ads_campaign_by_id: [user_auth, elevated_access, scoped]
+- x_ads_campaign_create: [user_auth, elevated_access, scoped]
+- x_ads_campaign_delete: [user_auth, elevated_access, scoped]
+- x_ads_campaign_update: [user_auth, elevated_access, scoped]
+- x_ads_campaigns: [user_auth, elevated_access, scoped]
+- x_ads_funding_instruments: [user_auth, elevated_access, scoped]
+- x_ads_line_item_create: [user_auth, elevated_access, scoped]
+- x_ads_line_items: [user_auth, elevated_access, scoped]
+- x_ads_promoted_tweet_create: [user_auth, elevated_access, scoped]
+- x_ads_promoted_tweets: [user_auth, elevated_access, scoped]
+- x_ads_targeting_create: [user_auth, elevated_access, scoped]
+- x_ads_targeting_criteria: [user_auth, elevated_access, scoped]
+- x_ads_targeting_delete: [user_auth, elevated_access, scoped]
 - x_bookmark_tweet: [user_auth, scoped]
 - x_delete: [user_auth, elevated_access]
 - x_delete_tweet: [user_auth, scoped]
-- x_follow_user: [user_auth, scoped]
-- x_get: [user_auth, elevated_access]
-- x_get_bookmarks: [user_auth, scoped]
-- x_get_followers: [user_auth, scoped]
-- x_get_following: [user_auth, scoped]
-- x_get_home_timeline: [user_auth, scoped]
-- x_get_liked_tweets: [user_auth, scoped]
-- x_get_me: [user_auth, scoped]
-- x_get_tweet_liking_users: [user_auth, scoped]
-- x_get_user_by_id: [user_auth, scoped]
-- x_get_user_by_username: [user_auth, scoped]
-- x_get_user_mentions: [user_auth, scoped]
-- x_get_user_tweets: [user_auth, scoped]
-- x_get_users_by_ids: [user_auth, scoped]
-- x_like_tweet: [user_auth, scoped]
-- x_post: [user_auth, elevated_access]
-- ... and 56 more
+- ... and 72 more
 
 ## Coverage Gaps (Untested Tools)
 
-72 tools lack any test coverage:
+88 tools lack any test coverage:
 
 - approve_item (approval)
 - compose_tweet (write)
@@ -124,6 +125,22 @@ Tools restricted to specific profiles:
 - recommend_engagement_action (context)
 - reject_item (approval)
 - suggest_topics (content)
+- x_ads_account_by_id (ads)
+- x_ads_accounts (ads)
+- x_ads_analytics (ads)
+- x_ads_campaign_by_id (ads)
+- x_ads_campaign_create (ads)
+- x_ads_campaign_delete (ads)
+- x_ads_campaign_update (ads)
+- x_ads_campaigns (ads)
+- x_ads_funding_instruments (ads)
+- x_ads_line_item_create (ads)
+- x_ads_line_items (ads)
+- x_ads_promoted_tweet_create (ads)
+- x_ads_promoted_tweets (ads)
+- x_ads_targeting_create (ads)
+- x_ads_targeting_criteria (ads)
+- x_ads_targeting_delete (ads)
 - x_delete (write)
 - x_get (read)
 - x_post (write)

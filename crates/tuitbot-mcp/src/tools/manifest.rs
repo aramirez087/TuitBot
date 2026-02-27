@@ -77,6 +77,7 @@ pub enum ToolCategory {
     List,
     Moderation,
     DirectMessage,
+    Ads,
 }
 
 /// MCP server profile.

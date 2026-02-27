@@ -30,6 +30,8 @@ const WRITE_UP_AND_API_RO_AND_UTIL_WRITE: &[Profile] = &[
 /// Write + Admin + UtilityWrite.
 const WRITE_UP_AND_UTIL_WRITE: &[Profile] =
     &[Profile::Write, Profile::Admin, Profile::UtilityWrite];
+/// Admin profile only (enterprise/elevated-access tools).
+const ADMIN_ONLY: &[Profile] = &[Profile::Admin];
 
 // ── Error code sets ────────────────────────────────────────────────────
 
@@ -155,6 +157,48 @@ const PARAM_PARTICIPANT_ID: ParamDef = ParamDef {
     default: None,
 };
 
+// ── Ads-specific parameter definitions ────────────────────────────────
+
+const PARAM_ACCOUNT_ID: ParamDef = ParamDef {
+    name: "account_id",
+    param_type: ParamType::String,
+    required: true,
+    description: "Ads account ID",
+    default: None,
+};
+
+const PARAM_CAMPAIGN_ID: ParamDef = ParamDef {
+    name: "campaign_id",
+    param_type: ParamType::String,
+    required: true,
+    description: "Campaign ID",
+    default: None,
+};
+
+const PARAM_WITH_DELETED: ParamDef = ParamDef {
+    name: "with_deleted",
+    param_type: ParamType::Boolean,
+    required: false,
+    description: "Include deleted entities in the response",
+    default: Some("false"),
+};
+
+const PARAM_ADS_CURSOR: ParamDef = ParamDef {
+    name: "cursor",
+    param_type: ParamType::String,
+    required: false,
+    description: "Cursor for paginating through Ads API results",
+    default: None,
+};
+
+const PARAM_ADS_COUNT: ParamDef = ParamDef {
+    name: "count",
+    param_type: ParamType::Integer,
+    required: false,
+    description: "Number of results per page (Ads API, default: 200)",
+    default: Some("200"),
+};
+
 // ── The spec pack ──────────────────────────────────────────────────────
 
 /// All X API endpoint definitions in the spec pack.
@@ -186,6 +230,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "tweets",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_users_lookup_by_usernames",
@@ -209,6 +254,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "users",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_tweets_retweeted_by",
@@ -227,6 +273,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "tweets",
+        host: None,
     },
     // ── Tweet Metadata (4) ─────────────────────────────────────────
     EndpointDef {
@@ -248,6 +295,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "tweets",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_tweets_counts_recent",
@@ -290,6 +338,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "tweets",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_tweets_hide_reply",
@@ -312,6 +361,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "tweets",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_tweets_unhide_reply",
@@ -334,6 +384,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "tweets",
+        host: None,
     },
     // ── Pin Management (2) ─────────────────────────────────────────
     EndpointDef {
@@ -357,6 +408,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "users",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_users_unpin_tweet",
@@ -370,6 +422,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "users",
+        host: None,
     },
     // ── Lists (15) ─────────────────────────────────────────────────
     EndpointDef {
@@ -384,6 +437,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_owned",
@@ -402,6 +456,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_create",
@@ -437,6 +492,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_update",
@@ -473,6 +529,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_delete",
@@ -486,6 +543,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_tweets",
@@ -506,6 +564,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_members",
@@ -524,6 +583,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_members_add",
@@ -546,6 +606,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_members_remove",
@@ -559,6 +620,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_memberships",
@@ -577,6 +639,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_followers",
@@ -595,6 +658,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_follow",
@@ -617,6 +681,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_unfollow",
@@ -639,6 +704,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_pinned",
@@ -652,6 +718,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_lists_pin",
@@ -674,6 +741,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "lists",
+        host: None,
     },
     // ── Mutes (3) ──────────────────────────────────────────────────
     EndpointDef {
@@ -693,6 +761,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "mutes",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_mutes_create",
@@ -715,6 +784,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "mutes",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_mutes_delete",
@@ -728,6 +798,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "mutes",
+        host: None,
     },
     // ── Blocks (3) ─────────────────────────────────────────────────
     EndpointDef {
@@ -747,6 +818,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "blocks",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_blocks_create",
@@ -769,6 +841,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "blocks",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_blocks_delete",
@@ -782,6 +855,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "blocks",
+        host: None,
     },
     // ── Spaces (6) ─────────────────────────────────────────────────
     EndpointDef {
@@ -796,6 +870,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "spaces",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_spaces_lookup",
@@ -819,6 +894,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "spaces",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_spaces_by_creator",
@@ -842,6 +918,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "spaces",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_spaces_search",
@@ -872,6 +949,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "spaces",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_spaces_buyers",
@@ -885,6 +963,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "spaces",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_spaces_tweets",
@@ -903,6 +982,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "spaces",
+        host: None,
     },
     // ── Direct Messages (8) ───────────────────────────────────────
     EndpointDef {
@@ -922,6 +1002,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_conversation_by_id",
@@ -935,6 +1016,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_events_by_conversation",
@@ -954,6 +1036,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_events_by_participant",
@@ -973,6 +1056,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_events",
@@ -991,6 +1075,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_READ_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_send_in_conversation",
@@ -1020,6 +1105,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_send_to_participant",
@@ -1049,6 +1135,7 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
     },
     EndpointDef {
         tool_name: "x_v2_dm_create_group",
@@ -1084,5 +1171,501 @@ pub static SPEC_ENDPOINTS: &[EndpointDef] = &[
         error_codes: X_WRITE_ERR,
         api_version: "v2",
         group: "direct_messages",
+        host: None,
+    },
+    // ── Ads / Campaign (16) — Admin-only, host: ads-api.x.com ─────
+    EndpointDef {
+        tool_name: "x_ads_accounts",
+        description: "List all advertising accounts the authenticating user has access to",
+        method: HttpMethod::Get,
+        path: "/12/accounts",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[PARAM_WITH_DELETED, PARAM_ADS_CURSOR, PARAM_ADS_COUNT],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_account_by_id",
+        description: "Get details of a specific advertising account",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[PARAM_ACCOUNT_ID, PARAM_WITH_DELETED],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_analytics",
+        description: "Retrieve analytics and performance metrics for an ads account",
+        method: HttpMethod::Get,
+        path: "/12/stats/accounts/{account_id}",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "entity",
+                param_type: ParamType::String,
+                required: false,
+                description: "Entity type: CAMPAIGN, LINE_ITEM, PROMOTED_TWEET",
+                default: None,
+            },
+            ParamDef {
+                name: "entity_ids",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated entity IDs to retrieve metrics for",
+                default: None,
+            },
+            ParamDef {
+                name: "start_time",
+                param_type: ParamType::String,
+                required: false,
+                description: "Start time in ISO 8601 format",
+                default: None,
+            },
+            ParamDef {
+                name: "end_time",
+                param_type: ParamType::String,
+                required: false,
+                description: "End time in ISO 8601 format",
+                default: None,
+            },
+            ParamDef {
+                name: "granularity",
+                param_type: ParamType::String,
+                required: false,
+                description: "Aggregation granularity: HOUR, DAY, TOTAL",
+                default: Some("DAY"),
+            },
+            ParamDef {
+                name: "metric_groups",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated metric groups (e.g. ENGAGEMENT,BILLING)",
+                default: None,
+            },
+        ],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_campaign_by_id",
+        description: "Get details of a specific campaign",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}/campaigns/{campaign_id}",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[PARAM_ACCOUNT_ID, PARAM_CAMPAIGN_ID, PARAM_WITH_DELETED],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_campaign_create",
+        description: "Create a new advertising campaign",
+        method: HttpMethod::Post,
+        path: "/12/accounts/{account_id}/campaigns",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "name",
+                param_type: ParamType::String,
+                required: true,
+                description: "Campaign name",
+                default: None,
+            },
+            ParamDef {
+                name: "funding_instrument_id",
+                param_type: ParamType::String,
+                required: true,
+                description: "Funding instrument ID for the campaign budget",
+                default: None,
+            },
+            ParamDef {
+                name: "status",
+                param_type: ParamType::String,
+                required: false,
+                description: "Campaign status: ACTIVE, PAUSED, DRAFT",
+                default: Some("PAUSED"),
+            },
+            ParamDef {
+                name: "daily_budget_amount_local_micro",
+                param_type: ParamType::Integer,
+                required: false,
+                description: "Daily budget in microcurrency units (e.g. 5000000 = $5.00)",
+                default: None,
+            },
+            ParamDef {
+                name: "start_time",
+                param_type: ParamType::String,
+                required: false,
+                description: "Campaign start time in ISO 8601 format",
+                default: None,
+            },
+            ParamDef {
+                name: "end_time",
+                param_type: ParamType::String,
+                required: false,
+                description: "Campaign end time in ISO 8601 format",
+                default: None,
+            },
+        ],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_campaign_delete",
+        description: "Delete (archive) a campaign",
+        method: HttpMethod::Delete,
+        path: "/12/accounts/{account_id}/campaigns/{campaign_id}",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[PARAM_ACCOUNT_ID, PARAM_CAMPAIGN_ID],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_campaign_update",
+        description: "Update an existing campaign's name, status, or budget",
+        method: HttpMethod::Put,
+        path: "/12/accounts/{account_id}/campaigns/{campaign_id}",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            PARAM_CAMPAIGN_ID,
+            ParamDef {
+                name: "name",
+                param_type: ParamType::String,
+                required: false,
+                description: "Updated campaign name",
+                default: None,
+            },
+            ParamDef {
+                name: "status",
+                param_type: ParamType::String,
+                required: false,
+                description: "Updated status: ACTIVE, PAUSED",
+                default: None,
+            },
+            ParamDef {
+                name: "daily_budget_amount_local_micro",
+                param_type: ParamType::Integer,
+                required: false,
+                description: "Updated daily budget in microcurrency units",
+                default: None,
+            },
+            ParamDef {
+                name: "start_time",
+                param_type: ParamType::String,
+                required: false,
+                description: "Updated start time in ISO 8601 format",
+                default: None,
+            },
+            ParamDef {
+                name: "end_time",
+                param_type: ParamType::String,
+                required: false,
+                description: "Updated end time in ISO 8601 format",
+                default: None,
+            },
+        ],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_campaigns",
+        description: "List campaigns for an advertising account",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}/campaigns",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "campaign_ids",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated campaign IDs to filter by",
+                default: None,
+            },
+            PARAM_WITH_DELETED,
+            PARAM_ADS_CURSOR,
+            PARAM_ADS_COUNT,
+        ],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_funding_instruments",
+        description: "List funding instruments (payment methods) for an ads account",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}/funding_instruments",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            PARAM_WITH_DELETED,
+            PARAM_ADS_CURSOR,
+            PARAM_ADS_COUNT,
+        ],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_line_item_create",
+        description: "Create a new line item (ad group) within a campaign",
+        method: HttpMethod::Post,
+        path: "/12/accounts/{account_id}/line_items",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            PARAM_CAMPAIGN_ID,
+            ParamDef {
+                name: "bid_amount_local_micro",
+                param_type: ParamType::Integer,
+                required: true,
+                description: "Bid amount in microcurrency units",
+                default: None,
+            },
+            ParamDef {
+                name: "product_type",
+                param_type: ParamType::String,
+                required: true,
+                description: "Product type: PROMOTED_TWEETS, PROMOTED_ACCOUNT",
+                default: None,
+            },
+            ParamDef {
+                name: "placements",
+                param_type: ParamType::StringArray,
+                required: true,
+                description: "Comma-separated placements: ALL_ON_TWITTER, PUBLISHER_NETWORK",
+                default: None,
+            },
+            ParamDef {
+                name: "objective",
+                param_type: ParamType::String,
+                required: true,
+                description: "Campaign objective: AWARENESS, ENGAGEMENTS, VIDEO_VIEWS, etc.",
+                default: None,
+            },
+            ParamDef {
+                name: "bid_type",
+                param_type: ParamType::String,
+                required: false,
+                description: "Bid type: AUTO, MAX, TARGET",
+                default: None,
+            },
+            ParamDef {
+                name: "total_budget_amount_local_micro",
+                param_type: ParamType::Integer,
+                required: false,
+                description: "Total line item budget in microcurrency units",
+                default: None,
+            },
+        ],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_line_items",
+        description: "List line items (ad groups) for an advertising account",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}/line_items",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "campaign_ids",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated campaign IDs to filter by",
+                default: None,
+            },
+            ParamDef {
+                name: "line_item_ids",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated line item IDs to filter by",
+                default: None,
+            },
+            PARAM_WITH_DELETED,
+            PARAM_ADS_CURSOR,
+            PARAM_ADS_COUNT,
+        ],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_promoted_tweet_create",
+        description: "Promote a tweet under a line item",
+        method: HttpMethod::Post,
+        path: "/12/accounts/{account_id}/promoted_tweets",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "line_item_id",
+                param_type: ParamType::String,
+                required: true,
+                description: "Line item ID to associate the promoted tweet with",
+                default: None,
+            },
+            ParamDef {
+                name: "tweet_ids",
+                param_type: ParamType::StringArray,
+                required: true,
+                description: "Comma-separated tweet IDs to promote",
+                default: None,
+            },
+        ],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_promoted_tweets",
+        description: "List promoted tweets for an advertising account",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}/promoted_tweets",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "line_item_ids",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated line item IDs to filter by",
+                default: None,
+            },
+            PARAM_WITH_DELETED,
+            PARAM_ADS_CURSOR,
+            PARAM_ADS_COUNT,
+        ],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_targeting_create",
+        description: "Create targeting criteria for a line item",
+        method: HttpMethod::Post,
+        path: "/12/accounts/{account_id}/targeting_criteria",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "line_item_id",
+                param_type: ParamType::String,
+                required: true,
+                description: "Line item ID to apply targeting to",
+                default: None,
+            },
+            ParamDef {
+                name: "targeting_type",
+                param_type: ParamType::String,
+                required: true,
+                description: "Targeting type: LOCATION, KEYWORD, INTEREST, etc.",
+                default: None,
+            },
+            ParamDef {
+                name: "targeting_value",
+                param_type: ParamType::String,
+                required: true,
+                description: "Targeting value (depends on targeting_type)",
+                default: None,
+            },
+        ],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_targeting_criteria",
+        description: "List targeting criteria for an advertising account",
+        method: HttpMethod::Get,
+        path: "/12/accounts/{account_id}/targeting_criteria",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read"],
+        params: &[
+            PARAM_ACCOUNT_ID,
+            ParamDef {
+                name: "line_item_ids",
+                param_type: ParamType::StringArray,
+                required: false,
+                description: "Comma-separated line item IDs to filter by",
+                default: None,
+            },
+            PARAM_WITH_DELETED,
+            PARAM_ADS_CURSOR,
+            PARAM_ADS_COUNT,
+        ],
+        error_codes: X_READ_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
+    },
+    EndpointDef {
+        tool_name: "x_ads_targeting_delete",
+        description: "Delete targeting criteria from a line item",
+        method: HttpMethod::Delete,
+        path: "/12/accounts/{account_id}/targeting_criteria/{id}",
+        category: ToolCategory::Ads,
+        profiles: ADMIN_ONLY,
+        scopes: &["ads.read", "ads.write"],
+        params: &[PARAM_ACCOUNT_ID, PARAM_ID],
+        error_codes: X_WRITE_ERR,
+        api_version: "ads-v12",
+        group: "ads",
+        host: Some("ads-api.x.com"),
     },
 ];

@@ -2,8 +2,8 @@
   "tuitbot_mcp_version": "0.1.10",
   "mcp_schema_version": "1.2",
   "x_api_spec_version": "1.2.0",
-  "profile": "readonly",
-  "tool_count": 14,
+  "profile": "utility-readonly",
+  "tool_count": 15,
   "tools": [
     {
       "name": "get_config",
@@ -90,6 +90,23 @@
       "possible_error_codes": [
         "invalid_input"
       ]
+    },
+    {
+      "name": "validate_config",
+      "category": "config",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": []
     },
     {
       "name": "x_get_home_timeline",

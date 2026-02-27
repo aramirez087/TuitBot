@@ -1,24 +1,32 @@
 {
-  "generated_at": "2026-02-27T03:02:37.965201+00:00",
+  "generated_at": "2026-02-27T03:15:44.344516+00:00",
   "mcp_schema_version": "1.2",
-  "x_api_spec_version": "1.1.0",
+  "x_api_spec_version": "1.2.0",
   "summary": {
-    "total_tools": 117,
+    "total_tools": 133,
     "curated_tools": 73,
-    "generated_tools": 44,
-    "mutation_tools": 41,
-    "readonly_tools": 76,
-    "x_client_required": 83,
+    "generated_tools": 60,
+    "mutation_tools": 48,
+    "readonly_tools": 85,
+    "x_client_required": 99,
     "llm_required": 5,
-    "db_required": 37,
-    "user_auth_required": 76,
-    "elevated_access_required": 4,
+    "db_required": 44,
+    "user_auth_required": 92,
+    "elevated_access_required": 20,
     "kernel_conformance_tested": 27,
     "contract_tested": 18,
     "live_tested": 9,
-    "untested": 72
+    "untested": 88
   },
   "categories": [
+    {
+      "category": "ads",
+      "total": 16,
+      "curated": 0,
+      "generated": 16,
+      "mutation_count": 7,
+      "tested_count": 0
+    },
     {
       "category": "analytics",
       "total": 9,
@@ -193,9 +201,9 @@
     },
     {
       "profile": "admin",
-      "tool_count": 116,
-      "mutation_count": 41,
-      "read_count": 75
+      "tool_count": 132,
+      "mutation_count": 48,
+      "read_count": 84
     }
   ],
   "tools": [
@@ -1022,6 +1030,349 @@
       "has_contract_test": true,
       "has_live_test": false,
       "tier_gate": "api_readonly+"
+    },
+    {
+      "name": "x_ads_account_by_id",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_accounts",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_analytics",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_campaign_by_id",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_campaign_create",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_campaign_delete",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_campaign_update",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_campaigns",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_funding_instruments",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_line_item_create",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_line_items",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_promoted_tweet_create",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_promoted_tweets",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_targeting_create",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_targeting_criteria",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
+    },
+    {
+      "name": "x_ads_targeting_delete",
+      "category": "ads",
+      "layer": "generated (L2)",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "profiles": [
+        "admin"
+      ],
+      "has_kernel_conformance_test": false,
+      "has_contract_test": false,
+      "has_live_test": false,
+      "tier_gate": "admin only"
     },
     {
       "name": "x_bookmark_tweet",
@@ -2928,6 +3279,22 @@
     "recommend_engagement_action (context)",
     "reject_item (approval)",
     "suggest_topics (content)",
+    "x_ads_account_by_id (ads)",
+    "x_ads_accounts (ads)",
+    "x_ads_analytics (ads)",
+    "x_ads_campaign_by_id (ads)",
+    "x_ads_campaign_create (ads)",
+    "x_ads_campaign_delete (ads)",
+    "x_ads_campaign_update (ads)",
+    "x_ads_campaigns (ads)",
+    "x_ads_funding_instruments (ads)",
+    "x_ads_line_item_create (ads)",
+    "x_ads_line_items (ads)",
+    "x_ads_promoted_tweet_create (ads)",
+    "x_ads_promoted_tweets (ads)",
+    "x_ads_targeting_create (ads)",
+    "x_ads_targeting_criteria (ads)",
+    "x_ads_targeting_delete (ads)",
     "x_delete (write)",
     "x_get (read)",
     "x_post (write)",
@@ -3017,6 +3384,22 @@
     "suggest_topics: write+",
     "topic_performance_snapshot: write+",
     "validate_config: api_readonly+",
+    "x_ads_account_by_id: admin only",
+    "x_ads_accounts: admin only",
+    "x_ads_analytics: admin only",
+    "x_ads_campaign_by_id: admin only",
+    "x_ads_campaign_create: admin only",
+    "x_ads_campaign_delete: admin only",
+    "x_ads_campaign_update: admin only",
+    "x_ads_campaigns: admin only",
+    "x_ads_funding_instruments: admin only",
+    "x_ads_line_item_create: admin only",
+    "x_ads_line_items: admin only",
+    "x_ads_promoted_tweet_create: admin only",
+    "x_ads_promoted_tweets: admin only",
+    "x_ads_targeting_create: admin only",
+    "x_ads_targeting_criteria: admin only",
+    "x_ads_targeting_delete: admin only",
     "x_bookmark_tweet: write+",
     "x_delete: admin only",
     "x_delete_tweet: write+",
@@ -3087,6 +3470,22 @@
   ],
   "credential_gated_areas": [
     "get_tweet_by_id: [user_auth, scoped]",
+    "x_ads_account_by_id: [user_auth, elevated_access, scoped]",
+    "x_ads_accounts: [user_auth, elevated_access, scoped]",
+    "x_ads_analytics: [user_auth, elevated_access, scoped]",
+    "x_ads_campaign_by_id: [user_auth, elevated_access, scoped]",
+    "x_ads_campaign_create: [user_auth, elevated_access, scoped]",
+    "x_ads_campaign_delete: [user_auth, elevated_access, scoped]",
+    "x_ads_campaign_update: [user_auth, elevated_access, scoped]",
+    "x_ads_campaigns: [user_auth, elevated_access, scoped]",
+    "x_ads_funding_instruments: [user_auth, elevated_access, scoped]",
+    "x_ads_line_item_create: [user_auth, elevated_access, scoped]",
+    "x_ads_line_items: [user_auth, elevated_access, scoped]",
+    "x_ads_promoted_tweet_create: [user_auth, elevated_access, scoped]",
+    "x_ads_promoted_tweets: [user_auth, elevated_access, scoped]",
+    "x_ads_targeting_create: [user_auth, elevated_access, scoped]",
+    "x_ads_targeting_criteria: [user_auth, elevated_access, scoped]",
+    "x_ads_targeting_delete: [user_auth, elevated_access, scoped]",
     "x_bookmark_tweet: [user_auth, scoped]",
     "x_delete: [user_auth, elevated_access]",
     "x_delete_tweet: [user_auth, scoped]",

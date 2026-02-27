@@ -702,6 +702,455 @@
       "possible_error_codes": []
     },
     {
+      "name": "x_ads_account_by_id",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_accounts",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_analytics",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_by_id",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_delete",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_update",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaigns",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_funding_instruments",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_line_item_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_line_items",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_promoted_tweet_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_promoted_tweets",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_targeting_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_targeting_criteria",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_targeting_delete",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
       "name": "x_bookmark_tweet",
       "category": "engage",
       "lane": "shared",
