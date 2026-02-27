@@ -1,0 +1,179 @@
+<script lang="ts">
+	import { X } from 'lucide-svelte';
+
+	let {
+		mode,
+		ongenerate,
+		onclose
+	}: {
+		mode: 'tweet' | 'thread';
+		ongenerate: (text: string) => Promise<void>;
+		onclose: () => void;
+	} = $props();
+
+	let notesText = $state('');
+	let generating = $state(false);
+	let error = $state<string | null>(null);
+
+	async function handleGenerate() {
+		if (!notesText.trim() || generating) return;
+		generating = true;
+		error = null;
+		try {
+			await ongenerate(notesText.trim());
+			notesText = '';
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to generate from notes';
+		} finally {
+			generating = false;
+		}
+	}
+</script>
+
+<div class="from-notes-section">
+	<div class="notes-header">
+		<span class="notes-label">From Notes</span>
+		<button class="notes-close" onclick={onclose} aria-label="Close notes panel">
+			<X size={12} />
+		</button>
+	</div>
+	<textarea
+		class="notes-input"
+		placeholder="Paste rough notes, ideas, or an outline..."
+		bind:value={notesText}
+		rows={4}
+		aria-label="Notes to transform into content"
+	></textarea>
+	{#if error}
+		<div class="notes-error" role="alert">{error}</div>
+	{/if}
+	<button
+		class="notes-generate-btn"
+		onclick={handleGenerate}
+		disabled={!notesText.trim() || generating}
+	>
+		{generating
+			? 'Generating...'
+			: mode === 'thread'
+				? 'Generate thread from notes'
+				: 'Generate tweet from notes'}
+	</button>
+</div>
+
+<style>
+	.from-notes-section {
+		margin-top: 12px;
+		padding: 12px;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 8px;
+		background: var(--color-base);
+	}
+
+	.notes-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 8px;
+	}
+
+	.notes-label {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--color-text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	.notes-close {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border: none;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.notes-close:hover {
+		background: var(--color-surface-hover);
+		color: var(--color-text);
+	}
+
+	.notes-input {
+		width: 100%;
+		padding: 8px 10px;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		background: var(--color-surface);
+		color: var(--color-text);
+		font-size: 13px;
+		font-family: var(--font-sans);
+		line-height: 1.5;
+		resize: vertical;
+		box-sizing: border-box;
+		transition: border-color 0.15s ease;
+	}
+
+	.notes-input:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+
+	.notes-input::placeholder {
+		color: var(--color-text-subtle);
+	}
+
+	.notes-error {
+		margin-top: 6px;
+		font-size: 12px;
+		color: var(--color-danger);
+	}
+
+	.notes-generate-btn {
+		margin-top: 8px;
+		padding: 6px 14px;
+		border: 1px solid var(--color-accent);
+		border-radius: 6px;
+		background: var(--color-accent);
+		color: #fff;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.notes-generate-btn:hover:not(:disabled) {
+		background: var(--color-accent-hover);
+	}
+
+	.notes-generate-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	@media (max-width: 640px) {
+		.from-notes-section {
+			padding: 10px;
+		}
+
+		.notes-input {
+			font-size: 16px;
+		}
+	}
+
+	@media (pointer: coarse) {
+		.notes-close {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.notes-generate-btn {
+			min-height: 44px;
+			padding: 10px 14px;
+		}
+	}
+</style>

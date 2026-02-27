@@ -10,10 +10,12 @@
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
 	import { X, Send, Image, Film, Plus, Maximize2, Minimize2, FileText } from 'lucide-svelte';
 	import { matchEvent } from '$lib/utils/shortcuts';
+	import { focusTrap } from '$lib/actions/focusTrap';
 	import TimePicker from './TimePicker.svelte';
 	import ThreadComposer from './ThreadComposer.svelte';
 	import TweetPreview from './TweetPreview.svelte';
 	import CommandPalette from './CommandPalette.svelte';
+	import FromNotesPanel from './FromNotesPanel.svelte';
 
 	let {
 		open,
@@ -58,8 +60,8 @@
 	let threadComposerRef: ThreadComposer | undefined = $state();
 	// From notes
 	let showFromNotes = $state(false);
-	let notesText = $state('');
-	let notesGenerating = $state(false);
+	// Focus return
+	let triggerElement: Element | null = null;
 
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
 	const MAX_IMAGES = 4;
@@ -144,6 +146,7 @@
 	// Sync state when modal opens/closes
 	$effect(() => {
 		if (open) {
+			triggerElement = document.activeElement;
 			selectedTime = prefillTime ?? null;
 			checkRecovery();
 			if (!showRecovery) {
@@ -161,8 +164,6 @@
 			focusMode = false;
 			paletteOpen = false;
 			showFromNotes = false;
-			notesText = '';
-			notesGenerating = false;
 		}
 	});
 
@@ -289,7 +290,7 @@
 	}
 
 	function handleBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget) onclose();
+		if (e.target === e.currentTarget) handleCloseModal();
 	}
 
 	function toggleFocusMode() {
@@ -336,7 +337,7 @@
 			} else if (focusMode) {
 				focusMode = false;
 			} else {
-				onclose();
+				handleCloseModal();
 			}
 			return;
 		}
@@ -405,9 +406,7 @@
 		}
 	}
 
-	async function generateFromNotes() {
-		if (!notesText.trim()) return;
-
+	async function handleGenerateFromNotes(notesInput: string) {
 		const hasContent =
 			mode === 'tweet'
 				? tweetText.trim().length > 0
@@ -417,30 +416,29 @@
 			return;
 		}
 
-		notesGenerating = true;
 		submitError = null;
-		try {
-			if (mode === 'thread') {
-				const result = await api.assist.thread(notesText.trim());
-				threadBlocks = result.tweets.map((text, i) => ({
-					id: crypto.randomUUID(),
-					text,
-					media_paths: [],
-					order: i
-				}));
-			} else {
-				const result = await api.assist.improve(
-					notesText.trim(),
-					'Expand these rough notes into a polished tweet'
-				);
-				tweetText = result.content;
-			}
-			showFromNotes = false;
-			notesText = '';
-		} catch (e) {
-			submitError = e instanceof Error ? e.message : 'Failed to generate from notes';
-		} finally {
-			notesGenerating = false;
+		if (mode === 'thread') {
+			const result = await api.assist.thread(notesInput);
+			threadBlocks = result.tweets.map((text, i) => ({
+				id: crypto.randomUUID(),
+				text,
+				media_paths: [],
+				order: i
+			}));
+		} else {
+			const result = await api.assist.improve(
+				notesInput,
+				'Expand these rough notes into a polished tweet'
+			);
+			tweetText = result.content;
+		}
+		showFromNotes = false;
+	}
+
+	function handleCloseModal() {
+		onclose();
+		if (triggerElement instanceof HTMLElement) {
+			triggerElement.focus();
 		}
 	}
 
@@ -482,9 +480,6 @@
 	<div
 		class="backdrop"
 		onclick={handleBackdropClick}
-		onkeydown={(e) => {
-			if (e.key === 'Enter' || e.key === ' ') onclose();
-		}}
 		role="presentation"
 	>
 		<div
@@ -494,6 +489,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-label="Compose content"
+			use:focusTrap
 		>
 			{#if showRecovery}
 				<div class="recovery-banner" role="alert">
@@ -523,7 +519,7 @@
 							<Maximize2 size={14} />
 						{/if}
 					</button>
-					<button class="close-btn" onclick={onclose} aria-label="Close compose modal">
+					<button class="close-btn" onclick={handleCloseModal} aria-label="Close compose modal">
 						<X size={16} />
 					</button>
 				</div>
@@ -610,8 +606,7 @@
 						{#each attachedMedia as media, i}
 							<div class="media-thumb">
 								{#if media.mediaType === 'video/mp4'}
-									<!-- svelte-ignore a11y_media_has_caption -->
-									<video src={media.previewUrl} class="thumb-img"></video>
+									<video src={media.previewUrl} class="thumb-img" muted></video>
 									<span class="media-badge"><Film size={10} /> Video</span>
 								{:else}
 									<img src={media.previewUrl} alt="Attached media" class="thumb-img" />
@@ -648,32 +643,7 @@
 				{/if}
 
 				{#if showFromNotes}
-					<div class="from-notes-section">
-						<div class="notes-header">
-							<span class="notes-label">From Notes</span>
-							<button class="notes-close" onclick={() => { showFromNotes = false; }} aria-label="Close notes">
-								<X size={12} />
-							</button>
-						</div>
-						<textarea
-							class="notes-input"
-							placeholder="Paste rough notes, ideas, or an outline..."
-							bind:value={notesText}
-							rows={4}
-							aria-label="Notes to transform into content"
-						></textarea>
-						<button
-							class="notes-generate-btn"
-							onclick={generateFromNotes}
-							disabled={!notesText.trim() || notesGenerating}
-						>
-							{notesGenerating
-								? 'Generating...'
-								: mode === 'thread'
-									? 'Generate thread from notes'
-									: 'Generate tweet from notes'}
-						</button>
-					</div>
+					<FromNotesPanel {mode} ongenerate={handleGenerateFromNotes} onclose={() => { showFromNotes = false; }} />
 				{/if}
 
 				<div class="schedule-section">
@@ -712,7 +682,7 @@
 					<FileText size={14} />
 				</button>
 				<div class="footer-spacer"></div>
-				<button class="cancel-btn" onclick={onclose}>Cancel</button>
+				<button class="cancel-btn" onclick={handleCloseModal}>Cancel</button>
 				<button class="submit-btn" onclick={handleSubmit} disabled={!canSubmit || submitting}>
 					<Send size={14} />
 					{submitting ? 'Submitting...' : selectedTime ? 'Schedule' : 'Post now'}
@@ -1201,95 +1171,6 @@
 		color: var(--color-text);
 	}
 
-	/* From notes */
-	.from-notes-section {
-		margin-top: 12px;
-		padding: 12px;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		background: var(--color-base);
-	}
-
-	.notes-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 8px;
-	}
-
-	.notes-label {
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-	}
-
-	.notes-close {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		height: 20px;
-		border: none;
-		border-radius: 4px;
-		background: transparent;
-		color: var(--color-text-subtle);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.notes-close:hover {
-		background: var(--color-surface-hover);
-		color: var(--color-text);
-	}
-
-	.notes-input {
-		width: 100%;
-		padding: 8px 10px;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: var(--color-surface);
-		color: var(--color-text);
-		font-size: 13px;
-		font-family: var(--font-sans);
-		line-height: 1.5;
-		resize: vertical;
-		box-sizing: border-box;
-		transition: border-color 0.15s ease;
-	}
-
-	.notes-input:focus {
-		outline: none;
-		border-color: var(--color-accent);
-	}
-
-	.notes-input::placeholder {
-		color: var(--color-text-subtle);
-	}
-
-	.notes-generate-btn {
-		margin-top: 8px;
-		padding: 6px 14px;
-		border: 1px solid var(--color-accent);
-		border-radius: 6px;
-		background: var(--color-accent);
-		color: #fff;
-		font-size: 12px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.notes-generate-btn:hover:not(:disabled) {
-		background: var(--color-accent-hover);
-	}
-
-	.notes-generate-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
 	.notes-btn {
 		display: flex;
 		align-items: center;
@@ -1307,5 +1188,86 @@
 	.notes-btn:hover {
 		border-color: var(--color-accent);
 		color: var(--color-accent);
+	}
+
+	/* Touch targets */
+	@media (pointer: coarse) {
+		.close-btn,
+		.focus-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.remove-media-btn {
+			width: 32px;
+			height: 32px;
+		}
+
+		.notes-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.tab {
+			min-height: 44px;
+		}
+
+		.assist-btn,
+		.cancel-btn,
+		.submit-btn {
+			min-height: 44px;
+		}
+	}
+
+	/* Mobile responsive */
+	@media (max-width: 640px) {
+		.modal {
+			width: 100vw;
+			max-width: 100vw;
+			height: 100vh;
+			max-height: 100vh;
+			border-radius: 0;
+			display: flex;
+			flex-direction: column;
+		}
+
+		.modal-body {
+			flex: 1;
+			overflow-y: auto;
+			padding: 16px;
+		}
+
+		.modal-header {
+			padding: 12px 16px;
+		}
+
+		.mode-tabs {
+			padding: 0 16px;
+		}
+
+		.modal-footer {
+			flex-wrap: wrap;
+			gap: 8px;
+			padding: 12px 16px;
+		}
+
+		.modal-footer .footer-spacer {
+			display: none;
+		}
+
+		.modal-footer .submit-btn {
+			width: 100%;
+			justify-content: center;
+			order: -1;
+		}
+
+		.media-attach-section {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.compose-input {
+			font-size: 16px;
+		}
 	}
 </style>

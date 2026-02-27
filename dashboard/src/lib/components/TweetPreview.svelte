@@ -167,4 +167,25 @@
 		object-fit: cover;
 		display: block;
 	}
+
+	/* Mobile responsive */
+	@media (max-width: 640px) {
+		.tweet-preview {
+			gap: 8px;
+			padding: 10px 0;
+		}
+
+		.preview-gutter {
+			width: 28px;
+		}
+
+		.avatar-placeholder {
+			width: 28px;
+			height: 28px;
+		}
+
+		.preview-text {
+			font-size: 14px;
+		}
+	}
 </style>

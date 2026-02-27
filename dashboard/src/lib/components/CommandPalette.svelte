@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatCombo, SHORTCUT_CATALOG } from '$lib/utils/shortcuts';
+	import { focusTrap } from '$lib/actions/focusTrap';
 	import {
 		Maximize2,
 		MessageSquare,
@@ -143,17 +144,18 @@
 </script>
 
 {#if open}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="palette-backdrop"
 		onclick={(e) => { if (e.target === e.currentTarget) onclose(); }}
 		onkeydown={handleKeydown}
+		role="presentation"
 	>
 		<div
 			class="palette-panel"
 			role="dialog"
 			aria-modal="true"
 			aria-label="Command palette"
+			use:focusTrap
 		>
 			<div class="palette-search">
 				<Search size={14} />
@@ -309,5 +311,31 @@
 		background: var(--color-base);
 		border: 1px solid var(--color-border-subtle);
 		flex-shrink: 0;
+	}
+
+	/* Mobile layout */
+	@media (max-width: 640px) {
+		.palette-backdrop {
+			padding-top: 20px;
+		}
+
+		.palette-panel {
+			width: 100%;
+			max-width: 100%;
+			border-radius: 0;
+			max-height: calc(100vh - 40px);
+		}
+
+		.palette-item {
+			padding: 12px 14px;
+			min-height: 44px;
+		}
+	}
+
+	/* Touch targets */
+	@media (pointer: coarse) {
+		.palette-item {
+			min-height: 44px;
+		}
 	}
 </style>

@@ -455,7 +455,7 @@
 				<div
 					class="drag-handle"
 					title="Drag to reorder"
-					aria-label="Drag tweet {i + 1} to reorder"
+					aria-label="Reorder tweet {i + 1}. Use Alt+Up or Alt+Down to move."
 					draggable="true"
 					role="button"
 					tabindex="-1"
@@ -802,5 +802,57 @@
 		color: var(--color-danger);
 		margin: 0;
 		padding: 2px 0;
+	}
+
+	/* Card actions always visible on touch devices */
+	@media (hover: none) {
+		.card-actions {
+			opacity: 1;
+		}
+	}
+
+	/* Touch targets */
+	@media (pointer: coarse) {
+		.action-btn,
+		.remove-card-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
+
+		.drag-handle {
+			min-width: 44px;
+			min-height: 44px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.add-card-btn {
+			min-height: 44px;
+		}
+	}
+
+	/* Mobile layout */
+	@media (max-width: 640px) {
+		.tweet-card {
+			padding: 10px;
+		}
+
+		.card-footer {
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+
+		.card-gutter {
+			width: 20px;
+		}
+
+		.card-textarea {
+			font-size: 16px;
+		}
+
+		.thread-line {
+			left: 19px;
+		}
 	}
 </style>

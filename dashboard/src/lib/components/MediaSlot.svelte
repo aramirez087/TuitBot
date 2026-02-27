@@ -136,8 +136,7 @@
 			{#each mediaPaths as path (path)}
 				<div class="thumb">
 					{#if isVideo(path)}
-						<!-- svelte-ignore a11y_media_has_caption -->
-						<video src={getPreviewUrl(path)} class="thumb-img"></video>
+						<video src={getPreviewUrl(path)} class="thumb-img" muted></video>
 						<span class="media-badge"><Film size={10} /> Video</span>
 					{:else}
 						<img src={getPreviewUrl(path)} alt="" class="thumb-img" />
@@ -145,7 +144,7 @@
 					<button
 						class="remove-btn"
 						onclick={() => removeMedia(path)}
-						aria-label="Remove media"
+						aria-label="Remove media attachment {mediaPaths.indexOf(path) + 1}"
 					>
 						<X size={10} />
 					</button>
@@ -277,5 +276,18 @@
 		margin-top: 4px;
 		font-size: 11px;
 		color: var(--color-danger);
+	}
+
+	/* Touch targets */
+	@media (pointer: coarse) {
+		.remove-btn {
+			width: 32px;
+			height: 32px;
+		}
+
+		.attach-btn {
+			min-height: 44px;
+			padding: 8px 12px;
+		}
 	}
 </style>
