@@ -1,0 +1,35 @@
+---
+
+## Session 5 Completion Summary
+
+### Files Created
+- `docs/roadmap/x-enterprise-api-parity/session-05-enterprise-admin-matrix.md` — Compliance/stream endpoint reference
+- `docs/roadmap/x-enterprise-api-parity/session-05-handoff.md` — Handoff document
+
+### Files Modified (key)
+| File | Change |
+|------|--------|
+| `crates/tuitbot-mcp/src/tools/manifest.rs` | Added `Compliance` ToolCategory; improved manifest regeneration test |
+| `crates/tuitbot-mcp/src/spec/endpoints.rs` | +6 compliance params, +7 EndpointDef entries |
+| `crates/tuitbot-mcp/src/spec/tests.rs` | Count 60→67; `compliance` group; 3 invariant tests |
+| `crates/tuitbot-mcp/src/spec/mod.rs` | Spec version 1.2.0 → 1.3.0 |
+| `crates/tuitbot-mcp/src/tools/boundary_tests.rs` | +3 mutations to denylist; Admin count 132→139 |
+| `crates/tuitbot-mcp/src/tools/conformance_tests/coverage.rs` | `Compliance` match arm |
+| `crates/tuitbot-core/src/mcp_policy/types.rs` | `EnterpriseAdmin` variant + 3 tests |
+| All `docs/generated/mcp-manifest-*.json` | Regenerated (Admin now 139 tools) |
+
+### Tests
+- `cargo fmt --all --check` — pass
+- `cargo clippy --workspace -- -D warnings` — pass
+- `RUSTFLAGS="-D warnings" cargo test --workspace` — 964 pass, 1 pre-existing flake (`env_var_override_approval_mode`)
+- `tuitbot-mcp` tests: 432 pass, 0 fail
+
+### Key Decisions
+1. All 7 compliance/stream tools Admin-only
+2. `Compliance` ToolCategory covers both compliance jobs AND stream rules
+3. `EnterpriseAdmin` policy category for compliance mutations (distinct from `UniversalRequest`)
+4. Stream rules delete uses POST (X API design quirk)
+5. All compliance tools use default `api.x.com` host
+
+### Charter Status
+All 31 charter-defined tools are now complete (8 DM + 16 Ads + 4 Compliance + 3 Stream Rules). Session 06 should focus on documentation updates and final integration audit.
