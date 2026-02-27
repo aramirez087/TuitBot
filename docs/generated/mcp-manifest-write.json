@@ -1,9 +1,9 @@
 {
-  "tuitbot_mcp_version": "0.1.9",
+  "tuitbot_mcp_version": "0.1.10",
   "mcp_schema_version": "1.2",
-  "x_api_spec_version": "1.0.0",
+  "x_api_spec_version": "1.3.0",
   "profile": "write",
-  "tool_count": 104,
+  "tool_count": 112,
   "tools": [
     {
       "name": "approve_all",
@@ -1654,6 +1654,248 @@
         "x_forbidden",
         "x_network_error",
         "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_conversation_by_id",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_conversations",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_create_group",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.write",
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_events",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_events_by_conversation",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_events_by_participant",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_send_in_conversation",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.write",
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_send_to_participant",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.write",
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
       ]
     },
     {

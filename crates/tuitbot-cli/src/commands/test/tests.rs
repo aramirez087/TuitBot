@@ -16,6 +16,8 @@ fn valid_tokens() -> StoredTokens {
             "like.write".to_string(),
             "bookmark.read".to_string(),
             "bookmark.write".to_string(),
+            "dm.read".to_string(),
+            "dm.write".to_string(),
             "offline.access".to_string(),
         ],
     }

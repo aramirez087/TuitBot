@@ -1067,7 +1067,7 @@ impl AdminMcpServer {
 
     // --- Universal X API Request Tools ---
 
-    /// Send a GET request to any authorized X API endpoint. Supports auto-pagination with next_token. Host is restricted to api.x.com, upload.x.com, upload.twitter.com.
+    /// Send a GET request to any authorized X API endpoint. Supports auto-pagination with next_token. Host is restricted to api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com.
     #[tool]
     async fn x_get(
         &self,
@@ -1088,7 +1088,7 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Send a POST request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — admin-only, host-constrained.
+    /// Send a POST request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com. MUTATION — admin-only, policy-gated, audit-recorded.
     #[tool]
     async fn x_post(
         &self,
@@ -1096,7 +1096,7 @@ impl AdminMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let query = kv_to_tuples(req.query.as_deref());
         let headers = kv_to_tuples(req.headers.as_deref());
-        let result = workflow::x_actions::x_request::x_post(
+        let result = workflow::x_actions::x_request::x_post_audited(
             &self.state,
             &req.path,
             req.host.as_deref(),
@@ -1108,7 +1108,7 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Send a PUT request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — admin-only, host-constrained.
+    /// Send a PUT request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com. MUTATION — admin-only, policy-gated, audit-recorded.
     #[tool]
     async fn x_put(
         &self,
@@ -1116,7 +1116,7 @@ impl AdminMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let query = kv_to_tuples(req.query.as_deref());
         let headers = kv_to_tuples(req.headers.as_deref());
-        let result = workflow::x_actions::x_request::x_put(
+        let result = workflow::x_actions::x_request::x_put_audited(
             &self.state,
             &req.path,
             req.host.as_deref(),
@@ -1128,7 +1128,7 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
-    /// Send a DELETE request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com. MUTATION — admin-only, host-constrained.
+    /// Send a DELETE request to any authorized X API endpoint. Host is restricted to api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com. MUTATION — admin-only, policy-gated, audit-recorded.
     #[tool]
     async fn x_delete(
         &self,
@@ -1136,7 +1136,7 @@ impl AdminMcpServer {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let query = kv_to_tuples(req.query.as_deref());
         let headers = kv_to_tuples(req.headers.as_deref());
-        let result = workflow::x_actions::x_request::x_delete(
+        let result = workflow::x_actions::x_request::x_delete_audited(
             &self.state,
             &req.path,
             req.host.as_deref(),
@@ -1165,7 +1165,7 @@ impl ServerHandler for AdminMcpServer {
             instructions: Some(
                 "Tuitbot Admin MCP Server — full X growth assistant with universal request tools. \
                  Includes all write-profile tools plus x_get/x_post/x_put/x_delete for \
-                 arbitrary X API endpoint access."
+                 arbitrary X API endpoint access (policy-gated, audit-recorded mutations)."
                     .into(),
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),

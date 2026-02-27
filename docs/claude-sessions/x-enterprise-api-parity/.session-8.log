@@ -1,0 +1,33 @@
+---
+
+## Completion Summary
+
+### Files Created
+- `docs/roadmap/x-enterprise-api-parity/final-go-no-go-report.md` — Release-quality go/no-go decision with full evidence
+- `docs/roadmap/x-enterprise-api-parity/session-08-handoff.md` — Session handoff document
+
+### Files Modified
+- `scripts/check-mcp-manifests.sh` — Added `utility-readonly` and `utility-write` to PROFILES array
+- `scripts/generate-mcp-manifests.sh` — Added `utility-readonly` and `utility-write` to PROFILES array; updated comment
+- `docs/generated/coverage-report.json` — Regenerated timestamp from conformance run
+- `docs/generated/coverage-report.md` — Regenerated timestamp from conformance run
+
+### Tests Run
+| Suite | Result |
+|-------|--------|
+| `cargo fmt --all --check` | PASS |
+| `cargo clippy --workspace -- -D warnings` | PASS (0 warnings) |
+| tuitbot-core (847 tests, single-threaded) | PASS |
+| tuitbot-mcp (495 tests + 11 ignored) | PASS |
+| tuitbot-server (32 tests) | PASS |
+| Manifest sync (6 profiles) | PASS |
+| Conformance harness (183 tests, 5 phases) | PASS |
+
+### Key Decisions
+1. **GO recommendation issued** — All quality gates pass, all 31 charter tools delivered, documentation consistent, zero blockers
+2. **Fixed utility profile gap in scripts** — `check-mcp-manifests.sh` and `generate-mcp-manifests.sh` were missing 2 of 6 profiles
+3. **Accepted pre-existing env var race** — Not related to this initiative; passes with `--test-threads=1`
+
+### Warnings
+- The env var race in `config::tests::env_var_override_approval_mode` should be fixed in a separate PR to avoid CI flakiness under parallel test execution
+- 64 tools remain untested (pre-existing gap, not in scope for this initiative)

@@ -132,7 +132,48 @@ max_mutations_per_hour = 20
 
 **Composer mode**: All mutations require approval regardless of `require_approval_for`.
 
-**Admin profile**: When running `tuitbot mcp serve --profile admin`, the universal request tools (`x_get`, `x_post`, `x_put`, `x_delete`) are available in addition to all Write tools. Universal request mutations are constrained by the host allowlist (api.x.com, upload.x.com, upload.twitter.com), SSRF guards, and header blocklist — but are **not** currently subject to the MCP policy engine or mutation audit trail. These tools are designed for power users who need ad-hoc X API v2 access. See the [MCP Reference](mcp-reference.md) for profile details.
+**Admin profile**: When running `tuitbot mcp serve --profile admin`, 27 additional tools are available: 16 Ads API tools, 4 Compliance tools, 3 Stream Rules tools, and 4 universal request tools (`x_get`, `x_post`, `x_put`, `x_delete`). All typed enterprise mutations (Ads, Compliance, Stream Rules) are policy-gated with approval routing, rate limiting, and dry-run mode. Universal request mutations are constrained by the host allowlist (`api.x.com`, `upload.x.com`, `upload.twitter.com`, `ads-api.x.com`), SSRF guards, and header blocklist — but are **not** currently subject to the MCP policy engine. See the [MCP Reference](mcp-reference.md) for profile details.
+
+## Enterprise API Access
+
+Some MCP tools require additional X API access beyond a standard developer account. These tools will return `x_forbidden` if your credentials lack the required authorization.
+
+### Direct Message Access
+
+DM tools (8 tools, available from API-readonly profile and above) require DM-scoped OAuth tokens:
+
+- **Scopes needed:** `dm.read`, `dm.write` (write only for mutations), `users.read`
+- **How to enable:** Request DM scopes during `tuitbot auth`. If you authenticated before DM tools were available, re-run `tuitbot auth` to request updated scopes.
+- **Verification:** `tuitbot test` reports whether DM scopes are granted.
+
+### Ads API Access
+
+Ads tools (16 tools, Admin profile only) require a separate Ads API developer account:
+
+- **Prerequisite:** Apply for [X Ads API access](https://developer.x.com/en/docs/twitter-ads-api/getting-started) through the developer portal.
+- **Host:** All Ads tools route to `ads-api.x.com` (included in the host allowlist).
+- **Financial risk:** Ads mutations can incur ad spend. TuitBot does not enforce budget caps — manage spend limits in the X Ads dashboard.
+- **Scopes needed:** Ads-specific OAuth scopes as required by the X Ads API.
+
+### Compliance & Stream Rules Access
+
+Compliance and Stream Rules tools (7 tools, Admin profile only) require elevated API access:
+
+- **Prerequisite:** Enterprise or Academic Research API tier.
+- **Scopes needed:** `compliance.write` (Compliance tools), `tweet.read` (Stream Rules tools), `usage.read` (tweet usage).
+- **Note:** The filtered stream *connection* endpoint is not supported (SSE does not fit MCP's request/response model). Only stream rule CRUD is available.
+
+### Verifying Enterprise Access
+
+After configuring enterprise access, verify with:
+
+```bash
+tuitbot test                              # reports scope status
+tuitbot mcp serve --profile admin         # starts with all 139 tools
+tuitbot mcp manifest --profile admin      # lists all available tools
+```
+
+If enterprise tools return `x_forbidden`, check your developer account permissions in the X developer portal.
 
 ## Validation
 

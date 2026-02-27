@@ -76,6 +76,9 @@ pub enum ToolCategory {
     Meta,
     List,
     Moderation,
+    DirectMessage,
+    Ads,
+    Compliance,
 }
 
 /// MCP server profile.
@@ -318,8 +321,8 @@ const X_ENGAGE_ERR: &[ErrorCode] = &[
     ErrorCode::PolicyError,
 ];
 
-/// Universal X API request errors.
-const X_REQUEST_ERR: &[ErrorCode] = &[
+/// Universal X API request errors (read-only — x_get).
+const X_REQUEST_READ_ERR: &[ErrorCode] = &[
     ErrorCode::XNotConfigured,
     ErrorCode::XRateLimited,
     ErrorCode::XAuthExpired,
@@ -327,6 +330,23 @@ const X_REQUEST_ERR: &[ErrorCode] = &[
     ErrorCode::XNetworkError,
     ErrorCode::XApiError,
     ErrorCode::XRequestBlocked,
+];
+
+/// Universal X API request mutation errors (x_post, x_put, x_delete).
+/// Includes policy denial codes because mutations are gateway-gated.
+const X_REQUEST_MUTATION_ERR: &[ErrorCode] = &[
+    ErrorCode::XNotConfigured,
+    ErrorCode::XRateLimited,
+    ErrorCode::XAuthExpired,
+    ErrorCode::XForbidden,
+    ErrorCode::XNetworkError,
+    ErrorCode::XApiError,
+    ErrorCode::XRequestBlocked,
+    ErrorCode::PolicyDeniedBlocked,
+    ErrorCode::PolicyDeniedRateLimited,
+    ErrorCode::PolicyDeniedHardRule,
+    ErrorCode::PolicyDeniedUserRule,
+    ErrorCode::PolicyError,
 ];
 
 /// Database-only errors.
@@ -1257,43 +1277,43 @@ fn all_curated_tools() -> Vec<ToolEntry> {
             true,
             true,
             ADMIN_ONLY,
-            X_REQUEST_ERR,
+            X_REQUEST_READ_ERR,
         ),
         x_tool(
             "x_post",
             ToolCategory::Write,
             Lane::Workflow,
             true,
-            false,
+            true, // requires_db: policy gateway + mutation audit
             &[],
             true,
             true,
             ADMIN_ONLY,
-            X_REQUEST_ERR,
+            X_REQUEST_MUTATION_ERR,
         ),
         x_tool(
             "x_put",
             ToolCategory::Write,
             Lane::Workflow,
             true,
-            false,
+            true, // requires_db: policy gateway + mutation audit
             &[],
             true,
             true,
             ADMIN_ONLY,
-            X_REQUEST_ERR,
+            X_REQUEST_MUTATION_ERR,
         ),
         x_tool(
             "x_delete",
             ToolCategory::Write,
             Lane::Workflow,
             true,
-            false,
+            true, // requires_db: policy gateway + mutation audit
             &[],
             true,
             true,
             ADMIN_ONLY,
-            X_REQUEST_ERR,
+            X_REQUEST_MUTATION_ERR,
         ),
     ]
 }
@@ -1470,6 +1490,16 @@ mod tests {
     fn write_utility_manifests() {
         let docs_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/generated");
         for (profile, filename) in [
+            (
+                crate::state::Profile::Readonly,
+                "mcp-manifest-readonly.json",
+            ),
+            (
+                crate::state::Profile::ApiReadonly,
+                "mcp-manifest-api-readonly.json",
+            ),
+            (crate::state::Profile::Write, "mcp-manifest-write.json"),
+            (crate::state::Profile::Admin, "mcp-manifest-admin.json"),
             (
                 crate::state::Profile::UtilityReadonly,
                 "mcp-manifest-utility-readonly.json",

@@ -127,8 +127,8 @@ Tuitbot is designed to operate within X's [Automation Rules](https://help.x.com/
 | **Duplicate or near-duplicate content** | The dedup engine (Jaccard similarity >= 0.8) blocks repetitive phrasing across all posts. |
 | **Mass-reply patterns** | Hard cap of 5 replies/day (default) and 1 reply per author per day. |
 | **Engagement manipulation** | No coordinated behavior, vote manipulation, or artificial amplification. |
-| **DM automation** | Not implemented and not planned. DM endpoints are not exposed as tools. |
-| **Ads automation** | Not implemented. TuitBot does not connect to the X Ads API (`ads-api.x.com`). |
+| **DM spam** | TuitBot provides typed DM API tools for legitimate conversation management (Admin/Write profiles), but does not send unsolicited bulk DMs. DM mutations are policy-gated and audit-logged. |
+| **Autonomous ad spend** | TuitBot provides typed Ads API tools for campaign reads and management (Admin profile only), but does not autonomously create or fund ad campaigns. All Ads mutations require explicit invocation and are audit-logged. |
 
 All generated content is original — created per-request by your configured LLM, not from templates or recycled text.
 
@@ -205,9 +205,9 @@ tuitbot backup                             # back up database
 tuitbot update                             # check for updates
 
 # AI agent integration (MCP)
-tuitbot mcp serve                          # Write profile (104 tools, default)
-tuitbot mcp serve --profile admin          # Admin profile (108 tools)
-tuitbot mcp serve --profile api-readonly   # API read-only (40 tools)
+tuitbot mcp serve                          # Write profile (112 tools, default)
+tuitbot mcp serve --profile admin          # Admin profile (139 tools)
+tuitbot mcp serve --profile api-readonly   # API read-only (45 tools)
 tuitbot mcp serve --profile readonly       # Read-only (14 tools)
 ```
 
@@ -215,13 +215,13 @@ tuitbot mcp serve --profile readonly       # Read-only (14 tools)
 
 ## AI Agent Integration (MCP)
 
-Tuitbot includes an MCP server that exposes up to **109 tools** for AI agents (Claude Code, custom agents, etc.), covering the X API v2 public surface. Four profiles serve different use cases:
+Tuitbot includes an MCP server that exposes up to **140 tools** for AI agents (Claude Code, custom agents, etc.), covering the X API v2 public surface plus enterprise APIs (DMs, Ads, Compliance, Stream Rules). Four profiles serve different use cases:
 
 | Profile | Command | Tools | Use Case |
 |---------|---------|-------|----------|
-| **Write** (default) | `tuitbot mcp serve` | 104 | Full growth co-pilot: reads, writes, analytics, content gen, approval workflows, generated X API tools |
-| **Admin** | `tuitbot mcp serve --profile admin` | 108 | Superset of Write — adds universal request tools for ad-hoc X API v2 access |
-| **API read-only** | `tuitbot mcp serve --profile api-readonly` | 40 | X API reads + utility tools, no mutations |
+| **Write** (default) | `tuitbot mcp serve` | 112 | Full growth co-pilot: reads, writes, DMs, analytics, content gen, approval workflows, generated X API tools |
+| **Admin** | `tuitbot mcp serve --profile admin` | 139 | Superset of Write — adds Ads API, Compliance, Stream Rules, and universal request tools |
+| **API read-only** | `tuitbot mcp serve --profile api-readonly` | 45 | X API reads + DM reads + utility tools, no mutations |
 | **Read-only** | `tuitbot mcp serve --profile readonly` | 14 | Minimal safe surface — utility, config, and health tools only |
 
 Read-only profiles are safe by construction — mutation tools are never registered, not policy-blocked. You get typed schemas, structured errors, rate-limit awareness, retry/backoff, and stable output formats with zero mutation risk.
@@ -254,7 +254,7 @@ Read-only profiles are safe by construction — mutation tools are never registe
 
 All tools return structured `{ success, data, error, meta }` envelopes with 28 typed error codes, retryable flags, and per-invocation telemetry. Mutations are policy-gated with approval routing, dry-run mode, and hourly rate limiting.
 
-**Coverage note:** TuitBot targets maximum coverage of the X API v2 public surface. Ads API, DM API, and platform-admin endpoints are not supported. See the [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) for the full API coverage boundary documentation.
+**Enterprise APIs:** DM tools are available from API-readonly and above. Ads, Compliance, and Stream Rules tools are Admin-only and require separate X API access (Ads API approval, Compliance API access). See the [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) for profiles, scopes, and safety controls.
 
 ---
 
@@ -270,7 +270,7 @@ Tuitbot's core is organized into three layers with strict dependency rules:
 
 Every layer only calls the layer below it. Toolkit functions are usable from any context (MCP, CLI, tests) without DB or LLM initialization. Workflow functions compose toolkit calls with state. Autopilot schedules workflow cycles on timers. MCP handlers and HTTP routes are thin adapters over these layers.
 
-Four workspace crates: `tuitbot-core` (all business logic), `tuitbot-cli` (CLI), `tuitbot-mcp` (MCP server, 109 tools), `tuitbot-server` (HTTP/WS API). Full details in [Architecture](https://aramirez087.github.io/TuitBot/architecture/).
+Four workspace crates: `tuitbot-core` (all business logic), `tuitbot-cli` (CLI), `tuitbot-mcp` (MCP server, 140 tools), `tuitbot-server` (HTTP/WS API). Full details in [Architecture](https://aramirez087.github.io/TuitBot/architecture/).
 
 ---
 

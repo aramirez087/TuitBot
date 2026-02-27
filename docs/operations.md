@@ -71,10 +71,12 @@ Choose the right MCP profile based on your use case:
 
 | Scenario | Recommended Profile | Rationale |
 |----------|-------------------|-----------|
-| AI agent that reads tweets and scores them | `api-readonly` | Full read access, zero mutation risk |
+| AI agent that reads tweets and scores them | `api-readonly` | Full read access + DM reads (45 tools), zero mutation risk |
 | Agent that needs config/health checks only | `readonly` | Minimal 14-tool surface |
-| Growth co-pilot that drafts and queues content | `write` | All 104 tools including content gen and approval |
-| Debugging raw X API responses | `admin` | Universal request tools for ad-hoc endpoints |
+| Growth co-pilot that drafts and queues content | `write` | All 112 tools including DMs, content gen, and approval |
+| Managing X Ads campaigns | `admin` | 16 Ads API tools (Admin only) |
+| Compliance job management or stream rules | `admin` | 7 Compliance + Stream Rules tools (Admin only) |
+| Debugging raw X API responses | `admin` | Universal request tools for ad-hoc endpoints (139 tools total) |
 | New integration, testing phase | `api-readonly` | Start read-only, upgrade to `write` after validation |
 | Production autonomous agent | `write` with `approval_mode = true` | Human review before posting |
 
@@ -204,16 +206,16 @@ Use this runbook to verify MCP profile integrity after deployments, profile chan
 Confirm each profile exposes the expected number of tools:
 
 ```bash
-# Write profile (expect 104)
+# Write profile (expect 112)
 cargo run -p tuitbot-cli -- mcp manifest --profile write --format json | jq '.tool_count'
 
-# Admin profile (expect 108)
+# Admin profile (expect 139)
 cargo run -p tuitbot-cli -- mcp manifest --profile admin --format json | jq '.tool_count'
 
 # Read-only profile (expect 14)
 cargo run -p tuitbot-cli -- mcp manifest --profile readonly --format json | jq '.tool_count'
 
-# API read-only profile (expect 40)
+# API read-only profile (expect 45)
 cargo run -p tuitbot-cli -- mcp manifest --profile api-readonly --format json | jq '.tool_count'
 ```
 
@@ -245,8 +247,8 @@ If drift is detected, regenerate: `bash scripts/generate-mcp-manifests.sh`
 
 | Gate | What it validates | Local run command |
 |------|-------------------|-------------------|
-| Boundary tests (32) | Profile isolation, mutation denylists, lane constraints | `cargo test -p tuitbot-mcp boundary` |
-| Conformance tests | 27 kernel tools present with correct schemas | `cargo test -p tuitbot-mcp conformance_all_kernel_tools` |
+| Boundary tests (32+) | Profile isolation, mutation denylists, lane constraints | `cargo test -p tuitbot-mcp boundary` |
+| Conformance tests | 27 kernel + 31 spec conformance tools with correct schemas | `cargo test -p tuitbot-mcp conformance` |
 | Golden snapshots | Response schema drift detection | `cargo test -p tuitbot-mcp golden_snapshot_matches` |
 | Eval harness | 4 scenarios × 4 quality gates | `cargo test -p tuitbot-mcp eval_harness` |
 | Manifest sync | Committed JSON matches binary output | `bash scripts/check-mcp-manifests.sh` |

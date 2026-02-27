@@ -41,6 +41,9 @@ pub struct ToolSchema {
     pub group: String,
     pub scopes: Vec<String>,
     pub input_schema: Value,
+    /// Target API host override. `None` means default `api.x.com`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 /// Convert one endpoint definition into a manifest [`ToolEntry`].
@@ -56,6 +59,10 @@ fn endpoint_to_tool_entry(ep: &EndpointDef) -> ToolEntry {
     } else {
         (Lane::Shared, false)
     };
+    // Admin-only endpoints (not in any other profile) require elevated access.
+    // This covers Ads API and future enterprise-only tools.
+    let is_admin_only =
+        ep.profiles.len() == 1 && ep.profiles.iter().all(|p| matches!(p, Profile::Admin));
     ToolEntry {
         name: ep.tool_name.to_owned(),
         category: ep.category,
@@ -66,7 +73,7 @@ fn endpoint_to_tool_entry(ep: &EndpointDef) -> ToolEntry {
         requires_db,
         requires_scopes: ep.scopes.iter().map(|s| (*s).to_string()).collect(),
         requires_user_auth: true,
-        requires_elevated_access: false,
+        requires_elevated_access: is_admin_only,
         profiles: ep.profiles.to_vec(),
         possible_error_codes: ep.error_codes.to_vec(),
     }
@@ -138,5 +145,6 @@ fn endpoint_to_schema(ep: &EndpointDef) -> ToolSchema {
         group: ep.group.to_owned(),
         scopes: ep.scopes.iter().map(|s| (*s).to_owned()).collect(),
         input_schema: Value::Object(schema),
+        host: ep.host.map(|h| h.to_owned()),
     }
 }

@@ -55,6 +55,22 @@ mod tests {
             "x_v2_tweets_unhide_reply",
             "x_v2_users_pin_tweet",
             "x_v2_users_unpin_tweet",
+            // ── Generated Layer 2 DM mutations ──
+            "x_v2_dm_send_in_conversation",
+            "x_v2_dm_send_to_participant",
+            "x_v2_dm_create_group",
+            // ── Generated Layer 2 Ads mutations (Admin-only) ──
+            "x_ads_campaign_create",
+            "x_ads_campaign_update",
+            "x_ads_campaign_delete",
+            "x_ads_line_item_create",
+            "x_ads_promoted_tweet_create",
+            "x_ads_targeting_create",
+            "x_ads_targeting_delete",
+            // ── Generated Layer 2 Compliance/Stream mutations (Admin-only) ──
+            "x_v2_compliance_job_create",
+            "x_v2_stream_rules_add",
+            "x_v2_stream_rules_delete",
         ]
     }
 
@@ -194,19 +210,22 @@ mod tests {
     // ── Lane isolation ──────────────────────────────────────────────
 
     #[test]
-    fn write_admin_only_tools_have_workflow_lane() {
+    fn write_admin_only_mutation_tools_have_workflow_lane() {
         let manifest = generate_manifest();
         for t in &manifest.tools {
-            // "write/admin-only" means: in write or admin, but NOT in any
-            // readonly or utility profile. Tools also in utility profiles
-            // use Lane::Shared because they bypass the workflow layer.
+            // "write/admin-only mutation" means: a mutation tool in write or
+            // admin, but NOT in any readonly or utility profile. Read tools
+            // (even admin-only reads like Ads) use Lane::Shared. Tools also
+            // in utility profiles use Lane::Shared because they bypass the
+            // workflow layer.
             let has_utility = t.profiles.contains(&Profile::UtilityReadonly)
                 || t.profiles.contains(&Profile::UtilityWrite);
-            let write_admin_only = !t.profiles.contains(&Profile::Readonly)
+            let write_admin_only_mutation = t.mutation
+                && !t.profiles.contains(&Profile::Readonly)
                 && !t.profiles.contains(&Profile::ApiReadonly)
                 && !has_utility
                 && (t.profiles.contains(&Profile::Write) || t.profiles.contains(&Profile::Admin));
-            if write_admin_only {
+            if write_admin_only_mutation {
                 assert_eq!(
                     t.lane,
                     Lane::Workflow,
@@ -257,7 +276,7 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::ApiReadonly))
             .count();
-        assert_eq!(count, 40, "ApiReadonly has {count} tools (expected 40)");
+        assert_eq!(count, 45, "ApiReadonly has {count} tools (expected 45)");
     }
 
     #[test]
@@ -268,8 +287,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Write))
             .count();
-        // 68 curated write + 36 generated - 4 admin-only = 104
-        assert_eq!(count, 104, "Write has {count} tools (expected 104)");
+        // 68 curated write + 44 generated - 4 admin-only = 112
+        assert_eq!(count, 112, "Write has {count} tools (expected 112)");
     }
 
     #[test]
@@ -280,8 +299,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Admin))
             .count();
-        // 72 curated + 36 generated = 108 (superset of write)
-        assert_eq!(count, 108, "Admin has {count} tools (expected 108)");
+        // 72 curated + 44 generated + 16 ads + 7 compliance/stream = 139 (superset of write)
+        assert_eq!(count, 139, "Admin has {count} tools (expected 139)");
     }
 
     // ── Mutation safety ─────────────────────────────────────────────

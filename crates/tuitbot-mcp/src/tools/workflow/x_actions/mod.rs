@@ -87,7 +87,7 @@ pub use write::{
 };
 
 /// Return an error response when the X client is not configured.
-fn not_configured_response(start: Instant) -> String {
+pub(super) fn not_configured_response(start: Instant) -> String {
     let elapsed = start.elapsed().as_millis() as u64;
     ToolResponse::x_not_configured()
         .with_meta(ToolMeta::new(elapsed))

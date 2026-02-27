@@ -25,8 +25,8 @@ fn spec_version_is_valid_semver() {
 fn spec_has_expected_endpoint_count() {
     assert_eq!(
         SPEC_ENDPOINTS.len(),
-        36,
-        "expected 36 spec endpoints (charter defines 36 new tools)"
+        67,
+        "expected 67 spec endpoints (36 original + 8 DM + 16 Ads + 7 Compliance/Stream tools)"
     );
 }
 
@@ -45,9 +45,10 @@ fn no_duplicate_tool_names_in_spec() {
 #[test]
 fn all_tool_names_follow_naming_convention() {
     for ep in SPEC_ENDPOINTS {
+        let valid = ep.tool_name.starts_with("x_v2_") || ep.tool_name.starts_with("x_ads_");
         assert!(
-            ep.tool_name.starts_with("x_v2_"),
-            "tool {} must start with x_v2_",
+            valid,
+            "tool {} must start with x_v2_ or x_ads_",
             ep.tool_name
         );
     }
@@ -209,22 +210,35 @@ fn read_tools_are_shared_lane() {
 }
 
 #[test]
-fn all_api_versions_are_v2() {
+fn all_api_versions_are_recognized() {
+    let valid_versions = ["v2", "ads-v12"];
     for ep in SPEC_ENDPOINTS {
-        assert_eq!(
-            ep.api_version, "v2",
-            "tool {} uses non-v2 api_version: {}",
-            ep.tool_name, ep.api_version
+        assert!(
+            valid_versions.contains(&ep.api_version),
+            "tool {} uses unrecognized api_version: {} (expected one of {:?})",
+            ep.tool_name,
+            ep.api_version,
+            valid_versions
         );
     }
 }
 
 #[test]
 fn groups_match_expected_set() {
-    let valid_groups: HashSet<&str> = ["tweets", "users", "lists", "mutes", "blocks", "spaces"]
-        .iter()
-        .copied()
-        .collect();
+    let valid_groups: HashSet<&str> = [
+        "tweets",
+        "users",
+        "lists",
+        "mutes",
+        "blocks",
+        "spaces",
+        "direct_messages",
+        "ads",
+        "compliance",
+    ]
+    .iter()
+    .copied()
+    .collect();
     for ep in SPEC_ENDPOINTS {
         assert!(
             valid_groups.contains(ep.group),
@@ -232,6 +246,68 @@ fn groups_match_expected_set() {
             ep.tool_name,
             ep.group
         );
+    }
+}
+
+#[test]
+fn ads_endpoints_target_ads_host() {
+    use crate::tools::manifest::ToolCategory;
+    for ep in SPEC_ENDPOINTS {
+        if ep.category == ToolCategory::Ads {
+            assert_eq!(
+                ep.host,
+                Some("ads-api.x.com"),
+                "Ads tool {} must target ads-api.x.com",
+                ep.tool_name
+            );
+            assert_eq!(
+                ep.api_version, "ads-v12",
+                "Ads tool {} must use ads-v12 version",
+                ep.tool_name
+            );
+        } else {
+            assert_eq!(
+                ep.host, None,
+                "non-Ads tool {} should not have a host override",
+                ep.tool_name
+            );
+        }
+    }
+}
+
+#[test]
+fn ads_endpoints_are_admin_only() {
+    use crate::tools::manifest::{Profile, ToolCategory};
+    for ep in SPEC_ENDPOINTS {
+        if ep.category == ToolCategory::Ads {
+            assert_eq!(
+                ep.profiles,
+                &[Profile::Admin],
+                "Ads tool {} must be Admin-only, got {:?}",
+                ep.tool_name,
+                ep.profiles
+            );
+        }
+    }
+}
+
+#[test]
+fn ads_mutations_are_elevated_access() {
+    use crate::tools::manifest::ToolCategory;
+    let tools = generate_spec_tools();
+    for t in &tools {
+        if t.category == ToolCategory::Ads && t.mutation {
+            assert!(
+                t.requires_elevated_access,
+                "Ads mutation {} should require elevated access",
+                t.name
+            );
+            assert!(
+                t.requires_db,
+                "Ads mutation {} should require DB for audit",
+                t.name
+            );
+        }
     }
 }
 
@@ -248,4 +324,59 @@ fn category_distribution() {
         cats.len() >= 3,
         "expected at least 3 categories in generated tools"
     );
+}
+
+#[test]
+fn compliance_endpoints_are_admin_only() {
+    use crate::tools::manifest::{Profile, ToolCategory};
+    for ep in SPEC_ENDPOINTS {
+        if ep.category == ToolCategory::Compliance {
+            assert_eq!(
+                ep.profiles,
+                &[Profile::Admin],
+                "Compliance tool {} must be Admin-only, got {:?}",
+                ep.tool_name,
+                ep.profiles
+            );
+        }
+    }
+}
+
+#[test]
+fn compliance_endpoints_use_default_host() {
+    use crate::tools::manifest::ToolCategory;
+    for ep in SPEC_ENDPOINTS {
+        if ep.category == ToolCategory::Compliance {
+            assert_eq!(
+                ep.host, None,
+                "Compliance tool {} should use default api.x.com host",
+                ep.tool_name
+            );
+            assert_eq!(
+                ep.api_version, "v2",
+                "Compliance tool {} must use v2 API version",
+                ep.tool_name
+            );
+        }
+    }
+}
+
+#[test]
+fn compliance_mutations_are_elevated_access() {
+    use crate::tools::manifest::ToolCategory;
+    let tools = generate_spec_tools();
+    for t in &tools {
+        if t.category == ToolCategory::Compliance && t.mutation {
+            assert!(
+                t.requires_elevated_access,
+                "Compliance mutation {} should require elevated access",
+                t.name
+            );
+            assert!(
+                t.requires_db,
+                "Compliance mutation {} should require DB for audit",
+                t.name
+            );
+        }
+    }
 }

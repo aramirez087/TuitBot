@@ -93,7 +93,7 @@ Autopilot ──uses──> Workflow ──uses──> Toolkit ──uses──>
 |-------|------|
 | `tuitbot-core` | All business logic: three layers above, plus `x_api`, `storage`, `llm`, `config`, `scoring`, `safety`, `content`, `strategy` |
 | `tuitbot-cli` | CLI binary: parsing, logging, dispatch |
-| `tuitbot-mcp` | MCP server: AI agent integration, 109 tools across 4 profiles |
+| `tuitbot-mcp` | MCP server: AI agent integration, 140 tools across 4 profiles |
 | `tuitbot-server` | Axum HTTP/WS API: thin layer over core |
 
 ## Frontend Stack & Modes

@@ -1,0 +1,33 @@
+## Session 03 Completion Summary
+
+### Files Modified (10 source files)
+- `crates/tuitbot-mcp/src/tools/manifest.rs` — Added `DirectMessage` to `ToolCategory` enum
+- `crates/tuitbot-mcp/src/spec/endpoints.rs` — Added `PARAM_DM_EVENT_FIELDS`, `PARAM_PARTICIPANT_ID`, and 8 DM `EndpointDef` entries (197 lines added)
+- `crates/tuitbot-mcp/src/spec/tests.rs` — Updated endpoint count (36→44), added `"direct_messages"` to valid groups
+- `crates/tuitbot-mcp/src/spec/mod.rs` — Bumped `X_API_SPEC_VERSION` to 1.1.0
+- `crates/tuitbot-mcp/src/tools/boundary_tests.rs` — Added 3 DM mutations to denylist; updated profile counts
+- `crates/tuitbot-mcp/src/tools/conformance_tests/coverage.rs` — Added `DirectMessage` match arm
+- `crates/tuitbot-core/src/x_api/scopes.rs` — Added `dm.read`/`dm.write` to `REQUIRED_SCOPES` and `FEATURE_SCOPE_MAP`
+- `crates/tuitbot-cli/src/commands/test/tests.rs` — Added DM scopes to `valid_tokens()`
+
+### Files Created (2)
+- `docs/roadmap/x-enterprise-api-parity/session-03-dm-endpoint-matrix.md`
+- `docs/roadmap/x-enterprise-api-parity/session-03-handoff.md`
+
+### Artifacts Regenerated (18)
+- `roadmap/artifacts/session-06-tool-manifest.json` + all `docs/generated/mcp-manifest-*.json` + coverage reports
+
+### Test Results
+- **426 MCP tests pass** (0 failures, 11 ignored)
+- `cargo fmt --all --check` — clean
+- `cargo clippy --workspace -- -D warnings` — clean
+- 1 pre-existing flaky env-var test (`config::tests::env_var_override_approval_mode`) — unrelated, passes with `--test-threads=1`
+
+### Key Decisions
+1. DM scopes (`dm.read`, `dm.write`) added to `REQUIRED_SCOPES` — existing users will need OAuth re-authorization
+2. DM reads are broadly available (ApiRO+); DM writes restricted to Write+
+3. DM mutations in UtilityWrite use `Lane::Shared` (no DB/policy), consistent with existing utility behavior
+4. Spec version bumped to 1.1.0 (backward-compatible addition)
+
+### Next Session (04) Inputs
+Session 04 should add 16 Ads/Campaign API tools. This requires adding an optional `host` field to `EndpointDef` (all Ads tools target `ads-api.x.com`). Exact file paths and changes documented in `session-03-handoff.md`.

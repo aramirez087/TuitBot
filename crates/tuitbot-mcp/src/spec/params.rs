@@ -76,4 +76,7 @@ pub struct EndpointDef {
     pub api_version: &'static str,
     /// Endpoint group for naming hierarchy (e.g. "lists", "mutes").
     pub group: &'static str,
+    /// Target API host override. `None` defaults to `api.x.com`.
+    /// Use `Some("ads-api.x.com")` for Ads API endpoints.
+    pub host: Option<&'static str>,
 }

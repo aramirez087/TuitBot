@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMMITTED_DIR="$REPO_ROOT/docs/generated"
-PROFILES=(write admin readonly api-readonly)
+PROFILES=(write admin readonly api-readonly utility-readonly utility-write)
 
 TMPDIR_FRESH="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_FRESH"' EXIT

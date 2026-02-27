@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **X Enterprise API Parity** — 31 new typed MCP tools across 4 endpoint families:
+  - **Direct Messages** (8 tools): conversation listing, event retrieval, message sending, group DM creation. Available from API-readonly (reads) and Write (mutations) profiles. Requires `dm.read`/`dm.write` OAuth scopes.
+  - **Ads / Campaign** (16 tools): account, campaign, line item, promoted tweet, targeting, analytics, and funding instrument management. Admin profile only. Routes to `ads-api.x.com`. Requires Ads API developer access.
+  - **Compliance** (4 tools): compliance job listing, creation, and tweet usage statistics. Admin profile only. Requires `compliance.write` scope and elevated API tier.
+  - **Stream Rules** (3 tools): filtered stream rule listing, creation, and deletion. Admin profile only. Requires `tweet.read` scope.
+- Extended host allowlist with `ads-api.x.com` for Ads API routing, with all existing safety controls (SSRF protection, path validation, header blocklist).
+- 3 new `ToolCategory` variants: `DirectMessage`, `Ads`, `Compliance`.
+- 59 conformance tests: 7 parity, 15 DM, 18 Ads, 19 enterprise admin.
+- Profile tool counts updated: Readonly 14, ApiReadonly 45 (+5), Write 112 (+8), Admin 139 (+31).
+
+### Changed
+
+- Documentation aligned with delivered enterprise API coverage: removed outdated claims that DM/Ads/Compliance APIs were unsupported, added enterprise tool reference sections, configuration guidance for enterprise API access, and updated all tool counts.
+
 ## [0.1.10](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.9...tuitbot-cli-v0.1.10) - 2026-02-27
 
 ### Added

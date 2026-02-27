@@ -18,6 +18,8 @@ pub const REQUIRED_SCOPES: &[&str] = &[
     "like.write",
     "bookmark.read",
     "bookmark.write",
+    "dm.read",
+    "dm.write",
     "offline.access",
 ];
 
@@ -68,6 +70,16 @@ pub const FEATURE_SCOPE_MAP: &[FeatureScopeMapping] = &[
         feature: "Token refresh",
         description: "Refresh access tokens without re-authentication.",
         required_scopes: &["offline.access"],
+    },
+    FeatureScopeMapping {
+        feature: "Read DMs",
+        description: "Read direct message conversations and events.",
+        required_scopes: &["dm.read", "users.read"],
+    },
+    FeatureScopeMapping {
+        feature: "Send DMs",
+        description: "Send direct messages and create group conversations.",
+        required_scopes: &["dm.write", "dm.read", "users.read"],
     },
 ];
 

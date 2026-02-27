@@ -468,7 +468,7 @@ pub struct KeyValue {
 pub struct XGetRequest {
     /// API path (e.g., "/2/tweets/123"). Must start with "/".
     pub path: String,
-    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com allowed.
+    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com allowed.
     pub host: Option<String>,
     /// Query parameters as key-value pairs.
     pub query: Option<Vec<KeyValue>>,
@@ -485,7 +485,7 @@ pub struct XGetRequest {
 pub struct XPostRequest {
     /// API path (e.g., "/2/tweets"). Must start with "/".
     pub path: String,
-    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com allowed.
+    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com allowed.
     pub host: Option<String>,
     /// Query parameters as key-value pairs.
     pub query: Option<Vec<KeyValue>>,
@@ -499,7 +499,7 @@ pub struct XPostRequest {
 pub struct XPutRequest {
     /// API path (e.g., "/2/lists/123"). Must start with "/".
     pub path: String,
-    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com allowed.
+    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com allowed.
     pub host: Option<String>,
     /// Query parameters as key-value pairs.
     pub query: Option<Vec<KeyValue>>,
@@ -513,7 +513,7 @@ pub struct XPutRequest {
 pub struct XDeleteRequest {
     /// API path (e.g., "/2/tweets/123"). Must start with "/".
     pub path: String,
-    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com allowed.
+    /// Target host (default: "api.x.com"). Only api.x.com, upload.x.com, upload.twitter.com, ads-api.x.com allowed.
     pub host: Option<String>,
     /// Query parameters as key-value pairs.
     pub query: Option<Vec<KeyValue>>,

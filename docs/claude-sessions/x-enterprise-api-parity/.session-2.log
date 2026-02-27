@@ -1,0 +1,24 @@
+Session 02 is complete. Here's the summary:
+
+## Session 02 — Enterprise Security Foundation
+
+**Commit:** `fdfb5ac` on `feat/mcp_x_api_coverage`
+
+### What was done
+
+1. **Host allowlist** — Added `ads-api.x.com` for enterprise Ads/Campaign API
+2. **Policy-gated mutations** — `x_post`/`x_put`/`x_delete` now route through the unified mutation gateway (policy eval + idempotency + audit trail)
+3. **Request family classification** — `RequestFamily` enum (PublicApi, DirectMessage, Ads, EnterpriseAdmin, MediaUpload) enriches every mutation audit record
+4. **Manifest metadata** — Split error codes into read vs mutation variants; mutation tools now declare `requires_db: true`
+5. **Core policy types** — Added `UniversalRequest` to `ToolCategory` enum
+6. **Module splitting** — `mod.rs` from 782→474 lines via `audited.rs` + `family.rs` extraction
+7. **27 new tests** covering host allowlist, request family classification, and policy type mappings
+
+### CI Status
+- `cargo fmt` — pass
+- `cargo test` — 456 passed, 11 ignored, 0 failed
+- `cargo clippy` — pass
+
+### Deliverables
+- `docs/roadmap/x-enterprise-api-parity/session-02-security-foundation.md`
+- `docs/roadmap/x-enterprise-api-parity/session-02-handoff.md`
