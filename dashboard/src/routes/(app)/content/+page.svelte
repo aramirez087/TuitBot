@@ -7,6 +7,7 @@
 	import ComposeModal from '$lib/components/ComposeModal.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import type { ComposeRequest } from '$lib/api';
 	import {
 		calendarItems,
 		schedule,
@@ -61,7 +62,7 @@
 		openCompose(date);
 	}
 
-	async function handleCompose(data: { content_type: string; content: string; scheduled_for?: string }) {
+	async function handleCompose(data: ComposeRequest) {
 		await composeContent(data);
 		composeOpen = false;
 	}

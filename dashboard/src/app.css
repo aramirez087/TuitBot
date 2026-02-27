@@ -14,7 +14,7 @@
 	--color-border-subtle: #21262d;
 	--color-text: #e6edf3;
 	--color-text-muted: #8b949e;
-	--color-text-subtle: #6e7681;
+	--color-text-subtle: #848d97;
 	--color-accent: #58a6ff;
 	--color-accent-hover: #79c0ff;
 	--color-success: #3fb950;
@@ -61,6 +61,24 @@ body {
 	background: var(--color-text-subtle);
 }
 
+/* Keyboard focus indicator */
+:focus-visible {
+	outline: 2px solid var(--color-accent);
+	outline-offset: 2px;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
 /* Light theme overrides */
 :root[data-theme='light'] {
 	--color-base: #f6f8fa;
@@ -71,7 +89,7 @@ body {
 	--color-border-subtle: #e1e4e8;
 	--color-text: #1f2328;
 	--color-text-muted: #656d76;
-	--color-text-subtle: #8b949e;
+	--color-text-subtle: #656d76;
 	--color-accent: #0969da;
 	--color-accent-hover: #0550ae;
 	--color-success: #1a7f37;

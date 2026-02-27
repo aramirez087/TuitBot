@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { PenLine, Send, Calendar, Trash2, Sparkles, Loader2, Plus } from 'lucide-svelte';
-	import { api, type ScheduledContentItem } from '$lib/api';
+	import { api, type ScheduledContentItem, parseThreadContent, isBlocksPayload } from '$lib/api';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
@@ -191,7 +191,19 @@
 						</div>
 					</div>
 				{:else if schedulingId === draft.id}
-					<p class="draft-content">{draft.content}</p>
+					{#if isBlocksPayload(draft.content)}
+						{@const blocks = parseThreadContent(draft.content)}
+						<div class="thread-preview-compact">
+							{#each blocks as block, i}
+								<p class="draft-content thread-block-preview">
+									<span class="block-num">{i + 1}.</span>
+									{typeof block === 'string' ? block : block.text}
+								</p>
+							{/each}
+						</div>
+					{:else}
+						<p class="draft-content">{draft.content}</p>
+					{/if}
 					<div class="schedule-row">
 						<input type="datetime-local" class="text-input" bind:value={scheduleTime} />
 						<button class="save-btn" onclick={() => scheduleDraft(draft.id)} disabled={!scheduleTime}>Schedule</button>
@@ -202,7 +214,19 @@
 						<span class="type-badge">{draft.content_type}</span>
 						<span class="draft-date">{new Date(draft.created_at).toLocaleDateString()}</span>
 					</div>
-					<p class="draft-content">{draft.content}</p>
+					{#if isBlocksPayload(draft.content)}
+						{@const blocks = parseThreadContent(draft.content)}
+						<div class="thread-preview-compact">
+							{#each blocks as block, i}
+								<p class="draft-content thread-block-preview">
+									<span class="block-num">{i + 1}.</span>
+									{typeof block === 'string' ? block : block.text}
+								</p>
+							{/each}
+						</div>
+					{:else}
+						<p class="draft-content">{draft.content}</p>
+					{/if}
 					<div class="card-actions">
 						<button class="icon-btn" title="Improve with AI" onclick={() => improveDraft(draft.id, draft.content)} disabled={improvingId === draft.id}>
 							{#if improvingId === draft.id}
@@ -502,6 +526,22 @@
 	.char-count.over {
 		color: var(--color-danger);
 		font-weight: 600;
+	}
+
+	.thread-preview-compact {
+		margin-bottom: 12px;
+	}
+
+	.thread-block-preview {
+		margin: 0 0 4px;
+	}
+
+	.block-num {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--color-accent);
+		font-family: var(--font-mono);
+		margin-right: 4px;
 	}
 
 	.loading-state {
