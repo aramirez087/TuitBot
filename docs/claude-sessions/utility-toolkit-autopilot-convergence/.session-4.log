@@ -1,0 +1,33 @@
+Session 4 is complete. Here's the summary:
+
+## Session 04 — Unified Mutation Policy Gateway
+
+**Commit:** `c51aab9` on `feat/mcp_final`
+
+### What was built
+
+A single `MutationGateway` in `tuitbot-core::mutation_gateway` that enforces a strict 4-step sequence for every mutation:
+
+1. **Policy evaluation** — block rules, rate limits, approval routing, dry-run
+2. **DB-backed idempotency** — 5-minute dedup window with cached results
+3. **Pending audit record** — before execution begins
+4. **Post-execution recording** — rate counters + audit completion
+
+### Key changes
+
+| File | Change |
+|------|--------|
+| `mutation_gateway/mod.rs` | New core gateway (270 lines) |
+| `mutation_gateway/tests.rs` | 15 tests covering all decision paths |
+| `policy_gate.rs` | Rewritten as thin MCP adapter |
+| `write.rs` | 5 tools refactored to gateway pattern |
+| `engage.rs` | 8 tools refactored to gateway pattern |
+| `audit.rs` | Deleted (logic moved to core) |
+| `idempotency.rs` | Cleaned up (kept in-memory store only) |
+
+### CI results
+
+- **792 tests passed** (+15 from baseline 777)
+- **0 clippy warnings**
+- **Formatting clean**
+- 1 pre-existing flaky test (env-var race, passes in isolation)
