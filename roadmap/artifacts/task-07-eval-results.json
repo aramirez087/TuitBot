@@ -1,0 +1,101 @@
+{
+  "eval_name": "task-07-observability-evals",
+  "timestamp": "2026-02-27T02:21:31.308856+00:00",
+  "scenarios": [
+    {
+      "scenario": "A",
+      "description": "Raw direct reply flow: draft -> queue",
+      "steps": [
+        {
+          "tool_name": "draft_replies_for_candidates",
+          "latency_ms": 4,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": null
+        },
+        {
+          "tool_name": "propose_and_queue_replies",
+          "latency_ms": 4,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": "allow"
+        }
+      ],
+      "total_latency_ms": 8,
+      "success": true,
+      "telemetry_entries": 1,
+      "schema_valid": true
+    },
+    {
+      "scenario": "B",
+      "description": "Composite flow: find -> draft -> queue",
+      "steps": [
+        {
+          "tool_name": "find_reply_opportunities",
+          "latency_ms": 2,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": null
+        },
+        {
+          "tool_name": "draft_replies_for_candidates",
+          "latency_ms": 2,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": null
+        },
+        {
+          "tool_name": "propose_and_queue_replies",
+          "latency_ms": 4,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": "allow"
+        }
+      ],
+      "total_latency_ms": 8,
+      "success": true,
+      "telemetry_entries": 3,
+      "schema_valid": true
+    },
+    {
+      "scenario": "C",
+      "description": "Blocked-by-policy mutation with telemetry verification",
+      "steps": [
+        {
+          "tool_name": "propose_and_queue_replies",
+          "latency_ms": 0,
+          "success": false,
+          "response_valid": true,
+          "error_code": "policy_denied_blocked",
+          "policy_decision": "deny"
+        },
+        {
+          "tool_name": "get_mcp_error_breakdown",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": null
+        }
+      ],
+      "total_latency_ms": 0,
+      "success": true,
+      "telemetry_entries": 1,
+      "schema_valid": true
+    }
+  ],
+  "quality_gates": {
+    "schema_validation_rate": 1.0,
+    "schema_validation_threshold": 0.95,
+    "schema_validation_pass": true,
+    "unknown_error_rate": 0.0,
+    "unknown_error_threshold": 0.05,
+    "unknown_error_pass": true,
+    "all_pass": true
+  }
+}

@@ -11,6 +11,7 @@ mod defaults;
 mod enrichment;
 mod env_overrides;
 mod types;
+mod types_policy;
 mod validation;
 
 #[cfg(test)]
@@ -18,10 +19,10 @@ mod tests;
 
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
 pub use types::{
-    AuthConfig, BusinessProfile, CircuitBreakerConfig, IntervalsConfig, LimitsConfig, LlmConfig,
-    LoggingConfig, McpPolicyConfig, ScheduleConfig, ScoringConfig, StorageConfig, TargetsConfig,
-    XApiConfig,
+    AuthConfig, BusinessProfile, IntervalsConfig, LimitsConfig, LlmConfig, LoggingConfig,
+    ScoringConfig, StorageConfig, TargetsConfig, XApiConfig,
 };
+pub use types_policy::{CircuitBreakerConfig, McpPolicyConfig, ScheduleConfig};
 
 use crate::error::ConfigError;
 use serde::{Deserialize, Serialize};
