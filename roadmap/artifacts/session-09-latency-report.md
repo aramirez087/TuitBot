@@ -1,6 +1,6 @@
 # Session 09 — Latency Report
 
-**Generated:** 2026-02-27 19:16 UTC
+**Generated:** 2026-02-27 23:24 UTC
 
 **Tools benchmarked:** 16
 
@@ -8,38 +8,38 @@
 
 | Tool | Avg (ms) | P50 (ms) | P95 (ms) | Min (ms) | Max (ms) |
 |------|----------|----------|----------|----------|----------|
-| kernel::get_tweet | 0.026 | 0.022 | 0.042 | 0.021 | 0.042 |
-| kernel::search_tweets | 0.016 | 0.011 | 0.027 | 0.008 | 0.027 |
-| kernel::get_followers | 0.006 | 0.006 | 0.009 | 0.006 | 0.009 |
-| kernel::get_user_by_id | 0.008 | 0.007 | 0.010 | 0.007 | 0.010 |
+| kernel::get_tweet | 0.018 | 0.012 | 0.043 | 0.012 | 0.043 |
+| kernel::search_tweets | 0.011 | 0.008 | 0.018 | 0.008 | 0.018 |
+| kernel::get_followers | 0.007 | 0.006 | 0.011 | 0.005 | 0.011 |
+| kernel::get_user_by_id | 0.007 | 0.007 | 0.009 | 0.007 | 0.009 |
 | kernel::get_me | 0.007 | 0.007 | 0.008 | 0.007 | 0.008 |
 | kernel::post_tweet | 0.004 | 0.003 | 0.006 | 0.003 | 0.006 |
 | kernel::reply_to_tweet | 0.004 | 0.003 | 0.004 | 0.003 | 0.004 |
-| score_tweet | 0.018 | 0.012 | 0.041 | 0.012 | 0.041 |
-| get_config | 0.083 | 0.081 | 0.093 | 0.079 | 0.093 |
-| validate_config | 0.532 | 0.010 | 2.621 | 0.010 | 2.621 |
-| get_mcp_tool_metrics | 1.078 | 0.580 | 3.031 | 0.464 | 3.031 |
-| get_mcp_error_breakdown | 0.311 | 0.208 | 0.683 | 0.163 | 0.683 |
-| get_capabilities | 0.906 | 0.701 | 1.507 | 0.686 | 1.507 |
-| health_check | 0.341 | 0.232 | 0.609 | 0.120 | 0.609 |
-| get_stats | 1.550 | 1.376 | 2.579 | 1.144 | 2.579 |
-| list_pending | 0.354 | 0.138 | 1.297 | 0.082 | 1.297 |
+| score_tweet | 0.019 | 0.017 | 0.030 | 0.012 | 0.030 |
+| get_config | 0.084 | 0.081 | 0.096 | 0.080 | 0.096 |
+| validate_config | 0.020 | 0.010 | 0.058 | 0.010 | 0.058 |
+| get_mcp_tool_metrics | 1.124 | 0.680 | 3.012 | 0.587 | 3.012 |
+| get_mcp_error_breakdown | 0.464 | 0.259 | 1.284 | 0.213 | 1.284 |
+| get_capabilities | 2.354 | 2.221 | 3.160 | 1.120 | 3.160 |
+| health_check | 0.600 | 0.518 | 1.055 | 0.432 | 1.055 |
+| get_stats | 2.451 | 2.150 | 4.409 | 1.654 | 4.409 |
+| list_pending | 1.004 | 0.286 | 3.931 | 0.183 | 3.931 |
 
 ## Category Breakdown
 
 | Category | Tools | P95 (ms) |
 |----------|-------|----------|
-| Kernel read | 5 | 0.027 |
+| Kernel read | 5 | 0.018 |
 | Kernel write | 2 | 0.006 |
-| Config | 3 | 2.621 |
-| Telemetry | 2 | 3.031 |
+| Config | 3 | 0.096 |
+| Telemetry | 2 | 3.012 |
 
 ## Aggregate
 
-**P50:** 0.025 ms | **P95:** 1.455 ms | **Min:** 0.003 ms | **Max:** 3.031 ms
+**P50:** 0.018 ms | **P95:** 3.012 ms | **Min:** 0.003 ms | **Max:** 4.409 ms
 
 ## P95 Gate
 
-**Global P95:** 1.455 ms
+**Global P95:** 3.012 ms
 **Threshold:** 50.0 ms
 **Status:** PASS

@@ -1,7 +1,8 @@
 //! Tuitbot HTTP API server.
 //!
 //! Exposes `tuitbot-core`'s storage layer as a REST API with read + write
-//! endpoints, local bearer-token auth, and a WebSocket for real-time events.
+//! endpoints, multi-strategy auth (bearer token + session cookie), and a
+//! WebSocket for real-time events.
 
 pub mod account;
 pub mod auth;
@@ -25,6 +26,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let api = Router::new()
         .route("/health", get(routes::health::health))
         .route("/health/detailed", get(routes::health::health_detailed))
+        // Auth
+        .route("/auth/login", post(auth::routes::login))
+        .route("/auth/logout", post(auth::routes::logout))
+        .route("/auth/status", get(auth::routes::status))
         // Analytics
         .route("/analytics/summary", get(routes::analytics::summary))
         .route("/analytics/followers", get(routes::analytics::followers))
@@ -209,7 +214,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         // WebSocket
         .route("/ws", get(ws::ws_handler))
-        // Auth middleware — applied to all routes; health is exempted internally.
+        // Auth middleware — applied to all routes; exempt paths handled internally.
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth::auth_middleware,

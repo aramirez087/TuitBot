@@ -11,6 +11,7 @@ This documentation is the source of truth for setup, operations, release, and pu
 ## Documentation Map
 
 - [Getting Started](getting-started.md): install, initialize, authenticate, and run.
+- [LAN Mode](lan-mode.md): access the dashboard from any device on your network.
 - [Configuration](configuration.md): configuration model and production guidance.
 - [Composer Mode](composer-mode.md): AI-assisted writing, drafts, and discovery feed.
 - [CLI Reference](cli-reference.md): command-by-command usage.

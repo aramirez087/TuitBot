@@ -2,15 +2,20 @@
 //!
 //! Provides a `/api/ws` endpoint that streams server events to dashboard clients
 //! via a `tokio::sync::broadcast` channel.
+//!
+//! Supports two authentication methods:
+//! - Query parameter: `?token=<api_token>` (Tauri/API clients)
+//! - Session cookie: `tuitbot_session=<token>` (web/LAN clients)
 
 use std::sync::Arc;
 
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Query, State, WebSocketUpgrade};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tuitbot_core::auth::session;
 
 use crate::state::AppState;
 
@@ -81,26 +86,49 @@ pub enum WsEvent {
 /// Query parameters for WebSocket authentication.
 #[derive(Deserialize)]
 pub struct WsQuery {
-    /// API token passed as a query parameter.
-    pub token: String,
+    /// API token passed as a query parameter (optional — cookie auth is fallback).
+    pub token: Option<String>,
 }
 
-/// `GET /api/ws?token=...` — WebSocket upgrade with token auth.
+/// Extract the session cookie value from headers.
+fn extract_session_cookie(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("cookie")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|cookies| {
+            cookies.split(';').find_map(|c| {
+                let c = c.trim();
+                c.strip_prefix("tuitbot_session=").map(|v| v.to_string())
+            })
+        })
+}
+
+/// `GET /api/ws` — WebSocket upgrade with token or cookie auth.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(params): Query<WsQuery>,
 ) -> Response {
-    // Authenticate via query parameter.
-    if params.token != state.api_token {
-        return (
-            StatusCode::UNAUTHORIZED,
-            axum::Json(json!({"error": "unauthorized"})),
-        )
-            .into_response();
+    // Strategy 1: Bearer token via query parameter
+    if let Some(ref token) = params.token {
+        if token == &state.api_token {
+            return ws.on_upgrade(move |socket| handle_ws(socket, state));
+        }
     }
 
-    ws.on_upgrade(move |socket| handle_ws(socket, state))
+    // Strategy 2: Session cookie
+    if let Some(session_token) = extract_session_cookie(&headers) {
+        if let Ok(Some(_)) = session::validate_session(&state.db, &session_token).await {
+            return ws.on_upgrade(move |socket| handle_ws(socket, state));
+        }
+    }
+
+    (
+        StatusCode::UNAUTHORIZED,
+        axum::Json(json!({"error": "unauthorized"})),
+    )
+        .into_response()
 }
 
 /// Handle a single WebSocket connection.

@@ -29,6 +29,7 @@ Tuitbot supports three ways to run — all using the exact same core automation 
 | Mode | How it runs | Dashboard access | Best for |
 |------|-------------|-----------------|----------|
 | **Desktop App** | Native window (Tauri) on macOS/Windows. | Built-in native UI | Users who want a beautiful app with point-and-click settings. |
+| **LAN Mode** | Server on a local machine (Pi, NAS, spare laptop). `--host 0.0.0.0` | Browser → `http://<server-ip>:3001` | Access from any device on your network without keeping a laptop open. |
 | **Self-Hosted** | `docker compose up` on a VPS. | Browser → `http://localhost:3001` | Technical users who want 24/7 automation and full control. |
 | **Cloud Tier**  | Fully managed by us. | Browser → `app.tuitbot.dev` | Zero setup, always-on automation. |
 
@@ -148,7 +149,17 @@ The easiest way to get started is by downloading the desktop app. You don't need
 
 The app will run quietly as a system tray icon, discovering and drafting content for your review.
 
-### 2. Self-Hosted Docker
+### 2. LAN Mode (Run on a Pi, access from anywhere on your network)
+
+Run the server on any always-on machine and access the dashboard from your phone, tablet, or laptop:
+
+```bash
+cargo run -p tuitbot-server -- --host 0.0.0.0
+```
+
+The server prints a 4-word passphrase to the terminal on first start. Open `http://<server-ip>:3001` from any device on your network and enter the passphrase to log in. Sessions last 7 days. Full setup guide: [LAN Mode](https://aramirez087.github.io/TuitBot/lan-mode/).
+
+### 3. Self-Hosted Docker
 
 For users who want to run Tuitbot on a cloud VPS (like Hetzner or DigitalOcean) for 24/7 uptime without keeping a laptop open:
 
@@ -161,7 +172,7 @@ docker compose up -d
 ```
 Then navigate to `http://localhost:3001` to access the full graphical dashboard in your browser.
 
-### 3. Command Line Interface (CLI)
+### 4. Command Line Interface (CLI)
 
 For power users who prefer the terminal. **Hello world in under 2 minutes:**
 
@@ -283,6 +294,7 @@ This README is intentionally concise. The full system docs are on GitHub Pages:
 - [Configuration](https://aramirez087.github.io/TuitBot/configuration/) - config model and production guidance
 - [CLI Reference](https://aramirez087.github.io/TuitBot/cli-reference/) - command reference
 - [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) - AI agent integration
+- [LAN Mode](https://aramirez087.github.io/TuitBot/lan-mode/) - access the dashboard from any device on your network
 - [Composer Mode](https://aramirez087.github.io/TuitBot/composer-mode/) - AI-assisted writing, drafts, and discovery feed
 - [Operations](https://aramirez087.github.io/TuitBot/operations/) - deployment and runbook
 - [Release and Publishing](https://aramirez087.github.io/TuitBot/release-and-publishing/) - release-plz and crates.io

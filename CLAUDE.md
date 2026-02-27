@@ -13,6 +13,7 @@ Tuitbot — local-first autonomous growth assistant for X (Twitter). CLI + deskt
 cargo build                              # debug
 cargo build --release                    # release → target/release/tuitbot
 cargo run -p tuitbot-server              # API server (127.0.0.1:3001)
+cargo run -p tuitbot-server -- --host 0.0.0.0  # LAN mode (all interfaces)
 
 # Test
 cargo test                               # all tests
@@ -95,6 +96,7 @@ Dependency rules: Toolkit ← Workflow ← Autopilot. No upward or skip-level im
 
 | Module | Notes |
 |--------|-------|
+| `core/auth/` | Passphrase generation (EFF wordlist, bcrypt), session CRUD (SHA-256 hashed tokens in SQLite) |
 | `core/toolkit/` | Stateless X API wrappers: `read.rs`, `write.rs`, `engage.rs`, `media.rs` over `&dyn XApiClient` |
 | `core/workflow/` | Stateful composites: `discover.rs`, `draft.rs`, `queue.rs`, `publish.rs`, `thread_plan.rs`, `orchestrate.rs` |
 | `core/config/` | Defaults → TOML → env vars (`TUITBOT_` prefix, `__` separator) |
@@ -106,8 +108,9 @@ Dependency rules: Toolkit ← Workflow ← Autopilot. No upward or skip-level im
 | `core/safety/` | Dedup, rate limits, banned phrases, per-author limits, self-reply prevention |
 | `core/content/` | LLM generation + `frameworks.rs` (reply archetypes, tweet formats, thread structures — weighted random selection) |
 | `core/strategy/` | Weekly reports: metrics, 8-rule recommendation engine, ISO week computation |
+| `server/auth/` | Multi-strategy middleware (Bearer token + session cookie), login/logout/status routes, rate limiting |
 | `server/routes/` | Handlers by domain: analytics, approval, content, targets, settings, activity, strategy |
-| `server/ws.rs` | Broadcast channels → WebSocket fan-out for real-time events |
+| `server/ws.rs` | Broadcast channels → WebSocket fan-out for real-time events (token or cookie auth) |
 
 ### Patterns to Follow
 
@@ -115,6 +118,7 @@ Dependency rules: Toolkit ← Workflow ← Autopilot. No upward or skip-level im
 - **Error handling**: `thiserror` in core (typed enums per domain), `anyhow` in binaries.
 - **Config precedence**: CLI flags > env vars > `config.toml` > defaults. `init`/`upgrade`/`settings` subcommands handle config before general loading.
 - **Server boundary**: Server owns zero business logic — only routing, serialization, WebSocket fan-out, auth. All domain logic in core.
+- **Dual auth**: Bearer token (Tauri/API/MCP) and session cookie (web/LAN) coexist. Middleware checks bearer first, then cookie. CSRF token required for mutating cookie-auth requests. `--host 0.0.0.0` enables LAN access.
 - **Frontend**: Svelte 5, TypeScript strict, TailwindCSS, SPA mode (no SSR). Stores for state — no external libraries.
 - **Approval queue**: When `approval_mode = true` (always in Composer mode), posting routes to `approval_queue` table instead of X API.
 - **Storage**: WAL mode, 90-day retention, dedup records never deleted. `build.rs` watches `migrations/` for recompilation.

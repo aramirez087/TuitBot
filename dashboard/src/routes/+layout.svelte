@@ -1,8 +1,9 @@
 <script lang="ts">
 	import "../app.css";
-	import { setToken } from "$lib/api";
+	import { setToken, setAuthMode, setCsrfToken } from "$lib/api";
 	import { connectWs } from "$lib/stores/websocket";
 	import { initTheme } from "$lib/stores/theme";
+	import { checkAuth, authMode as authModeStore } from "$lib/stores/auth";
 	import { onMount } from "svelte";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/stores";
@@ -14,26 +15,38 @@
 	onMount(async () => {
 		initTheme();
 
-		// Get API token from Tauri or dev fallback.
+		// Step 1: Try Tauri token or dev fallback (bearer mode).
 		let token = "";
 		try {
 			const { invoke } = await import("@tauri-apps/api/core");
 			token = await invoke("get_api_token");
 		} catch {
 			token = __DEV_API_TOKEN__;
-			if (!token) {
-				console.warn(
-					"No API token available. Start tuitbot-server to generate ~/.tuitbot/api_token, then restart the dev server.",
-				);
-			}
 		}
 
 		if (token) {
+			// Bearer mode: Tauri desktop or dev mode.
 			setToken(token);
+			setAuthMode("bearer");
+			authModeStore.set("tauri");
 			connectWs(token);
+		} else {
+			// Step 2: Web/LAN mode — check for existing session cookie.
+			const hasSession = await checkAuth();
+			if (hasSession) {
+				connectWs(); // Cookie-based WS auth
+			} else {
+				// Not authenticated — redirect to login (unless already there or onboarding).
+				const path = $page.url.pathname;
+				if (!path.startsWith("/login") && !path.startsWith("/onboarding")) {
+					goto("/login");
+					ready = true;
+					return;
+				}
+			}
 		}
 
-		// Check if config exists — redirect to onboarding if not.
+		// Step 3: Check if config exists — redirect to onboarding if not.
 		try {
 			const status = await api.settings.configStatus();
 			if (!status.configured && !$page.url.pathname.startsWith("/onboarding")) {

@@ -45,13 +45,19 @@ async function sendNativeNotification(title: string, body: string) {
 /**
  * Connect to the tuitbot-server WebSocket.
  * Automatically reconnects with exponential backoff on disconnect.
+ *
+ * If `token` is provided, authenticates via query parameter (Tauri/API mode).
+ * If omitted, the server authenticates via the session cookie (web/LAN mode).
  */
-export function connectWs(token: string) {
+export function connectWs(token?: string) {
     if (ws) {
         ws.close();
     }
 
-    ws = new WebSocket(`ws://localhost:3001/api/ws?token=${token}`);
+    const url = token
+        ? `ws://localhost:3001/api/ws?token=${token}`
+        : `ws://localhost:3001/api/ws`;
+    ws = new WebSocket(url);
 
     ws.onopen = () => {
         connected.set(true);

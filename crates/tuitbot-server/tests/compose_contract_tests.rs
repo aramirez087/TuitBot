@@ -25,6 +25,8 @@ async fn test_router() -> axum::Router {
         data_dir: std::path::PathBuf::from("/tmp"),
         event_tx,
         api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: None,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,

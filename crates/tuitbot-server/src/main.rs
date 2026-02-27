@@ -3,14 +3,14 @@
 //! Starts an HTTP server bridging tuitbot-core's storage layer to a REST API
 //! for the desktop dashboard.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
-use std::collections::HashMap;
-
 use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
+use tuitbot_core::auth::passphrase;
 use tuitbot_core::config::Config;
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::llm::factory::create_provider;
@@ -29,9 +29,17 @@ struct Cli {
     #[arg(long, default_value = "3001")]
     port: u16,
 
+    /// Host address to bind to. Use 0.0.0.0 for LAN access.
+    #[arg(long, default_value = "127.0.0.1")]
+    host: String,
+
     /// Path to the tuitbot configuration file.
     #[arg(long, default_value = "~/.tuitbot/config.toml")]
     config: String,
+
+    /// Reset the web login passphrase and print the new one.
+    #[arg(long)]
+    reset_passphrase: bool,
 }
 
 #[tokio::main]
@@ -52,6 +60,7 @@ async fn main() -> Result<()> {
 
     tracing::info!(
         db = %db_path.display(),
+        host = %cli.host,
         port = cli.port,
         "starting tuitbot server"
     );
@@ -61,6 +70,25 @@ async fn main() -> Result<()> {
     // Ensure the API token file exists and read it.
     let api_token = auth::ensure_api_token(db_dir)?;
     tracing::info!(token_path = %db_dir.join("api_token").display(), "API token ready");
+
+    // Handle passphrase for web/LAN auth.
+    let passphrase_hash = if cli.reset_passphrase {
+        let new_passphrase = passphrase::reset_passphrase(db_dir)?;
+        println!("\n  Web login passphrase (reset): {new_passphrase}\n");
+        tracing::info!("Passphrase has been reset");
+        passphrase::load_passphrase_hash(db_dir)?
+    } else {
+        match passphrase::ensure_passphrase(db_dir)? {
+            Some(new_passphrase) => {
+                println!("\n  Web login passphrase: {new_passphrase}");
+                println!("  (save this — it won't be shown again)\n");
+            }
+            None => {
+                tracing::info!("Passphrase already configured");
+            }
+        }
+        passphrase::load_passphrase_hash(db_dir)?
+    };
 
     // Create the broadcast channel for WebSocket events.
     let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
@@ -96,6 +124,8 @@ async fn main() -> Result<()> {
         data_dir,
         event_tx,
         api_token,
+        passphrase_hash,
+        login_attempts: Mutex::new(HashMap::new()),
         runtimes: Mutex::new(HashMap::new()),
         content_generators: Mutex::new(content_generators),
         circuit_breaker: None,
@@ -103,9 +133,25 @@ async fn main() -> Result<()> {
 
     let router = tuitbot_server::build_router(state);
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", cli.port)).await?;
-    tracing::info!("listening on http://127.0.0.1:{}", cli.port);
+    // Warn about network exposure when binding to 0.0.0.0.
+    if cli.host == "0.0.0.0" {
+        tracing::warn!("Binding to 0.0.0.0 — server accessible from LAN");
+        if let Some(ip) = local_ip() {
+            println!("  Dashboard: http://{}:{}", ip, cli.port);
+        }
+    }
+
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", cli.host, cli.port)).await?;
+    tracing::info!("listening on http://{}:{}", cli.host, cli.port);
     axum::serve(listener, router).await?;
 
     Ok(())
+}
+
+/// Try to detect a local non-loopback IPv4 address for display purposes.
+fn local_ip() -> Option<String> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("8.8.8.8:80").ok()?;
+    let addr = socket.local_addr().ok()?;
+    Some(addr.ip().to_string())
 }

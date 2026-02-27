@@ -1,8 +1,10 @@
 //! Shared application state for the tuitbot server.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
 use tokio::sync::{broadcast, Mutex};
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
@@ -24,6 +26,10 @@ pub struct AppState {
     pub event_tx: broadcast::Sender<WsEvent>,
     /// Local bearer token for API authentication.
     pub api_token: String,
+    /// Bcrypt hash of the web login passphrase (None if not configured).
+    pub passphrase_hash: Option<String>,
+    /// Per-IP login attempt tracking for rate limiting: (count, window_start).
+    pub login_attempts: Mutex<HashMap<IpAddr, (u32, Instant)>>,
     /// Per-account automation runtimes (keyed by account_id).
     pub runtimes: Mutex<HashMap<String, Runtime>>,
     /// Per-account content generators for AI assist endpoints.

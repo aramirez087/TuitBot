@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use tauri::Manager;
 use tokio::sync::Mutex;
+use tuitbot_core::auth::passphrase;
 use tuitbot_core::startup::data_dir;
 use tuitbot_core::storage;
 use tuitbot_server::auth;
@@ -60,6 +61,15 @@ pub fn run() {
                 let api_token =
                     auth::ensure_api_token(&dir).expect("failed to create API token");
 
+                // Ensure passphrase exists (Tauri uses bearer tokens, but the
+                // hash is needed if the user later accesses via web browser).
+                if let Err(e) = passphrase::ensure_passphrase(&dir) {
+                    log::warn!("Failed to initialize passphrase: {}", e);
+                }
+                let passphrase_hash = passphrase::load_passphrase_hash(&dir)
+                    .ok()
+                    .flatten();
+
                 let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
 
                 Arc::new(AppState {
@@ -68,6 +78,8 @@ pub fn run() {
                     data_dir: dir,
                     event_tx,
                     api_token,
+                    passphrase_hash,
+                    login_attempts: Mutex::new(HashMap::new()),
                     runtimes: Mutex::new(HashMap::new()),
                     content_generators: Mutex::new(HashMap::new()),
                     circuit_breaker: None,

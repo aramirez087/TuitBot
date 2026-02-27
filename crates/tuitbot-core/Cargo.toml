@@ -30,6 +30,8 @@ base64 = "0.22"
 open = "5"
 tokio-util = "0.7.18"
 regex = "1"
+bcrypt = "0.16"
+hex = "0.4"
 
 [features]
 test-helpers = []
