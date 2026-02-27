@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.9...tuitbot-cli-v0.1.10) - 2026-02-27
+
+### Added
+
+- Session 5 — route autopilot adapters through toolkit layer
+- Session 3 — expose flat MCP utility profiles
+- Session 7 — refresh manifests docs and e2e tests
+- Session 6 — extract workflow composers to core, rewire MCP handlers
+- Session 4 — implement unified mutation policy gateway
+- Session 2 — stateless Toolkit layer and MCP x_actions refactor
+
 ## [0.1.9](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.8...tuitbot-cli-v0.1.9) - 2026-02-26
 
 ### Added
