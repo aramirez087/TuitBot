@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-02-27T03:27:25.361622+00:00",
+  "timestamp": "2026-02-27T03:39:22.131240+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -42,7 +42,7 @@
         },
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 1,
+          "latency_ms": 2,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -57,7 +57,7 @@
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 6,
+      "total_latency_ms": 7,
       "success": true,
       "telemetry_entries": 3,
       "schema_valid": true
@@ -76,14 +76,14 @@
         },
         {
           "tool_name": "get_mcp_error_breakdown",
-          "latency_ms": 0,
+          "latency_ms": 1,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": null
         }
       ],
-      "total_latency_ms": 0,
+      "total_latency_ms": 1,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true

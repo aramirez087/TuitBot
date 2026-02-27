@@ -31,6 +31,7 @@ struct ToolCoverage {
     scopes: Vec<String>,
     profiles: Vec<String>,
     has_kernel_conformance_test: bool,
+    has_spec_conformance_test: bool,
     has_contract_test: bool,
     has_live_test: bool,
     tier_gate: String,
@@ -50,6 +51,7 @@ struct CoverageSummary {
     user_auth_required: usize,
     elevated_access_required: usize,
     kernel_conformance_tested: usize,
+    spec_conformance_tested: usize,
     contract_tested: usize,
     live_tested: usize,
     untested: usize,
@@ -66,13 +68,15 @@ struct CategoryBreakdown {
     tested_count: usize,
 }
 
-/// Per-profile tool counts.
+/// Per-profile tool counts with pre/post comparison.
 #[derive(Debug, Serialize)]
 struct ProfileBreakdown {
     profile: String,
     tool_count: usize,
     mutation_count: usize,
     read_count: usize,
+    pre_initiative_count: usize,
+    delta: i32,
 }
 
 /// The full coverage report.
@@ -121,6 +125,46 @@ const KERNEL_CONFORMANCE_TESTED: &[&str] = &[
     "x_unbookmark_tweet",
 ];
 
+/// Spec-generated tools with deterministic conformance tests
+/// (in conformance_tests/dm.rs, ads.rs, enterprise_admin.rs).
+/// These validate EndpointDef properties, schemas, profiles, and safety.
+const SPEC_CONFORMANCE_TESTED: &[&str] = &[
+    // DM tools (8) — dm.rs
+    "x_v2_dm_conversations",
+    "x_v2_dm_conversation_by_id",
+    "x_v2_dm_events",
+    "x_v2_dm_events_by_conversation",
+    "x_v2_dm_events_by_participant",
+    "x_v2_dm_send_in_conversation",
+    "x_v2_dm_send_to_participant",
+    "x_v2_dm_create_group",
+    // Ads tools (16) — ads.rs
+    "x_ads_accounts",
+    "x_ads_account_by_id",
+    "x_ads_analytics",
+    "x_ads_campaign_by_id",
+    "x_ads_campaign_create",
+    "x_ads_campaign_delete",
+    "x_ads_campaign_update",
+    "x_ads_campaigns",
+    "x_ads_funding_instruments",
+    "x_ads_line_item_create",
+    "x_ads_line_items",
+    "x_ads_promoted_tweet_create",
+    "x_ads_promoted_tweets",
+    "x_ads_targeting_create",
+    "x_ads_targeting_criteria",
+    "x_ads_targeting_delete",
+    // Enterprise admin tools (7) — enterprise_admin.rs
+    "x_v2_compliance_job_by_id",
+    "x_v2_compliance_job_create",
+    "x_v2_compliance_jobs",
+    "x_v2_stream_rules_add",
+    "x_v2_stream_rules_delete",
+    "x_v2_stream_rules_list",
+    "x_v2_usage_tweets",
+];
+
 /// Tools that have contract tests (in contract_tests.rs).
 const CONTRACT_TESTED: &[&str] = &[
     "get_rate_limits",
@@ -158,8 +202,19 @@ const LIVE_TESTED: &[&str] = &[
     "x_unlike_tweet",
 ];
 
+/// Pre-initiative profile tool counts (before DM/Ads/Compliance additions).
+fn pre_initiative_count(profile: Profile) -> usize {
+    match profile {
+        Profile::Readonly => 14,
+        Profile::ApiReadonly => 40,
+        Profile::Write => 104,
+        Profile::Admin => 108,
+        Profile::UtilityReadonly => 12,
+        Profile::UtilityWrite => 50,
+    }
+}
+
 fn layer_for_tool(tool: &ToolEntry) -> &'static str {
-    // Spec-pack tools all start with x_v2_ or x_v1_
     let spec_names: BTreeSet<&str> = SPEC_ENDPOINTS.iter().map(|e| e.tool_name).collect();
     if spec_names.contains(tool.name.as_str()) {
         "generated (L2)"
@@ -228,6 +283,7 @@ fn generate_report() -> CoverageReport {
         let layer = layer_for_tool(tool);
         let cat = category_str(tool.category).to_string();
         let has_kernel = KERNEL_CONFORMANCE_TESTED.contains(&tool.name.as_str());
+        let has_spec = SPEC_CONFORMANCE_TESTED.contains(&tool.name.as_str());
         let has_contract = CONTRACT_TESTED.contains(&tool.name.as_str());
         let has_live = LIVE_TESTED.contains(&tool.name.as_str());
 
@@ -248,6 +304,7 @@ fn generate_report() -> CoverageReport {
                 .map(|p| profile_str(*p).to_string())
                 .collect(),
             has_kernel_conformance_test: has_kernel,
+            has_spec_conformance_test: has_spec,
             has_contract_test: has_contract,
             has_live_test: has_live,
             tier_gate: tier_gate(tool),
@@ -263,7 +320,7 @@ fn generate_report() -> CoverageReport {
         if tool.mutation {
             entry.3 += 1; // mutation
         }
-        if has_kernel || has_contract || has_live {
+        if has_kernel || has_spec || has_contract || has_live {
             entry.4 += 1; // tested
         }
     }
@@ -297,11 +354,15 @@ fn generate_report() -> CoverageReport {
             .iter()
             .filter(|t| t.profiles.contains(p))
             .collect();
+        let current = matching.len();
+        let pre = pre_initiative_count(*p);
         ProfileBreakdown {
             profile: profile_str(*p).to_string(),
-            tool_count: matching.len(),
+            tool_count: current,
             mutation_count: matching.iter().filter(|t| t.mutation).count(),
             read_count: matching.iter().filter(|t| !t.mutation).count(),
+            pre_initiative_count: pre,
+            delta: current as i32 - pre as i32,
         }
     })
     .collect();
@@ -318,6 +379,10 @@ fn generate_report() -> CoverageReport {
         .iter()
         .filter(|t| t.has_kernel_conformance_test)
         .count();
+    let spec_tested = tools_coverage
+        .iter()
+        .filter(|t| t.has_spec_conformance_test)
+        .count();
     let contract_tested = tools_coverage
         .iter()
         .filter(|t| t.has_contract_test)
@@ -325,12 +390,22 @@ fn generate_report() -> CoverageReport {
     let live_tested = tools_coverage.iter().filter(|t| t.has_live_test).count();
     let untested = tools_coverage
         .iter()
-        .filter(|t| !t.has_kernel_conformance_test && !t.has_contract_test && !t.has_live_test)
+        .filter(|t| {
+            !t.has_kernel_conformance_test
+                && !t.has_spec_conformance_test
+                && !t.has_contract_test
+                && !t.has_live_test
+        })
         .count();
 
     let coverage_gaps: Vec<String> = tools_coverage
         .iter()
-        .filter(|t| !t.has_kernel_conformance_test && !t.has_contract_test && !t.has_live_test)
+        .filter(|t| {
+            !t.has_kernel_conformance_test
+                && !t.has_spec_conformance_test
+                && !t.has_contract_test
+                && !t.has_live_test
+        })
         .map(|t| format!("{} ({})", t.name, t.category))
         .collect();
 
@@ -388,6 +463,7 @@ fn generate_report() -> CoverageReport {
                 .filter(|t| t.requires_elevated_access)
                 .count(),
             kernel_conformance_tested: kernel_tested,
+            spec_conformance_tested: spec_tested,
             contract_tested,
             live_tested,
             untested,
@@ -457,9 +533,6 @@ fn report_to_markdown(report: &CoverageReport) -> String {
 
     // Test coverage
     md.push_str("\n## Test Coverage\n\n");
-    let tested = report.summary.kernel_conformance_tested
-        + report.summary.contract_tested
-        + report.summary.live_tested;
     let unique_tested = report.summary.total_tools - report.summary.untested;
     md.push_str(&format!(
         "**{unique_tested}/{} tools have at least one test ({:.1}%)**\n\n",
@@ -473,6 +546,10 @@ fn report_to_markdown(report: &CoverageReport) -> String {
         report.summary.kernel_conformance_tested
     ));
     md.push_str(&format!(
+        "| Spec conformance | {} |\n",
+        report.summary.spec_conformance_tested
+    ));
+    md.push_str(&format!(
         "| Contract envelope | {} |\n",
         report.summary.contract_tested
     ));
@@ -480,7 +557,6 @@ fn report_to_markdown(report: &CoverageReport) -> String {
         "| Live (sandbox) | {} |\n",
         report.summary.live_tested
     ));
-    md.push_str(&format!("| Total test touches | {} |\n", tested));
     md.push_str(&format!("| Untested | {} |\n", report.summary.untested));
 
     // Categories
@@ -499,14 +575,19 @@ fn report_to_markdown(report: &CoverageReport) -> String {
         ));
     }
 
-    // Profiles
+    // Profiles with deltas
     md.push_str("\n## By Profile\n\n");
-    md.push_str("| Profile | Total | Mutations | Read-Only |\n");
-    md.push_str("|---------|-------|-----------|-----------|\n");
+    md.push_str("| Profile | Total | Pre-Initiative | Delta | Mutations | Read-Only |\n");
+    md.push_str("|---------|-------|----------------|-------|-----------|----------|\n");
     for p in &report.profiles {
         md.push_str(&format!(
-            "| {} | {} | {} | {} |\n",
-            p.profile, p.tool_count, p.mutation_count, p.read_count,
+            "| {} | {} | {} | {:+} | {} | {} |\n",
+            p.profile,
+            p.tool_count,
+            p.pre_initiative_count,
+            p.delta,
+            p.mutation_count,
+            p.read_count,
         ));
     }
 
@@ -571,12 +652,12 @@ async fn generate_coverage_report() {
 
     // JSON report
     let json = serde_json::to_string_pretty(&report).expect("serialize report");
-    std::fs::write(dir.join("session-09-coverage-report.json"), &json)
+    std::fs::write(dir.join("session-06-coverage-report.json"), &json)
         .expect("write coverage JSON");
 
     // Markdown report
     let md = report_to_markdown(&report);
-    std::fs::write(dir.join("session-09-coverage-report.md"), &md)
+    std::fs::write(dir.join("session-06-coverage-report.md"), &md)
         .expect("write coverage markdown");
 
     // Also write to docs/generated/
@@ -592,14 +673,36 @@ async fn generate_coverage_report() {
 
     // Assertions
     assert!(report.summary.total_tools > 0, "No tools found in manifest");
+    // 139 in Admin manifest + tools only in utility profiles
+    assert!(
+        report.summary.total_tools >= 139,
+        "Expected at least 139 total tools, got {}",
+        report.summary.total_tools
+    );
     assert!(
         report.summary.kernel_conformance_tested >= 27,
         "Expected at least 27 kernel conformance tests, got {}",
         report.summary.kernel_conformance_tested
+    );
+    assert_eq!(
+        report.summary.spec_conformance_tested, 31,
+        "Expected 31 spec conformance tests (DM+Ads+Compliance), got {}",
+        report.summary.spec_conformance_tested
     );
     assert!(
         report.summary.contract_tested >= 15,
         "Expected at least 15 contract tests, got {}",
         report.summary.contract_tested
     );
+
+    // Profile delta assertions
+    for p in &report.profiles {
+        match p.profile.as_str() {
+            "readonly" => assert_eq!(p.delta, 0, "Readonly delta should be 0"),
+            "api_readonly" => assert_eq!(p.delta, 5, "ApiReadonly delta should be +5"),
+            "write" => assert_eq!(p.delta, 8, "Write delta should be +8"),
+            "admin" => assert_eq!(p.delta, 31, "Admin delta should be +31"),
+            _ => {}
+        }
+    }
 }
