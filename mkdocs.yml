@@ -6,6 +6,17 @@ repo_name: aramirez087/TuitBot
 edit_uri: edit/main/docs/
 theme:
   name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
   features:
     - navigation.sections
     - navigation.expand
@@ -22,12 +33,24 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Configuration: configuration.md
+  - LAN Mode: lan-mode.md
   - Auth Matrix: auth-matrix.md
   - Composer Mode: composer-mode.md
   - CLI Reference: cli-reference.md
   - MCP Reference: mcp-reference.md
   - Architecture: architecture.md
   - Operations: operations.md
+  - Runbooks:
+      - Overview: runbooks/README.md
+      - Incident Response: runbooks/incident-response.md
+      - Auth Expiry: runbooks/auth-expiry.md
+      - Rate Limit Storms: runbooks/rate-limit-storms.md
+      - Backup & Restore: runbooks/backup-restore.md
+      - Database Maintenance: runbooks/database-maintenance.md
+  - Roadmap:
+      - Cloud Hosted Tier Backlog: roadmap/BACKLOG-cloud-hosted-tier.md
+  - Reports:
+      - MCP Endpoint Coverage: generated/coverage-report.md
   - Release and Publishing: release-and-publishing.md
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md

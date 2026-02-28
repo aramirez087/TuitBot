@@ -109,7 +109,7 @@ The palette provides fuzzy search over 13 compose actions organized into 4 categ
 
 Navigate with `↑` / `↓` arrow keys, execute with `Enter`, close with `Escape`.
 
-For the full list of palette actions, see the [Keyboard Shortcut Cheatsheet](roadmap/typefully-composer-ui-parity/shortcut-cheatsheet.md).
+For the full list of palette actions, see the [Keyboard Shortcuts](#keyboard-shortcuts).
 
 ## Keyboard Shortcuts
 
@@ -132,7 +132,7 @@ For the full list of palette actions, see the [Keyboard Shortcut Cheatsheet](roa
 | Merge with next | `⌘⇧M` | `Ctrl+Shift+M` | Thread |
 | Next / prev card | `Tab` / `⇧Tab` | `Tab` / `Shift+Tab` | Thread |
 
-Full reference with descriptions: [Keyboard Shortcut Cheatsheet](roadmap/typefully-composer-ui-parity/shortcut-cheatsheet.md).
+Full reference with descriptions: [Keyboard Shortcuts](#keyboard-shortcuts).
 
 Typefully provides only `Cmd+Enter` for submission. Tuitbot provides 14 shortcuts covering every compose operation — you can create, restructure, and submit a thread without touching the mouse.
 
@@ -309,7 +309,7 @@ If you are upgrading from a pre-thread-composer version, here is what changed:
 
 3. **Media can be attached per-tweet in threads.** Previously, media was only available in tweet mode. Now each thread card has its own media slot.
 
-4. **Keyboard shortcuts are available.** 14 shortcuts cover all compose operations. See the [Keyboard Shortcut Cheatsheet](roadmap/typefully-composer-ui-parity/shortcut-cheatsheet.md).
+4. **Keyboard shortcuts are available.** 14 shortcuts cover all compose operations. See the [Keyboard Shortcuts](#keyboard-shortcuts).
 
 5. **Auto-save protects your work.** Content is saved to `localStorage` every 500ms. If you close the modal without submitting, a recovery prompt appears next time.
 
