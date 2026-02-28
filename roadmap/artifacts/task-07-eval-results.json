@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-02-28T04:13:21.540035+00:00",
+  "timestamp": "2026-02-28T04:26:16.698718+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -42,7 +42,7 @@
         },
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 5,
+          "latency_ms": 6,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -57,7 +57,7 @@
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 10,
+      "total_latency_ms": 11,
       "success": true,
       "telemetry_entries": 3,
       "schema_valid": true
