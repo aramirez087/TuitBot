@@ -3,8 +3,8 @@
 	import { FolderOpen, Cloud } from 'lucide-svelte';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 	import { draft, updateDraft } from '$lib/stores/settings';
+	import { capabilities, loadCapabilities } from '$lib/stores/runtime';
 
-	let isTauri = $state(false);
 	let browseError = $state('');
 
 	const currentSource = $derived($draft?.content_sources?.sources?.[0]);
@@ -17,14 +17,26 @@
 	const filePatterns = $derived(currentSource?.file_patterns ?? ['*.md', '*.txt']);
 	const pollInterval = $derived(currentSource?.poll_interval_seconds ?? 300);
 
+	const canLocalFs = $derived($capabilities?.local_folder ?? true);
+	const canManualPath = $derived($capabilities?.manual_local_path ?? true);
+	const canNativePicker = $derived($capabilities?.file_picker_native ?? false);
+	const canGoogleDrive = $derived($capabilities?.google_drive ?? true);
+
 	const SectionIcon = $derived(sourceType === 'google_drive' ? Cloud : FolderOpen);
 
-	onMount(async () => {
-		try {
-			await import('@tauri-apps/plugin-dialog');
-			isTauri = true;
-		} catch {
-			// Not in Tauri context
+	onMount(() => {
+		loadCapabilities();
+	});
+
+	// Auto-switch away from local_fs when capabilities disallow it
+	$effect(() => {
+		if ($capabilities && !$capabilities.local_folder && sourceType === 'local_fs') {
+			updateSource({
+				source_type: 'google_drive',
+				path: null,
+				loop_back_enabled: false,
+				poll_interval_seconds: 300
+			});
 		}
 	});
 
@@ -126,15 +138,24 @@
 				value={sourceType}
 				onchange={handleSourceTypeChange}
 			>
-				<option value="local_fs">Local Folder</option>
-				<option value="google_drive">Google Drive</option>
+				{#if canLocalFs}
+					<option value="local_fs">Local Folder</option>
+				{/if}
+				{#if canGoogleDrive}
+					<option value="google_drive">Google Drive</option>
+				{/if}
 			</select>
 			<span class="field-hint">
 				Choose where your content lives
 			</span>
+			{#if !canLocalFs}
+				<div class="capability-notice">
+					Local folder sources are not available in cloud deployments. Use Google Drive or another cloud connector to provide content.
+				</div>
+			{/if}
 		</div>
 
-		{#if sourceType === 'local_fs'}
+		{#if sourceType === 'local_fs' && (canLocalFs || canManualPath)}
 			<div class="field full-width">
 				<label class="field-label" for="source_path">Vault / Notes Folder</label>
 				<div class="path-row">
@@ -146,7 +167,7 @@
 						oninput={handlePathInput}
 						placeholder="~/Documents/my-vault"
 					/>
-					{#if isTauri}
+					{#if canNativePicker}
 						<button type="button" class="browse-btn" onclick={browseFolder}>
 							<FolderOpen size={14} />
 							Browse
@@ -154,17 +175,17 @@
 					{/if}
 				</div>
 				<span class="field-hint">
-					{#if isTauri}
+					{#if canNativePicker}
 						Click Browse to select your Obsidian vault or notes folder.
 					{:else}
-						Enter the full path to your Obsidian vault or notes folder.
+						Enter the full server-side path to your content folder.
 					{/if}
 				</span>
 				{#if browseError}
 					<span class="field-error">{browseError}</span>
 				{/if}
 			</div>
-		{:else}
+		{:else if sourceType === 'google_drive'}
 			<div class="field full-width">
 				<label class="field-label" for="folder_id">Google Drive Folder ID</label>
 				<input
@@ -312,6 +333,16 @@
 	.field-error {
 		font-size: 12px;
 		color: var(--color-danger);
+	}
+
+	.capability-notice {
+		padding: 10px 14px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-accent) 15%, transparent);
+		border-radius: 6px;
+		font-size: 12px;
+		color: var(--color-text-subtle);
+		line-height: 1.5;
 	}
 
 	.path-row {

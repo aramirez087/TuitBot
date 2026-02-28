@@ -437,6 +437,12 @@ export interface TuitbotConfig {
 	deployment_mode: DeploymentModeValue;
 }
 
+export interface ConfigStatus {
+	configured: boolean;
+	deployment_mode: DeploymentModeValue;
+	capabilities: DeploymentCapabilities;
+}
+
 export interface SettingsValidationResult {
 	valid: boolean;
 	errors: Array<{ field: string; message: string }>;
@@ -858,7 +864,7 @@ export const api = {
 	},
 
 	settings: {
-		configStatus: () => request<{ configured: boolean }>('/api/settings/status'),
+		configStatus: () => request<ConfigStatus>('/api/settings/status'),
 		init: (data: Partial<TuitbotConfig>) =>
 			request<{ status: string; config?: TuitbotConfig; errors?: Array<{ field: string; message: string }> }>(
 				'/api/settings/init',

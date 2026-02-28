@@ -107,9 +107,17 @@ fn config_errors_to_response(errors: Vec<ConfigError>) -> Vec<ValidationErrorIte
 // ---------------------------------------------------------------------------
 
 /// `GET /api/settings/status` — check if config exists.
+///
+/// Also returns `deployment_mode` and `capabilities` so unauthenticated
+/// pages (e.g. onboarding) can adapt their source-type UI.
 pub async fn config_status(State(state): State<Arc<AppState>>) -> Json<Value> {
     let configured = state.config_path.exists();
-    Json(serde_json::json!({ "configured": configured }))
+    let capabilities = state.deployment_mode.capabilities();
+    Json(serde_json::json!({
+        "configured": configured,
+        "deployment_mode": state.deployment_mode,
+        "capabilities": capabilities,
+    }))
 }
 
 /// `POST /api/settings/init` — create initial config from JSON.

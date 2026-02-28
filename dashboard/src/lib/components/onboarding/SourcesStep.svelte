@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { onboardingData } from '$lib/stores/onboarding';
+	import { capabilities, loadCapabilities } from '$lib/stores/runtime';
 	import { FolderOpen, Cloud } from 'lucide-svelte';
 
 	let sourceType = $state($onboardingData.source_type);
@@ -10,15 +11,20 @@
 	let folderId = $state($onboardingData.folder_id);
 	let serviceAccountKey = $state($onboardingData.service_account_key);
 	let pollInterval = $state($onboardingData.poll_interval_seconds);
-	let isTauri = $state(false);
 	let browseError = $state('');
 
-	onMount(async () => {
-		try {
-			await import('@tauri-apps/plugin-dialog');
-			isTauri = true;
-		} catch {
-			// Not in Tauri context
+	const canLocalFs = $derived($capabilities?.local_folder ?? true);
+	const canNativePicker = $derived($capabilities?.file_picker_native ?? false);
+	const canGoogleDrive = $derived($capabilities?.google_drive ?? true);
+
+	onMount(() => {
+		loadCapabilities();
+	});
+
+	// Auto-switch to google_drive when cloud mode disallows local_fs
+	$effect(() => {
+		if ($capabilities && !$capabilities.local_folder && sourceType === 'local_fs') {
+			sourceType = 'google_drive';
 		}
 	});
 
@@ -83,9 +89,18 @@
 			class="text-input"
 			bind:value={sourceType}
 		>
-			<option value="local_fs">Local Folder</option>
-			<option value="google_drive">Google Drive</option>
+			{#if canLocalFs}
+				<option value="local_fs">Local Folder</option>
+			{/if}
+			{#if canGoogleDrive}
+				<option value="google_drive">Google Drive</option>
+			{/if}
 		</select>
+		{#if !canLocalFs}
+			<p class="capability-hint">
+				Local folder sources are not available in cloud deployments. Connect a Google Drive folder to provide your content.
+			</p>
+		{/if}
 	</div>
 
 	{#if sourceType === 'local_fs'}
@@ -102,13 +117,18 @@
 					bind:value={vaultPath}
 					placeholder="~/Documents/my-vault"
 				/>
-				{#if isTauri}
+				{#if canNativePicker}
 					<button type="button" class="browse-btn" onclick={browseFolder}>
 						<FolderOpen size={14} />
 						Browse
 					</button>
 				{/if}
 			</div>
+			{#if !canNativePicker}
+				<span class="field-hint">
+					Enter the full server-side path to your content folder.
+				</span>
+			{/if}
 			{#if browseError}
 				<span class="field-error">{browseError}</span>
 			{/if}
@@ -243,9 +263,24 @@
 		color: var(--color-text);
 	}
 
+	.field-hint {
+		font-size: 12px;
+		color: var(--color-text-muted);
+	}
+
 	.field-error {
 		font-size: 12px;
 		color: var(--color-danger);
+	}
+
+	.capability-hint {
+		font-size: 13px;
+		color: var(--color-text-muted);
+		margin: -4px 0 0;
+		padding: 10px 14px;
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+		border-radius: 8px;
+		line-height: 1.4;
 	}
 
 	.path-row {
