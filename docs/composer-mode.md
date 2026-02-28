@@ -46,7 +46,7 @@ In Composer mode, you write and schedule content yourself. Tuitbot provides AI a
 
 ## Thread Composer
 
-The thread composer uses a card-based editor where each tweet in the thread is a visual card with its own textarea, character counter, and media slot. A two-pane layout shows the editor on the left and a live tweet-style preview on the right (stacked vertically on mobile).
+The thread composer uses a card-based editor where each tweet in the thread is a visual card with its own textarea, character counter, and media slot. Both tweet and thread modes use a two-pane layout: editor on the left, X-accurate preview on the right (stacked vertically on mobile). See [Preview Fidelity](#preview-fidelity) for details on the preview rendering.
 
 ### Data Model
 
@@ -178,6 +178,52 @@ Cues are saved to a most-recently-used list (up to 5) in `localStorage` (`tuitbo
 ### Data flow
 
 The VoiceContextPanel reads settings from the `config` store (`$lib/stores/settings`). On modal open, if settings haven't been loaded yet, a fallback `loadSettings()` call fetches them. The quick cue value flows up to ComposeModal via `oncuechange`, which threads it into all AI assist calls.
+
+## Preview Fidelity
+
+Both tweet and thread modes display a live preview alongside the editor. On desktop, the editor and preview sit side-by-side in a two-column layout. On mobile (< 768px), they stack vertically with the preview below the editor.
+
+### What the preview emulates
+
+- **Tweet card chrome** — Avatar placeholder, handle, tweet numbering, and text rendering
+- **Thread connectors** — Vertical line between cards showing thread continuity
+- **X-accurate media grids** — 1, 2, 3, and 4 image arrangements that match X's layout patterns
+- **Video poster frame** — First frame of video with centered play icon overlay
+- **Crop severity indicator** — Small "cropped" badge when an image's shape significantly differs from the display slot
+
+### Media Grid Rules
+
+| Image count | Grid layout | Slot aspect ratios |
+|-------------|-------------|-------------------|
+| 1 | Full width | 16:9 landscape |
+| 2 | Side by side | 4:5 portrait each |
+| 3 | Left tall + right stacked | Left: 2:3, Right: 1:1 each |
+| 4 | 2x2 grid | 1:1 square each |
+
+All images use `object-fit: cover` to fill their slot, matching X's cropping behavior. Maximum 4 images displayed per tweet (X's limit).
+
+### Crop Indicator
+
+When an image's intrinsic aspect ratio deviates significantly (> 30%) from its display slot, a subtle "cropped" badge appears in the bottom-right corner of the image. This helps you anticipate how your image will appear on X before posting.
+
+Crop severity is calculated from the ratio between the image's natural dimensions and the slot's target aspect ratio. The indicator appears after the image loads (brief delay for local files, typically < 50ms).
+
+### Preview Fidelity Constants
+
+The exact aspect ratios and crop math are defined in `dashboard/src/lib/utils/mediaDimensions.ts`. This utility provides:
+
+- `X_SLOT_RATIOS` — Display slot aspect ratios per media count
+- `calculateCropSeverity()` — Numeric crop severity (0 = no crop, 1 = extreme)
+- `CROP_SEVERITY_THRESHOLD` — Threshold above which the crop badge appears (0.3)
+
+### Known Limitations
+
+- No URL unfurling or link card preview
+- No GIF animation toggle in preview
+- No quote-tweet or poll preview
+- No dark/light theme preview switching (follows the app theme)
+- Crop indicator appears after image loads (brief delay)
+- Preview shows a maximum of 4 images per tweet (matches X)
 
 ## AI Assist
 

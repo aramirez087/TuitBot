@@ -9,12 +9,12 @@
 	import { matchEvent } from '$lib/utils/shortcuts';
 	import TimePicker from './TimePicker.svelte';
 	import ThreadComposer from './ThreadComposer.svelte';
-	import TweetPreview from './TweetPreview.svelte';
 	import CommandPalette from './CommandPalette.svelte';
 	import FromNotesPanel from './FromNotesPanel.svelte';
 	import ComposerShell from './composer/ComposerShell.svelte';
 	import TweetEditor from './composer/TweetEditor.svelte';
 	import VoiceContextPanel from './composer/VoiceContextPanel.svelte';
+	import ThreadPreviewRail from './composer/ThreadPreviewRail.svelte';
 	import type { AttachedMedia } from './composer/TweetEditor.svelte';
 
 	let {
@@ -139,6 +139,10 @@
 
 	const hasExistingContent = $derived(
 		mode === 'tweet' ? tweetText.trim().length > 0 : threadBlocks.some((b) => b.text.trim().length > 0)
+	);
+
+	const tweetMediaPreviewMap = $derived(
+		new Map(attachedMedia.map((m) => [m.path, m.previewUrl]))
 	);
 
 	async function handleSubmit() {
@@ -315,44 +319,36 @@
 		{#snippet children()}
 			<VoiceContextPanel bind:this={voicePanelRef} cue={voiceCue} oncuechange={(c) => { voiceCue = c; }} />
 
-			{#if mode === 'tweet'}
-				<TweetEditor
-					bind:this={tweetEditorRef}
-					text={tweetText}
-					onchange={(t) => { tweetText = t; }}
-					{attachedMedia}
-					onmediachange={(m) => { attachedMedia = m; }}
-					onerror={(msg) => { submitError = msg; }}
-				/>
-			{:else}
-				<div class="thread-layout">
-					<div class="thread-editor-pane">
+			<div class="compose-layout">
+				<div class="editor-pane">
+					{#if mode === 'tweet'}
+						<TweetEditor
+							bind:this={tweetEditorRef}
+							text={tweetText}
+							onchange={(t) => { tweetText = t; }}
+							{attachedMedia}
+							onmediachange={(m) => { attachedMedia = m; }}
+							onerror={(msg) => { submitError = msg; }}
+						/>
+					{:else}
 						<ThreadComposer
 							bind:this={threadComposerRef}
 							initialBlocks={threadBlocks.length > 0 ? threadBlocks : undefined}
 							onchange={(b) => { threadBlocks = b; }}
 							onvalidchange={(v) => { threadValid = v; }}
 						/>
-					</div>
-					<div class="thread-preview-pane">
-						<div class="preview-header-label">Preview</div>
-						<div class="preview-scroll">
-							{#if sortedPreviewBlocks.length > 0}
-								{#each sortedPreviewBlocks as block, i (block.id)}
-									<TweetPreview
-										text={block.text}
-										mediaPaths={block.media_paths}
-										index={i}
-										total={sortedPreviewBlocks.length}
-									/>
-								{/each}
-							{:else}
-								<div class="preview-empty">Start typing to see preview...</div>
-							{/if}
-						</div>
-					</div>
+					{/if}
 				</div>
-			{/if}
+				<div class="preview-pane">
+					<ThreadPreviewRail
+						{mode}
+						tweetText={tweetText}
+						tweetMediaPaths={attachedMedia.map((m) => m.path)}
+						tweetLocalPreviews={tweetMediaPreviewMap}
+						blocks={sortedPreviewBlocks}
+					/>
+				</div>
+			</div>
 
 			{#if showFromNotes}
 				<FromNotesPanel
@@ -392,42 +388,20 @@
 {/if}
 
 <style>
-	.thread-layout {
+	.compose-layout {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 16px;
 	}
 
-	.thread-editor-pane {
+	.editor-pane {
 		min-width: 0;
 	}
 
-	.thread-preview-pane {
+	.preview-pane {
 		min-width: 0;
 		border-left: 1px solid var(--color-border-subtle);
 		padding-left: 16px;
-	}
-
-	.preview-header-label {
-		font-size: 11px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--color-text-subtle);
-		margin-bottom: 8px;
-	}
-
-	.preview-scroll {
-		max-height: 400px;
-		overflow-y: auto;
-	}
-
-	.preview-empty {
-		padding: 24px 0;
-		text-align: center;
-		font-size: 13px;
-		color: var(--color-text-subtle);
-		font-style: italic;
 	}
 
 	.schedule-section {
@@ -466,11 +440,11 @@
 	}
 
 	@media (max-width: 768px) {
-		.thread-layout {
+		.compose-layout {
 			grid-template-columns: 1fr;
 		}
 
-		.thread-preview-pane {
+		.preview-pane {
 			border-left: none;
 			padding-left: 0;
 			border-top: 1px solid var(--color-border-subtle);

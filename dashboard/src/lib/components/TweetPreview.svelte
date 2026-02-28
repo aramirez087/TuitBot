@@ -1,15 +1,17 @@
 <script lang="ts">
-	import { api } from '$lib/api';
+	import MediaCropPreview from './composer/MediaCropPreview.svelte';
 
 	let {
 		text,
 		mediaPaths = [],
+		localPreviews,
 		index,
 		total,
 		handle = '@you'
 	}: {
 		text: string;
 		mediaPaths: string[];
+		localPreviews?: Map<string, string>;
 		index: number;
 		total: number;
 		handle?: string;
@@ -17,7 +19,6 @@
 
 	const displayText = $derived(text.trim() || '');
 	const hasMedia = $derived(mediaPaths.length > 0);
-	const mediaCount = $derived(mediaPaths.length);
 	const showConnector = $derived(index < total - 1);
 </script>
 
@@ -39,19 +40,7 @@
 			<div class="preview-text placeholder">Empty tweet</div>
 		{/if}
 		{#if hasMedia}
-			<div
-				class="preview-media-grid"
-				class:single={mediaCount === 1}
-				class:double={mediaCount === 2}
-				class:triple={mediaCount === 3}
-				class:quad={mediaCount === 4}
-			>
-				{#each mediaPaths as path}
-					<div class="preview-media-item">
-						<img src={api.media.fileUrl(path)} alt="" loading="lazy" />
-					</div>
-				{/each}
-			</div>
+			<MediaCropPreview {mediaPaths} {localPreviews} />
 		{/if}
 	</div>
 </article>
@@ -123,49 +112,6 @@
 	.preview-text.placeholder {
 		color: var(--color-text-subtle);
 		font-style: italic;
-	}
-
-	.preview-media-grid {
-		display: grid;
-		gap: 4px;
-		margin-top: 8px;
-		border-radius: 8px;
-		overflow: hidden;
-		border: 1px solid var(--color-border-subtle);
-	}
-
-	.preview-media-grid.single {
-		grid-template-columns: 1fr;
-	}
-
-	.preview-media-grid.double {
-		grid-template-columns: 1fr 1fr;
-	}
-
-	.preview-media-grid.triple {
-		grid-template-columns: 1fr 1fr;
-		grid-template-rows: 1fr 1fr;
-	}
-
-	.preview-media-grid.triple .preview-media-item:first-child {
-		grid-row: 1 / 3;
-	}
-
-	.preview-media-grid.quad {
-		grid-template-columns: 1fr 1fr;
-		grid-template-rows: 1fr 1fr;
-	}
-
-	.preview-media-item {
-		aspect-ratio: 16 / 9;
-		overflow: hidden;
-	}
-
-	.preview-media-item img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
 	}
 
 	/* Mobile responsive */
