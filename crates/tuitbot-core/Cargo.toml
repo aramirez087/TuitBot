@@ -32,6 +32,10 @@ tokio-util = "0.7.18"
 regex = "1"
 bcrypt = "0.16"
 hex = "0.4"
+notify = "7"
+notify-debouncer-full = "0.4"
+serde_yaml = "0.9"
+glob = "0.3"
 
 [features]
 test-helpers = []

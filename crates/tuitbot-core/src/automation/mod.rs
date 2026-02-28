@@ -28,6 +28,7 @@ pub mod scheduler;
 pub mod status_reporter;
 pub mod target_loop;
 pub mod thread_loop;
+pub mod watchtower;
 
 pub use analytics_loop::{
     AnalyticsError, AnalyticsLoop, AnalyticsStorage, AnalyticsSummary, EngagementFetcher,
@@ -54,6 +55,7 @@ pub use target_loop::{
     TargetUserManager,
 };
 pub use thread_loop::{ThreadGenerator, ThreadLoop, ThreadResult};
+pub use watchtower::{IngestSummary, WatchtowerError, WatchtowerLoop};
 
 use std::future::Future;
 use std::sync::Arc;

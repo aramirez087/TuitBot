@@ -3,6 +3,7 @@
 //! Accepts inline content nodes for direct ingestion (e.g. from iOS Shortcuts
 //! or Telegram) and file hints for future filesystem scanning.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -10,6 +11,7 @@ use axum::extract::State;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tuitbot_core::automation::watchtower as wt;
 use tuitbot_core::storage::watchtower;
 
 use crate::error::ApiError;
@@ -113,10 +115,44 @@ pub async fn ingest(
         }
     }
 
-    // File hints are acknowledged but not processed until Session 03
-    // when the ContentSource trait and filesystem scanning are implemented.
-    if !body.file_hints.is_empty() && body.inline_nodes.is_empty() {
-        // No-op for now — hints will be routed through ContentSource in S03.
+    // Process file hints through the shared ingest pipeline.
+    if !body.file_hints.is_empty() {
+        // Find the first configured local_fs source to resolve base path.
+        let source_entry = state
+            .content_sources
+            .sources
+            .iter()
+            .find(|s| s.source_type == "local_fs" && s.path.is_some());
+
+        if let Some(entry) = source_entry {
+            let path_str = entry.path.as_deref().unwrap();
+            let base_path = PathBuf::from(tuitbot_core::storage::expand_tilde(path_str));
+
+            let config_json = serde_json::json!({
+                "path": path_str,
+                "file_patterns": entry.file_patterns,
+                "loop_back_enabled": entry.loop_back_enabled,
+            })
+            .to_string();
+
+            let source_id = watchtower::ensure_local_fs_source(&state.db, path_str, &config_json)
+                .await
+                .map_err(ApiError::Storage)?;
+
+            let summary = wt::ingest_files(
+                &state.db,
+                source_id,
+                &base_path,
+                &body.file_hints,
+                body.force,
+            )
+            .await;
+            ingested += summary.ingested;
+            skipped += summary.skipped;
+            errors.extend(summary.errors);
+        } else {
+            errors.push("No local_fs content source configured for file_hints".to_string());
+        }
     }
 
     let duration_ms = start.elapsed().as_millis() as u64;

@@ -7,8 +7,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use tokio::sync::{broadcast, Mutex, RwLock};
+use tokio_util::sync::CancellationToken;
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
 use tuitbot_core::automation::Runtime;
+use tuitbot_core::config::ContentSourcesConfig;
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::storage::DbPool;
 
@@ -40,4 +42,8 @@ pub struct AppState {
     pub content_generators: Mutex<HashMap<String, Arc<ContentGenerator>>>,
     /// Optional circuit breaker for X API rate-limit protection.
     pub circuit_breaker: Option<Arc<CircuitBreaker>>,
+    /// Cancellation token for the Watchtower filesystem watcher (None if not running).
+    pub watchtower_cancel: Option<CancellationToken>,
+    /// Content sources configuration for the Watchtower.
+    pub content_sources: ContentSourcesConfig,
 }

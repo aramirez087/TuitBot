@@ -17,6 +17,8 @@ use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage;
 use tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID;
 
+use tokio_util::sync::CancellationToken;
+use tuitbot_core::automation::WatchtowerLoop;
 use tuitbot_core::net::local_ip;
 use tuitbot_server::auth;
 use tuitbot_server::state::AppState;
@@ -140,6 +142,34 @@ async fn main() -> Result<()> {
         content_generators.insert(DEFAULT_ACCOUNT_ID.to_string(), cg);
     }
 
+    // Extract content_sources config for Watchtower.
+    let content_sources = loaded_config
+        .as_ref()
+        .map(|c| c.content_sources.clone())
+        .unwrap_or_default();
+
+    // Conditionally start the Watchtower filesystem watcher.
+    let watchtower_cancel = {
+        let watch_sources: Vec<_> = content_sources
+            .sources
+            .iter()
+            .filter(|s| s.watch && s.path.is_some())
+            .collect();
+
+        if !watch_sources.is_empty() {
+            let cancel = CancellationToken::new();
+            let watchtower = WatchtowerLoop::new(pool.clone(), content_sources.clone());
+            let cancel_clone = cancel.clone();
+            tokio::spawn(async move {
+                watchtower.run(cancel_clone).await;
+            });
+            tracing::info!(sources = watch_sources.len(), "Watchtower started");
+            Some(cancel)
+        } else {
+            None
+        }
+    };
+
     let state = Arc::new(AppState {
         db: pool,
         config_path,
@@ -153,6 +183,8 @@ async fn main() -> Result<()> {
         runtimes: Mutex::new(HashMap::new()),
         content_generators: Mutex::new(content_generators),
         circuit_breaker: None,
+        watchtower_cancel: watchtower_cancel.clone(),
+        content_sources,
     });
 
     let router = tuitbot_server::build_router(state);
@@ -168,6 +200,11 @@ async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("{}:{}", bind_host, bind_port)).await?;
     tracing::info!("listening on http://{}:{}", bind_host, bind_port);
     axum::serve(listener, router).await?;
+
+    // Cancel watchtower on shutdown.
+    if let Some(cancel) = watchtower_cancel {
+        cancel.cancel();
+    }
 
     Ok(())
 }

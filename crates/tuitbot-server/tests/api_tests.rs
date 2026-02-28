@@ -33,6 +33,8 @@ async fn test_router() -> axum::Router {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
 
     tuitbot_server::build_router(state)
@@ -244,6 +246,8 @@ async fn approval_stats_returns_counts() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -286,6 +290,8 @@ async fn approval_list_with_status_filter() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -338,6 +344,8 @@ async fn approval_edit_content() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -388,6 +396,8 @@ async fn approval_edit_empty_content() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -524,6 +534,8 @@ async fn add_and_list_target() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -562,6 +574,8 @@ async fn add_duplicate_target_fails() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -601,6 +615,8 @@ async fn remove_target_works() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -660,6 +676,8 @@ async fn runtime_start_and_stop() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -716,6 +734,8 @@ async fn settings_get_returns_json() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -746,6 +766,8 @@ async fn settings_patch_round_trips() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -833,6 +855,8 @@ async fn post_ingest_idempotent() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
     });
     let router = tuitbot_server::build_router(state);
 
