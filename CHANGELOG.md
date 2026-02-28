@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.12...tuitbot-cli-v0.1.13) - 2026-02-28
+
+### Added
+
+- Implement LAN access mode with new API, UI, server logic, and updated evaluation artifacts.
+- Implement session-based authentication and login UI for web/LAN mode, adding server middleware, core session management, and related database migrations.
+
+### Other
+
+- modularize automation adapters into sub-modules and add X-API adapter tests.
+
 ## [0.1.12](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.11...tuitbot-cli-v0.1.12) - 2026-02-27
 
 ### Added
