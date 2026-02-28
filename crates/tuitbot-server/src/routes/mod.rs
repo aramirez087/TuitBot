@@ -9,6 +9,7 @@ pub mod content;
 pub mod costs;
 pub mod discovery;
 pub mod health;
+pub mod ingest;
 pub mod lan;
 pub mod mcp;
 pub mod media;

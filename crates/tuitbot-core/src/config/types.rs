@@ -451,3 +451,52 @@ fn default_db_path() -> String {
 fn default_retention_days() -> u32 {
     90
 }
+
+// ---------------------------------------------------------------------------
+// Content Sources
+// ---------------------------------------------------------------------------
+
+/// Content source configuration for the Watchtower.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct ContentSourcesConfig {
+    /// Configured content sources.
+    #[serde(default)]
+    pub sources: Vec<ContentSourceEntry>,
+}
+
+/// A single content source entry.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ContentSourceEntry {
+    /// Source type: "local_fs" (v1). Future: "google_drive".
+    #[serde(default = "default_source_type")]
+    pub source_type: String,
+
+    /// Filesystem path (for local_fs sources). Supports ~ expansion.
+    #[serde(default)]
+    pub path: Option<String>,
+
+    /// Whether to watch for changes in real-time.
+    #[serde(default = "default_watch")]
+    pub watch: bool,
+
+    /// File patterns to include.
+    #[serde(default = "default_file_patterns")]
+    pub file_patterns: Vec<String>,
+
+    /// Whether to write metadata back to source files.
+    #[serde(default = "default_loop_back")]
+    pub loop_back_enabled: bool,
+}
+
+fn default_source_type() -> String {
+    "local_fs".to_string()
+}
+fn default_watch() -> bool {
+    true
+}
+fn default_file_patterns() -> Vec<String> {
+    vec!["*.md".to_string(), "*.txt".to_string()]
+}
+fn default_loop_back() -> bool {
+    true
+}

@@ -775,3 +775,110 @@ async fn settings_patch_round_trips() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["business"]["product_name"], "NewName");
 }
+
+// ============================================================
+// Ingest
+// ============================================================
+
+#[tokio::test]
+async fn post_ingest_inline_returns_200() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/ingest",
+        serde_json::json!({
+            "inline_nodes": [{
+                "relative_path": "notes/test.md",
+                "body_text": "Some test content about Rust.",
+                "title": "Test Note"
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ingested"], 1);
+    assert_eq!(body["skipped"], 0);
+    assert!(body["duration_ms"].is_number());
+}
+
+#[tokio::test]
+async fn post_ingest_requires_auth() {
+    let router = test_router().await;
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/ingest")
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&serde_json::json!({"inline_nodes": []})).unwrap(),
+        ))
+        .expect("build request");
+    let response = router.oneshot(req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn post_ingest_idempotent() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let state = Arc::new(AppState {
+        db: pool,
+        config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
+        data_dir: std::path::PathBuf::from("/tmp"),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let body = serde_json::json!({
+        "inline_nodes": [{
+            "relative_path": "notes/idea.md",
+            "body_text": "Content that won't change."
+        }]
+    });
+
+    // First ingest
+    let (status, resp1) = post_json(router.clone(), "/api/ingest", body.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(resp1["ingested"], 1);
+
+    // Second ingest — same content, same hash → skipped
+    let (status, resp2) = post_json(router, "/api/ingest", body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(resp2["ingested"], 0);
+    assert_eq!(resp2["skipped"], 1);
+}
+
+#[tokio::test]
+async fn post_ingest_empty_body() {
+    let router = test_router().await;
+    let (status, body) = post_json(router, "/api/ingest", serde_json::json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ingested"], 0);
+    assert_eq!(body["skipped"], 0);
+}
+
+#[tokio::test]
+async fn post_ingest_empty_body_text_errors() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/ingest",
+        serde_json::json!({
+            "inline_nodes": [{
+                "relative_path": "notes/empty.md",
+                "body_text": ""
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ingested"], 0);
+    assert_eq!(body["errors"].as_array().unwrap().len(), 1);
+}

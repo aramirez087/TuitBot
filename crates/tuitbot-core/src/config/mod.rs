@@ -19,8 +19,9 @@ mod tests;
 
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
 pub use types::{
-    AuthConfig, BusinessProfile, IntervalsConfig, LimitsConfig, LlmConfig, LoggingConfig,
-    ScoringConfig, ServerConfig, StorageConfig, TargetsConfig, XApiConfig,
+    AuthConfig, BusinessProfile, ContentSourceEntry, ContentSourcesConfig, IntervalsConfig,
+    LimitsConfig, LlmConfig, LoggingConfig, ScoringConfig, ServerConfig, StorageConfig,
+    TargetsConfig, XApiConfig,
 };
 pub use types_policy::{CircuitBreakerConfig, McpPolicyConfig, ScheduleConfig};
 
@@ -132,6 +133,10 @@ pub struct Config {
     /// Circuit breaker for X API rate-limit protection.
     #[serde(default)]
     pub circuit_breaker: CircuitBreakerConfig,
+
+    /// Content source configuration for the Watchtower.
+    #[serde(default)]
+    pub content_sources: ContentSourcesConfig,
 }
 
 impl Config {

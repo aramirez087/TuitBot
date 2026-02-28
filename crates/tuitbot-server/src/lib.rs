@@ -99,6 +99,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/content/drafts/{id}/publish",
             post(routes::content::publish_draft),
         )
+        // Ingest
+        .route("/ingest", post(routes::ingest::ingest))
         // Targets
         .route(
             "/targets",

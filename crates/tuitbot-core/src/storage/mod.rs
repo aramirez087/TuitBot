@@ -23,6 +23,7 @@ pub mod strategy;
 pub mod target_accounts;
 pub mod threads;
 pub mod tweets;
+pub mod watchtower;
 pub mod x_api_usage;
 
 use crate::error::StorageError;
@@ -171,6 +172,9 @@ mod tests {
         assert!(table_names.contains(&"approval_edit_history"));
         assert!(table_names.contains(&"media_uploads"));
         assert!(table_names.contains(&"mutation_audit"));
+        assert!(table_names.contains(&"source_contexts"));
+        assert!(table_names.contains(&"content_nodes"));
+        assert!(table_names.contains(&"draft_seeds"));
     }
 
     #[tokio::test]

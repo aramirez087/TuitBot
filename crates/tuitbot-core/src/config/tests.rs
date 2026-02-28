@@ -450,3 +450,49 @@ fn is_enriched_true_with_brand_voice() {
     profile.brand_voice = Some("Friendly and casual".to_string());
     assert!(profile.is_enriched());
 }
+
+// --- Content sources config tests ---
+
+#[test]
+fn content_sources_config_serde_roundtrip() {
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "local_fs"
+path = "~/notes/vault"
+watch = true
+file_patterns = ["*.md", "*.txt"]
+loop_back_enabled = true
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert_eq!(config.content_sources.sources.len(), 1);
+    let source = &config.content_sources.sources[0];
+    assert_eq!(source.source_type, "local_fs");
+    assert_eq!(source.path.as_deref(), Some("~/notes/vault"));
+    assert!(source.watch);
+    assert_eq!(source.file_patterns, vec!["*.md", "*.txt"]);
+    assert!(source.loop_back_enabled);
+}
+
+#[test]
+fn content_sources_defaults() {
+    let toml_str = r#"
+[[content_sources.sources]]
+path = "~/notes"
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    let source = &config.content_sources.sources[0];
+    assert_eq!(source.source_type, "local_fs");
+    assert!(source.watch);
+    assert_eq!(source.file_patterns, vec!["*.md", "*.txt"]);
+    assert!(source.loop_back_enabled);
+}
+
+#[test]
+fn content_sources_optional_in_config() {
+    let toml_str = r#"
+[business]
+product_name = "Test"
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert!(config.content_sources.sources.is_empty());
+}
