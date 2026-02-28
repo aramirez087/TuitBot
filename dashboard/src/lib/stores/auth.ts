@@ -27,6 +27,14 @@ export async function logout(): Promise<void> {
 	isAuthenticated.set(false);
 }
 
+/** Establish session after claim (init with passphrase). */
+export function claimSession(csrfToken: string): void {
+	setCsrfToken(csrfToken);
+	setAuthMode('cookie');
+	authMode.set('web');
+	isAuthenticated.set(true);
+}
+
 /** Check if there's an existing valid session (cookie-based). */
 export async function checkAuth(): Promise<boolean> {
 	try {

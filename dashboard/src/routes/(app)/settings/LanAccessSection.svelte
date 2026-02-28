@@ -17,6 +17,9 @@
 
 	let revealedPassphrase = $state<string | null>(null);
 	let copied = $state(false);
+	let confirmingReset = $state(false);
+	let confirmTimeout: ReturnType<typeof setTimeout> | null = null;
+	let resetError = $state('');
 	let hideTimeout: ReturnType<typeof setTimeout> | null = null;
 	let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -25,6 +28,7 @@
 		return () => {
 			if (hideTimeout) clearTimeout(hideTimeout);
 			if (copyTimeout) clearTimeout(copyTimeout);
+			if (confirmTimeout) clearTimeout(confirmTimeout);
 		};
 	});
 
@@ -56,8 +60,20 @@
 		toggling = false;
 	}
 
+	function initiateReset() {
+		if (confirmingReset) {
+			handleResetPassphrase();
+			confirmingReset = false;
+			if (confirmTimeout) clearTimeout(confirmTimeout);
+		} else {
+			confirmingReset = true;
+			confirmTimeout = setTimeout(() => { confirmingReset = false; }, 3000);
+		}
+	}
+
 	async function handleResetPassphrase() {
 		resetting = true;
+		resetError = '';
 		try {
 			const result = await api.lan.resetPassphrase();
 			revealedPassphrase = result.passphrase;
@@ -70,6 +86,7 @@
 			}, 30000);
 		} catch (e) {
 			console.error('Failed to reset passphrase', e);
+			resetError = 'Failed to reset passphrase. Please try again.';
 		}
 		resetting = false;
 	}
@@ -162,7 +179,7 @@
 			{#if revealedPassphrase}
 				<div class="passphrase-reveal">
 					<code class="passphrase-text">{revealedPassphrase}</code>
-					<button class="copy-btn" onclick={copyPassphrase} title="Copy passphrase">
+					<button class="copy-btn" onclick={copyPassphrase} title="Copy passphrase" aria-label="Copy passphrase to clipboard">
 						{#if copied}
 							<Check size={14} />
 						{:else}
@@ -177,14 +194,25 @@
 
 			<button
 				class="reset-btn"
-				onclick={handleResetPassphrase}
+				class:confirming={confirmingReset}
+				onclick={initiateReset}
 				disabled={resetting}
+				aria-label="Reset passphrase"
 			>
 				<RefreshCw size={14} class={resetting ? 'spinning' : ''} />
-				{resetting ? 'Resetting...' : 'Reset Passphrase'}
+				{#if resetting}
+					Resetting...
+				{:else if confirmingReset}
+					Confirm Reset
+				{:else}
+					Reset Passphrase
+				{/if}
 			</button>
+			{#if resetError}
+				<span class="field-error">{resetError}</span>
+			{/if}
 			<span class="field-hint">
-				Generate a new passphrase for web/LAN login
+				Generate a new passphrase for browser login. All existing sessions will continue working.
 			</span>
 		</div>
 	{/if}
@@ -372,6 +400,11 @@
 		color: var(--color-accent);
 	}
 
+	.copy-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
 	.reset-btn {
 		display: inline-flex;
 		align-items: center;
@@ -393,9 +426,31 @@
 		background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
 	}
 
+	.reset-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.reset-btn.confirming {
+		border-color: var(--color-danger);
+		color: var(--color-danger);
+	}
+
 	.reset-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+
+	.toggle:focus-visible .toggle-track {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.field-error {
+		display: block;
+		font-size: 12px;
+		color: var(--color-danger);
+		margin-top: 4px;
 	}
 
 	:global(.spinning) {

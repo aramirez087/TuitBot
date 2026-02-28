@@ -446,6 +446,7 @@ export interface TuitbotConfig {
 
 export interface ConfigStatus {
 	configured: boolean;
+	claimed: boolean;
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
 }
@@ -872,14 +873,24 @@ export const api = {
 
 	settings: {
 		configStatus: () => request<ConfigStatus>('/api/settings/status'),
-		init: (data: Partial<TuitbotConfig>) =>
-			request<{ status: string; config?: TuitbotConfig; errors?: Array<{ field: string; message: string }> }>(
-				'/api/settings/init',
-				{
-					method: 'POST',
-					body: JSON.stringify(data)
-				}
-			),
+		init: async (data: Record<string, unknown>): Promise<{
+			status: string;
+			config?: TuitbotConfig;
+			csrf_token?: string;
+			errors?: Array<{ field: string; message: string }>;
+		}> => {
+			const res = await fetch(`${BASE_URL}/api/settings/init`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data),
+				credentials: 'include'
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ error: res.statusText }));
+				throw new Error(body.error || res.statusText);
+			}
+			return res.json();
+		},
 		get: () => request<TuitbotConfig>('/api/settings'),
 		patch: (data: Partial<TuitbotConfig>) =>
 			request<TuitbotConfig>('/api/settings', {
