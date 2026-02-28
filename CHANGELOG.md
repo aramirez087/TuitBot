@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.13...tuitbot-cli-v0.1.14) - 2026-02-28
+
+### Added
+
+- Session 8 — deployment mode source capabilities
+- Session 7 — cross source validation and release
+- Session 6 — google drive source adapter
+- Session 5 — source picker and local vault ux
+- Session 4 — winning dna retrieval
+- Session 3 — watchtower runtime and loop back
+- Session 2 — schema and ingest api
+
+### Other
+
+- introduce `relative_path_string` helper to standardize path string conversion across platforms.
+- reformat debouncer match statement for consistency
+- update debouncer cache type from `FileIdMap` to `RecommendedCache`
+
 ## [0.1.13](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.12...tuitbot-cli-v0.1.13) - 2026-02-28
 
 ### Added
