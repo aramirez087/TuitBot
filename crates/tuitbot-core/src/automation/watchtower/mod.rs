@@ -428,12 +428,12 @@ impl WatchtowerLoop {
         let debouncer_result = new_debouncer(self.debounce_duration, None, handler);
         let mut debouncer: Debouncer<notify::RecommendedWatcher, RecommendedCache> =
             match debouncer_result {
-            Ok(d) => d,
-            Err(e) => {
-                tracing::error!(error = %e, "Failed to create filesystem watcher, falling back to polling");
-                self.polling_loop(&source_map, cancel).await;
-                return;
-            }
+                Ok(d) => d,
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to create filesystem watcher, falling back to polling");
+                    self.polling_loop(&source_map, cancel).await;
+                    return;
+                }
             };
 
         // Register directories with the watcher.
