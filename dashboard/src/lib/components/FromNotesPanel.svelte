@@ -3,22 +3,36 @@
 
 	let {
 		mode,
+		hasExistingContent = false,
 		ongenerate,
-		onclose
+		onclose,
+		onundo,
+		showUndo = false
 	}: {
 		mode: 'tweet' | 'thread';
+		hasExistingContent?: boolean;
 		ongenerate: (text: string) => Promise<void>;
 		onclose: () => void;
+		onundo?: () => void;
+		showUndo?: boolean;
 	} = $props();
 
 	let notesText = $state('');
 	let generating = $state(false);
 	let error = $state<string | null>(null);
+	let confirmReplace = $state(false);
 
 	async function handleGenerate() {
 		if (!notesText.trim() || generating) return;
+
+		if (hasExistingContent && !confirmReplace) {
+			confirmReplace = true;
+			return;
+		}
+
 		generating = true;
 		error = null;
+		confirmReplace = false;
 		try {
 			await ongenerate(notesText.trim());
 			notesText = '';
@@ -27,6 +41,10 @@
 		} finally {
 			generating = false;
 		}
+	}
+
+	function cancelReplace() {
+		confirmReplace = false;
 	}
 </script>
 
@@ -37,27 +55,52 @@
 			<X size={12} />
 		</button>
 	</div>
-	<textarea
-		class="notes-input"
-		placeholder="Paste rough notes, ideas, or an outline..."
-		bind:value={notesText}
-		rows={4}
-		aria-label="Notes to transform into content"
-	></textarea>
+
+	<div class="notes-textarea-wrapper" class:loading={generating}>
+		<textarea
+			class="notes-input"
+			placeholder="Paste rough notes, ideas, or an outline..."
+			bind:value={notesText}
+			rows={4}
+			disabled={generating}
+			aria-label="Notes to transform into content"
+		></textarea>
+		{#if generating}
+			<div class="loading-overlay" aria-label="Generating content">
+				<div class="loading-shimmer"></div>
+			</div>
+		{/if}
+	</div>
+
 	{#if error}
 		<div class="notes-error" role="alert">{error}</div>
 	{/if}
-	<button
-		class="notes-generate-btn"
-		onclick={handleGenerate}
-		disabled={!notesText.trim() || generating}
-	>
-		{generating
-			? 'Generating...'
-			: mode === 'thread'
-				? 'Generate thread from notes'
-				: 'Generate tweet from notes'}
-	</button>
+
+	{#if confirmReplace}
+		<div class="replace-banner" role="alert">
+			<span>This will replace your current content.</span>
+			<div class="replace-actions">
+				<button class="replace-confirm-btn" onclick={handleGenerate}>Replace</button>
+				<button class="replace-cancel-btn" onclick={cancelReplace}>Cancel</button>
+			</div>
+		</div>
+	{:else}
+		<button
+			class="notes-generate-btn"
+			onclick={handleGenerate}
+			disabled={!notesText.trim() || generating}
+		>
+			{generating
+				? 'Generating...'
+				: mode === 'thread'
+					? 'Generate thread from notes'
+					: 'Generate tweet from notes'}
+		</button>
+	{/if}
+
+	{#if showUndo && onundo}
+		<button class="notes-undo-btn" onclick={onundo}>Undo replacement</button>
+	{/if}
 </div>
 
 <style>
@@ -103,6 +146,10 @@
 		color: var(--color-text);
 	}
 
+	.notes-textarea-wrapper {
+		position: relative;
+	}
+
 	.notes-input {
 		width: 100%;
 		padding: 8px 10px;
@@ -127,10 +174,80 @@
 		color: var(--color-text-subtle);
 	}
 
+	.notes-input:disabled {
+		opacity: 0.5;
+	}
+
+	.loading-overlay {
+		position: absolute;
+		inset: 0;
+		border-radius: 6px;
+		overflow: hidden;
+		pointer-events: none;
+	}
+
+	.loading-shimmer {
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(
+			90deg,
+			transparent 25%,
+			color-mix(in srgb, var(--color-accent) 8%, transparent) 50%,
+			transparent 75%
+		);
+		background-size: 200% 100%;
+		animation: shimmer 1.5s infinite;
+	}
+
+	@keyframes shimmer {
+		0% { background-position: 200% 0; }
+		100% { background-position: -200% 0; }
+	}
+
 	.notes-error {
 		margin-top: 6px;
 		font-size: 12px;
 		color: var(--color-danger);
+	}
+
+	.replace-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+		margin-top: 8px;
+		padding: 8px 10px;
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+		font-size: 12px;
+		color: var(--color-warning);
+	}
+
+	.replace-actions {
+		display: flex;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+
+	.replace-confirm-btn {
+		padding: 4px 10px;
+		border: 1px solid var(--color-warning);
+		border-radius: 4px;
+		background: var(--color-warning);
+		color: #000;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+
+	.replace-cancel-btn {
+		padding: 4px 10px;
+		border: 1px solid var(--color-warning);
+		border-radius: 4px;
+		background: transparent;
+		color: var(--color-warning);
+		font-size: 11px;
+		cursor: pointer;
 	}
 
 	.notes-generate-btn {
@@ -153,6 +270,23 @@
 	.notes-generate-btn:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
+	}
+
+	.notes-undo-btn {
+		margin-top: 6px;
+		padding: 4px 10px;
+		border: 1px solid var(--color-accent);
+		border-radius: 4px;
+		background: transparent;
+		color: var(--color-accent);
+		font-size: 11px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.notes-undo-btn:hover {
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 	}
 
 	@media (max-width: 640px) {

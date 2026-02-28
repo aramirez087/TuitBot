@@ -151,6 +151,34 @@ Auto-save uses the storage key `tuitbot:compose:draft` with a 7-day TTL. Saved c
 - If `localStorage` quota is exceeded, auto-save fails silently (no data loss, just no recovery)
 - Content older than 7 days is automatically discarded on the next compose open
 
+## Voice Context
+
+The Voice Context panel sits between the mode tabs and the editor area, giving you visibility into and control over the persona guiding AI generation.
+
+### What it shows
+
+- **Brand voice** — your configured voice personality (from Settings > Content Persona)
+- **Content style** — your content style setting
+- **Content pillars** — up to 3 topic pillars displayed as chips
+- If no voice settings are configured, a hint links to Settings
+
+The panel collapses by default and remembers its state in `localStorage` (`tuitbot:voice:expanded`).
+
+### Quick Cue
+
+The quick cue input lets you steer AI output with a tone directive (e.g., "more casual", "technical", "provocative"). The cue is threaded into assist calls:
+
+- **Improve (⌘J):** Passed as the `context` parameter to `/api/assist/improve`
+- **Tweet generation:** Prepended to the topic string as `[Tone: <cue>] <topic>`
+- **Thread generation:** Same prepend strategy
+- **From Notes:** Prepended to the notes input
+
+Cues are saved to a most-recently-used list (up to 5) in `localStorage` (`tuitbot:voice:saved-cues`). Click a saved cue to reuse it.
+
+### Data flow
+
+The VoiceContextPanel reads settings from the `config` store (`$lib/stores/settings`). On modal open, if settings haven't been loaded yet, a fallback `loadSettings()` call fetches them. The quick cue value flows up to ComposeModal via `oncuechange`, which threads it into all AI assist calls.
+
 ## AI Assist
 
 AI Assist provides on-demand content generation powered by your configured LLM. It uses the same persona, content frameworks, and topic knowledge as the autonomous loops — but only generates content when you ask.
@@ -161,7 +189,11 @@ Select text in the tweet editor and press `⌘J` to improve just the selection. 
 
 ### Generate from Notes
 
-Click the notes button in the modal footer or select "Generate from notes" from the command palette. Paste rough notes or bullet points, and AI generates a polished tweet or thread from them. If existing content is present, you are prompted before replacement.
+Click the notes button in the modal footer or select "Generate from notes" from the command palette. Paste rough notes or bullet points, and AI generates a polished tweet or thread from them.
+
+- **Inline confirmation:** If existing content is present, an inline banner asks "This will replace your current content" with Replace / Cancel buttons (no browser `confirm()` dialog).
+- **Loading shimmer:** While generating, a shimmer animation overlays the textarea to indicate progress.
+- **Undo:** After generation replaces content, an "Undo" button appears for 10 seconds. Clicking it restores the previous content.
 
 ### AI Assist Button
 

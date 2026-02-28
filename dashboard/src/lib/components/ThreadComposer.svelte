@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { api, type ThreadBlock } from '$lib/api';
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
-	import { Plus, Trash2, GripVertical, Copy, Scissors, Merge } from 'lucide-svelte';
+	import { Plus, GripVertical } from 'lucide-svelte';
 	import MediaSlot from './MediaSlot.svelte';
+	import ThreadCardActions from './composer/ThreadCardActions.svelte';
 
 	let {
 		initialBlocks = undefined,
@@ -29,7 +30,6 @@
 	let mergeError = $state<string | null>(null);
 	let assistingBlockId = $state<string | null>(null);
 
-	// Sync when parent provides structurally different blocks (AI assist, recovery).
 	$effect(() => {
 		if (initialBlocks && initialBlocks.length > 0) {
 			const currentIds = blocks.map((b) => b.id).join(',');
@@ -45,9 +45,7 @@
 	const validationErrors = $derived.by(() => {
 		const errors: string[] = [];
 		const nonEmpty = blocks.filter((b) => b.text.trim().length > 0);
-		if (nonEmpty.length < 2) {
-			errors.push('Thread needs at least 2 tweets with content.');
-		}
+		if (nonEmpty.length < 2) errors.push('Thread needs at least 2 tweets with content.');
 		for (const block of blocks) {
 			if (tweetWeightedLen(block.text) > MAX_TWEET_CHARS) {
 				const idx = sortedBlocks.findIndex((b) => b.id === block.id);
@@ -67,19 +65,13 @@
 			blocks.every((b) => b.media_paths.length <= 4)
 	);
 
-	$effect(() => {
-		onvalidchange(canSubmit);
-	});
+	$effect(() => { onvalidchange(canSubmit); });
 
-	function emitChange() {
-		onchange([...blocks]);
-	}
+	function emitChange() { onchange([...blocks]); }
 
 	function normalizeOrder(arr: ThreadBlock[]): ThreadBlock[] {
 		return arr.map((b, i) => ({ ...b, order: i }));
 	}
-
-	// --- Block CRUD ---
 
 	function addBlock() {
 		const sorted = [...blocks].sort((a, b) => a.order - b.order);
@@ -90,9 +82,7 @@
 
 	function removeBlock(id: string) {
 		if (blocks.length <= 2) return;
-		const sorted = blocks
-			.filter((b) => b.id !== id)
-			.sort((a, b) => a.order - b.order);
+		const sorted = blocks.filter((b) => b.id !== id).sort((a, b) => a.order - b.order);
 		blocks = normalizeOrder(sorted);
 		emitChange();
 	}
@@ -107,8 +97,6 @@
 		emitChange();
 	}
 
-	// --- Reorder ---
-
 	function moveBlock(blockId: string, newIndex: number) {
 		const sorted = [...blocks].sort((a, b) => a.order - b.order);
 		const currentIndex = sorted.findIndex((b) => b.id === blockId);
@@ -117,9 +105,7 @@
 		sorted.splice(newIndex, 0, moved);
 		blocks = normalizeOrder(sorted);
 		reorderAnnouncement = `Tweet moved to position ${newIndex + 1}`;
-		setTimeout(() => {
-			reorderAnnouncement = '';
-		}, 1000);
+		setTimeout(() => { reorderAnnouncement = ''; }, 1000);
 		emitChange();
 	}
 
@@ -132,8 +118,6 @@
 		});
 	}
 
-	// --- Drag and Drop ---
-
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
 		if (e.dataTransfer) {
@@ -142,28 +126,21 @@
 		}
 	}
 
-	function handleDragEnd() {
-		draggingBlockId = null;
-		dropTargetBlockId = null;
-	}
+	function handleDragEnd() { draggingBlockId = null; dropTargetBlockId = null; }
 
 	function handleCardDragOver(e: DragEvent, blockId: string) {
 		e.preventDefault();
-		if (draggingBlockId && draggingBlockId !== blockId) {
-			dropTargetBlockId = blockId;
-		}
+		if (draggingBlockId && draggingBlockId !== blockId) dropTargetBlockId = blockId;
 	}
 
 	function handleCardDragEnter(e: DragEvent, blockId: string) {
 		e.preventDefault();
-		if (draggingBlockId && draggingBlockId !== blockId) {
-			dropTargetBlockId = blockId;
-		}
+		if (draggingBlockId && draggingBlockId !== blockId) dropTargetBlockId = blockId;
 	}
 
 	function handleCardDragLeave(e: DragEvent, blockId: string) {
 		const related = e.relatedTarget as HTMLElement | null;
-		const card = (e.currentTarget as HTMLElement);
+		const card = e.currentTarget as HTMLElement;
 		if (!related || !card.contains(related)) {
 			if (dropTargetBlockId === blockId) dropTargetBlockId = null;
 		}
@@ -174,71 +151,44 @@
 		if (!draggingBlockId || draggingBlockId === targetBlockId) return;
 		const sorted = [...blocks].sort((a, b) => a.order - b.order);
 		const targetIndex = sorted.findIndex((b) => b.id === targetBlockId);
-		if (targetIndex !== -1) {
-			moveBlock(draggingBlockId, targetIndex);
-		}
+		if (targetIndex !== -1) moveBlock(draggingBlockId, targetIndex);
 		draggingBlockId = null;
 		dropTargetBlockId = null;
 	}
 
-	// --- Keyboard shortcuts ---
-
 	function handleCardKeydown(e: KeyboardEvent, blockId: string) {
-		// Tab/Shift+Tab: navigate between cards
 		if (e.key === 'Tab' && !e.altKey && !e.metaKey && !e.ctrlKey) {
 			e.preventDefault();
 			const sorted = [...blocks].sort((a, b) => a.order - b.order);
 			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (e.shiftKey) {
-				if (idx > 0) focusBlock(sorted[idx - 1].id);
-			} else {
-				if (idx < sorted.length - 1) focusBlock(sorted[idx + 1].id);
-			}
+			if (e.shiftKey) { if (idx > 0) focusBlock(sorted[idx - 1].id); }
+			else { if (idx < sorted.length - 1) focusBlock(sorted[idx + 1].id); }
 			return;
 		}
-		// Alt+ArrowUp: move card up
 		if (e.altKey && e.key === 'ArrowUp') {
 			e.preventDefault();
 			const sorted = [...blocks].sort((a, b) => a.order - b.order);
 			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (idx > 0) {
-				moveBlock(blockId, idx - 1);
-				focusBlock(blockId);
-			}
+			if (idx > 0) { moveBlock(blockId, idx - 1); focusBlock(blockId); }
 			return;
 		}
-		// Alt+ArrowDown: move card down
 		if (e.altKey && e.key === 'ArrowDown') {
 			e.preventDefault();
 			const sorted = [...blocks].sort((a, b) => a.order - b.order);
 			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (idx < sorted.length - 1) {
-				moveBlock(blockId, idx + 1);
-				focusBlock(blockId);
-			}
+			if (idx < sorted.length - 1) { moveBlock(blockId, idx + 1); focusBlock(blockId); }
 			return;
 		}
-		// Cmd/Ctrl+D: duplicate
 		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'd') {
-			e.preventDefault();
-			duplicateBlock(blockId);
-			return;
+			e.preventDefault(); duplicateBlock(blockId); return;
 		}
-		// Cmd/Ctrl+Shift+S: split
 		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
-			e.preventDefault();
-			splitBlock(blockId);
-			return;
+			e.preventDefault(); splitBlock(blockId); return;
 		}
-		// Cmd/Ctrl+Shift+M: merge with next
 		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
-			e.preventDefault();
-			mergeWithNext(blockId);
-			return;
+			e.preventDefault(); mergeWithNext(blockId); return;
 		}
 	}
-
-	// --- Power Actions ---
 
 	function duplicateBlock(id: string) {
 		const sorted = [...blocks].sort((a, b) => a.order - b.order);
@@ -246,15 +196,12 @@
 		if (idx === -1) return;
 		const source = sorted[idx];
 		const newBlock: ThreadBlock = {
-			id: crypto.randomUUID(),
-			text: source.text,
-			media_paths: [...source.media_paths],
-			order: 0
+			id: crypto.randomUUID(), text: source.text,
+			media_paths: [...source.media_paths], order: 0
 		};
 		sorted.splice(idx + 1, 0, newBlock);
 		blocks = normalizeOrder(sorted);
-		emitChange();
-		focusBlock(newBlock.id);
+		emitChange(); focusBlock(newBlock.id);
 	}
 
 	function splitBlock(id: string) {
@@ -262,13 +209,10 @@
 		const idx = sorted.findIndex((b) => b.id === id);
 		if (idx === -1) return;
 		const source = sorted[idx];
-
 		const textarea = document.querySelector(
 			`[data-block-id="${id}"] textarea`
 		) as HTMLTextAreaElement | null;
 		let splitPos = textarea?.selectionStart ?? Math.floor(source.text.length / 2);
-
-		// Snap to nearest word boundary
 		if (splitPos > 0 && splitPos < source.text.length) {
 			const before = source.text.slice(0, splitPos);
 			const lastSpace = before.lastIndexOf(' ');
@@ -276,116 +220,73 @@
 			if (lastSpace > splitPos - 10) splitPos = lastSpace + 1;
 			else if (nextSpace !== -1 && nextSpace < splitPos + 10) splitPos = nextSpace + 1;
 		}
-
 		const textBefore = source.text.slice(0, splitPos).trim();
 		const textAfter = source.text.slice(splitPos).trim();
 		if (!textBefore || !textAfter) return;
-
-		const newBlock: ThreadBlock = {
-			id: crypto.randomUUID(),
-			text: textAfter,
-			media_paths: [],
-			order: 0
-		};
-
+		const newBlock: ThreadBlock = { id: crypto.randomUUID(), text: textAfter, media_paths: [], order: 0 };
 		sorted[idx] = { ...source, text: textBefore };
 		sorted.splice(idx + 1, 0, newBlock);
 		blocks = normalizeOrder(sorted);
-		emitChange();
-		focusBlock(newBlock.id);
+		emitChange(); focusBlock(newBlock.id);
 	}
 
 	function mergeWithNext(id: string) {
 		const sorted = [...blocks].sort((a, b) => a.order - b.order);
 		const idx = sorted.findIndex((b) => b.id === id);
-		if (idx === -1 || idx >= sorted.length - 1) return;
-		if (sorted.length <= 2) return;
-
+		if (idx === -1 || idx >= sorted.length - 1 || sorted.length <= 2) return;
 		const current = sorted[idx];
 		const next = sorted[idx + 1];
-
 		const combinedMedia = [...current.media_paths, ...next.media_paths];
 		if (combinedMedia.length > 4) {
 			mergeError = `Cannot merge: combined media would exceed 4 (has ${combinedMedia.length}).`;
-			setTimeout(() => {
-				mergeError = null;
-			}, 3000);
+			setTimeout(() => { mergeError = null; }, 3000);
 			return;
 		}
-
 		const joinPoint = current.text.length;
 		const separator = current.text.endsWith('\n') ? '' : '\n';
-		const mergedText = current.text + separator + next.text;
-
-		sorted[idx] = { ...current, text: mergedText, media_paths: combinedMedia };
+		sorted[idx] = { ...current, text: current.text + separator + next.text, media_paths: combinedMedia };
 		sorted.splice(idx + 1, 1);
 		blocks = normalizeOrder(sorted);
 		emitChange();
-
 		requestAnimationFrame(() => {
 			const textarea = document.querySelector(
 				`[data-block-id="${current.id}"] textarea`
 			) as HTMLTextAreaElement | null;
 			if (textarea) {
 				textarea.focus();
-				const cursorPos = joinPoint + separator.length;
-				textarea.setSelectionRange(cursorPos, cursorPos);
+				textarea.setSelectionRange(joinPoint + separator.length, joinPoint + separator.length);
 			}
 		});
 	}
 
-	// --- Helpers ---
+	function getCharCount(text: string): number { return tweetWeightedLen(text); }
+	function isOverLimit(text: string): boolean { return getCharCount(text) > MAX_TWEET_CHARS; }
+	function isWarning(text: string): boolean { return getCharCount(text) > 260 && !isOverLimit(text); }
 
-	function getCharCount(text: string): number {
-		return tweetWeightedLen(text);
-	}
+	export function getBlocks(): ThreadBlock[] { return [...blocks]; }
+	export function setBlocks(newBlocks: ThreadBlock[]) { blocks = newBlocks; emitChange(); }
 
-	function isOverLimit(text: string): boolean {
-		return getCharCount(text) > MAX_TWEET_CHARS;
-	}
-
-	function isWarning(text: string): boolean {
-		return getCharCount(text) > 260 && !isOverLimit(text);
-	}
-
-	export function getBlocks(): ThreadBlock[] {
-		return [...blocks];
-	}
-
-	export function setBlocks(newBlocks: ThreadBlock[]) {
-		blocks = newBlocks;
-		emitChange();
-	}
-
-	export async function handleInlineAssist(): Promise<void> {
+	export async function handleInlineAssist(voiceCue?: string): Promise<void> {
 		if (!focusedBlockId) return;
 		const block = blocks.find((b) => b.id === focusedBlockId);
 		if (!block) return;
-
 		const textarea = document.querySelector(
 			`[data-block-id="${focusedBlockId}"] textarea`
 		) as HTMLTextAreaElement | null;
 		if (!textarea) return;
-
 		const start = textarea.selectionStart;
 		const end = textarea.selectionEnd;
 		const selectedText = start !== end ? block.text.slice(start, end) : block.text;
 		if (!selectedText.trim()) return;
-
 		assistingBlockId = focusedBlockId;
 		try {
-			const result = await api.assist.improve(selectedText);
+			const result = await api.assist.improve(selectedText, voiceCue || undefined);
 			if (start !== end) {
-				const newText = block.text.slice(0, start) + result.content + block.text.slice(end);
-				updateBlockText(block.id, newText);
+				updateBlockText(block.id, block.text.slice(0, start) + result.content + block.text.slice(end));
 			} else {
 				updateBlockText(block.id, result.content);
 			}
-		} catch {
-			// Error surfaced via parent's submitError
-		} finally {
-			assistingBlockId = null;
-		}
+		} catch { /* Error surfaced via parent */ } finally { assistingBlockId = null; }
 	}
 
 	export function handlePaletteAction(actionId: string) {
@@ -394,36 +295,21 @@
 			if (sorted.length > 0) focusedBlockId = sorted[0].id;
 		}
 		if (!focusedBlockId) return;
-
 		switch (actionId) {
-			case 'add-card':
-				addBlock();
-				break;
-			case 'duplicate':
-				duplicateBlock(focusedBlockId);
-				break;
-			case 'split':
-				splitBlock(focusedBlockId);
-				break;
-			case 'merge':
-				mergeWithNext(focusedBlockId);
-				break;
+			case 'add-card': addBlock(); break;
+			case 'duplicate': duplicateBlock(focusedBlockId); break;
+			case 'split': splitBlock(focusedBlockId); break;
+			case 'merge': mergeWithNext(focusedBlockId); break;
 			case 'move-up': {
-				const sorted = [...blocks].sort((a, b) => a.order - b.order);
-				const idx = sorted.findIndex((b) => b.id === focusedBlockId);
-				if (idx > 0) {
-					moveBlock(focusedBlockId, idx - 1);
-					focusBlock(focusedBlockId);
-				}
+				const s = [...blocks].sort((a, b) => a.order - b.order);
+				const idx = s.findIndex((b) => b.id === focusedBlockId);
+				if (idx > 0) { moveBlock(focusedBlockId, idx - 1); focusBlock(focusedBlockId); }
 				break;
 			}
 			case 'move-down': {
-				const sorted = [...blocks].sort((a, b) => a.order - b.order);
-				const idx = sorted.findIndex((b) => b.id === focusedBlockId);
-				if (idx < sorted.length - 1) {
-					moveBlock(focusedBlockId, idx + 1);
-					focusBlock(focusedBlockId);
-				}
+				const s = [...blocks].sort((a, b) => a.order - b.order);
+				const idx = s.findIndex((b) => b.id === focusedBlockId);
+				if (idx < s.length - 1) { moveBlock(focusedBlockId, idx + 1); focusBlock(focusedBlockId); }
 				break;
 			}
 		}
@@ -431,9 +317,7 @@
 </script>
 
 <div class="thread-composer" role="region" aria-label="Thread editor">
-	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-		{reorderAnnouncement}
-	</div>
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{reorderAnnouncement}</div>
 
 	{#each sortedBlocks as block, i (block.id)}
 		<div
@@ -452,85 +336,33 @@
 		>
 			<div class="card-gutter">
 				<div class="card-number" aria-hidden="true">{i + 1}</div>
-				<div
-					class="drag-handle"
-					title="Drag to reorder"
+				<div class="drag-handle" title="Drag to reorder"
 					aria-label="Reorder tweet {i + 1}. Use Alt+Up or Alt+Down to move."
-					draggable="true"
-					role="button"
-					tabindex="-1"
-					ondragstart={(e) => handleDragStart(e, block.id)}
-					ondragend={handleDragEnd}
-				>
+					draggable="true" role="button" tabindex="-1"
+					ondragstart={(e) => handleDragStart(e, block.id)} ondragend={handleDragEnd}>
 					<GripVertical size={14} />
 				</div>
 			</div>
 			<div class="card-body">
-				<textarea
-					class="card-textarea"
-					class:over-limit={isOverLimit(block.text)}
+				<textarea class="card-textarea" class:over-limit={isOverLimit(block.text)}
 					placeholder={i === 0 ? 'Start your thread...' : `Tweet ${i + 1}...`}
 					value={block.text}
 					oninput={(e) => updateBlockText(block.id, e.currentTarget.value)}
 					onfocus={() => (focusedBlockId = block.id)}
-					onblur={() => {
-						if (focusedBlockId === block.id) focusedBlockId = null;
-					}}
+					onblur={() => { if (focusedBlockId === block.id) focusedBlockId = null; }}
 					onkeydown={(e) => handleCardKeydown(e, block.id)}
-					rows={3}
-					aria-label={`Tweet ${i + 1} of ${sortedBlocks.length}`}
+					rows={3} aria-label={`Tweet ${i + 1} of ${sortedBlocks.length}`}
 				></textarea>
-				<MediaSlot
-					mediaPaths={block.media_paths}
-					onmediachange={(paths) => updateBlockMedia(block.id, paths)}
-				/>
+				<MediaSlot mediaPaths={block.media_paths}
+					onmediachange={(paths) => updateBlockMedia(block.id, paths)} />
 				<div class="card-footer">
-					<div
-						class="char-counter"
-						class:over-limit={isOverLimit(block.text)}
-						class:warning={isWarning(block.text)}
-						aria-live="polite"
-						aria-label="Character count"
-					>
+					<div class="char-counter" class:over-limit={isOverLimit(block.text)}
+						class:warning={isWarning(block.text)} aria-live="polite" aria-label="Character count">
 						{getCharCount(block.text)}/{MAX_TWEET_CHARS}
 					</div>
-					<div class="card-actions">
-						<button
-							class="action-btn"
-							onclick={() => duplicateBlock(block.id)}
-							title="Duplicate (Cmd+D)"
-							aria-label="Duplicate tweet {i + 1}"
-						>
-							<Copy size={12} />
-						</button>
-						<button
-							class="action-btn"
-							onclick={() => splitBlock(block.id)}
-							title="Split at cursor (Cmd+Shift+S)"
-							aria-label="Split tweet {i + 1}"
-						>
-							<Scissors size={12} />
-						</button>
-						{#if i < sortedBlocks.length - 1 && sortedBlocks.length > 2}
-							<button
-								class="action-btn"
-								onclick={() => mergeWithNext(block.id)}
-								title="Merge with next (Cmd+Shift+M)"
-								aria-label="Merge tweet {i + 1} with tweet {i + 2}"
-							>
-								<Merge size={12} />
-							</button>
-						{/if}
-						{#if sortedBlocks.length > 2}
-							<button
-								class="remove-card-btn"
-								onclick={() => removeBlock(block.id)}
-								aria-label="Remove tweet {i + 1}"
-							>
-								<Trash2 size={12} />
-							</button>
-						{/if}
-					</div>
+					<ThreadCardActions index={i} total={sortedBlocks.length}
+						onduplicate={() => duplicateBlock(block.id)} onsplit={() => splitBlock(block.id)}
+						onmerge={() => mergeWithNext(block.id)} onremove={() => removeBlock(block.id)} />
 				</div>
 			</div>
 			{#if i < sortedBlocks.length - 1}
@@ -540,319 +372,55 @@
 	{/each}
 
 	<button class="add-card-btn" onclick={addBlock} aria-label="Add another tweet to thread">
-		<Plus size={14} />
-		Add tweet
+		<Plus size={14} /> Add tweet
 	</button>
 
-	{#if mergeError}
-		<div class="merge-error" role="alert">{mergeError}</div>
-	{/if}
+	{#if mergeError}<div class="merge-error" role="alert">{mergeError}</div>{/if}
 
 	{#if validationErrors.length > 0}
 		<div class="validation-summary" role="status" aria-live="polite">
-			{#each validationErrors as err}
-				<p class="validation-error">{err}</p>
-			{/each}
+			{#each validationErrors as err}<p class="validation-error">{err}</p>{/each}
 		</div>
 	{/if}
 </div>
 
 <style>
-	.thread-composer {
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border-width: 0;
-	}
-
-	.tweet-card {
-		position: relative;
-		display: flex;
-		gap: 8px;
-		padding: 12px;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		background: var(--color-surface);
-		margin-bottom: 8px;
-		transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-	}
-
-	.tweet-card.focused {
-		border-color: var(--color-accent);
-		box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent);
-	}
-
-	.tweet-card.over-limit {
-		border-color: var(--color-danger);
-	}
-
-	.tweet-card.assisting {
-		border-color: var(--color-accent);
-		opacity: 0.7;
-		pointer-events: none;
-	}
-
-	.tweet-card.dragging {
-		opacity: 0.5;
-	}
-
-	.tweet-card.drop-target {
-		border-color: var(--color-accent);
-		border-style: dashed;
-	}
-
-	.card-gutter {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-		flex-shrink: 0;
-		width: 24px;
-		padding-top: 2px;
-	}
-
-	.card-number {
-		font-size: 11px;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		font-family: var(--font-mono);
-		line-height: 1;
-	}
-
-	.drag-handle {
-		color: var(--color-text-subtle);
-		cursor: grab;
-		opacity: 0.6;
-		display: flex;
-		align-items: center;
-		transition: opacity 0.15s ease;
-		border: none;
-		background: none;
-		padding: 0;
-	}
-
-	.drag-handle:hover {
-		opacity: 1;
-	}
-
-	.drag-handle:active {
-		cursor: grabbing;
-	}
-
-	.card-body {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.card-textarea {
-		width: 100%;
-		padding: 8px 10px;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: var(--color-base);
-		color: var(--color-text);
-		font-size: 13px;
-		font-family: var(--font-sans);
-		line-height: 1.5;
-		resize: vertical;
-		box-sizing: border-box;
-		transition: border-color 0.15s ease;
-	}
-
-	.card-textarea:focus {
-		outline: none;
-		border-color: var(--color-accent);
-	}
-
-	.card-textarea.over-limit {
-		border-color: var(--color-danger);
-	}
-
-	.card-footer {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-top: 4px;
-	}
-
-	.char-counter {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-		font-family: var(--font-mono);
-	}
-
-	.char-counter.warning {
-		color: var(--color-warning);
-	}
-
-	.char-counter.over-limit {
-		color: var(--color-danger);
-		font-weight: 600;
-	}
-
-	.card-actions {
-		display: flex;
-		gap: 2px;
-		opacity: 0;
-		transition: opacity 0.15s ease;
-	}
-
-	.tweet-card:hover .card-actions,
-	.tweet-card.focused .card-actions {
-		opacity: 1;
-	}
-
-	.action-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 24px;
-		border: none;
-		border-radius: 4px;
-		background: transparent;
-		color: var(--color-text-subtle);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.action-btn:hover {
-		background: var(--color-surface-hover);
-		color: var(--color-text);
-	}
-
-	.remove-card-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 24px;
-		border: none;
-		border-radius: 4px;
-		background: transparent;
-		color: var(--color-text-subtle);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.remove-card-btn:hover {
-		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-		color: var(--color-danger);
-	}
-
-	.thread-line {
-		position: absolute;
-		left: 23px;
-		bottom: -9px;
-		width: 2px;
-		height: 8px;
-		background: var(--color-border-subtle);
-	}
-
-	.add-card-btn {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 8px 12px;
-		border: 1px dashed var(--color-border);
-		border-radius: 6px;
-		background: transparent;
-		color: var(--color-text-muted);
-		font-size: 12px;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		margin-top: 4px;
-	}
-
-	.add-card-btn:hover {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 5%, transparent);
-	}
-
-	.merge-error {
-		margin-top: 8px;
-		padding: 8px 12px;
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--color-danger) 8%, transparent);
-		font-size: 12px;
-		color: var(--color-danger);
-	}
-
-	.validation-summary {
-		margin-top: 8px;
-		padding: 8px 12px;
-		border-radius: 6px;
-		background: color-mix(in srgb, var(--color-danger) 8%, transparent);
-	}
-
-	.validation-error {
-		font-size: 12px;
-		color: var(--color-danger);
-		margin: 0;
-		padding: 2px 0;
-	}
-
-	/* Card actions always visible on touch devices */
-	@media (hover: none) {
-		.card-actions {
-			opacity: 1;
-		}
-	}
-
-	/* Touch targets */
+	.thread-composer { display: flex; flex-direction: column; gap: 0; }
+	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
+	.tweet-card { position: relative; display: flex; gap: 8px; padding: 12px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-surface); margin-bottom: 8px; transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease; }
+	.tweet-card.focused { border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent); }
+	.tweet-card.over-limit { border-color: var(--color-danger); }
+	.tweet-card.assisting { border-color: var(--color-accent); opacity: 0.7; pointer-events: none; }
+	.tweet-card.dragging { opacity: 0.5; }
+	.tweet-card.drop-target { border-color: var(--color-accent); border-style: dashed; }
+	.card-gutter { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; width: 24px; padding-top: 2px; }
+	.card-number { font-size: 11px; font-weight: 600; color: var(--color-text-muted); font-family: var(--font-mono); line-height: 1; }
+	.drag-handle { color: var(--color-text-subtle); cursor: grab; opacity: 0.6; display: flex; align-items: center; transition: opacity 0.15s ease; border: none; background: none; padding: 0; }
+	.drag-handle:hover { opacity: 1; }
+	.drag-handle:active { cursor: grabbing; }
+	.card-body { flex: 1; min-width: 0; }
+	.card-textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-base); color: var(--color-text); font-size: 13px; font-family: var(--font-sans); line-height: 1.5; resize: vertical; box-sizing: border-box; transition: border-color 0.15s ease; }
+	.card-textarea:focus { outline: none; border-color: var(--color-accent); }
+	.card-textarea.over-limit { border-color: var(--color-danger); }
+	.card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+	.char-counter { font-size: 11px; color: var(--color-text-subtle); font-family: var(--font-mono); }
+	.char-counter.warning { color: var(--color-warning); }
+	.char-counter.over-limit { color: var(--color-danger); font-weight: 600; }
+	.thread-line { position: absolute; left: 23px; bottom: -9px; width: 2px; height: 8px; background: var(--color-border-subtle); }
+	.add-card-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px dashed var(--color-border); border-radius: 6px; background: transparent; color: var(--color-text-muted); font-size: 12px; cursor: pointer; transition: all 0.15s ease; margin-top: 4px; }
+	.add-card-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+	.merge-error { margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--color-danger) 8%, transparent); font-size: 12px; color: var(--color-danger); }
+	.validation-summary { margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+	.validation-error { font-size: 12px; color: var(--color-danger); margin: 0; padding: 2px 0; }
 	@media (pointer: coarse) {
-		.action-btn,
-		.remove-card-btn {
-			min-width: 44px;
-			min-height: 44px;
-		}
-
-		.drag-handle {
-			min-width: 44px;
-			min-height: 44px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-		}
-
-		.add-card-btn {
-			min-height: 44px;
-		}
+		.drag-handle { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+		.add-card-btn { min-height: 44px; }
 	}
-
-	/* Mobile layout */
 	@media (max-width: 640px) {
-		.tweet-card {
-			padding: 10px;
-		}
-
-		.card-footer {
-			flex-wrap: wrap;
-			gap: 8px;
-		}
-
-		.card-gutter {
-			width: 20px;
-		}
-
-		.card-textarea {
-			font-size: 16px;
-		}
-
-		.thread-line {
-			left: 19px;
-		}
+		.tweet-card { padding: 10px; }
+		.card-footer { flex-wrap: wrap; gap: 8px; }
+		.card-gutter { width: 20px; }
+		.card-textarea { font-size: 16px; }
+		.thread-line { left: 19px; }
 	}
 </style>
