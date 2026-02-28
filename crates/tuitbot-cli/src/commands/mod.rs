@@ -271,4 +271,6 @@ pub enum McpSubcommand {
         #[arg(long, default_value = "write")]
         profile: String,
     },
+    /// Guided setup for MCP-only users (Client ID → auth → register)
+    Setup,
 }

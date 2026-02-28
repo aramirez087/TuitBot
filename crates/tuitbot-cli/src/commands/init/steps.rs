@@ -2,7 +2,7 @@
 use anyhow::Result;
 use dialoguer::{Confirm, Input, Select};
 
-use super::display::{print_step_header, print_step_subtitle};
+use super::display::{print_step_header, print_step_subtitle, print_x_api_guide};
 use super::helpers::{capitalize, non_empty, parse_csv};
 use super::prompts;
 use super::wizard::WizardResult;
@@ -68,6 +68,8 @@ pub(super) fn step_quickstart() -> Result<WizardResult> {
     };
 
     // Prompt 5: X API Client ID (highest friction last)
+    print_x_api_guide();
+
     let client_id: String = Input::new()
         .with_prompt("X API Client ID")
         .validate_with(|input: &String| -> std::result::Result<(), &str> {

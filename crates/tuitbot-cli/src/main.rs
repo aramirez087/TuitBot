@@ -164,18 +164,46 @@ async fn run() -> anyhow::Result<()> {
         return commands::restore::execute(args).await;
     }
     if let Commands::Mcp(ref args) = cli.command {
-        if let commands::McpSubcommand::Manifest { ref profile } = args.command {
-            return commands::mcp::print_manifest(profile);
-        }
+        return match &args.command {
+            commands::McpSubcommand::Manifest { ref profile } => {
+                commands::mcp::print_manifest(profile)
+            }
+            commands::McpSubcommand::Serve { ref profile } => {
+                commands::mcp::execute_serve(profile).await
+            }
+            commands::McpSubcommand::Setup => commands::mcp::execute_setup().await,
+        };
     }
 
     // Load configuration.
-    let config = Config::load(Some(&cli.config)).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to load configuration: {e}\n\
-             Hint: Run 'tuitbot init' to create a default configuration file."
-        )
-    })?;
+    let config = match Config::load(Some(&cli.config)) {
+        Ok(c) => c,
+        Err(e) => {
+            // If the default config path doesn't exist and we're in an
+            // interactive terminal, offer to run init instead of erroring.
+            let expanded = tuitbot_core::startup::expand_tilde(&cli.config);
+            if cli.config == "~/.tuitbot/config.toml"
+                && !expanded.exists()
+                && std::io::stdin().is_terminal()
+            {
+                eprintln!("No configuration found.\n");
+                let run_init = dialoguer::Confirm::new()
+                    .with_prompt("Run setup wizard now?")
+                    .default(true)
+                    .interact()
+                    .unwrap_or(false);
+
+                if run_init {
+                    return commands::init::execute(false, false, false).await;
+                }
+            }
+
+            return Err(anyhow::anyhow!(
+                "Failed to load configuration: {e}\n\
+                 Hint: Run 'tuitbot init' to create a default configuration file."
+            ));
+        }
+    };
 
     // Check for config upgrade opportunity before `run`
     if matches!(&cli.command, Commands::Run(_)) && std::io::stdin().is_terminal() {
@@ -188,15 +216,10 @@ async fn run() -> anyhow::Result<()> {
         | Commands::Upgrade(_)
         | Commands::Settings(_)
         | Commands::Backup(_)
-        | Commands::Restore(_) => {
+        | Commands::Restore(_)
+        | Commands::Mcp(_) => {
             unreachable!()
         }
-        Commands::Mcp(args) => match args.command {
-            commands::McpSubcommand::Serve { ref profile } => {
-                commands::mcp::execute(&config, profile).await?;
-            }
-            commands::McpSubcommand::Manifest { .. } => unreachable!(),
-        },
         Commands::Run(args) => {
             commands::run::execute(&config, args.status_interval).await?;
         }

@@ -2,12 +2,26 @@
 
 ## Prerequisites
 
-- X Developer App credentials ([create one here](https://developer.x.com)) and funded X API credits (pay-per-usage; see [X API pricing](https://docs.x.com/x-api/getting-started/pricing))
-- One LLM provider:
-  - **OpenAI** — requires API key
-  - **Anthropic** — requires API key
-  - **Ollama** — free, runs locally, no API key needed
-- Rust 1.75+ (only needed for source builds)
+### X Developer App (takes ~2 minutes)
+
+1. Go to [developer.x.com/en/portal/dashboard](https://developer.x.com/en/portal/dashboard)
+2. Create a Project and App (or select an existing one)
+3. Under "User authentication settings", enable OAuth 2.0:
+   - Type: **Web App**
+   - Callback URL: `http://127.0.0.1:8080/callback`
+4. Copy the **Client ID** from the "Keys and tokens" tab
+
+You also need funded X API credits (pay-per-usage; see [X API pricing](https://docs.x.com/x-api/getting-started/pricing)).
+
+### LLM Provider (pick one)
+
+- **OpenAI** — requires API key ([platform.openai.com](https://platform.openai.com))
+- **Anthropic** — requires API key ([console.anthropic.com](https://console.anthropic.com))
+- **Ollama** — free, runs locally, no API key needed ([ollama.com](https://ollama.com))
+
+### Rust (source builds only)
+
+Rust 1.75+ is only needed if building from source. Precompiled binaries are available on the [Releases](https://github.com/aramirez087/TuitBot/releases) page.
 
 ## 1. Desktop App (Recommended for most users)
 
@@ -36,28 +50,55 @@ Navigate to `http://localhost:3001` for the full web dashboard.
 ### Install
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/aramirez087/TuitBot/main/scripts/install.sh | sh
+```
+
+Or install from source:
+
+```bash
 cargo install tuitbot-cli --locked
 ```
 
 Precompiled binaries are also available on the [Releases](https://github.com/aramirez087/TuitBot/releases) page.
 
-### Step 1: Initialize (5 questions)
+### Run the setup wizard
 
 ```bash
 tuitbot init
 ```
 
-The quickstart wizard asks only **5 questions**:
+This single command handles everything:
 
-1. Product name
-2. Discovery keywords (comma-separated)
-3. LLM provider (openai, anthropic, or ollama)
-4. API key (skipped for ollama)
-5. X API Client ID
+1. **5 quick questions** — product name, keywords, LLM provider, API key, X Client ID
+2. **LLM validation** — confirms your AI provider is reachable
+3. **X authentication** — OAuth flow to connect your account
+4. **Configuration check** — verifies everything works
+5. **Dry-run preview** — shows what the bot would do (no posts)
 
-Everything else gets safe defaults (UTC timezone, approval mode on, conservative rate limits). You'll see:
+The wizard includes inline guidance at the X API Client ID step (the same 4-step guide from [Prerequisites](#x-developer-app-takes-2-minutes) above).
+
+Everything else gets safe defaults (UTC timezone, approval mode on, conservative rate limits).
+
+> **Tip:** If you run any `tuitbot` command without a config file, it will offer to launch the setup wizard automatically.
+
+### What you'll see
 
 ```
+Tuitbot Quick Setup
+───────────────────
+Before we start, have these ready:
+  • X API Client ID  — from https://developer.x.com
+  • An LLM API key   — OpenAI, Anthropic, or Ollama (free, local)
+
+5 questions to get you running. Use --advanced for full configuration.
+
+? Product name: YourApp
+? Discovery keywords: rust, cli, devtools
+? LLM provider: openai
+? OpenAI API key: sk-...
+  ✓ Connected to openai (gpt-4o-mini, 340ms)
+? X API Client ID: abc123...
+
 Configuration Summary
 ─────────────────────
   Product:     YourApp
@@ -66,85 +107,53 @@ Configuration Summary
   X API:       abc123... (Client ID set)
   Approval:    on (all posts queued for review)
 
-  Defaults applied: UTC schedule, no brand voice, no persona.
-  Customize later: tuitbot init --advanced  or  tuitbot settings
-
-Wrote ~/.tuitbot/config.toml
-
-Get started:
-  1. tuitbot auth           — connect your X account
-  2. tuitbot test           — verify everything works
-  3. tuitbot tick --dry-run — see the bot in action (no posts)
+? Save configuration? [Y/n]
+? Connect your X account now? [Y/n]
+? Verify everything works? [Y/n]
+? Preview the bot? (dry run, no posts) [y/N]
 ```
 
-### Step 2: Authenticate
+### Standalone commands
+
+Each step also works as a standalone command if you prefer:
 
 ```bash
-tuitbot auth
+tuitbot auth                         # authenticate with X
+tuitbot test                         # verify everything works
+tuitbot tick --dry-run               # see the bot in action (no posts)
 ```
 
-Opens a browser flow (or prints a URL for headless environments). Paste the callback URL when prompted:
-
-```
-Authenticated as @yourhandle. Tokens saved to ~/.tuitbot/tokens.json
-```
-
-### Step 3: Validate
-
-```bash
-tuitbot test
-```
-
-Runs diagnostic checks across configuration, auth, LLM, and database:
-
-```
-Configuration:    OK (loaded from ~/.tuitbot/config.toml)
-Business profile: OK (product_name: "YourApp", 3 keywords, 3 topics)
-X API token:      OK (valid, expires in 30d)
-X API refresh:    OK (refresh token present)
-X API scopes:     OK (all required scopes granted)
-LLM provider:     OK (openai, model: gpt-4o-mini)
-Database:         OK (will be created at ~/.tuitbot/tuitbot.db)
-LLM connectivity: OK (openai: reachable)
-
-All checks passed.
-
-Profile: Voice --  Persona --  Targeting --
-Tip: Run `tuitbot settings enrich` to configure voice
-     (shapes every LLM-generated reply and tweet)
-
-Ready! Try: tuitbot tick --dry-run
-```
-
-### Step 4: First dry run
-
-```bash
-tuitbot tick --dry-run
-```
-
-This runs every automation loop **without posting anything**. You'll see what the bot would do — tweets it would discover, replies it would draft, content it would generate. No posts are made.
-
-```
-Dry run: showing what the bot would do. No posts will be made.
-
-tuitbot tick  tier=Free  schedule=active  dry_run=true  approval_mode=true
-
-  analytics    OK     followers=142, replies_measured=0, tweets_measured=0
-  discovery    OK     found=12, qualifying=3, replied=0, skipped=3, failed=0
-  ...
-
-Result: success
-
-Tip: Run `tuitbot settings enrich` to configure voice
-     — shapes every LLM-generated reply and tweet
-```
-
-You're done. From here, choose how to run Tuitbot:
+### Choose your run mode
 
 | Mode | Command | Best for |
 |------|---------|----------|
 | **Daemon** | `tuitbot run` | Long-running process (tmux, VPS, systemd) |
 | **Scheduler** | `tuitbot tick` | External schedulers (cron, launchd, systemd timer) |
+
+---
+
+## 4. MCP-Only Setup (Claude Code, Cursor, etc.)
+
+If you only need Tuitbot as an MCP server for your AI coding assistant (no LLM or business profile required):
+
+```bash
+tuitbot mcp setup
+```
+
+This streamlined wizard handles:
+
+1. **X API Client ID** — with inline guide
+2. **OAuth authentication** — connects your X account
+3. **Profile selection** — write, readonly, or admin
+4. **Auto-registration** — detects Claude Code and runs `claude mcp add` for you
+
+For non-interactive environments, use env vars directly:
+
+```bash
+claude mcp add -s user -e TUITBOT_X_API__CLIENT_ID=your_client_id tuitbot -- tuitbot mcp serve
+```
+
+See the [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) for profiles, tool counts, and configuration details.
 
 ---
 

@@ -178,6 +178,16 @@ pub(super) fn print_quickstart_banner() {
     eprintln!();
     eprintln!("{}", bold.apply_to("Tuitbot Quick Setup"));
     eprintln!("{}", dim.apply_to("───────────────────"));
+    eprintln!("{}", dim.apply_to("Before we start, have these ready:"));
+    eprintln!(
+        "{}",
+        dim.apply_to("  • X API Client ID  — from https://developer.x.com")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("  • An LLM API key   — OpenAI, Anthropic, or Ollama (free, local)")
+    );
+    eprintln!();
     eprintln!(
         "{}",
         dim.apply_to("5 questions to get you running. Use --advanced for full configuration.")
@@ -185,15 +195,56 @@ pub(super) fn print_quickstart_banner() {
     eprintln!();
 }
 
-/// Print the 3-step getting-started guide after quickstart config is written.
-pub(super) fn print_quickstart_next_steps() {
-    let bold = Style::new().bold();
+/// Print inline guide for obtaining an X API Client ID.
+pub(super) fn print_x_api_guide() {
+    let dim = Style::new().dim();
 
     eprintln!();
-    eprintln!("{}", bold.apply_to("Get started:"));
-    eprintln!("  1. tuitbot auth           \u{2014} connect your X account");
-    eprintln!("  2. tuitbot test           \u{2014} verify everything works");
-    eprintln!("  3. tuitbot tick --dry-run \u{2014} see the bot in action (no posts)");
+    eprintln!(
+        "{}",
+        dim.apply_to("To get your Client ID (takes ~2 minutes):")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("  1. Go to https://developer.x.com/en/portal/dashboard")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("  2. Create a Project and App (or select an existing one)")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("  3. Under \"User authentication settings\", enable OAuth 2.0:")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("     Type: \"Web App\" — Callback URL: http://127.0.0.1:8080/callback")
+    );
+    eprintln!(
+        "{}",
+        dim.apply_to("  4. Copy the Client ID from the \"Keys and tokens\" tab")
+    );
+    eprintln!();
+}
+
+/// Print a green checkmark for a successful LLM validation.
+pub(super) fn print_llm_validation_ok(provider: &str, model: &str, latency_ms: u128) {
+    let green = Style::new().green();
+    eprintln!(
+        "{}",
+        green.apply_to(format!(
+            "  ✓ Connected to {provider} ({model}, {latency_ms}ms)"
+        ))
+    );
+}
+
+/// Print a yellow warning for a failed LLM validation.
+pub(super) fn print_llm_validation_fail(provider: &str, error: &str) {
+    let yellow = Style::new().yellow();
+    eprintln!(
+        "{}",
+        yellow.apply_to(format!("  ⚠ Could not connect to {provider}: {error}"))
+    );
 }
 
 /// Print a compact summary of quickstart-collected values.

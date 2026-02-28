@@ -7,6 +7,20 @@ API coverage (DMs, Ads, Compliance, Stream Rules).
 
 ## Quick Start
 
+**Interactive setup (recommended — handles config, auth, and Claude Code registration):**
+
+```bash
+tuitbot mcp setup
+```
+
+**Env-var one-liner (non-interactive, no config file needed):**
+
+```bash
+claude mcp add -s user -e TUITBOT_X_API__CLIENT_ID=your_client_id tuitbot -- tuitbot mcp serve
+```
+
+**Manual serve (requires existing config or env vars):**
+
 ```bash
 # Write profile (112 tools, default)
 tuitbot mcp serve

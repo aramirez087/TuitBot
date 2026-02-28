@@ -5,7 +5,7 @@
 /// `config.example.toml` with `--non-interactive`.
 ///
 /// After writing the config the wizard offers to continue seamlessly
-/// through `auth → test → run` so the user doesn't have to remember
+/// through `auth → test → preview` so the user doesn't have to remember
 /// three separate commands.
 mod display;
 mod helpers;
@@ -20,23 +20,26 @@ mod tests;
 use std::fs;
 use std::io::IsTerminal;
 use std::path::PathBuf;
+use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
 use dialoguer::Confirm;
-use tuitbot_core::config::Config;
+use tuitbot_core::config::{Config, LlmConfig};
+use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::startup::data_dir;
 
 use display::{
-    print_quickstart_banner, print_quickstart_next_steps, print_quickstart_summary,
-    print_remaining_steps, print_summary, print_welcome_banner,
+    print_llm_validation_fail, print_llm_validation_ok, print_quickstart_banner,
+    print_quickstart_summary, print_remaining_steps, print_summary, print_welcome_banner,
 };
 use render::render_config_toml;
 use steps::{
     step_approval_mode, step_brand_voice, step_business_profile, step_llm_provider, step_persona,
     step_quickstart, step_schedule, step_target_accounts, step_x_api,
 };
+use wizard::WizardResult;
 
-use super::{auth, run, test};
+use super::{auth, test, tick, OutputFormat, TickArgs};
 
 // Re-export prompt functions used by the upgrade command.
 pub(crate) use prompts::{
@@ -75,7 +78,7 @@ pub async fn execute(force: bool, non_interactive: bool, advanced: bool) -> Resu
     if advanced {
         run_advanced_wizard(&dir, &config_path).await
     } else {
-        run_quickstart(&dir, &config_path)
+        run_quickstart(&dir, &config_path).await
     }
 }
 
@@ -97,11 +100,45 @@ fn write_template(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// Quickstart path: 5 prompts → usable config, no chaining.
-fn run_quickstart(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
+/// Validate the LLM provider is reachable (non-blocking — continues on failure).
+async fn validate_llm(result: &WizardResult) {
+    let llm_config = LlmConfig {
+        provider: result.llm_provider.clone(),
+        api_key: result.llm_api_key.clone(),
+        model: result.llm_model.clone(),
+        base_url: result.llm_base_url.clone(),
+    };
+
+    let provider = match create_provider(&llm_config) {
+        Ok(p) => p,
+        Err(e) => {
+            print_llm_validation_fail(&result.llm_provider, &format!("{e}"));
+            return;
+        }
+    };
+
+    let start = Instant::now();
+    match tokio::time::timeout(std::time::Duration::from_secs(10), provider.health_check()).await {
+        Ok(Ok(())) => {
+            let latency = start.elapsed().as_millis();
+            print_llm_validation_ok(provider.name(), &result.llm_model, latency);
+        }
+        Ok(Err(e)) => {
+            print_llm_validation_fail(provider.name(), &format!("{e}"));
+        }
+        Err(_) => {
+            print_llm_validation_fail(provider.name(), "connection timed out (10s)");
+        }
+    }
+}
+
+/// Quickstart path: 5 prompts → usable config → auth → test → preview.
+async fn run_quickstart(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
     print_quickstart_banner();
 
     let result = step_quickstart()?;
+
+    validate_llm(&result).await;
 
     print_quickstart_summary(&result);
 
@@ -121,12 +158,17 @@ fn run_quickstart(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
         .with_context(|| format!("Failed to write {}", config_path.display()))?;
 
     eprintln!("\nWrote {}", config_path.display());
-    print_quickstart_next_steps();
+
+    let config_path_str = config_path.display().to_string();
+    let config = Config::load(Some(&config_path_str))
+        .context("Failed to reload the config we just wrote")?;
+
+    chain_post_config(&config, &config_path_str).await?;
 
     Ok(())
 }
 
-/// Advanced wizard: full 8-step setup with auth → test → run chaining.
+/// Advanced wizard: full 8-step setup with auth → test → preview chaining.
 async fn run_advanced_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
     print_welcome_banner();
 
@@ -138,6 +180,8 @@ async fn run_advanced_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()>
     let result = step_target_accounts(result)?;
     let result = step_approval_mode(result)?;
     let result = step_schedule(result)?;
+
+    validate_llm(&result).await;
 
     print_summary(&result);
 
@@ -158,73 +202,91 @@ async fn run_advanced_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()>
 
     eprintln!("\nWrote {}", config_path.display());
 
-    // --- Seamless chaining: auth → test → run ---
-
     let config_path_str = config_path.display().to_string();
     let config = Config::load(Some(&config_path_str))
         .context("Failed to reload the config we just wrote")?;
 
+    chain_post_config(&config, &config_path_str).await?;
+
+    Ok(())
+}
+
+/// Shared post-config chaining: auth → test → preview (dry run).
+///
+/// Used by both quickstart and advanced flows. On failure at any step,
+/// prints actionable remaining steps and returns Ok (does not propagate).
+async fn chain_post_config(config: &Config, config_path_str: &str) -> Result<()> {
     // Step A: Authenticate
     let do_auth = Confirm::new()
-        .with_prompt("Authenticate with X now?")
+        .with_prompt("Connect your X account now?")
         .default(true)
         .interact()?;
 
     if !do_auth {
         print_remaining_steps(&[
-            "tuitbot auth    — authenticate with X",
-            "tuitbot test    — validate configuration",
-            "tuitbot run     — start the agent",
+            "tuitbot auth           — connect your X account",
+            "tuitbot test           — verify everything works",
+            "tuitbot tick --dry-run — preview the bot (no posts)",
         ]);
         return Ok(());
     }
 
-    if let Err(e) = auth::execute(&config, None).await {
+    if let Err(e) = auth::execute(config, None).await {
         eprintln!("\nAuth failed: {e:#}");
         print_remaining_steps(&[
-            "tuitbot auth    — retry authentication",
-            "tuitbot test    — validate configuration",
-            "tuitbot run     — start the agent",
+            "tuitbot auth           — retry authentication",
+            "tuitbot test           — verify everything works",
+            "tuitbot tick --dry-run — preview the bot (no posts)",
         ]);
         return Ok(());
     }
 
     // Step B: Validate
     let do_test = Confirm::new()
-        .with_prompt("Validate configuration now?")
+        .with_prompt("Verify everything works?")
         .default(true)
         .interact()?;
 
     if !do_test {
         print_remaining_steps(&[
-            "tuitbot test    — validate configuration",
-            "tuitbot run     — start the agent",
+            "tuitbot test           — verify everything works",
+            "tuitbot tick --dry-run — preview the bot (no posts)",
         ]);
         return Ok(());
     }
 
-    let all_passed = test::run_checks(&config, &config_path_str).await;
+    let all_passed = test::run_checks(config, config_path_str).await;
     if !all_passed {
         eprintln!("Fix the issues above, then:");
         print_remaining_steps(&[
-            "tuitbot test    — re-validate configuration",
-            "tuitbot run     — start the agent",
+            "tuitbot test           — re-validate configuration",
+            "tuitbot tick --dry-run — preview the bot (no posts)",
         ]);
         return Ok(());
     }
 
-    // Step C: Run (defaults No — bigger commitment)
-    let do_run = Confirm::new()
-        .with_prompt("Start the agent now?")
+    // Step C: Preview (dry run — defaults No, safe for new users)
+    let do_preview = Confirm::new()
+        .with_prompt("Preview the bot? (dry run, no posts)")
         .default(false)
         .interact()?;
 
-    if !do_run {
-        print_remaining_steps(&["tuitbot run     — start the agent"]);
+    if !do_preview {
+        print_remaining_steps(&["tuitbot tick --dry-run — preview the bot (no posts)"]);
         return Ok(());
     }
 
-    run::execute(&config, 0).await?;
+    let tick_args = TickArgs {
+        dry_run: true,
+        ignore_schedule: true,
+        loops: Some(vec!["discovery".into(), "content".into()]),
+        require_approval: false,
+    };
+
+    if let Err(e) = tick::execute(config, tick_args, OutputFormat::Text).await {
+        eprintln!("\nPreview failed: {e:#}");
+        print_remaining_steps(&["tuitbot tick --dry-run — retry preview"]);
+    }
 
     Ok(())
 }

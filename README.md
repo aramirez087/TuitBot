@@ -179,13 +179,12 @@ For power users who prefer the terminal. **Hello world in under 2 minutes:**
 ```bash
 cargo install tuitbot-cli --locked   # or grab a binary from Releases
 
-tuitbot init                         # 5 quick questions → config ready
-tuitbot auth                         # authenticate with X
-tuitbot test                         # verify everything works
-tuitbot tick --dry-run               # see the bot in action (no posts)
+tuitbot init                         # guided setup: config → auth → test → preview
 ```
 
-That's it — you're running. `init` asks only 5 questions (product name, keywords, LLM provider, API key, X Client ID). Everything else gets safe defaults. Customize later with `tuitbot settings` or `tuitbot init --advanced` for full control.
+That's it — one command. `init` asks 5 questions (product name, keywords, LLM provider, API key, X Client ID), validates your LLM connection, then walks you through auth, validation, and a dry-run preview. Everything else gets safe defaults. Customize later with `tuitbot settings` or `tuitbot init --advanced` for full control.
+
+Individual commands (`tuitbot auth`, `tuitbot test`, `tuitbot tick --dry-run`) still work standalone if you prefer step-by-step setup.
 
 ---
 
@@ -236,6 +235,18 @@ Tuitbot includes an MCP server that exposes up to **140 tools** for AI agents (C
 | **Read-only** | `tuitbot mcp serve --profile readonly` | 14 | Minimal safe surface — utility, config, and health tools only |
 
 Read-only profiles are safe by construction — mutation tools are never registered, not policy-blocked. You get typed schemas, structured errors, rate-limit awareness, retry/backoff, and stable output formats with zero mutation risk.
+
+**Quickest start (interactive — auto-registers with Claude Code):**
+
+```bash
+tuitbot mcp setup
+```
+
+**One-liner with env vars (non-interactive):**
+
+```bash
+claude mcp add -s user -e TUITBOT_X_API__CLIENT_ID=your_client_id tuitbot -- tuitbot mcp serve
+```
 
 **Claude Code config (Write — default, recommended):**
 
