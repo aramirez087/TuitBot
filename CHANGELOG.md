@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.14...tuitbot-cli-v0.1.15) - 2026-02-28
+
+### Other
+
+- modularize the `update` command into separate files for improved organization and maintainability.
+
 ## [0.1.14](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.13...tuitbot-cli-v0.1.14) - 2026-02-28
 
 ### Added
