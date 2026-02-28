@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.16](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.15...tuitbot-cli-v0.1.16) - 2026-02-28
+
+### Added
+
+- Refactor MCP command into a guided setup and enhance `init` wizard with LLM health checks and a dry-run preview.
+- Add conditional triggers to release workflows, introduce environment variable test isolation, and allow dirty `release-plz` builds.
+
 ## [0.1.15](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.14...tuitbot-cli-v0.1.15) - 2026-02-28
 
 ### Other
