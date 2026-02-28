@@ -43,6 +43,7 @@ Everything else uses defaults. Run `tuitbot init --advanced` for the full 8-step
 | `[logging]` | Log level and status interval |
 | `[mcp_policy]` | MCP mutation policy enforcement |
 | `[circuit_breaker]` | X API rate-limit protection |
+| `[content_sources]` | Content source configuration (local folders, Google Drive) |
 
 ## Progressive Enrichment
 
@@ -182,6 +183,79 @@ After any config change, verify with:
 ```bash
 tuitbot test                    # full diagnostic check
 tuitbot settings --show         # read-only config view
+```
+
+## Content Sources
+
+Configure external content sources for the Watchtower ingest pipeline.
+Content is ingested as notes, processed into draft seeds, and used to
+enrich AI-generated content via Winning DNA retrieval.
+
+### Local Folder Source
+
+```toml
+[[content_sources.sources]]
+source_type = "local_fs"
+path = "~/Obsidian/my-vault"
+watch = true
+file_patterns = ["*.md", "*.txt"]
+loop_back_enabled = true
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `source_type` | `"local_fs"` | Source type identifier |
+| `path` | — | Path to content directory (supports `~` expansion) |
+| `watch` | `true` | Watch for real-time file changes |
+| `file_patterns` | `["*.md", "*.txt"]` | Glob patterns for files to ingest |
+| `loop_back_enabled` | `true` | Write tweet metadata back to source file front-matter |
+
+### Google Drive Source
+
+```toml
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "1abc..."
+service_account_key = "~/.tuitbot/service-account.json"
+watch = true
+file_patterns = ["*.md", "*.txt"]
+poll_interval_seconds = 300
+loop_back_enabled = false
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `source_type` | — | Must be `"google_drive"` |
+| `folder_id` | — | Google Drive folder ID to monitor |
+| `service_account_key` | — | Path to Google service account JSON key file |
+| `poll_interval_seconds` | `300` | Seconds between Drive API polls |
+| `loop_back_enabled` | `false` | Not supported for Drive (read-only) |
+
+### Operational Limits
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Max file size | Unbounded (content truncated at 2000 chars for seed extraction) | Full content stored in DB |
+| File types | `.md`, `.txt` only | Configurable via `file_patterns` |
+| Dedup | SHA-256 content hash per (source, path) | Unchanged content is skipped |
+| Seed generation | 5 nodes per batch, every 5 minutes | Low-priority background worker |
+| RAG context | Max 5 ancestors or 5 cold-start seeds, 2000 chars | Injected into LLM prompts |
+
+### Manual Ingest API
+
+Content can also be submitted directly via the HTTP API:
+
+```bash
+curl -X POST http://localhost:3001/api/ingest \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inline_nodes": [{
+      "relative_path": "idea.md",
+      "body_text": "# My Idea\nContent here...",
+      "title": "My Idea"
+    }]
+  }'
 ```
 
 ## Production Guidance

@@ -110,6 +110,12 @@ impl SeedWorker {
         Ok(total_seeds)
     }
 
+    /// Public test accessor for `process_node`.
+    #[cfg(test)]
+    pub async fn process_node_for_test(&self, node: &ContentNode) -> Result<u32, WorkflowError> {
+        self.process_node(node).await
+    }
+
     /// Process a single content node, extracting hooks via LLM.
     ///
     /// Returns the number of seeds generated.

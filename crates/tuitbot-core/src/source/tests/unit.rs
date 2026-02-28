@@ -1,6 +1,6 @@
-//! Tests for content source providers.
+//! Unit tests for content source providers.
 
-use super::*;
+use crate::source::*;
 
 // ---------------------------------------------------------------------------
 // LocalFsProvider
