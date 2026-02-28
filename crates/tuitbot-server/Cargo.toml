@@ -9,6 +9,7 @@ repository = "https://github.com/aramirez087/TuitBot"
 homepage = "https://github.com/aramirez087/TuitBot"
 documentation = "https://docs.rs/tuitbot-server"
 keywords = ["x-api", "twitter", "api-server", "automation", "dashboard"]
+include = ["src/**/*", "build.rs", "Cargo.toml", "dashboard-dist/**/*"]
 
 [dependencies]
 tuitbot-core = { version = "0.1.13", path = "../tuitbot-core" }
@@ -27,6 +28,8 @@ rand = "0.8"
 hex = "0.4"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"
 
 [dev-dependencies]
 tuitbot-core = { version = "0.1.13", path = "../tuitbot-core", features = ["test-helpers"] }

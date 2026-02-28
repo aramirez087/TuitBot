@@ -173,6 +173,8 @@ tuitbot update --config-only      # upgrade config schema only
 tuitbot update --non-interactive  # skip all prompts
 ```
 
+Updates the CLI binary and, if `tuitbot-server` is found on `PATH`, updates it too from the same release. Server update failures are non-fatal — the CLI update is preserved.
+
 ## MCP Server
 
 ```bash

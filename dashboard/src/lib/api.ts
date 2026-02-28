@@ -1,4 +1,11 @@
-const BASE_URL = 'http://localhost:3001';
+function resolveBaseUrl(): string {
+	if (typeof window === 'undefined') return '';
+	if ('__TAURI_INTERNALS__' in window) return 'http://localhost:3001';
+	if (window.location.port === '5173') return 'http://localhost:3001';
+	return '';
+}
+
+const BASE_URL = resolveBaseUrl();
 let token: string = '';
 let accountId: string = '00000000-0000-0000-0000-000000000000';
 let authMode: 'bearer' | 'cookie' = 'bearer';

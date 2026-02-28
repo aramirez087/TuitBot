@@ -38,6 +38,9 @@ dashboard/.svelte-kit/
 dashboard/build/
 dashboard/src-tauri/target/
 
+# Embedded dashboard build artifact
+crates/tuitbot-server/dashboard-dist/
+
 # Added by Spec Kitty CLI (auto-managed)
 .claude/
 .codex/

@@ -310,7 +310,7 @@ Releases are fully automated in GitHub Actions and follow a release-PR model:
 3. Merging that release PR triggers:
    * crates.io publish for workspace crates (`tuitbot-core`, `tuitbot-mcp`, `tuitbot-cli`)
    * Tag + GitHub release for CLI (`tuitbot-cli-vX.Y.Z`)
-   * Cross-platform binary builds (`linux`, `macOS Intel`, `macOS Apple Silicon`, `windows`)
+   * Cross-platform binary builds for `tuitbot` and `tuitbot-server` (`linux`, `macOS Intel`, `macOS Apple Silicon`, `windows`)
    * Asset uploads + `SHA256SUMS` checksum file
 4. If a release contains only library crate updates and no `tuitbot-cli` release, binary asset jobs are skipped automatically.
 To keep versioning clean, use Conventional Commit prefixes (`feat:`, `fix:`, `chore:`, etc.) and `!` for breaking changes.

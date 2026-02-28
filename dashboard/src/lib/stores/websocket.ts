@@ -49,14 +49,24 @@ async function sendNativeNotification(title: string, body: string) {
  * If `token` is provided, authenticates via query parameter (Tauri/API mode).
  * If omitted, the server authenticates via the session cookie (web/LAN mode).
  */
+function resolveWsBase(): string {
+    if (typeof window === 'undefined') return 'ws://localhost:3001';
+    if ('__TAURI_INTERNALS__' in window || window.location.port === '5173') {
+        return 'ws://localhost:3001';
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}`;
+}
+
 export function connectWs(token?: string) {
     if (ws) {
         ws.close();
     }
 
+    const wsBase = resolveWsBase();
     const url = token
-        ? `ws://localhost:3001/api/ws?token=${token}`
-        : `ws://localhost:3001/api/ws`;
+        ? `${wsBase}/api/ws?token=${token}`
+        : `${wsBase}/api/ws`;
     ws = new WebSocket(url);
 
     ws.onopen = () => {

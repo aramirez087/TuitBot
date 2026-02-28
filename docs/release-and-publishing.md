@@ -16,13 +16,16 @@ Workflow: `.github/workflows/release.yml`
 
 ## GitHub releases and binary assets
 
-Only CLI releases produce GitHub release assets:
+CLI releases produce GitHub release assets for both `tuitbot` and `tuitbot-server`:
 
-- linux x86_64
-- macOS Intel
-- macOS Apple Silicon
-- windows x86_64
-- `SHA256SUMS`
+| Binary | Platforms |
+|--------|-----------|
+| `tuitbot` (CLI) | linux x86_64, macOS Intel, macOS Apple Silicon, windows x86_64 |
+| `tuitbot-server` | linux x86_64, macOS Intel, macOS Apple Silicon, windows x86_64 |
+
+Each release also includes a `SHA256SUMS` checksum manifest covering all archives.
+
+`tuitbot update` uses these assets to self-update the CLI and, if `tuitbot-server` is found on `PATH`, updates it from the same release.
 
 ## Required repository secrets
 

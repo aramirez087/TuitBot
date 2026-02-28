@@ -55,9 +55,12 @@ This single command:
 
 1. Checks GitHub Releases for a newer `tuitbot` binary.
 2. Downloads, verifies SHA256, and atomically replaces the running binary.
-3. Detects new config features and walks you through adding them.
+3. If `tuitbot-server` is found on `PATH`, updates it from the same release (non-fatal on failure).
+4. Detects new config features and walks you through adding them.
 
 Use `--check` to see if an update is available without installing. Use `--config-only` to skip the binary update. Use `--non-interactive` in CI to apply config defaults automatically.
+
+> **Note:** If `tuitbot-server` was installed via Tauri sidecar (not on `PATH`), it is skipped automatically. If the server is running during update, Unix will succeed (the process keeps its old file descriptor) but Windows may fail — stop the server first.
 
 After updating, run `tuitbot test` to validate auth and connectivity.
 

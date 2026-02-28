@@ -31,6 +31,17 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dashboard for embedding
+        run: |
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
+
       - name: Run release-plz release
         id: release-plz
         uses: release-plz/action@v0.5
@@ -80,6 +91,17 @@ jobs:
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dashboard for embedding
+        run: |
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
 
       - name: Run release-plz release-pr
         uses: release-plz/action@v0.5
@@ -136,7 +158,23 @@ jobs:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
         run: cargo build --locked --release --package tuitbot-cli --target ${{ matrix.target }}
 
-      - name: Package archive (Unix)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dashboard for server embedding
+        run: |
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
+
+      - name: Build tuitbot-server binary
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+        run: cargo build --locked --release --package tuitbot-server --target ${{ matrix.target }}
+
+      - name: Package CLI archive (Unix)
         if: runner.os != 'Windows'
         env:
           TARGET: ${{ matrix.target }}
@@ -149,7 +187,20 @@ jobs:
           $STRIP dist/package/tuitbot || true
           tar -czf "dist/tuitbot-${TARGET}.tar.gz" -C dist/package tuitbot README.md LICENSE
 
-      - name: Package archive (Windows)
+      - name: Package server archive (Unix)
+        if: runner.os != 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+          STRIP: ${{ matrix.cross && 'aarch64-linux-gnu-strip' || 'strip' }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/server-package
+          cp "target/${TARGET}/release/tuitbot-server" "dist/server-package/tuitbot-server"
+          cp README.md LICENSE dist/server-package/
+          $STRIP dist/server-package/tuitbot-server || true
+          tar -czf "dist/tuitbot-server-${TARGET}.tar.gz" -C dist/server-package tuitbot-server README.md LICENSE
+
+      - name: Package CLI archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
@@ -161,11 +212,30 @@ jobs:
           Copy-Item LICENSE "dist/package/LICENSE"
           Compress-Archive -Path dist/package/* -DestinationPath "dist/tuitbot-$env:TARGET.zip" -Force
 
-      - name: Upload packaged artifact
+      - name: Package server archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/server-package | Out-Null
+          Copy-Item "target/$env:TARGET/release/tuitbot-server.exe" "dist/server-package/tuitbot-server.exe"
+          Copy-Item README.md "dist/server-package/README.md"
+          Copy-Item LICENSE "dist/server-package/LICENSE"
+          Compress-Archive -Path dist/server-package/* -DestinationPath "dist/tuitbot-server-$env:TARGET.zip" -Force
+
+      - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:
           name: tuitbot-${{ matrix.target }}
           path: dist/tuitbot-${{ matrix.target }}.${{ matrix.archive_ext }}
+          if-no-files-found: error
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tuitbot-server-${{ matrix.target }}
+          path: dist/tuitbot-server-${{ matrix.target }}.${{ matrix.archive_ext }}
           if-no-files-found: error
 
   publish-assets:
