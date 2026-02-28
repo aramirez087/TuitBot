@@ -43,3 +43,20 @@ pub(super) fn latest_compatible_release<'a>(
         .filter(|(_, v)| is_newer(v, current))
         .max_by(|(_, a), (_, b)| a.cmp(b))
 }
+
+/// Return the newest non-draft, non-prerelease release that includes
+/// the server platform archive and SHA256SUMS.
+///
+/// Unlike `latest_compatible_release`, this does not require the release to be
+/// newer than a specific version — it just finds the best release with server assets.
+pub(super) fn latest_release_with_server_asset<'a>(
+    releases: &'a [GitHubRelease],
+    server_asset_name: &str,
+) -> Option<(&'a GitHubRelease, Version)> {
+    releases
+        .iter()
+        .filter(|r| !r.draft && !r.prerelease)
+        .filter(|r| has_update_assets(r, server_asset_name))
+        .filter_map(|r| parse_version_from_tag(&r.tag_name).map(|v| (r, v)))
+        .max_by(|(_, a), (_, b)| a.cmp(b))
+}

@@ -1,0 +1,3668 @@
+{
+  "version": "1.2",
+  "tools": [
+    {
+      "name": "approve_all",
+      "category": "approval",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error",
+        "x_not_configured",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "approve_item",
+      "category": "approval",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error",
+        "not_found",
+        "x_not_configured",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "compose_tweet",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_api_error",
+        "db_error",
+        "invalid_input",
+        "tweet_too_long",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "draft_replies_for_candidates",
+      "category": "composite",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": true,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "invalid_input",
+        "llm_not_configured",
+        "llm_error",
+        "db_error"
+      ]
+    },
+    {
+      "name": "find_reply_opportunities",
+      "category": "composite",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "invalid_input",
+        "x_api_error",
+        "db_error"
+      ]
+    },
+    {
+      "name": "generate_reply",
+      "category": "content",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": true,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "llm_not_configured",
+        "llm_error"
+      ]
+    },
+    {
+      "name": "generate_thread",
+      "category": "content",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": true,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "llm_not_configured",
+        "llm_error"
+      ]
+    },
+    {
+      "name": "generate_thread_plan",
+      "category": "composite",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": true,
+      "requires_db": false,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "llm_not_configured",
+        "llm_error",
+        "invalid_input"
+      ]
+    },
+    {
+      "name": "generate_tweet",
+      "category": "content",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": true,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "llm_not_configured",
+        "llm_error"
+      ]
+    },
+    {
+      "name": "get_action_counts",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_action_log",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_author_context",
+      "category": "context",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "context_error",
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_capabilities",
+      "category": "meta",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": []
+    },
+    {
+      "name": "get_config",
+      "category": "config",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": []
+    },
+    {
+      "name": "get_discovery_feed",
+      "category": "discovery",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_follower_trend",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_mcp_error_breakdown",
+      "category": "telemetry",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_mcp_tool_metrics",
+      "category": "telemetry",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_mode",
+      "category": "meta",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": []
+    },
+    {
+      "name": "get_mutation_detail",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_pending_count",
+      "category": "approval",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_policy_status",
+      "category": "policy",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_rate_limits",
+      "category": "policy",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_recent_mutations",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_recent_replies",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_reply_count_today",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_stats",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "get_tweet_by_id",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "get_x_usage",
+      "category": "analytics",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "health_check",
+      "category": "health",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": []
+    },
+    {
+      "name": "list_pending_approvals",
+      "category": "approval",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "list_target_accounts",
+      "category": "discovery",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "list_unreplied_tweets",
+      "category": "discovery",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "propose_and_queue_replies",
+      "category": "composite",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "invalid_input",
+        "x_not_configured",
+        "x_api_error",
+        "db_error",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "recommend_engagement_action",
+      "category": "context",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "recommendation_error",
+        "db_error"
+      ]
+    },
+    {
+      "name": "reject_item",
+      "category": "approval",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error",
+        "not_found"
+      ]
+    },
+    {
+      "name": "score_tweet",
+      "category": "scoring",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "invalid_input"
+      ]
+    },
+    {
+      "name": "suggest_topics",
+      "category": "content",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "db_error"
+      ]
+    },
+    {
+      "name": "topic_performance_snapshot",
+      "category": "context",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "topic_error",
+        "db_error"
+      ]
+    },
+    {
+      "name": "validate_config",
+      "category": "config",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": false,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": []
+    },
+    {
+      "name": "x_ads_account_by_id",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_accounts",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_analytics",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_by_id",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_delete",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaign_update",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_campaigns",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_funding_instruments",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_line_item_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_line_items",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_promoted_tweet_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_promoted_tweets",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_targeting_create",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_ads_targeting_criteria",
+      "category": "ads",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "ads.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_ads_targeting_delete",
+      "category": "ads",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "ads.read",
+        "ads.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_bookmark_tweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "bookmark.read",
+        "bookmark.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_delete",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "x_request_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_delete_tweet",
+      "category": "write",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "tweet_too_long",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_follow_user",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "follows.read",
+        "follows.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_get",
+      "category": "read",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "x_request_blocked"
+      ]
+    },
+    {
+      "name": "x_get_bookmarks",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "bookmark.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_followers",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "follows.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_following",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "follows.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_home_timeline",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_liked_tweets",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "like.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_me",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_tweet_liking_users",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_user_by_id",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_user_by_username",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_user_mentions",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_user_tweets",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_get_users_by_ids",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_like_tweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "like.read",
+        "like.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_post",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "x_request_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_post_thread",
+      "category": "write",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "tweet_too_long",
+        "invalid_input",
+        "thread_partial_failure",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_post_thread_dry_run",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "tweet_too_long",
+        "invalid_input",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_post_tweet",
+      "category": "write",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "tweet_too_long",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_post_tweet_dry_run",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": false,
+      "requires_x_client": false,
+      "requires_llm": false,
+      "requires_db": true,
+      "profiles": [
+        "write",
+        "admin"
+      ],
+      "possible_error_codes": [
+        "tweet_too_long",
+        "invalid_input",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_put",
+      "category": "write",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "x_request_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_quote_tweet",
+      "category": "write",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "tweet_too_long",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_reply_to_tweet",
+      "category": "write",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "tweet_too_long",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_retweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_search_tweets",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_unbookmark_tweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "bookmark.read",
+        "bookmark.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_unfollow_user",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "follows.read",
+        "follows.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_unlike_tweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "like.read",
+        "like.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_unretweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_upload_media",
+      "category": "media",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "unsupported_media_type",
+        "file_read_error",
+        "media_upload_error",
+        "x_api_error",
+        "scraper_mutation_blocked"
+      ]
+    },
+    {
+      "name": "x_v2_blocks_create",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "block.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_blocks_delete",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "block.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_blocks_list",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "block.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_compliance_job_by_id",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "compliance.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_compliance_job_create",
+      "category": "compliance",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "compliance.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_compliance_jobs",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "compliance.write"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_conversation_by_id",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_conversations",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_create_group",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.write",
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_events",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_events_by_conversation",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_events_by_participant",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_send_in_conversation",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.write",
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_dm_send_to_participant",
+      "category": "direct_message",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "dm.write",
+        "dm.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_create",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_delete",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_follow",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_followers",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_get",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_members",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_members_add",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_members_remove",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_memberships",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_owned",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_pin",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_pinned",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_tweets",
+      "category": "list",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.read",
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_unfollow",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_lists_update",
+      "category": "list",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "list.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_mutes_create",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "mute.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_mutes_delete",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "mute.write",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_mutes_list",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "mute.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_spaces_buyers",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "space.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_spaces_by_creator",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "space.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_spaces_get",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "space.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_spaces_lookup",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "space.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_spaces_search",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "space.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_spaces_tweets",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "space.read",
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_stream_rules_add",
+      "category": "compliance",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_stream_rules_delete",
+      "category": "compliance",
+      "lane": "workflow",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": true,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_stream_rules_list",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_tweets_counts_recent",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_tweets_hide_reply",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.moderate.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_tweets_lookup",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_tweets_quote_tweets",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_tweets_retweeted_by",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_tweets_unhide_reply",
+      "category": "moderation",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "tweet.moderate.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_usage_tweets",
+      "category": "compliance",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "usage.read"
+      ],
+      "requires_user_auth": true,
+      "requires_elevated_access": true,
+      "profiles": [
+        "admin"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_users_lookup_by_usernames",
+      "category": "read",
+      "lane": "shared",
+      "mutation": false,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "users.read"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "readonly",
+        "api_readonly",
+        "write",
+        "admin",
+        "utility_readonly",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error"
+      ]
+    },
+    {
+      "name": "x_v2_users_pin_tweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read",
+        "tweet.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    },
+    {
+      "name": "x_v2_users_unpin_tweet",
+      "category": "engage",
+      "lane": "shared",
+      "mutation": true,
+      "requires_x_client": true,
+      "requires_llm": false,
+      "requires_db": false,
+      "requires_scopes": [
+        "tweet.read",
+        "users.read",
+        "tweet.write"
+      ],
+      "requires_user_auth": true,
+      "profiles": [
+        "write",
+        "admin",
+        "utility_write"
+      ],
+      "possible_error_codes": [
+        "x_not_configured",
+        "x_rate_limited",
+        "x_auth_expired",
+        "x_forbidden",
+        "x_network_error",
+        "x_api_error",
+        "scraper_mutation_blocked",
+        "policy_denied_blocked",
+        "policy_denied_rate_limited",
+        "policy_denied_hard_rule",
+        "policy_denied_user_rule",
+        "policy_error"
+      ]
+    }
+  ]
+}

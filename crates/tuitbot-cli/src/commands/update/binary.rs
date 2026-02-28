@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
+use semver::Version;
 
 use super::github::{
     available_asset_names, download_asset, download_asset_text, parse_sha256sums, verify_sha256,
@@ -107,6 +108,35 @@ pub(super) fn detect_server_path() -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Run `tuitbot-server --version` and parse the output into a `semver::Version`.
+///
+/// Expected output format: `tuitbot-server X.Y.Z` (with optional trailing text).
+/// Returns `None` if the binary can't be executed or the output can't be parsed.
+pub(super) fn detect_server_version(server_exe: &Path) -> Option<Version> {
+    let output = std::process::Command::new(server_exe)
+        .arg("--version")
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    parse_server_version_output(stdout.trim())
+}
+
+/// Parse `"tuitbot-server X.Y.Z"` into a `Version`.
+pub(super) fn parse_server_version_output(output: &str) -> Option<Version> {
+    // Try the first line only (ignore any trailing output)
+    let line = output.lines().next()?.trim();
+
+    // Strip the "tuitbot-server " prefix if present
+    let version_str = line.strip_prefix("tuitbot-server ").unwrap_or(line).trim();
+
+    Version::parse(version_str).ok()
 }
 
 // ---------------------------------------------------------------------------

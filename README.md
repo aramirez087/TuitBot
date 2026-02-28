@@ -83,9 +83,9 @@ Full tool reference, response envelopes, and enterprise APIs → [MCP Reference]
 
 ## Growth Co-Pilot
 
-### Three Deployment Modes
+### Deployment Modes
 
-Tuitbot supports three ways to run — all using the exact same core automation engine:
+Tuitbot supports multiple ways to run — all using the exact same core automation engine:
 
 | Mode | How it runs | Dashboard access | Best for |
 |------|-------------|-----------------|----------|
@@ -273,7 +273,7 @@ tuitbot settings --show                    # read-only config view
 tuitbot approve --list                     # review queued posts
 tuitbot stats --output json                # analytics snapshot
 tuitbot backup                             # back up database
-tuitbot update                             # check for updates
+tuitbot update                             # update CLI + server binaries
 ```
 
 ---

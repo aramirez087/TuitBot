@@ -435,3 +435,136 @@ fn detect_server_path_returns_a_path_or_none() {
         None => {} // expected in most environments
     }
 }
+
+// ---------------------------------------------------------------------------
+// Server version parsing
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_server_version_standard_output() {
+    use super::binary::parse_server_version_output;
+    let v = parse_server_version_output("tuitbot-server 0.1.13").unwrap();
+    assert_eq!(v, Version::new(0, 1, 13));
+}
+
+#[test]
+fn parse_server_version_with_trailing_newline() {
+    use super::binary::parse_server_version_output;
+    let v = parse_server_version_output("tuitbot-server 0.2.0\n").unwrap();
+    assert_eq!(v, Version::new(0, 2, 0));
+}
+
+#[test]
+fn parse_server_version_multiline_output() {
+    use super::binary::parse_server_version_output;
+    // Only the first line matters
+    let v = parse_server_version_output("tuitbot-server 1.0.0\nsome extra output").unwrap();
+    assert_eq!(v, Version::new(1, 0, 0));
+}
+
+#[test]
+fn parse_server_version_bare_semver() {
+    use super::binary::parse_server_version_output;
+    // Fallback: no prefix, just a version string
+    let v = parse_server_version_output("0.1.16").unwrap();
+    assert_eq!(v, Version::new(0, 1, 16));
+}
+
+#[test]
+fn parse_server_version_garbage_returns_none() {
+    use super::binary::parse_server_version_output;
+    assert!(parse_server_version_output("not a version").is_none());
+    assert!(parse_server_version_output("").is_none());
+}
+
+// ---------------------------------------------------------------------------
+// latest_release_with_server_asset
+// ---------------------------------------------------------------------------
+
+#[test]
+fn latest_release_with_server_asset_picks_newest() {
+    use super::version::latest_release_with_server_asset;
+
+    let releases = vec![
+        release_with_assets(
+            "tuitbot-cli-v0.1.13",
+            &["SHA256SUMS", "tuitbot-x86_64-unknown-linux-gnu.tar.gz"],
+        ),
+        release_with_assets(
+            "tuitbot-cli-v0.1.15",
+            &["SHA256SUMS"], // no server asset
+        ),
+        release_with_assets(
+            "tuitbot-cli-v0.1.16",
+            &[
+                "SHA256SUMS",
+                "tuitbot-server-aarch64-unknown-linux-gnu.tar.gz",
+            ],
+        ),
+        release_with_assets(
+            "tuitbot-cli-v0.1.14",
+            &[
+                "SHA256SUMS",
+                "tuitbot-server-aarch64-unknown-linux-gnu.tar.gz",
+            ],
+        ),
+    ];
+
+    let (release, version) = latest_release_with_server_asset(
+        &releases,
+        "tuitbot-server-aarch64-unknown-linux-gnu.tar.gz",
+    )
+    .expect("should find a release");
+
+    assert_eq!(version, Version::new(0, 1, 16));
+    assert_eq!(release.tag_name, "tuitbot-cli-v0.1.16");
+}
+
+#[test]
+fn latest_release_with_server_asset_skips_drafts() {
+    use super::version::latest_release_with_server_asset;
+
+    let mut draft = release_with_assets(
+        "tuitbot-cli-v9.9.9",
+        &[
+            "SHA256SUMS",
+            "tuitbot-server-x86_64-unknown-linux-gnu.tar.gz",
+        ],
+    );
+    draft.draft = true;
+
+    let releases = vec![
+        draft,
+        release_with_assets(
+            "tuitbot-cli-v0.1.16",
+            &[
+                "SHA256SUMS",
+                "tuitbot-server-x86_64-unknown-linux-gnu.tar.gz",
+            ],
+        ),
+    ];
+
+    let (_, version) = latest_release_with_server_asset(
+        &releases,
+        "tuitbot-server-x86_64-unknown-linux-gnu.tar.gz",
+    )
+    .expect("should find a release");
+
+    assert_eq!(version, Version::new(0, 1, 16));
+}
+
+#[test]
+fn latest_release_with_server_asset_none_when_no_assets() {
+    use super::version::latest_release_with_server_asset;
+
+    let releases = vec![
+        release_with_assets("tuitbot-cli-v0.1.13", &["SHA256SUMS"]),
+        release_with_assets("tuitbot-cli-v0.1.15", &["SHA256SUMS"]),
+    ];
+
+    assert!(latest_release_with_server_asset(
+        &releases,
+        "tuitbot-server-aarch64-unknown-linux-gnu.tar.gz",
+    )
+    .is_none());
+}

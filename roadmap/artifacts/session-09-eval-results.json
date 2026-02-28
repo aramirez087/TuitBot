@@ -1,0 +1,139 @@
+{
+  "eval_name": "session-09-conformance-evals",
+  "timestamp": "2026-02-28T17:21:17.040326+00:00",
+  "scenarios": [
+    {
+      "scenario": "D",
+      "description": "Direct kernel read flow: get_tweet, search, followers, me",
+      "steps": [
+        {
+          "tool_name": "get_tweet",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        },
+        {
+          "tool_name": "search_tweets",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        },
+        {
+          "tool_name": "get_followers",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        },
+        {
+          "tool_name": "get_me",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        }
+      ],
+      "total_latency_ms": 0,
+      "success": true,
+      "schema_valid": true
+    },
+    {
+      "scenario": "E",
+      "description": "Mutation with idempotency enforcement",
+      "steps": [
+        {
+          "tool_name": "idempotency_check_first",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        },
+        {
+          "tool_name": "propose_and_queue_replies",
+          "latency_ms": 5,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        },
+        {
+          "tool_name": "idempotency_check_duplicate",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": "validation_error"
+        }
+      ],
+      "total_latency_ms": 5,
+      "success": true,
+      "schema_valid": true
+    },
+    {
+      "scenario": "F",
+      "description": "Rate-limited and auth error behavior validation",
+      "steps": [
+        {
+          "tool_name": "search_tweets_rate_limited",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": "x_rate_limited"
+        },
+        {
+          "tool_name": "get_tweet_auth_expired",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": "x_auth_expired"
+        }
+      ],
+      "total_latency_ms": 0,
+      "success": true,
+      "schema_valid": true
+    },
+    {
+      "scenario": "G",
+      "description": "Provider switching: MockProvider vs ScraperReadProvider",
+      "steps": [
+        {
+          "tool_name": "get_tweet_mock_provider",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": null
+        },
+        {
+          "tool_name": "get_tweet_scraper_provider",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": "x_api_error"
+        },
+        {
+          "tool_name": "get_bookmarks_scraper_provider",
+          "latency_ms": 0,
+          "success": true,
+          "response_valid": true,
+          "error_code": "x_not_configured"
+        }
+      ],
+      "total_latency_ms": 0,
+      "success": true,
+      "schema_valid": true
+    }
+  ],
+  "quality_gates": {
+    "schema_validation_rate": 1.0,
+    "schema_validation_threshold": 0.95,
+    "schema_validation_pass": true,
+    "unknown_error_rate": 0.0,
+    "unknown_error_threshold": 0.05,
+    "unknown_error_pass": true,
+    "kernel_conformance_rate": 1.0,
+    "kernel_conformance_pass": true,
+    "error_code_accuracy_rate": 1.0,
+    "error_code_accuracy_pass": true,
+    "all_pass": true
+  }
+}

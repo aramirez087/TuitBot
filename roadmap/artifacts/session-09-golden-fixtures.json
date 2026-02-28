@@ -1,0 +1,219 @@
+{
+  "version": "1.0",
+  "generated": "2026-02-28T17:21:16.464900+00:00",
+  "families": {
+    "engage_result": {
+      "description": "Engage action result",
+      "tools": [
+        "like_tweet",
+        "retweet",
+        "bookmark_tweet"
+      ],
+      "data_keys": [
+        "liked",
+        "tweet_id"
+      ],
+      "has_pagination": false,
+      "sample_shape": {
+        "liked": "boolean",
+        "tweet_id": "string"
+      }
+    },
+    "error_auth": {
+      "description": "Auth expired error shape",
+      "tools": [
+        "any_tool_via_error_provider"
+      ],
+      "data_keys": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "has_pagination": false,
+      "sample_shape": {
+        "code": "string",
+        "message": "string",
+        "retryable": "boolean"
+      }
+    },
+    "error_rate_limited": {
+      "description": "Rate-limited error shape",
+      "tools": [
+        "any_tool_via_error_provider"
+      ],
+      "data_keys": [
+        "code",
+        "message",
+        "retry_after_ms",
+        "retryable"
+      ],
+      "has_pagination": false,
+      "sample_shape": {
+        "code": "string",
+        "message": "string",
+        "retry_after_ms": "number",
+        "retryable": "boolean"
+      }
+    },
+    "read_single_tweet": {
+      "description": "Single tweet by ID",
+      "tools": [
+        "get_tweet"
+      ],
+      "data_keys": [
+        "author_id",
+        "conversation_id",
+        "created_at",
+        "id",
+        "public_metrics",
+        "text"
+      ],
+      "has_pagination": false,
+      "sample_shape": {
+        "author_id": "string",
+        "conversation_id": "null",
+        "created_at": "string",
+        "id": "string",
+        "public_metrics": {
+          "bookmark_count": "number",
+          "impression_count": "number",
+          "like_count": "number",
+          "quote_count": "number",
+          "reply_count": "number",
+          "retweet_count": "number"
+        },
+        "text": "string"
+      }
+    },
+    "read_single_user": {
+      "description": "Single user lookup",
+      "tools": [
+        "get_user_by_username",
+        "get_user_by_id",
+        "get_me"
+      ],
+      "data_keys": [
+        "id",
+        "name",
+        "public_metrics",
+        "username"
+      ],
+      "has_pagination": false,
+      "sample_shape": {
+        "id": "string",
+        "name": "string",
+        "public_metrics": {
+          "followers_count": "number",
+          "following_count": "number",
+          "tweet_count": "number"
+        },
+        "username": "string"
+      }
+    },
+    "read_tweet_list": {
+      "description": "Paginated tweet list",
+      "tools": [
+        "search_tweets",
+        "get_user_mentions",
+        "get_user_tweets",
+        "get_home_timeline",
+        "get_liked_tweets",
+        "get_bookmarks"
+      ],
+      "data_keys": [
+        "data",
+        "includes",
+        "meta"
+      ],
+      "has_pagination": true,
+      "sample_shape": {
+        "data": [
+          {
+            "author_id": "string",
+            "conversation_id": "null",
+            "created_at": "string",
+            "id": "string",
+            "public_metrics": {
+              "bookmark_count": "number",
+              "impression_count": "number",
+              "like_count": "number",
+              "quote_count": "number",
+              "reply_count": "number",
+              "retweet_count": "number"
+            },
+            "text": "string"
+          }
+        ],
+        "includes": {
+          "users": [
+            {
+              "id": "string",
+              "name": "string",
+              "public_metrics": {
+                "followers_count": "number",
+                "following_count": "number",
+                "tweet_count": "number"
+              },
+              "username": "string"
+            }
+          ]
+        },
+        "meta": {
+          "newest_id": "string",
+          "next_token": "null",
+          "oldest_id": "string",
+          "result_count": "number"
+        }
+      }
+    },
+    "read_users_list": {
+      "description": "Paginated user list",
+      "tools": [
+        "get_followers",
+        "get_following",
+        "get_users_by_ids",
+        "get_tweet_liking_users"
+      ],
+      "data_keys": [
+        "data",
+        "meta"
+      ],
+      "has_pagination": true,
+      "sample_shape": {
+        "data": [
+          {
+            "id": "string",
+            "name": "string",
+            "public_metrics": {
+              "followers_count": "number",
+              "following_count": "number",
+              "tweet_count": "number"
+            },
+            "username": "string"
+          }
+        ],
+        "meta": {
+          "next_token": "null",
+          "result_count": "number"
+        }
+      }
+    },
+    "write_result": {
+      "description": "Write operation result",
+      "tools": [
+        "post_tweet",
+        "reply_to_tweet",
+        "quote_tweet"
+      ],
+      "data_keys": [
+        "id",
+        "text"
+      ],
+      "has_pagination": false,
+      "sample_shape": {
+        "id": "string",
+        "text": "string"
+      }
+    }
+  }
+}

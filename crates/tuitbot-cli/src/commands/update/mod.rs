@@ -2,8 +2,11 @@
 ///
 /// Phase 1a: Check GitHub releases for a newer CLI binary, download, verify
 ///           SHA256, and atomically replace the current binary.
-/// Phase 1b: If `tuitbot-server` is found on PATH, update it from the same
-///           release (non-fatal on failure).
+/// Phase 1b: Independently check whether `tuitbot-server` (if on PATH) is
+///           behind the latest release that ships server assets. This runs
+///           regardless of whether the CLI itself needed an update, fixing
+///           the bootstrapping bug where a newly-updated CLI skips the server
+///           because it's "already up to date."
 /// Phase 2:  Run config upgrade (reuses `upgrade.rs` logic) to patch missing
 ///           feature groups into the user's `config.toml`.
 mod binary;
@@ -23,10 +26,12 @@ use semver::Version;
 
 use super::upgrade;
 
-use binary::{detect_server_path, update_cli_binary, update_target_binary};
+use binary::{detect_server_path, detect_server_version, update_cli_binary, update_target_binary};
 use github::{available_asset_names, check_recent_releases, GitHubRelease};
 use platform::{asset_name_for_binary, platform_asset_name};
-use version::{is_newer, latest_compatible_release, latest_known_release};
+use version::{
+    is_newer, latest_compatible_release, latest_known_release, latest_release_with_server_asset,
+};
 
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const UPDATE_TARGET_ENV: &str = "TUITBOT_UPDATE_TARGET";
@@ -52,17 +57,11 @@ pub async fn execute(
         eprintln!("{}", bold.apply_to("Checking for updates..."));
         eprintln!();
 
-        match check_recent_releases().await {
-            Ok(releases) => match latest_known_release(&releases) {
+        let fetched_releases = check_recent_releases().await;
+
+        match &fetched_releases {
+            Ok(releases) => match latest_known_release(releases) {
                 Some((latest_release, latest)) if is_newer(&latest, &current) => {
-                    let server_path = detect_server_path();
-
-                    let target_label = if server_path.is_some() {
-                        "tuitbot + tuitbot-server"
-                    } else {
-                        "tuitbot"
-                    };
-
                     eprintln!(
                         "  {} {} → {}",
                         green.apply_to("New version available:"),
@@ -83,7 +82,7 @@ pub async fn execute(
                     if !non_interactive && std::io::stdin().is_terminal() {
                         eprintln!();
                         let proceed = Confirm::new()
-                            .with_prompt(format!("Update {target_label} to v{latest}?"))
+                            .with_prompt(format!("Update tuitbot to v{latest}?"))
                             .default(true)
                             .interact()?;
 
@@ -133,7 +132,7 @@ pub async fn execute(
                     };
 
                     let (release_for_update, release_version) = match latest_compatible_release(
-                        &releases,
+                        releases,
                         &current,
                         &asset_name,
                     ) {
@@ -205,11 +204,6 @@ pub async fn execute(
                             );
                         }
                     }
-
-                    // Phase 1b: Update server binary (non-fatal)
-                    if let Some(server_exe) = server_path {
-                        update_server(release_for_update, &server_exe, &green, &dim).await;
-                    }
                 }
                 Some((_, latest)) => {
                     eprintln!("  Already up to date (v{current}).");
@@ -241,6 +235,15 @@ pub async fn execute(
                     "  {}",
                     dim.apply_to("Skipping binary update, continuing with config upgrade...")
                 );
+            }
+        }
+
+        // Phase 1b: Standalone server update check
+        // Runs independently of the CLI update — fixes the bootstrapping bug where
+        // the server stays stuck at an old version when the CLI is already current.
+        if !check_only {
+            if let Ok(releases) = &fetched_releases {
+                check_and_update_server(releases, &green, &dim).await;
             }
         }
 
@@ -299,15 +302,19 @@ pub async fn check_before_run(config_path_str: &str) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Server update (Phase 1b) — non-fatal
+// Server update (Phase 1b) — standalone, non-fatal
 // ---------------------------------------------------------------------------
 
-async fn update_server(
-    release: &GitHubRelease,
-    server_exe: &std::path::Path,
-    green: &Style,
-    dim: &Style,
-) {
+/// Check whether `tuitbot-server` is installed, behind, and update it.
+///
+/// This runs independently of the CLI update check so the server can be updated
+/// even when the CLI is already at the latest version (bootstrapping fix).
+async fn check_and_update_server(releases: &[GitHubRelease], green: &Style, dim: &Style) {
+    let server_exe = match detect_server_path() {
+        Some(path) => path,
+        None => return, // server not installed — nothing to do
+    };
+
     let server_asset = match asset_name_for_binary("tuitbot-server") {
         Some(name) => name,
         None => {
@@ -319,22 +326,45 @@ async fn update_server(
         }
     };
 
-    // Check if this release includes a server asset
-    if !release.assets.iter().any(|a| a.name == server_asset) {
+    // Find the newest release that ships a server binary
+    let (release, release_version) = match latest_release_with_server_asset(releases, &server_asset)
+    {
+        Some(found) => found,
+        None => return, // no release has server assets — skip silently
+    };
+
+    // Compare against the installed server version (if detectable)
+    if let Some(server_version) = detect_server_version(&server_exe) {
+        if server_version >= release_version {
+            eprintln!(
+                "  {} tuitbot-server is up to date (v{server_version}).",
+                dim.apply_to("ℹ"),
+            );
+            return;
+        }
         eprintln!(
-            "  {} Server update skipped: release has no '{}' asset",
-            dim.apply_to("ℹ"),
-            server_asset,
+            "  {} tuitbot-server v{server_version} → v{release_version}",
+            green.apply_to("Server update available:"),
         );
-        return;
+    } else {
+        eprintln!(
+            "  {} Could not detect server version; attempting update to v{release_version}.",
+            dim.apply_to("ℹ"),
+        );
     }
 
-    match update_target_binary(release, "tuitbot-server", &server_asset, server_exe).await {
+    match update_target_binary(release, "tuitbot-server", &server_asset, &server_exe).await {
         Ok(()) => {
             eprintln!(
                 "  {} Updated tuitbot-server at {}",
                 green.apply_to("✓"),
                 server_exe.display()
+            );
+            eprintln!(
+                "  {}",
+                dim.apply_to(
+                    "Restart the server to use the new version (e.g., sudo systemctl restart tuitbot)."
+                )
             );
         }
         Err(e) => {
