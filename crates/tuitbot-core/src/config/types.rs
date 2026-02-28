@@ -327,6 +327,38 @@ pub struct StorageConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
+
+/// Server binding configuration for LAN access.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServerConfig {
+    /// Host address to bind to. Use "0.0.0.0" for LAN access.
+    #[serde(default = "default_server_host")]
+    pub host: String,
+
+    /// Port to listen on.
+    #[serde(default = "default_server_port")]
+    pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: default_server_host(),
+            port: default_server_port(),
+        }
+    }
+}
+
+fn default_server_host() -> String {
+    "127.0.0.1".to_string()
+}
+fn default_server_port() -> u16 {
+    3001
+}
+
+// ---------------------------------------------------------------------------
 // Logging
 // ---------------------------------------------------------------------------
 

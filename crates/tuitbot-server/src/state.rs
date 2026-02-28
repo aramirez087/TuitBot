@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
 use tuitbot_core::automation::Runtime;
 use tuitbot_core::content::ContentGenerator;
@@ -27,7 +27,11 @@ pub struct AppState {
     /// Local bearer token for API authentication.
     pub api_token: String,
     /// Bcrypt hash of the web login passphrase (None if not configured).
-    pub passphrase_hash: Option<String>,
+    pub passphrase_hash: RwLock<Option<String>>,
+    /// Host address the server is bound to.
+    pub bind_host: String,
+    /// Port the server is listening on.
+    pub bind_port: u16,
     /// Per-IP login attempt tracking for rate limiting: (count, window_start).
     pub login_attempts: Mutex<HashMap<IpAddr, (u32, Instant)>>,
     /// Per-account automation runtimes (keyed by account_id).

@@ -1,9 +1,9 @@
 {
   "aggregate": {
-    "max_ms": "3.192",
-    "min_ms": "0.075",
-    "p50_ms": "0.433",
-    "p95_ms": "1.797"
+    "max_ms": "2.881",
+    "min_ms": "0.054",
+    "p50_ms": "0.559",
+    "p95_ms": "1.432"
   },
   "benchmark": "task-01-baseline",
   "iterations_per_tool": 5,
@@ -11,48 +11,48 @@
   "schema_pass_rate": "100%",
   "tools": [
     {
-      "avg_ms": "1.022",
+      "avg_ms": "0.937",
       "iterations": 5,
-      "max_ms": "1.636",
-      "min_ms": "0.749",
-      "p50_ms": "0.911",
-      "p95_ms": "1.636",
+      "max_ms": "1.432",
+      "min_ms": "0.691",
+      "p50_ms": "0.894",
+      "p95_ms": "1.432",
       "tool": "get_capabilities"
     },
     {
-      "avg_ms": "0.223",
+      "avg_ms": "0.277",
       "iterations": 5,
-      "max_ms": "0.433",
-      "min_ms": "0.146",
-      "p50_ms": "0.175",
-      "p95_ms": "0.433",
+      "max_ms": "0.559",
+      "min_ms": "0.176",
+      "p50_ms": "0.208",
+      "p95_ms": "0.559",
       "tool": "health_check"
     },
     {
-      "avg_ms": "1.687",
+      "avg_ms": "1.524",
       "iterations": 5,
-      "max_ms": "3.192",
-      "min_ms": "1.032",
-      "p50_ms": "1.217",
-      "p95_ms": "3.192",
+      "max_ms": "2.881",
+      "min_ms": "1.022",
+      "p50_ms": "1.280",
+      "p95_ms": "2.881",
       "tool": "get_stats"
     },
     {
-      "avg_ms": "0.347",
+      "avg_ms": "0.337",
       "iterations": 5,
-      "max_ms": "1.282",
-      "min_ms": "0.075",
-      "p50_ms": "0.120",
-      "p95_ms": "1.282",
+      "max_ms": "1.154",
+      "min_ms": "0.109",
+      "p50_ms": "0.142",
+      "p95_ms": "1.154",
       "tool": "list_pending"
     },
     {
-      "avg_ms": "0.240",
+      "avg_ms": "0.235",
       "iterations": 5,
-      "max_ms": "0.820",
-      "min_ms": "0.078",
-      "p50_ms": "0.104",
-      "p95_ms": "0.820",
+      "max_ms": "0.897",
+      "min_ms": "0.054",
+      "p50_ms": "0.069",
+      "p95_ms": "0.897",
       "tool": "list_unreplied_tweets_with_limit"
     }
   ],

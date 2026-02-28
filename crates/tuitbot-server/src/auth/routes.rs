@@ -114,7 +114,8 @@ pub async fn login(
     record_attempt(&state, ip).await;
 
     // Check if passphrase auth is configured
-    let Some(ref hash) = state.passphrase_hash else {
+    let hash = state.passphrase_hash.read().await;
+    let Some(ref hash) = *hash else {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             axum::Json(json!({"error": "passphrase authentication not configured"})),

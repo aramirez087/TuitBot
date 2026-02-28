@@ -104,6 +104,25 @@ server {
 }
 ```
 
+## Upgrading from a Previous Version
+
+If you already have Tuitbot installed, the update is seamless — no manual steps required:
+
+1. `git pull && cargo build` (or update via your package manager)
+2. Start the server normally. On first start after the update:
+   - The `sessions` table migration runs automatically
+   - A passphrase is generated and printed to the terminal
+   - `~/.tuitbot/passphrase_hash` is created with `0600` permissions
+3. Everything else works exactly as before — Tauri, dev mode, and CLI are unaffected
+
+If you missed the passphrase in the terminal output, reset it:
+
+```bash
+cargo run -p tuitbot-server -- --reset-passphrase
+```
+
+To start using LAN mode, just add `--host 0.0.0.0` to your server command.
+
 ## Tauri Desktop + LAN Mode
 
 The Tauri desktop app always uses bearer token auth (reads `~/.tuitbot/api_token` directly). LAN mode doesn't affect it — the desktop app continues to work exactly as before, even when the server is bound to `0.0.0.0`.

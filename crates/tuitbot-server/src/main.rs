@@ -17,6 +17,7 @@ use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage;
 use tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID;
 
+use tuitbot_core::net::local_ip;
 use tuitbot_server::auth;
 use tuitbot_server::state::AppState;
 use tuitbot_server::ws::WsEvent;
@@ -95,6 +96,27 @@ async fn main() -> Result<()> {
 
     let data_dir = db_dir.to_path_buf();
 
+    // Load config for server settings and content generator.
+    let loaded_config = Config::load(Some(&cli.config)).ok();
+
+    // Determine effective bind host/port: CLI flags override config values.
+    let bind_host = if cli.host != "127.0.0.1" {
+        cli.host.clone()
+    } else {
+        loaded_config
+            .as_ref()
+            .map(|c| c.server.host.clone())
+            .unwrap_or_else(|| cli.host.clone())
+    };
+    let bind_port = if cli.port != 3001 {
+        cli.port
+    } else {
+        loaded_config
+            .as_ref()
+            .map(|c| c.server.port)
+            .unwrap_or(cli.port)
+    };
+
     // Try to initialize content generator from config (optional — AI assist endpoints need it).
     let content_generator = match Config::load(Some(&cli.config)) {
         Ok(config) => match create_provider(&config.llm) {
@@ -124,7 +146,9 @@ async fn main() -> Result<()> {
         data_dir,
         event_tx,
         api_token,
-        passphrase_hash,
+        passphrase_hash: tokio::sync::RwLock::new(passphrase_hash),
+        bind_host: bind_host.clone(),
+        bind_port,
         login_attempts: Mutex::new(HashMap::new()),
         runtimes: Mutex::new(HashMap::new()),
         content_generators: Mutex::new(content_generators),
@@ -134,24 +158,16 @@ async fn main() -> Result<()> {
     let router = tuitbot_server::build_router(state);
 
     // Warn about network exposure when binding to 0.0.0.0.
-    if cli.host == "0.0.0.0" {
+    if bind_host == "0.0.0.0" {
         tracing::warn!("Binding to 0.0.0.0 — server accessible from LAN");
         if let Some(ip) = local_ip() {
-            println!("  Dashboard: http://{}:{}", ip, cli.port);
+            println!("  Dashboard: http://{}:{}", ip, bind_port);
         }
     }
 
-    let listener = tokio::net::TcpListener::bind(format!("{}:{}", cli.host, cli.port)).await?;
-    tracing::info!("listening on http://{}:{}", cli.host, cli.port);
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", bind_host, bind_port)).await?;
+    tracing::info!("listening on http://{}:{}", bind_host, bind_port);
     axum::serve(listener, router).await?;
 
     Ok(())
-}
-
-/// Try to detect a local non-loopback IPv4 address for display purposes.
-fn local_ip() -> Option<String> {
-    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("8.8.8.8:80").ok()?;
-    let addr = socket.local_addr().ok()?;
-    Some(addr.ip().to_string())
 }

@@ -1,6 +1,6 @@
 {
   "eval_name": "session-09-conformance-evals",
-  "timestamp": "2026-02-27T23:24:51.281180+00:00",
+  "timestamp": "2026-02-28T00:09:20.245950+00:00",
   "scenarios": [
     {
       "scenario": "D",
@@ -52,7 +52,7 @@
         },
         {
           "tool_name": "propose_and_queue_replies",
-          "latency_ms": 5,
+          "latency_ms": 4,
           "success": true,
           "response_valid": true,
           "error_code": null
@@ -65,7 +65,7 @@
           "error_code": "validation_error"
         }
       ],
-      "total_latency_ms": 5,
+      "total_latency_ms": 4,
       "success": true,
       "schema_valid": true
     },

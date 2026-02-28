@@ -8,7 +8,8 @@
 		Clock,
 		Brain,
 		Key,
-		Database
+		Database,
+		Wifi
 	} from 'lucide-svelte';
 	import {
 		loading,
@@ -30,6 +31,7 @@
 	import LlmProviderSection from './LlmProviderSection.svelte';
 	import XApiSection from './XApiSection.svelte';
 	import StorageSection from './StorageSection.svelte';
+	import LanAccessSection from './LanAccessSection.svelte';
 	import SaveBar from './SaveBar.svelte';
 	import ConfirmModal from './ConfirmModal.svelte';
 
@@ -43,7 +45,8 @@
 		{ id: 'schedule', label: 'Schedule', icon: Clock },
 		{ id: 'llm', label: 'LLM', icon: Brain },
 		{ id: 'xapi', label: 'X API', icon: Key },
-		{ id: 'storage', label: 'Storage', icon: Database }
+		{ id: 'storage', label: 'Storage', icon: Database },
+		{ id: 'lan', label: 'LAN', icon: Wifi }
 	];
 
 	let activeSection = $state('business');
@@ -177,6 +180,7 @@
 				<LlmProviderSection />
 				<XApiSection />
 				<StorageSection />
+				<LanAccessSection />
 			</div>
 		</div>
 	</div>

@@ -799,6 +799,26 @@ export const api = {
 			request<unknown[]>(`/api/content/threads?limit=${limit}`)
 	},
 
+	lan: {
+		status: () =>
+			request<{
+				bind_host: string;
+				bind_port: number;
+				lan_enabled: boolean;
+				local_ip: string | null;
+				passphrase_configured: boolean;
+			}>('/api/settings/lan'),
+		toggle: (host: string) =>
+			request<{ restart_required: boolean }>('/api/settings/lan', {
+				method: 'PATCH',
+				body: JSON.stringify({ host })
+			}),
+		resetPassphrase: () =>
+			request<{ passphrase: string }>('/api/settings/lan/reset-passphrase', {
+				method: 'POST'
+			})
+	},
+
 	settings: {
 		configStatus: () => request<{ configured: boolean }>('/api/settings/status'),
 		init: (data: Partial<TuitbotConfig>) =>

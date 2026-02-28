@@ -158,6 +158,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Media
         .route("/media/upload", post(routes::media::upload))
         .route("/media/file", get(routes::media::serve_file))
+        // LAN settings
+        .route(
+            "/settings/lan",
+            get(routes::lan::get_status).patch(routes::lan::toggle_lan),
+        )
+        .route(
+            "/settings/lan/reset-passphrase",
+            post(routes::lan::reset_passphrase),
+        )
         // Settings
         .route("/settings/status", get(routes::settings::config_status))
         .route("/settings/init", post(routes::settings::init_settings))

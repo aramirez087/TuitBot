@@ -20,7 +20,7 @@ mod tests;
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
 pub use types::{
     AuthConfig, BusinessProfile, IntervalsConfig, LimitsConfig, LlmConfig, LoggingConfig,
-    ScoringConfig, StorageConfig, TargetsConfig, XApiConfig,
+    ScoringConfig, ServerConfig, StorageConfig, TargetsConfig, XApiConfig,
 };
 pub use types_policy::{CircuitBreakerConfig, McpPolicyConfig, ScheduleConfig};
 
@@ -108,6 +108,10 @@ pub struct Config {
     /// Maximum items that can be batch-approved at once.
     #[serde(default = "default_max_batch_approve")]
     pub max_batch_approve: usize,
+
+    /// Server binding configuration for LAN access.
+    #[serde(default)]
+    pub server: ServerConfig,
 
     /// Data storage configuration.
     #[serde(default)]
