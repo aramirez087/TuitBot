@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.17](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.16...tuitbot-cli-v0.1.17) - 2026-02-28
+
+### Added
+
+- Session 1 — compose charter
+- Session 2 — distraction-free writer (component refactor + voice context + generator module)
+
 ## [0.1.16](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.15...tuitbot-cli-v0.1.16) - 2026-02-28
 
 ### Added
