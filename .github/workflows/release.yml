@@ -31,6 +31,17 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dashboard for embedding
+        run: |
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
+
       - name: Run release-plz release
         id: release-plz
         uses: release-plz/action@v0.5
@@ -80,6 +91,17 @@ jobs:
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build dashboard for embedding
+        run: |
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
 
       - name: Run release-plz release-pr
         uses: release-plz/action@v0.5

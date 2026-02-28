@@ -6,6 +6,7 @@
 
 pub mod account;
 pub mod auth;
+pub mod dashboard;
 pub mod error;
 pub mod routes;
 pub mod state;
@@ -233,6 +234,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
 
     Router::new()
         .nest("/api", api)
+        .fallback(dashboard::serve_dashboard)
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(state)

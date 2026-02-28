@@ -38,9 +38,12 @@ jobs:
         run: cargo test --workspace
         env:
           RUSTFLAGS: "-D warnings"
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
 
       - name: Run clippy
         run: cargo clippy --workspace -- -D warnings
+        env:
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
 
       - name: Conformance gates
         run: |
@@ -50,6 +53,7 @@ jobs:
           cargo test -p tuitbot-mcp eval_session09_all_scenarios
         env:
           RUSTFLAGS: "-D warnings"
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
 
   fmt:
     name: Formatting
@@ -121,3 +125,5 @@ jobs:
 
       - name: Check MCP manifests
         run: bash scripts/check-mcp-manifests.sh
+        env:
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
