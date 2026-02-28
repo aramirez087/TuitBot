@@ -34,6 +34,7 @@ async fn test_router() -> axum::Router {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        deployment_mode: Default::default(),
     });
 
     tuitbot_server::build_router(state)

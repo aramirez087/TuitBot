@@ -106,6 +106,20 @@ Autopilot ──uses──> Workflow ──uses──> Toolkit ──uses──>
 | `core/context/winning_dna.rs` | Archetype classification, engagement scoring, ancestor retrieval, cold-start seeds |
 | `core/storage/watchtower/` | CRUD for `source_contexts`, `content_nodes`, `draft_seeds` tables |
 
+## Deployment Modes
+
+Tuitbot supports three deployment modes controlling which features and source types are available:
+
+| Mode | Context | Capabilities |
+|------|---------|-------------|
+| **Desktop** (default) | Native Tauri app | Full local filesystem + native file picker + remote sources |
+| **SelfHost** | Docker/VPS browser UI | Local filesystem (server-side) + remote sources |
+| **Cloud** | Managed cloud service | Remote sources only (no local filesystem access) |
+
+Deployment mode is set via `TUITBOT_DEPLOYMENT_MODE` env var or `deployment_mode` in config. Default is `Desktop`. Capabilities are derived from mode — they are not individually configurable. See `docs/roadmap/cold-start-watchtower-rag/deployment-capability-matrix.md` for the full matrix.
+
+`DeploymentMode` is orthogonal to `OperatingMode` (Autopilot/Composer). A cloud user can run in Composer mode; a desktop user can run in Autopilot mode.
+
 ## Frontend Stack & Modes
 
 - **Dashboard UI**: SvelteKit single-page application built out of `dashboard/`. Connects to `tuitbot-server`.
@@ -125,13 +139,13 @@ The Watchtower subsystem ingests content from external sources, extracts draft s
 
 ### Provider Model
 
-Content sources implement the `ContentSourceProvider` trait (`core::source/`):
+Content sources implement the `ContentSourceProvider` trait (`core::source/`). Source availability is gated by the deployment mode capability matrix — `local_fs` requires `local_folder` capability (Desktop/SelfHost only).
 
-| Provider | Module | Mechanism | Status |
-|----------|--------|-----------|--------|
-| `local_fs` | `source/local_fs.rs` | `notify` watcher + fallback polling | Stable |
-| `google_drive` | `source/google_drive.rs` | Interval polling via Drive API v3 | Stable (read-only) |
-| `manual` | (inline via API) | Direct `POST /api/ingest` | Stable |
+| Provider | Module | Mechanism | Status | Modes |
+|----------|--------|-----------|--------|-------|
+| `local_fs` | `source/local_fs.rs` | `notify` watcher + fallback polling | Stable | Desktop, SelfHost |
+| `google_drive` | `source/google_drive.rs` | Interval polling via Drive API v3 | Stable (read-only) | All |
+| `manual` | (inline via API) | Direct `POST /api/ingest` | Stable | All |
 
 ### Pipeline Flow
 

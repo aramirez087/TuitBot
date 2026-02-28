@@ -246,6 +246,19 @@ impl Config {
             });
         }
 
+        // Validate content sources against deployment capabilities
+        for (i, source) in self.content_sources.sources.iter().enumerate() {
+            if !self.deployment_mode.allows_source_type(&source.source_type) {
+                errors.push(ConfigError::InvalidValue {
+                    field: format!("content_sources.sources[{}].source_type", i),
+                    message: format!(
+                        "source type '{}' is not available in {} deployment mode",
+                        source.source_type, self.deployment_mode
+                    ),
+                });
+            }
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {

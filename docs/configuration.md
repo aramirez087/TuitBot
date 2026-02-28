@@ -31,6 +31,7 @@ Everything else uses defaults. Run `tuitbot init --advanced` for the full 8-step
 | Section | Purpose |
 |---------|---------|
 | `mode` | Operating mode (`autopilot` or `composer`) |
+| `deployment_mode` | Deployment mode (`desktop`, `self_host`, or `cloud`) |
 | `[x_api]` | OAuth credentials for X integration |
 | `[business]` | Product profile, keywords, voice, persona |
 | `[llm]` | LLM provider, model, and API key |
@@ -78,6 +79,30 @@ export TUITBOT_MODE=composer
 
 Setting `mode = "composer"` implies `approval_mode = true`. See the [Composer Mode guide](composer-mode.md) for details.
 
+## Deployment Mode
+
+Controls which content source types and features are available based on where the server runs.
+
+| Mode | Context | Local folder | Google Drive | Manual ingest |
+|------|---------|-------------|-------------|---------------|
+| `desktop` (default) | Tauri native app | Yes | Yes | Yes |
+| `self_host` | Docker/VPS browser | Yes | Yes | Yes |
+| `cloud` | Managed cloud | **No** | Yes | Yes |
+
+```toml
+deployment_mode = "self_host"
+```
+
+```bash
+export TUITBOT_DEPLOYMENT_MODE=self_host
+```
+
+Defaults to `desktop` — existing users need no config changes. The env var accepts `self_host`, `selfhost`, and `self-host` as synonyms for the self-hosted mode.
+
+Deployment mode is orthogonal to operating mode. A cloud user can run in Composer mode; a desktop user can run in Autopilot mode.
+
+In cloud mode, validation rejects `local_fs` content sources on save. Pre-existing `local_fs` entries in the config file are preserved (not deleted) but skipped at runtime with a log warning.
+
 ## Safety Defaults
 
 The default config is intentionally conservative:
@@ -102,6 +127,7 @@ export TUITBOT_X_API__CLIENT_SECRET=your_secret
 export TUITBOT_LLM__API_KEY=sk-your-key
 export TUITBOT_LLM__PROVIDER=openai
 export TUITBOT_MODE=composer
+export TUITBOT_DEPLOYMENT_MODE=self_host
 ```
 
 **Precedence:** CLI flags > environment variables > `config.toml` > built-in defaults.
@@ -190,6 +216,8 @@ tuitbot settings --show         # read-only config view
 Configure external content sources for the Watchtower ingest pipeline.
 Content is ingested as notes, processed into draft seeds, and used to
 enrich AI-generated content via Winning DNA retrieval.
+
+> **Deployment mode note:** `local_fs` sources require `local_folder` capability, available only in Desktop and SelfHost modes. Cloud mode supports `google_drive` and manual ingest only. See [Deployment Mode](#deployment-mode) above.
 
 ### Local Folder Source
 

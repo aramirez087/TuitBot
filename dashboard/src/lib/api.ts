@@ -73,6 +73,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 	return res.json();
 }
 
+// --- Deployment types ---
+
+export type DeploymentModeValue = 'desktop' | 'self_host' | 'cloud';
+
+export interface DeploymentCapabilities {
+	local_folder: boolean;
+	manual_local_path: boolean;
+	google_drive: boolean;
+	inline_ingest: boolean;
+	file_picker_native: boolean;
+}
+
+export interface RuntimeStatus {
+	running: boolean;
+	task_count: number;
+	deployment_mode: DeploymentModeValue;
+	capabilities: DeploymentCapabilities;
+}
+
 // --- Shared types ---
 
 export interface HealthResponse {
@@ -415,6 +434,7 @@ export interface TuitbotConfig {
 			poll_interval_seconds: number | null;
 		}>;
 	};
+	deployment_mode: DeploymentModeValue;
 }
 
 export interface SettingsValidationResult {
@@ -708,6 +728,12 @@ export interface Account {
 
 export const api = {
 	health: () => request<HealthResponse>('/api/health'),
+
+	runtime: {
+		status: () => request<RuntimeStatus>('/api/runtime/status'),
+		start: () => request<{ status: string }>('/api/runtime/start', { method: 'POST' }),
+		stop: () => request<{ status: string }>('/api/runtime/stop', { method: 'POST' })
+	},
 
 	auth: {
 		login: async (passphrase: string): Promise<{ csrf_token: string; expires_at: string }> => {

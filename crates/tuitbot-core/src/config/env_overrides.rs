@@ -1,6 +1,6 @@
 //! Environment variable overrides for configuration.
 
-use super::{Config, OperatingMode};
+use super::{Config, DeploymentMode, OperatingMode};
 use crate::error::ConfigError;
 use std::env;
 
@@ -20,6 +20,25 @@ impl Config {
                         field: "mode".to_string(),
                         message: format!(
                             "invalid mode '{other}', expected 'autopilot' or 'composer'"
+                        ),
+                    });
+                }
+            }
+        }
+
+        // Deployment mode
+        if let Ok(val) = env::var("TUITBOT_DEPLOYMENT_MODE") {
+            match val.to_lowercase().as_str() {
+                "desktop" => self.deployment_mode = DeploymentMode::Desktop,
+                "self_host" | "selfhost" | "self-host" => {
+                    self.deployment_mode = DeploymentMode::SelfHost;
+                }
+                "cloud" => self.deployment_mode = DeploymentMode::Cloud,
+                other => {
+                    return Err(ConfigError::InvalidValue {
+                        field: "deployment_mode".to_string(),
+                        message: format!(
+                            "invalid deployment mode '{other}', expected 'desktop', 'self_host', or 'cloud'"
                         ),
                     });
                 }

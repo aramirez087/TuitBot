@@ -13,6 +13,9 @@ use crate::state::AppState;
 use crate::ws::WsEvent;
 
 /// `GET /api/runtime/status` — check if the automation runtime is running.
+///
+/// Also returns `deployment_mode` and `capabilities` so the frontend can
+/// adapt its source-type UI without platform guessing.
 pub async fn status(
     State(state): State<Arc<AppState>>,
     ctx: AccountContext,
@@ -21,10 +24,13 @@ pub async fn status(
     let runtime = runtimes.get(&ctx.account_id);
     let running = runtime.is_some();
     let task_count = runtime.map_or(0, |r| r.task_count());
+    let capabilities = state.deployment_mode.capabilities();
 
     Ok(Json(json!({
         "running": running,
         "task_count": task_count,
+        "deployment_mode": state.deployment_mode,
+        "capabilities": capabilities,
     })))
 }
 

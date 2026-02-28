@@ -148,6 +148,12 @@ async fn main() -> Result<()> {
         .map(|c| c.content_sources.clone())
         .unwrap_or_default();
 
+    // Extract deployment mode from config (defaults to Desktop).
+    let deployment_mode = loaded_config
+        .as_ref()
+        .map(|c| c.deployment_mode.clone())
+        .unwrap_or_default();
+
     // Conditionally start the Watchtower filesystem watcher.
     let watchtower_cancel = {
         let watch_sources: Vec<_> = content_sources
@@ -185,6 +191,7 @@ async fn main() -> Result<()> {
         circuit_breaker: None,
         watchtower_cancel: watchtower_cancel.clone(),
         content_sources,
+        deployment_mode,
     });
 
     let router = tuitbot_server::build_router(state);
