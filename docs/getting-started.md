@@ -210,7 +210,7 @@ export TUITBOT_LLM__API_KEY=sk-your-key
 tuitbot update
 ```
 
-Checks for new releases, updates the binary, and upgrades your config with any new settings.
+Checks for new releases, updates the CLI binary (and `tuitbot-server` if installed on `PATH`), and upgrades your config with any new settings.
 
 ## Validation
 
