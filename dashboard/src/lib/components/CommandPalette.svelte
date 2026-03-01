@@ -48,7 +48,7 @@
 		{ id: 'ai-improve', label: 'AI Improve', icon: Sparkles, category: 'AI', shortcut: 'cmd+j', when: 'always' },
 		{ id: 'ai-generate', label: 'AI Generate / Improve', icon: Sparkles, category: 'AI', when: 'always' },
 		{ id: 'ai-from-notes', label: 'Generate from notes', icon: FileText, category: 'AI', when: 'always' },
-		{ id: 'attach-media', label: 'Attach media', icon: Image, category: 'Compose', when: 'always' },
+		{ id: 'attach-media', label: 'Attach media', icon: Image, category: 'Compose', when: 'tweet' },
 		{ id: 'add-card', label: 'Add tweet card', icon: Plus, category: 'Thread', when: 'thread' },
 		{ id: 'duplicate', label: 'Duplicate card', icon: Copy, category: 'Thread', shortcut: 'cmd+d', when: 'thread' },
 		{ id: 'split', label: 'Split at cursor', icon: Scissors, category: 'Thread', shortcut: 'cmd+shift+s', when: 'thread' },

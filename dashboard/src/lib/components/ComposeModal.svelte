@@ -492,6 +492,7 @@
 				<div class="inspector-section">
 					<div class="inspector-section-label">Voice</div>
 					<VoiceContextPanel
+						bind:this={voicePanelRef}
 						cue={voiceCue}
 						oncuechange={(c) => { voiceCue = c; }}
 						inline={true}

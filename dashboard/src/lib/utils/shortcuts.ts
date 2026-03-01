@@ -106,6 +106,8 @@ export const SHORTCUT_CATALOG: ShortcutDef[] = [
 	{ combo: 'cmd+k', label: 'Open command palette', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+j', label: 'AI improve selection', category: 'AI', when: 'always' },
 	{ combo: 'escape', label: 'Close modal / palette', category: 'Mode', when: 'always' },
+	{ combo: 'cmd+i', label: 'Toggle inspector', category: 'Mode', when: 'always' },
+	{ combo: 'cmd+shift+p', label: 'Toggle preview', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+shift+n', label: 'Switch to tweet mode', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+shift+t', label: 'Switch to thread mode', category: 'Mode', when: 'always' },
 	{ combo: 'alt+arrowup', label: 'Move card up', category: 'Thread', when: 'thread' },
