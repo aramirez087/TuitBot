@@ -19,9 +19,10 @@ mod tests;
 
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
 pub use types::{
-    AuthConfig, BusinessProfile, ContentSourceEntry, ContentSourcesConfig, DeploymentCapabilities,
-    DeploymentMode, IntervalsConfig, LimitsConfig, LlmConfig, LoggingConfig, ScoringConfig,
-    ServerConfig, StorageConfig, TargetsConfig, XApiConfig,
+    AuthConfig, BusinessProfile, ConnectorConfig, ContentSourceEntry, ContentSourcesConfig,
+    DeploymentCapabilities, DeploymentMode, GoogleDriveConnectorConfig, IntervalsConfig,
+    LimitsConfig, LlmConfig, LoggingConfig, ScoringConfig, ServerConfig, StorageConfig,
+    TargetsConfig, XApiConfig,
 };
 pub use types_policy::{CircuitBreakerConfig, McpPolicyConfig, ScheduleConfig};
 
@@ -142,6 +143,10 @@ pub struct Config {
     /// Controls which source types and features are available.
     #[serde(default)]
     pub deployment_mode: DeploymentMode,
+
+    /// Connector configuration for remote source OAuth flows.
+    #[serde(default)]
+    pub connectors: ConnectorConfig,
 }
 
 impl Config {

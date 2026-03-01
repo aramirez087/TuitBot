@@ -290,8 +290,23 @@ pub async fn get_settings(State(state): State<Arc<AppState>>) -> Result<Json<Val
     let config: Config = toml::from_str(&contents)
         .map_err(|e| ApiError::BadRequest(format!("failed to parse config: {e}")))?;
 
-    let json = serde_json::to_value(config)
+    let mut json = serde_json::to_value(config)
         .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
+
+    // Redact service_account_key from response (charter D5, rule 2).
+    if let Some(sources) = json
+        .get_mut("content_sources")
+        .and_then(|cs| cs.get_mut("sources"))
+        .and_then(|s| s.as_array_mut())
+    {
+        for source in sources {
+            if let Some(key) = source.get_mut("service_account_key") {
+                if !key.is_null() {
+                    *key = serde_json::Value::String("[redacted]".to_string());
+                }
+            }
+        }
+    }
 
     Ok(Json(json))
 }
@@ -434,7 +449,7 @@ struct FactoryResetCleared {
 /// `POST /api/settings/factory-reset` -- erase all Tuitbot-managed data.
 ///
 /// Requires authentication (bearer or session+CSRF). Validates a typed
-/// confirmation phrase before proceeding. Stops runtimes, clears all 30
+/// confirmation phrase before proceeding. Stops runtimes, clears all 31
 /// DB tables in a single transaction, deletes config/passphrase/media files,
 /// clears in-memory state, and returns a response that also clears the
 /// session cookie.

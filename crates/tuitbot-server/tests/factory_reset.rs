@@ -206,7 +206,7 @@ async fn factory_reset_success() {
     assert_eq!(json["status"], "reset_complete");
 
     let cleared = &json["cleared"];
-    assert_eq!(cleared["tables_cleared"], 30);
+    assert_eq!(cleared["tables_cleared"], 31);
     // Migration seeds 1 account + 2 account_roles = at least 3 rows.
     assert!(cleared["rows_deleted"].as_u64().unwrap() >= 3);
     assert_eq!(cleared["config_deleted"], true);

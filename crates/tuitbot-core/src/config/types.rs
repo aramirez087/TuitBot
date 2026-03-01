@@ -480,8 +480,15 @@ pub struct ContentSourceEntry {
     pub folder_id: Option<String>,
 
     /// Path to a Google service-account JSON key file (for google_drive sources).
-    #[serde(default)]
+    /// Legacy field -- new installs use `connection_id` with OAuth 2.0 instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_account_key: Option<String>,
+
+    /// Reference to a row in the `connections` table for remote sources.
+    /// When set, the Watchtower uses the linked account's credentials
+    /// instead of `service_account_key`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_id: Option<i64>,
 
     /// Whether to watch for changes in real-time.
     #[serde(default = "default_watch")]
@@ -557,6 +564,45 @@ pub struct DeploymentCapabilities {
     pub inline_ingest: bool,
     /// Native file picker dialog (Tauri only).
     pub file_picker_native: bool,
+    /// Preferred default source type for onboarding in this deployment mode.
+    /// `"local_fs"` for Desktop, `"google_drive"` for SelfHost and Cloud.
+    pub preferred_source_default: String,
+}
+
+// ---------------------------------------------------------------------------
+// Connector Config
+// ---------------------------------------------------------------------------
+
+/// Application-level connector configuration for remote source OAuth flows.
+///
+/// These are *application credentials* (e.g. GCP OAuth client ID/secret),
+/// not user credentials. They define which OAuth application the linking
+/// flow uses. User credentials are stored in the `connections` table.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct ConnectorConfig {
+    /// Google Drive connector settings.
+    #[serde(default)]
+    pub google_drive: GoogleDriveConnectorConfig,
+}
+
+/// Google Drive OAuth application credentials.
+///
+/// Self-hosted operators configure these once in `config.toml` or via
+/// environment variables. Desktop installs can bundle embedded defaults
+/// via env vars in the Tauri sidecar.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct GoogleDriveConnectorConfig {
+    /// GCP OAuth client ID for user-account Drive linking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+
+    /// GCP OAuth client secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
+
+    /// Override redirect URI (default: http://localhost:3001/api/connectors/google-drive/callback).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redirect_uri: Option<String>,
 }
 
 impl DeploymentMode {
@@ -569,6 +615,7 @@ impl DeploymentMode {
                 google_drive: true,
                 inline_ingest: true,
                 file_picker_native: true,
+                preferred_source_default: "local_fs".to_string(),
             },
             DeploymentMode::SelfHost => DeploymentCapabilities {
                 local_folder: true,
@@ -576,6 +623,7 @@ impl DeploymentMode {
                 google_drive: true,
                 inline_ingest: true,
                 file_picker_native: false,
+                preferred_source_default: "google_drive".to_string(),
             },
             DeploymentMode::Cloud => DeploymentCapabilities {
                 local_folder: false,
@@ -583,6 +631,7 @@ impl DeploymentMode {
                 google_drive: true,
                 inline_ingest: true,
                 file_picker_native: false,
+                preferred_source_default: "google_drive".to_string(),
             },
         }
     }

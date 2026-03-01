@@ -370,6 +370,7 @@ async fn watcher_cancels_with_sources() {
             path: Some(dir.path().to_string_lossy().to_string()),
             folder_id: None,
             service_account_key: None,
+            connection_id: None,
             watch: true,
             file_patterns: vec!["*.md".to_string()],
             loop_back_enabled: false,

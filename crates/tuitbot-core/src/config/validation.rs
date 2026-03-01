@@ -257,6 +257,20 @@ impl Config {
                     ),
                 });
             }
+
+            // Warn if both connection_id and service_account_key are set.
+            // Not a blocking error -- session 04 handles precedence.
+            if source.source_type == "google_drive"
+                && source.connection_id.is_some()
+                && source.service_account_key.is_some()
+            {
+                tracing::warn!(
+                    source_index = i,
+                    "content_sources.sources[{}] has both connection_id and \
+                     service_account_key; connection_id takes precedence",
+                    i
+                );
+            }
         }
 
         if errors.is_empty() {

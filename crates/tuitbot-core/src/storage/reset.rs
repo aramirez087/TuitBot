@@ -1,6 +1,6 @@
 //! Factory reset: clear all user data from the database.
 //!
-//! Deletes rows from all 30 user tables in FK-safe order within a single
+//! Deletes rows from all 31 user tables in FK-safe order within a single
 //! transaction. Preserves the schema and `_sqlx_migrations` so the pool
 //! and migration tracking remain usable.
 
@@ -26,6 +26,7 @@ const TABLES_TO_CLEAR: &[&str] = &[
     "draft_seeds",
     "original_tweets",
     "content_nodes",
+    "connections",
     "thread_tweets",
     "account_roles",
     "target_tweets",
@@ -58,7 +59,7 @@ const TABLES_TO_CLEAR: &[&str] = &[
 
 /// Clear all user data from the database within a single transaction.
 ///
-/// Deletes all rows from 30 user tables in FK-safe order.
+/// Deletes all rows from 31 user tables in FK-safe order.
 /// Preserves the schema (tables, indexes) and `_sqlx_migrations`.
 ///
 /// Table names come from the compile-time `TABLES_TO_CLEAR` constant --
@@ -130,7 +131,7 @@ mod tests {
 
         // Run factory reset.
         let stats = factory_reset(&pool).await.expect("factory reset");
-        assert_eq!(stats.tables_cleared, 30);
+        assert_eq!(stats.tables_cleared, 31);
         // Migration seeds 1 account + 2 account_roles = 3 rows, plus our 4 = 7.
         assert!(stats.rows_deleted >= 7);
 
@@ -181,7 +182,7 @@ mod tests {
             .unwrap();
 
         let stats = factory_reset(&pool).await.expect("factory reset");
-        assert_eq!(stats.tables_cleared, 30);
+        assert_eq!(stats.tables_cleared, 31);
         assert_eq!(stats.rows_deleted, 2);
     }
 
@@ -191,13 +192,13 @@ mod tests {
 
         // First reset clears migration-seeded rows.
         let stats1 = factory_reset(&pool).await.expect("first reset");
-        assert_eq!(stats1.tables_cleared, 30);
+        assert_eq!(stats1.tables_cleared, 31);
         // Migration seeds 1 account + 2 account_roles = 3 rows.
         assert_eq!(stats1.rows_deleted, 3);
 
         // Second reset on now-empty DB succeeds with 0 rows.
         let stats2 = factory_reset(&pool).await.expect("second reset");
-        assert_eq!(stats2.tables_cleared, 30);
+        assert_eq!(stats2.tables_cleared, 31);
         assert_eq!(stats2.rows_deleted, 0);
     }
 

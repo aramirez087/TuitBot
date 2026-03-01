@@ -947,6 +947,7 @@ async fn config_status_includes_capabilities() {
     assert_eq!(body["deployment_mode"], "desktop");
     assert_eq!(body["capabilities"]["local_folder"], true);
     assert_eq!(body["capabilities"]["file_picker_native"], true);
+    assert_eq!(body["capabilities"]["preferred_source_default"], "local_fs");
 }
 
 #[tokio::test]
@@ -990,4 +991,63 @@ async fn config_status_capabilities_match_cloud_mode() {
     assert_eq!(body["capabilities"]["manual_local_path"], false);
     assert_eq!(body["capabilities"]["file_picker_native"], false);
     assert_eq!(body["capabilities"]["google_drive"], true);
+    assert_eq!(
+        body["capabilities"]["preferred_source_default"],
+        "google_drive"
+    );
+}
+
+#[tokio::test]
+async fn settings_get_redacts_service_account_key() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Write a config file with a service_account_key.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[business]
+product_name = "TestBot"
+
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/secret/path/sa-key.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: std::path::PathBuf::from("/tmp"),
+        config_path,
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        deployment_mode: Default::default(),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let (status, body) = get_json(router, "/api/settings").await;
+    assert_eq!(status, StatusCode::OK);
+
+    // The service_account_key must be redacted.
+    let source = &body["content_sources"]["sources"][0];
+    assert_eq!(source["service_account_key"], "[redacted]");
+    // Other fields remain intact.
+    assert_eq!(source["folder_id"], "abc123");
+    assert_eq!(source["source_type"], "google_drive");
 }

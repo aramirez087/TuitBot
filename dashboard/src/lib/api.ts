@@ -90,6 +90,7 @@ export interface DeploymentCapabilities {
 	google_drive: boolean;
 	inline_ingest: boolean;
 	file_picker_native: boolean;
+	preferred_source_default: string;
 }
 
 export interface RuntimeStatus {
@@ -435,6 +436,7 @@ export interface TuitbotConfig {
 			path: string | null;
 			folder_id: string | null;
 			service_account_key: string | null;
+			connection_id: number | null;
 			watch: boolean;
 			file_patterns: string[];
 			loop_back_enabled: boolean;
@@ -442,6 +444,13 @@ export interface TuitbotConfig {
 		}>;
 	};
 	deployment_mode: DeploymentModeValue;
+	connectors?: {
+		google_drive?: {
+			client_id?: string | null;
+			client_secret?: string | null;
+			redirect_uri?: string | null;
+		};
+	};
 }
 
 export interface ConfigStatus {
