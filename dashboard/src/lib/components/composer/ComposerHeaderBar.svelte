@@ -24,7 +24,7 @@
 	<button
 		class="header-btn close-btn"
 		onclick={onclose}
-		aria-label="Close compose modal"
+		aria-label="Close composer"
 	>
 		<X size={16} />
 	</button>

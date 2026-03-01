@@ -104,8 +104,7 @@
 		const result = threadOps.moveBlockToIndex(blocks, blockId, newIndex);
 		if (!result) return;
 		blocks = result;
-		reorderAnnouncement = `Post moved to position ${newIndex + 1}`;
-		setTimeout(() => { reorderAnnouncement = ''; }, 1000);
+		announce(`Post moved to position ${newIndex + 1}`);
 		emitChange();
 	}
 
@@ -115,6 +114,11 @@
 		blocks = result.blocks;
 		emitChange();
 		focusBlock(result.newId);
+	}
+
+	function announce(msg: string) {
+		reorderAnnouncement = msg;
+		setTimeout(() => { reorderAnnouncement = ''; }, 1000);
 	}
 
 	function splitBlock(id: string) {
@@ -129,6 +133,7 @@
 		blocks = result.blocks;
 		emitChange();
 		focusBlock(result.newId);
+		announce(`Post split. Now ${blocks.length} posts in thread.`);
 	}
 
 	function mergeWithNext(id: string) {
@@ -149,6 +154,7 @@
 		blocks = result.blocks;
 		emitChange();
 		focusBlock(id, result.cursorPos);
+		announce(`Posts merged. Now ${blocks.length} posts in thread.`);
 	}
 
 	function mergeWithPrevious(id: string) {
@@ -169,6 +175,7 @@
 		blocks = result.blocks;
 		emitChange();
 		focusBlock(result.targetId, result.cursorPos);
+		announce(`Posts merged. Now ${blocks.length} posts in thread.`);
 	}
 
 	// ── Paste handler ──────────────────────────────────────

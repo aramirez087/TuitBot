@@ -8,16 +8,16 @@
 	} from '$lib/api';
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
 	import { matchEvent } from '$lib/utils/shortcuts';
-	import { focusTrap } from '$lib/actions/focusTrap';
-	import TimePicker from '../TimePicker.svelte';
+	import { buildComposeRequest, topicWithCue } from '$lib/utils/composeHandlers';
 	import ThreadFlowLane from './ThreadFlowLane.svelte';
 	import CommandPalette from '../CommandPalette.svelte';
-	import FromNotesPanel from '../FromNotesPanel.svelte';
 	import ComposerShell from './ComposerShell.svelte';
 	import ComposerHeaderBar from './ComposerHeaderBar.svelte';
 	import HomeComposerHeader from './HomeComposerHeader.svelte';
 	import ComposerCanvas from './ComposerCanvas.svelte';
 	import ComposerInspector from './ComposerInspector.svelte';
+	import InspectorContent from './InspectorContent.svelte';
+	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ThreadPreviewRail from './ThreadPreviewRail.svelte';
@@ -63,6 +63,7 @@
 	let previewCollapsed = $state(false);
 	let inspectorOpen = $state(loadInspectorState());
 	let isMobile = $state(false);
+	let statusAnnouncement = $state('');
 
 	// Home-surface state (only active when embedded)
 	let tipsVisible = $state(false);
@@ -153,6 +154,13 @@
 
 	$effect(() => { void mode; void tweetText; void threadBlocks; autoSave(); });
 
+	// Announce mode switches to screen readers (skip initial render)
+	let modeInitialized = false;
+	$effect(() => {
+		if (!modeInitialized) { modeInitialized = true; return; }
+		statusAnnouncement = mode === 'tweet' ? 'Switched to tweet mode' : 'Switched to thread mode';
+	});
+
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
 		checkRecovery();
@@ -175,6 +183,7 @@
 		if (embedded) {
 			const tipsDismissed = await persistGet('home_tips_dismissed', false);
 			tipsVisible = !tipsDismissed;
+			window.addEventListener('tuitbot:compose', handleComposeEvent);
 		}
 	});
 
@@ -182,7 +191,13 @@
 		for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		if (undoTimer) clearTimeout(undoTimer);
+		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
 	});
+
+	function handleComposeEvent() {
+		const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
+		textarea?.focus();
+	}
 
 	// ── Autosave / Recovery ────────────────────────────────
 	function autoSave() {
@@ -228,26 +243,9 @@
 		if (!canSubmit || submitting) return;
 		submitting = true; submitError = null;
 		try {
-			const data: ComposeRequest = { content_type: mode, content: '' };
-			if (mode === 'tweet') {
-				data.content = tweetText.trim();
-			} else {
-				const validBlocks = threadBlocks
-					.filter((b) => b.text.trim().length > 0)
-					.sort((a, b) => a.order - b.order)
-					.map((b, i) => ({ ...b, text: b.text.trim(), order: i }));
-				data.content = JSON.stringify(validBlocks.map((b) => b.text));
-				data.blocks = validBlocks;
-				const allMedia = validBlocks.flatMap((b) => b.media_paths);
-				if (allMedia.length > 0) data.media_paths = allMedia;
-			}
-			if (selectedTime) {
-				const scheduled = new Date(targetDate);
-				const [h, m] = selectedTime.split(':').map(Number);
-				scheduled.setHours(h, m, 0, 0);
-				data.scheduled_for = scheduled.toISOString().replace('Z', '');
-			}
-			if (attachedMedia.length > 0) data.media_paths = attachedMedia.map((m) => m.path);
+			const data = buildComposeRequest({
+				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
+			});
 			clearAutoSave();
 			onsubmit(data);
 
@@ -322,6 +320,7 @@
 			case 'ai-from-notes': showFromNotes = true; if (!inspectorOpen) inspectorOpen = true; break;
 			case 'ai-generate': handleAiAssist(); break;
 			case 'toggle-inspector': toggleInspector(); break;
+			case 'toggle-preview': togglePreview(); break;
 			case 'attach-media': tweetEditorRef?.triggerFileSelect(); break;
 			case 'add-card': case 'duplicate': case 'split': case 'merge':
 			case 'move-up': case 'move-down':
@@ -359,8 +358,7 @@
 		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
 
 		if (mode === 'thread') {
-			const topicWithCue = voiceCue ? `[Tone: ${voiceCue}] ${notesInput}` : notesInput;
-			const result = await api.assist.thread(topicWithCue);
+			const result = await api.assist.thread(topicWithCue(voiceCue, notesInput));
 			threadBlocks = result.tweets.map((text, i) => ({
 				id: crypto.randomUUID(), text, media_paths: [], order: i
 			}));
@@ -421,13 +419,11 @@
 					const result = await api.assist.improve(tweetText, voiceCue || undefined);
 					tweetText = result.content;
 				} else {
-					const topicWithCue = voiceCue ? `[Tone: ${voiceCue}] general` : 'general';
-					const result = await api.assist.tweet(topicWithCue);
+					const result = await api.assist.tweet(topicWithCue(voiceCue, 'general'));
 					tweetText = result.content;
 				}
 			} else {
-				const topicWithCue = voiceCue ? `[Tone: ${voiceCue}] general` : 'general';
-				const result = await api.assist.thread(topicWithCue);
+				const result = await api.assist.thread(topicWithCue(voiceCue, 'general'));
 				threadBlocks = result.tweets.map((text, i) => ({
 					id: crypto.randomUUID(), text, media_paths: [], order: i
 				}));
@@ -438,75 +434,15 @@
 		} finally { assisting = false; }
 	}
 
-	// ── Inspector content snippet ──────────────────────────
-	// Defined once here, rendered in both desktop (via ComposerCanvas)
-	// and mobile (via ComposerInspector) contexts.
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#snippet inspectorContent()}
-	<div class="inspector-section">
-		<div class="inspector-section-label">Schedule</div>
-		<TimePicker
-			{schedule} {selectedTime} targetDate={targetDate}
-			onselect={(time) => (selectedTime = time || null)}
-		/>
-		{#if !selectedTime}
-			<p class="inspector-hint">Posts immediately unless scheduled</p>
-		{/if}
-	</div>
-
-	<div class="inspector-section">
-		<div class="inspector-section-label">Voice</div>
-		<VoiceContextPanel
-			bind:this={voicePanelRef}
-			cue={voiceCue}
-			oncuechange={(c) => { voiceCue = c; }}
-			inline={true}
-		/>
-	</div>
-
-	<div class="inspector-section">
-		<div class="inspector-section-label">
-			<span>AI</span>
-			<kbd class="inspector-kbd">{'\u2318'}J</kbd>
-		</div>
-		<p class="inspector-subtitle">Improve selected text or generate new content</p>
-		<div class="ai-actions-row">
-			<button class="ai-action-btn" onclick={handleAiAssist} disabled={assisting}>
-				{assisting ? 'Working...' : hasExistingContent ? 'AI Improve' : 'AI Generate'}
-			</button>
-			<button class="ai-action-btn secondary" onclick={() => { showFromNotes = true; }}>
-				From Notes
-			</button>
-		</div>
-	</div>
-
-	{#if showFromNotes}
-		<div class="inspector-section">
-			<FromNotesPanel
-				{mode}
-				{hasExistingContent}
-				compact={true}
-				ongenerate={handleGenerateFromNotes}
-				onclose={() => { showFromNotes = false; }}
-				onundo={handleUndo}
-				{showUndo}
-			/>
-		</div>
-	{/if}
-{/snippet}
+<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{statusAnnouncement}</div>
 
 {#snippet composeBody()}
 	{#if showRecovery}
-		<div class="recovery-banner" role="alert">
-			<span>Unsaved draft found. Recover it?</span>
-			<div class="recovery-actions">
-				<button class="recovery-btn" onclick={recoverDraft}>Recover</button>
-				<button class="recovery-dismiss" onclick={dismissRecovery}>Discard</button>
-			</div>
-		</div>
+		<RecoveryBanner onrecover={recoverDraft} ondismiss={dismissRecovery} />
 	{/if}
 
 	<ComposerCanvas
@@ -559,7 +495,18 @@
 		{/snippet}
 
 		{#snippet inspector()}
-			{@render inspectorContent()}
+			<InspectorContent
+				{schedule} {selectedTime} {targetDate} {voiceCue}
+				{assisting} {hasExistingContent} {showFromNotes} {showUndo} {mode}
+				bind:voicePanelRef={voicePanelRef}
+				onselect={(time) => { selectedTime = time; }}
+				oncuechange={(c) => { voiceCue = c; }}
+				onaiassist={handleAiAssist}
+				onopenotes={() => { showFromNotes = true; }}
+				ongenerate={handleGenerateFromNotes}
+				onclosenotes={() => { showFromNotes = false; }}
+				onundo={handleUndo}
+			/>
 		{/snippet}
 	</ComposerCanvas>
 
@@ -570,7 +517,18 @@
 			onclose={() => { inspectorOpen = false; }}
 		>
 			{#snippet children()}
-				{@render inspectorContent()}
+				<InspectorContent
+					{schedule} {selectedTime} {targetDate} {voiceCue}
+					{assisting} {hasExistingContent} {showFromNotes} {showUndo} {mode}
+					bind:voicePanelRef={voicePanelRef}
+					onselect={(time) => { selectedTime = time; }}
+					oncuechange={(c) => { voiceCue = c; }}
+					onaiassist={handleAiAssist}
+					onopenotes={() => { showFromNotes = true; }}
+					ongenerate={handleGenerateFromNotes}
+					onclosenotes={() => { showFromNotes = false; }}
+					onundo={handleUndo}
+				/>
 			{/snippet}
 		</ComposerInspector>
 	{/if}
@@ -622,6 +580,7 @@
 			ontogglepreview={togglePreview}
 			onschedule={openScheduleInInspector}
 			onopenpalette={() => { paletteOpen = true; }}
+			onaiassist={handleInlineAssist}
 		/>
 		{#if tipsVisible}
 			<ComposerTipsTray
@@ -642,52 +601,23 @@
 {/if}
 
 <style>
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
+	}
+
 	.embedded-workspace {
 		display: flex;
 		flex-direction: column;
 		flex: 1;
 		min-height: 0;
-	}
-
-	/* Recovery banner */
-	.recovery-banner {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 10px 20px;
-		background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-		border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 25%, transparent);
-		font-size: 13px;
-		color: var(--color-warning);
-		flex-shrink: 0;
-	}
-
-	.recovery-actions {
-		display: flex;
-		gap: 6px;
-		flex-shrink: 0;
-	}
-
-	.recovery-btn {
-		padding: 4px 12px;
-		border: 1px solid var(--color-warning);
-		border-radius: 4px;
-		background: var(--color-warning);
-		color: #000;
-		font-size: 12px;
-		font-weight: 600;
-		cursor: pointer;
-	}
-
-	.recovery-dismiss {
-		padding: 4px 12px;
-		border: 1px solid var(--color-warning);
-		border-radius: 4px;
-		background: transparent;
-		color: var(--color-warning);
-		font-size: 12px;
-		cursor: pointer;
 	}
 
 	/* Preview section */
@@ -756,97 +686,9 @@
 		color: #fff;
 	}
 
-	/* Inspector sections */
-	.inspector-section {
-		padding: 14px 0;
-		border-bottom: 1px solid var(--color-border-subtle);
-	}
-
-	.inspector-section:last-child {
-		border-bottom: none;
-	}
-
-	.inspector-section-label {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 11px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--color-text-muted);
-		margin-bottom: 8px;
-	}
-
-	.inspector-kbd {
-		display: inline-flex;
-		align-items: center;
-		padding: 0 4px;
-		border-radius: 3px;
-		background: var(--color-surface-hover);
-		color: var(--color-text-subtle);
-		font-size: 10px;
-		font-family: var(--font-mono);
-		font-weight: 400;
-		text-transform: none;
-		letter-spacing: 0;
-		line-height: 1.6;
-	}
-
-	.inspector-subtitle {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-		margin: 0 0 8px;
-		line-height: 1.4;
-	}
-
-	.inspector-hint {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-		margin: 6px 0 0;
-	}
-
-	.ai-actions-row {
-		display: flex;
-		gap: 6px;
-	}
-
-	.ai-action-btn {
-		flex: 1;
-		padding: 6px 10px;
-		border: 1px solid var(--color-accent);
-		border-radius: 6px;
-		background: var(--color-accent);
-		color: #fff;
-		font-size: 12px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		white-space: nowrap;
-	}
-
-	.ai-action-btn:hover:not(:disabled) {
-		background: var(--color-accent-hover);
-		border-color: var(--color-accent-hover);
-	}
-
-	.ai-action-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
-	.ai-action-btn.secondary {
-		background: transparent;
-		color: var(--color-accent);
-	}
-
-	.ai-action-btn.secondary:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-	}
-
-	@media (pointer: coarse) {
-		.ai-action-btn {
-			min-height: 44px;
+	@media (prefers-reduced-motion: reduce) {
+		.undo-btn {
+			transition: none;
 		}
 	}
 </style>

@@ -86,4 +86,10 @@
 			border-radius: 0;
 		}
 	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.modal {
+			transition: none;
+		}
+	}
 </style>

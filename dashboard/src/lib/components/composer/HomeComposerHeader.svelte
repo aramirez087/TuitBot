@@ -24,7 +24,8 @@
 		ontoggleinspector,
 		ontogglepreview,
 		onschedule,
-		onopenpalette
+		onopenpalette,
+		onaiassist
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
@@ -40,6 +41,7 @@
 		ontogglepreview: () => void;
 		onschedule: () => void;
 		onopenpalette: () => void;
+		onaiassist?: () => void;
 	} = $props();
 
 	const postLabel = $derived(
@@ -73,6 +75,7 @@
 			class="cta-pill schedule-pill"
 			onclick={onschedule}
 			title="Schedule post"
+			aria-label={selectedTime ? `Scheduled for ${formatTime(selectedTime)}` : 'Schedule post'}
 		>
 			<Calendar size={14} />
 			{#if selectedTime}
@@ -87,6 +90,7 @@
 			onclick={onsubmit}
 			disabled={!canSubmit || submitting}
 			title={selectedTime ? 'Schedule post' : 'Publish now'}
+			aria-label={submitting ? 'Posting' : selectedTime ? 'Schedule post' : 'Publish now'}
 		>
 			{#if submitting}
 				<Loader2 size={14} class="spin-icon" />
@@ -110,6 +114,17 @@
 					<EyeOff size={15} />
 				{/if}
 			</button>
+
+			{#if onaiassist}
+				<button
+					class="icon-btn"
+					onclick={onaiassist}
+					aria-label="Improve with AI"
+					title="Improve with AI (\u2318J)"
+				>
+					<Sparkles size={15} />
+				</button>
+			{/if}
 
 			<button
 				class="icon-btn"
@@ -274,6 +289,16 @@
 	@keyframes spin {
 		from { transform: rotate(0deg); }
 		to { transform: rotate(360deg); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.spin-icon) {
+			animation: none;
+		}
+
+		.header-dot {
+			transition: none;
+		}
 	}
 
 	@media (pointer: coarse) {

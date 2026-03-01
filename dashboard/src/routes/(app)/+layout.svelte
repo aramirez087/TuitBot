@@ -39,7 +39,13 @@
 			}
 			if (e.key === 'n' || e.key === 'N') {
 				e.preventDefault();
-				window.dispatchEvent(new CustomEvent('tuitbot:compose'));
+				if ($page.url.pathname === '/') {
+					// Already on home — focus the compose textarea
+					window.dispatchEvent(new CustomEvent('tuitbot:compose'));
+				} else {
+					// Navigate to home (composer is default surface)
+					goto('/');
+				}
 			}
 		}
 	}

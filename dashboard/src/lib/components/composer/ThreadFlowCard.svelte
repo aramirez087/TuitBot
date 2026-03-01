@@ -147,10 +147,20 @@
 				<GripVertical size={12} />
 			</div>
 			{#if total > 2}
-				<button class="sep-action-btn" onclick={() => onmerge()} title="Merge with next ({'\u2318'}{'\u21e7'}M)">
+				<button
+					class="sep-action-btn"
+					onclick={() => onmerge()}
+					title="Merge with next ({'\u2318'}{'\u21e7'}M)"
+					aria-label={`Merge post ${index + 1} with post ${index + 2}`}
+				>
 					<Merge size={12} />
 				</button>
-				<button class="sep-action-btn sep-remove" onclick={() => onremove()} title="Remove post">
+				<button
+					class="sep-action-btn sep-remove"
+					onclick={() => onremove()}
+					title="Remove post"
+					aria-label={`Remove post ${index + 1}`}
+				>
 					<Trash2 size={12} />
 				</button>
 			{/if}
@@ -160,7 +170,7 @@
 	<button
 		class="between-zone"
 		tabindex="-1"
-		aria-label="Add post below"
+		aria-label={`Add post after post ${index + 1}`}
 		onclick={() => onaddafter()}
 	>
 		<span class="between-plus">
@@ -377,6 +387,22 @@
 		.sep-action-btn {
 			min-width: 44px;
 			min-height: 44px;
+		}
+
+		.between-zone {
+			min-height: 44px;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.flow-card,
+		.card-writing-area,
+		.spine-dot,
+		.sep-tools,
+		.between-plus,
+		.sep-handle,
+		.sep-action-btn {
+			transition: none;
 		}
 	}
 
