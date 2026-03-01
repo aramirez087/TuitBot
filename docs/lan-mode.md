@@ -145,6 +145,24 @@ To start using LAN mode, just add `--host 0.0.0.0` to your server command.
 
 The Tauri desktop app always uses bearer token auth (reads `~/.tuitbot/api_token` directly). LAN mode doesn't affect it — the desktop app continues to work exactly as before, even when the server is bound to `0.0.0.0`.
 
+## Content Sources
+
+LAN mode users typically run in `self_host` deployment mode. Content source
+setup works through the browser dashboard:
+
+- **Google Drive (recommended):** Open Settings > Content Sources > Connect
+  Google Drive. The browser-based OAuth flow works over LAN -- the popup
+  redirects back to the server's address.
+
+- **Local folder:** Available under "Advanced: Local Server Folder" in
+  Settings. Note that `local_fs` paths resolve relative to the **server**
+  filesystem, not the client browser's machine. Point to a path that exists
+  on the server (e.g., a mounted NAS share or synced folder).
+
+Set `deployment_mode = "self_host"` in your config (or
+`TUITBOT_DEPLOYMENT_MODE=self_host`) so the dashboard defaults to the Google
+Drive connector flow instead of a local file picker.
+
 ## Troubleshooting
 
 **"Connection refused" from another device**

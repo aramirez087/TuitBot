@@ -123,3 +123,6 @@ Dependency rules: Toolkit ← Workflow ← Autopilot. No upward or skip-level im
 - **Approval queue**: When `approval_mode = true` (always in Composer mode), posting routes to `approval_queue` table instead of X API.
 - **Storage**: WAL mode, 90-day retention, dedup records never deleted. `build.rs` watches `migrations/` for recompilation.
 - **Tauri**: Sidecar starts `tuitbot-server` on launch. Frontend connects to `localhost:3001`.
+
+## Always Do First
+- **Invoke the `frontend-design` skill** before writing any frontend code, every session, no exceptions.

@@ -293,3 +293,52 @@ active_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 # Maximum MCP mutations allowed per hour (aggregate across all tools).
 # max_mutations_per_hour = 20
+
+# --- Deployment Mode ---
+# Controls which content source types and features are available.
+# "desktop" (default) -- Tauri app with native file picker and local filesystem
+# "self_host"         -- Docker/VPS with browser UI; local paths and Google Drive
+# "cloud"             -- Managed service; Google Drive and manual ingest only
+# deployment_mode = "desktop"
+#
+# Environment variable override: TUITBOT_DEPLOYMENT_MODE=desktop|self_host|cloud
+
+# --- Content Sources ---
+# Configure where Watchtower ingests content for Winning DNA enrichment.
+# Desktop users: point to your Obsidian vault or notes folder.
+# Self-hosted/Cloud users: connect Google Drive via the dashboard.
+
+# Example: Local folder source (Desktop / SelfHost)
+# [[content_sources.sources]]
+# source_type = "local_fs"
+# path = "~/Obsidian/my-vault"
+# watch = true
+# file_patterns = ["*.md", "*.txt"]
+# loop_back_enabled = true
+
+# Example: Google Drive source (recommended for SelfHost / Cloud)
+# [[content_sources.sources]]
+# source_type = "google_drive"
+# folder_id = "1aBcD_eFgHiJkLmNoPqRsTuVwXyZ"
+# connection_id = 1                    # from dashboard: Settings > Content Sources > Connect
+# watch = true
+# file_patterns = ["*.md", "*.txt"]
+# poll_interval_seconds = 300
+# loop_back_enabled = false
+
+# Legacy: service-account JSON key (deprecated -- use connection_id instead)
+# service_account_key = "~/.tuitbot/service-account.json"
+
+# --- Connectors ---
+# OAuth application credentials for remote source linking.
+# Get these from Google Cloud Console > APIs & Services > Credentials.
+# Desktop apps may bundle defaults via environment variables.
+# [connectors.google_drive]
+# client_id = "YOUR_GCP_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+# client_secret = "GOCSPX-YOUR_CLIENT_SECRET"
+# redirect_uri = "http://localhost:3001/api/connectors/google-drive/callback"
+#
+# Environment variable overrides:
+#   TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_ID=...
+#   TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_SECRET=...
+#   TUITBOT_CONNECTORS__GOOGLE_DRIVE__REDIRECT_URI=...

@@ -157,6 +157,21 @@ See the [MCP Reference](https://aramirez087.github.io/TuitBot/mcp-reference/) fo
 
 ---
 
+## Content Sources (Optional)
+
+Content sources feed your notes, ideas, and expertise into TuitBot's AI engine
+(Watchtower / Winning DNA). This step is optional but improves content quality.
+
+| Deployment | Recommended Setup |
+|-----------|-------------------|
+| **Desktop** | Open Settings > Content Sources. Point to your Obsidian vault or Markdown notes folder. |
+| **Self-Hosted** | Open the browser dashboard > Settings > Content Sources > Connect Google Drive. |
+| **Cloud** | Connect Google Drive during onboarding, or later in Settings. |
+
+Desktop users get a native file picker; self-hosted and cloud users use the
+OAuth-based Google Drive connection flow in the browser. See the
+[Configuration guide](configuration.md#content-sources) for manual TOML setup.
+
 ## Progressive Enrichment (Optional)
 
 The quickstart gets you running fast with safe defaults. When you're ready for better results, enrich your profile in stages:
