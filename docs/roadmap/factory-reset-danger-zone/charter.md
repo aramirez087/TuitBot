@@ -236,11 +236,13 @@ Order matters to avoid partial states and race conditions:
 6. **Clear in-memory state** -- `passphrase_hash` RwLock -> `None`, clear
    `content_generators`, clear `login_attempts`.
 
-7. **VACUUM** -- Reclaim disk space from deleted rows.
+7. ~~**VACUUM**~~ -- Dropped in Session 2 (see `session-02-handoff.md`).
+   SQLite reclaims space on its own over time; VACUUM on a WAL-mode DB
+   can block concurrent readers and is unnecessary for correctness.
 
 8. **Return response** -- Include cleared stats, set cookie-clearing header.
 
-Steps 2-7 log partial failures but continue.  The response indicates
+Steps 2-6 log partial failures but continue.  The response indicates
 what succeeded and what failed.
 
 ---
