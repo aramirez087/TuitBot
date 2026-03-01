@@ -231,12 +231,16 @@ pub async fn init_settings(
             },
         )?;
 
-        // Update in-memory hash.
+        // Update in-memory hash and mtime.
         let new_hash = passphrase::load_passphrase_hash(&state.data_dir)
             .map_err(|e| ApiError::Internal(format!("failed to load passphrase hash: {e}")))?;
         {
             let mut hash = state.passphrase_hash.write().await;
             *hash = new_hash;
+        }
+        {
+            let mut mtime = state.passphrase_hash_mtime.write().await;
+            *mtime = passphrase::passphrase_hash_mtime(&state.data_dir);
         }
 
         // Create session (same pattern as login route).
@@ -525,6 +529,7 @@ pub async fn factory_reset(
 
     // 8. Clear in-memory state.
     *state.passphrase_hash.write().await = None;
+    *state.passphrase_hash_mtime.write().await = None;
     state.content_generators.lock().await.clear();
     state.login_attempts.lock().await.clear();
 

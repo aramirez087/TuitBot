@@ -41,6 +41,7 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         event_tx,
         api_token: TEST_TOKEN.to_string(),
         passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
         bind_host: "127.0.0.1".to_string(),
         bind_port: 3001,
         login_attempts: Mutex::new(std::collections::HashMap::new()),
@@ -262,6 +263,7 @@ async fn init_with_claim_produces_valid_session() {
         event_tx,
         api_token: TEST_TOKEN.to_string(),
         passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
         bind_host: "127.0.0.1".to_string(),
         bind_port: 3001,
         login_attempts: Mutex::new(std::collections::HashMap::new()),
@@ -316,4 +318,130 @@ async fn init_with_claim_produces_valid_session() {
         serde_json::from_slice(&bytes.to_bytes()).expect("parse JSON");
     assert_eq!(auth_status["authenticated"], true);
     assert_eq!(auth_status["csrf_token"], csrf_token);
+}
+
+// ============================================================
+// Mtime-based passphrase reload
+// ============================================================
+
+/// Verify that login detects an out-of-band passphrase reset (mtime change).
+#[tokio::test]
+async fn login_detects_out_of_band_passphrase_reset() {
+    let dir = tempfile::tempdir().expect("create temp dir");
+
+    // Create initial passphrase.
+    let initial_passphrase = "alpha bravo charlie delta";
+    passphrase::create_passphrase_hash(dir.path(), initial_passphrase).unwrap();
+    let initial_hash = passphrase::load_passphrase_hash(dir.path()).unwrap();
+    let initial_mtime = passphrase::passphrase_hash_mtime(dir.path());
+
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    let state = Arc::new(AppState {
+        db: pool,
+        config_path: dir.path().join("config.toml"),
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(initial_hash),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(initial_mtime),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // Login with original passphrase works.
+    let (status, _, _) = post_json_noauth(
+        router.clone(),
+        "/api/auth/login",
+        serde_json::json!({"passphrase": initial_passphrase}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Simulate out-of-band reset (as if CLI --reset-passphrase ran).
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    let new_passphrase = passphrase::reset_passphrase(dir.path()).unwrap();
+
+    // Old passphrase should now fail.
+    let (status, _, _) = post_json_noauth(
+        router.clone(),
+        "/api/auth/login",
+        serde_json::json!({"passphrase": initial_passphrase}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // New passphrase should work.
+    let (status, _, _) = post_json_noauth(
+        router.clone(),
+        "/api/auth/login",
+        serde_json::json!({"passphrase": new_passphrase}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+/// Verify that login picks up a passphrase created after server start (out-of-band claim).
+#[tokio::test]
+async fn login_detects_new_passphrase_file() {
+    let dir = tempfile::tempdir().expect("create temp dir");
+
+    // Start with no passphrase (unclaimed).
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    let state = Arc::new(AppState {
+        db: pool,
+        config_path: dir.path().join("config.toml"),
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // Login before any passphrase exists → SERVICE_UNAVAILABLE.
+    let (status, _, _) = post_json_noauth(
+        router.clone(),
+        "/api/auth/login",
+        serde_json::json!({"passphrase": "anything at all"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+
+    // Create passphrase out-of-band.
+    let passphrase_text = "alpha bravo charlie delta";
+    passphrase::create_passphrase_hash(dir.path(), passphrase_text).unwrap();
+
+    // Login should now pick up the new file and succeed.
+    let (status, _, _) = post_json_noauth(
+        router.clone(),
+        "/api/auth/login",
+        serde_json::json!({"passphrase": passphrase_text}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
 }

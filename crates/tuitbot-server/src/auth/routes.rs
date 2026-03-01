@@ -113,6 +113,27 @@ pub async fn login(
 
     record_attempt(&state, ip).await;
 
+    // Check for out-of-band passphrase resets (e.g., CLI --reset-passphrase).
+    {
+        let disk_mtime = passphrase::passphrase_hash_mtime(&state.data_dir);
+        let cached_mtime = *state.passphrase_hash_mtime.read().await;
+        let needs_reload = match (disk_mtime, cached_mtime) {
+            (Some(disk), Some(cached)) => disk != cached,
+            (Some(_), None) => true,
+            (None, Some(_)) => true,
+            (None, None) => false,
+        };
+        if needs_reload {
+            if let Ok(new_hash) = passphrase::load_passphrase_hash(&state.data_dir) {
+                let mut hash_guard = state.passphrase_hash.write().await;
+                *hash_guard = new_hash;
+                let mut mtime_guard = state.passphrase_hash_mtime.write().await;
+                *mtime_guard = disk_mtime;
+                tracing::info!("passphrase hash reloaded from disk (out-of-band change detected)");
+            }
+        }
+    }
+
     // Check if passphrase auth is configured
     let hash = state.passphrase_hash.read().await;
     let Some(ref hash) = *hash else {

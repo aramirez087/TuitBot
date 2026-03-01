@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
@@ -38,6 +38,8 @@ pub struct AppState {
     pub api_token: String,
     /// Bcrypt hash of the web login passphrase (None if not configured).
     pub passphrase_hash: RwLock<Option<String>>,
+    /// Last-observed mtime of the `passphrase_hash` file (for detecting out-of-band resets).
+    pub passphrase_hash_mtime: RwLock<Option<SystemTime>>,
     /// Host address the server is bound to.
     pub bind_host: String,
     /// Port the server is listening on.

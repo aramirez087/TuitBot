@@ -157,6 +157,16 @@ pub fn create_passphrase_hash(data_dir: &Path, plaintext: &str) -> Result<(), Au
     Ok(())
 }
 
+/// Return the modification time of the `passphrase_hash` file.
+///
+/// Returns `None` if the file does not exist or its metadata cannot be read.
+pub fn passphrase_hash_mtime(data_dir: &Path) -> Option<std::time::SystemTime> {
+    let hash_path = data_dir.join("passphrase_hash");
+    std::fs::metadata(&hash_path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+}
+
 /// Re-generate a passphrase (for `--reset-passphrase`).
 ///
 /// Overwrites the existing hash file and returns the new plaintext passphrase.
@@ -272,6 +282,26 @@ mod tests {
             matches!(result.unwrap_err(), AuthError::AlreadyClaimed),
             "expected AlreadyClaimed error"
         );
+    }
+
+    #[test]
+    fn passphrase_hash_mtime_returns_some_after_create() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(passphrase_hash_mtime(dir.path()).is_none());
+        ensure_passphrase(dir.path()).unwrap();
+        assert!(passphrase_hash_mtime(dir.path()).is_some());
+    }
+
+    #[test]
+    fn passphrase_hash_mtime_changes_after_reset() {
+        let dir = tempfile::tempdir().unwrap();
+        ensure_passphrase(dir.path()).unwrap();
+        let mtime1 = passphrase_hash_mtime(dir.path()).unwrap();
+        // Small sleep to ensure filesystem mtime granularity advances.
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        reset_passphrase(dir.path()).unwrap();
+        let mtime2 = passphrase_hash_mtime(dir.path()).unwrap();
+        assert!(mtime2 >= mtime1);
     }
 
     #[test]
