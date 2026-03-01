@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-03-01T02:37:51.227683+00:00",
+  "timestamp": "2026-03-01T02:54:21.606540+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -8,7 +8,7 @@
       "steps": [
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 4,
+          "latency_ms": 13,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -23,7 +23,7 @@
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 8,
+      "total_latency_ms": 17,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true
@@ -42,7 +42,7 @@
         },
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 6,
+          "latency_ms": 5,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -50,14 +50,14 @@
         },
         {
           "tool_name": "propose_and_queue_replies",
-          "latency_ms": 4,
+          "latency_ms": 2,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 12,
+      "total_latency_ms": 9,
       "success": true,
       "telemetry_entries": 3,
       "schema_valid": true
@@ -76,14 +76,14 @@
         },
         {
           "tool_name": "get_mcp_error_breakdown",
-          "latency_ms": 0,
+          "latency_ms": 1,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": null
         }
       ],
-      "total_latency_ms": 0,
+      "total_latency_ms": 1,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true
