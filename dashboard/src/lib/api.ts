@@ -1,4 +1,4 @@
-function resolveBaseUrl(): string {
+export function resolveBaseUrl(): string {
 	if (typeof window === 'undefined') return '';
 	if ('__TAURI_INTERNALS__' in window) return 'http://localhost:3001';
 	if (window.location.port === '5173') return 'http://localhost:3001';
@@ -347,6 +347,33 @@ export interface TargetStats {
 	best_reply_score: number | null;
 	first_interaction: string | null;
 	interaction_frequency_days: number | null;
+}
+
+// --- Connector types ---
+
+export interface Connection {
+	id: number;
+	connector_type: string;
+	account_email: string | null;
+	display_name: string | null;
+	status: string;
+	metadata_json: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface LinkResponse {
+	authorization_url: string;
+	state: string;
+}
+
+export interface ConnectorStatusResponse {
+	connections: Connection[];
+}
+
+export interface DisconnectResponse {
+	disconnected: boolean;
+	id: number;
 }
 
 // --- Settings types ---
@@ -1135,6 +1162,23 @@ export const api = {
 			request<McpErrorBreakdown[]>(`/api/mcp/telemetry/errors?hours=${hours}`),
 		telemetryRecent: (limit: number = 50) =>
 			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`)
+	},
+
+	connectors: {
+		googleDrive: {
+			link: (force?: boolean) =>
+				request<LinkResponse>(
+					`/api/connectors/google-drive/link${force ? '?force=true' : ''}`,
+					{ method: 'POST' }
+				),
+			status: () =>
+				request<ConnectorStatusResponse>('/api/connectors/google-drive/status'),
+			disconnect: (id: number) =>
+				request<DisconnectResponse>(
+					`/api/connectors/google-drive/${id}`,
+					{ method: 'DELETE' }
+				),
+		}
 	},
 
 	discovery: {

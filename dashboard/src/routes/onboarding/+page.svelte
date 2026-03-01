@@ -119,13 +119,14 @@
 				approval_mode: data.approval_mode,
 			};
 
-			if (data.source_type === 'google_drive' && data.folder_id) {
+			if (data.source_type === 'google_drive' && (data.connection_id || data.folder_id)) {
 				config.content_sources = {
 					sources: [{
 						source_type: 'google_drive',
 						path: null,
-						folder_id: data.folder_id,
-						service_account_key: data.service_account_key || null,
+						folder_id: data.folder_id || null,
+						service_account_key: null,
+						connection_id: data.connection_id,
 						watch: data.vault_watch,
 						file_patterns: ['*.md', '*.txt'],
 						loop_back_enabled: false,

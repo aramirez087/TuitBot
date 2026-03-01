@@ -1,11 +1,20 @@
 <script lang="ts">
 	import { onboardingData } from '$lib/stores/onboarding';
+	import { activeGoogleDrive } from '$lib/stores/connectors';
 
 	let approvalMode = $state($onboardingData.approval_mode);
 
 	$effect(() => {
 		onboardingData.updateField('approval_mode', approvalMode);
 	});
+
+	const sourceLabel = $derived(
+		$onboardingData.source_type === 'google_drive'
+			? 'Google Drive'
+			: $onboardingData.source_type === 'local_fs'
+				? 'Local Folder'
+				: 'Not configured'
+	);
 </script>
 
 <div class="step">
@@ -75,6 +84,40 @@
 				<div class="summary-row">
 					<span class="summary-label">Base URL</span>
 					<span class="summary-value">{$onboardingData.llm_base_url}</span>
+				</div>
+			{/if}
+		</div>
+
+		<div class="summary-section">
+			<h3 class="summary-heading">Content Source</h3>
+			<div class="summary-row">
+				<span class="summary-label">Source Type</span>
+				<span class="summary-value">{sourceLabel}</span>
+			</div>
+			{#if $onboardingData.source_type === 'local_fs' && $onboardingData.vault_path}
+				<div class="summary-row">
+					<span class="summary-label">Vault Path</span>
+					<span class="summary-value">{$onboardingData.vault_path}</span>
+				</div>
+			{/if}
+			{#if $onboardingData.source_type === 'google_drive'}
+				<div class="summary-row">
+					<span class="summary-label">Account</span>
+					<span class="summary-value">
+						{$activeGoogleDrive?.account_email ?? ($onboardingData.connection_id ? 'Connected' : 'Not connected')}
+					</span>
+				</div>
+				{#if $onboardingData.folder_id}
+					<div class="summary-row">
+						<span class="summary-label">Folder ID</span>
+						<span class="summary-value">{$onboardingData.folder_id}</span>
+					</div>
+				{/if}
+			{/if}
+			{#if !$onboardingData.vault_path && !$onboardingData.connection_id && !$onboardingData.folder_id}
+				<div class="summary-row">
+					<span class="summary-label">Status</span>
+					<span class="summary-value">(skipped -- configure later in Settings)</span>
 				</div>
 			{/if}
 		</div>
