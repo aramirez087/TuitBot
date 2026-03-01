@@ -12,6 +12,8 @@
 	import CommandPalette from './CommandPalette.svelte';
 	import FromNotesPanel from './FromNotesPanel.svelte';
 	import ComposerShell from './composer/ComposerShell.svelte';
+	import ComposerHeaderBar from './composer/ComposerHeaderBar.svelte';
+	import ComposerCanvas from './composer/ComposerCanvas.svelte';
 	import TweetEditor from './composer/TweetEditor.svelte';
 	import VoiceContextPanel from './composer/VoiceContextPanel.svelte';
 	import ThreadPreviewRail from './composer/ThreadPreviewRail.svelte';
@@ -50,6 +52,7 @@
 	let triggerElement: Element | null = null;
 	let assisting = $state(false);
 	let voiceCue = $state('');
+	let previewCollapsed = $state(false);
 
 	// Undo state for notes generation
 	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[] } | null>(null);
@@ -57,9 +60,6 @@
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const targetDate = $derived(prefillDate ?? new Date());
-	const dateLabel = $derived(
-		targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-	);
 
 	// Auto-save
 	const AUTOSAVE_KEY = 'tuitbot:compose:draft';
@@ -121,6 +121,7 @@
 			focusMode = false; paletteOpen = false; showFromNotes = false;
 			voiceCue = '';
 			undoSnapshot = null; showUndo = false;
+			previewCollapsed = false;
 			if (undoTimer) clearTimeout(undoTimer);
 		}
 	});
@@ -143,6 +144,12 @@
 
 	const tweetMediaPreviewMap = $derived(
 		new Map(attachedMedia.map((m) => [m.path, m.previewUrl]))
+	);
+
+	const hasPreviewContent = $derived(
+		mode === 'thread'
+			? sortedPreviewBlocks.length > 0
+			: tweetText.trim().length > 0
 	);
 
 	async function handleSubmit() {
@@ -304,23 +311,25 @@
 
 {#if open}
 	<ComposerShell
-		{open} {mode} {focusMode} {dateLabel} {canSubmit} {submitting} {assisting}
-		tweetHasText={tweetText.trim().length > 0}
-		{showRecovery} {selectedTime} {submitError} {showFromNotes}
+		{open} {focusMode} {showRecovery}
 		onclose={handleCloseModal}
-		ontogglefocus={toggleFocusMode}
-		onmodechange={(m) => { mode = m; }}
-		onsubmit={handleSubmit}
-		onaiassist={handleAiAssist}
-		ontogglefromnotes={() => { showFromNotes = !showFromNotes; }}
 		onrecover={recoverDraft}
 		ondismissrecovery={dismissRecovery}
 	>
 		{#snippet children()}
-			<VoiceContextPanel bind:this={voicePanelRef} cue={voiceCue} oncuechange={(c) => { voiceCue = c; }} />
+			<ComposerHeaderBar
+				{focusMode}
+				ontogglefocus={toggleFocusMode}
+				onclose={handleCloseModal}
+			/>
 
-			<div class="compose-layout">
-				<div class="editor-pane">
+			<ComposerCanvas
+				{canSubmit} {submitting} {selectedTime} {submitError}
+				onsubmit={handleSubmit}
+			>
+				{#snippet children()}
+					<VoiceContextPanel bind:this={voicePanelRef} cue={voiceCue} oncuechange={(c) => { voiceCue = c; }} />
+
 					{#if mode === 'tweet'}
 						<TweetEditor
 							bind:this={tweetEditorRef}
@@ -338,42 +347,54 @@
 							onvalidchange={(v) => { threadValid = v; }}
 						/>
 					{/if}
-				</div>
-				<div class="preview-pane">
-					<ThreadPreviewRail
-						{mode}
-						tweetText={tweetText}
-						tweetMediaPaths={attachedMedia.map((m) => m.path)}
-						tweetLocalPreviews={tweetMediaPreviewMap}
-						blocks={sortedPreviewBlocks}
-					/>
-				</div>
-			</div>
 
-			{#if showFromNotes}
-				<FromNotesPanel
-					{mode}
-					{hasExistingContent}
-					ongenerate={handleGenerateFromNotes}
-					onclose={() => { showFromNotes = false; }}
-					onundo={handleUndo}
-					{showUndo}
-				/>
-			{/if}
+					{#if hasPreviewContent && !previewCollapsed}
+						<div class="preview-section">
+							<button class="preview-toggle" onclick={() => { previewCollapsed = true; }}>
+								<span class="preview-label">Preview</span>
+								<span class="preview-collapse">Hide</span>
+							</button>
+							<ThreadPreviewRail
+								{mode}
+								tweetText={tweetText}
+								tweetMediaPaths={attachedMedia.map((m) => m.path)}
+								tweetLocalPreviews={tweetMediaPreviewMap}
+								blocks={sortedPreviewBlocks}
+							/>
+						</div>
+					{:else if hasPreviewContent && previewCollapsed}
+						<button class="preview-toggle collapsed" onclick={() => { previewCollapsed = false; }}>
+							<span class="preview-label">Preview</span>
+							<span class="preview-collapse">Show</span>
+						</button>
+					{/if}
 
-			{#if showUndo && !showFromNotes}
-				<div class="undo-banner">
-					<span>Content replaced from notes.</span>
-					<button class="undo-btn" onclick={handleUndo}>Undo</button>
-				</div>
-			{/if}
+					{#if showFromNotes}
+						<FromNotesPanel
+							{mode}
+							{hasExistingContent}
+							ongenerate={handleGenerateFromNotes}
+							onclose={() => { showFromNotes = false; }}
+							onundo={handleUndo}
+							{showUndo}
+						/>
+					{/if}
 
-			<div class="schedule-section">
-				<TimePicker
-					{schedule} {selectedTime} targetDate={targetDate}
-					onselect={(time) => (selectedTime = time || null)}
-				/>
-			</div>
+					{#if showUndo && !showFromNotes}
+						<div class="undo-banner">
+							<span>Content replaced from notes.</span>
+							<button class="undo-btn" onclick={handleUndo}>Undo</button>
+						</div>
+					{/if}
+
+					<div class="schedule-section">
+						<TimePicker
+							{schedule} {selectedTime} targetDate={targetDate}
+							onselect={(time) => (selectedTime = time || null)}
+						/>
+					</div>
+				{/snippet}
+			</ComposerCanvas>
 		{/snippet}
 	</ComposerShell>
 
@@ -388,20 +409,46 @@
 {/if}
 
 <style>
-	.compose-layout {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 16px;
+	.preview-section {
+		margin-top: 16px;
+		padding-top: 16px;
+		border-top: 1px solid var(--color-border-subtle);
 	}
 
-	.editor-pane {
-		min-width: 0;
+	.preview-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		padding: 0 0 12px;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		color: var(--color-text-muted);
+		font-size: 11px;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
-	.preview-pane {
-		min-width: 0;
-		border-left: 1px solid var(--color-border-subtle);
-		padding-left: 16px;
+	.preview-toggle:hover {
+		color: var(--color-text);
+	}
+
+	.preview-toggle.collapsed {
+		margin-top: 16px;
+		padding-top: 16px;
+		padding-bottom: 0;
+		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.preview-collapse {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+	}
+
+	.preview-toggle:hover .preview-collapse {
+		color: var(--color-accent);
 	}
 
 	.schedule-section {
@@ -437,18 +484,5 @@
 	.undo-btn:hover {
 		background: var(--color-accent);
 		color: #fff;
-	}
-
-	@media (max-width: 768px) {
-		.compose-layout {
-			grid-template-columns: 1fr;
-		}
-
-		.preview-pane {
-			border-left: none;
-			padding-left: 0;
-			border-top: 1px solid var(--color-border-subtle);
-			padding-top: 16px;
-		}
 	}
 </style>
