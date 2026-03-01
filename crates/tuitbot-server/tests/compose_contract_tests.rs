@@ -35,6 +35,7 @@ async fn test_router() -> axum::Router {
         watchtower_cancel: None,
         content_sources: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
 
     tuitbot_server::build_router(state)

@@ -5,6 +5,7 @@
 //! for changed files and reading content — the Watchtower orchestrates
 //! watching vs polling based on source type.
 
+pub mod connector;
 pub mod google_drive;
 pub mod local_fs;
 

@@ -217,6 +217,7 @@ async fn main() -> Result<()> {
         watchtower_cancel: watchtower_cancel.clone(),
         content_sources,
         deployment_mode,
+        pending_oauth: Mutex::new(HashMap::new()),
     });
 
     let router = tuitbot_server::build_router(state);

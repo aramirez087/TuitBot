@@ -607,3 +607,83 @@ async fn delete_connection_works() {
     let conn = get_connection(&pool, id).await.expect("get");
     assert!(conn.is_none());
 }
+
+#[tokio::test]
+async fn get_connections_by_type_filters_correctly() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert two different connector types.
+    insert_connection(&pool, "google_drive", Some("a@gmail.com"), None)
+        .await
+        .expect("insert");
+    insert_connection(&pool, "onedrive", Some("b@outlook.com"), None)
+        .await
+        .expect("insert");
+
+    let gdrive = get_connections_by_type(&pool, "google_drive")
+        .await
+        .expect("get");
+    assert_eq!(gdrive.len(), 1);
+    assert_eq!(gdrive[0].account_email.as_deref(), Some("a@gmail.com"));
+
+    let onedrive = get_connections_by_type(&pool, "onedrive")
+        .await
+        .expect("get");
+    assert_eq!(onedrive.len(), 1);
+    assert_eq!(onedrive[0].account_email.as_deref(), Some("b@outlook.com"));
+}
+
+#[tokio::test]
+async fn store_and_read_encrypted_credentials() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(&pool, "google_drive", Some("user@gmail.com"), None)
+        .await
+        .expect("insert");
+
+    // Initially no credentials.
+    let creds = read_encrypted_credentials(&pool, id).await.expect("read");
+    assert!(creds.is_none());
+
+    // Store some ciphertext.
+    let ciphertext = vec![1, 2, 3, 4, 5];
+    store_encrypted_credentials(&pool, id, &ciphertext)
+        .await
+        .expect("store");
+
+    let creds = read_encrypted_credentials(&pool, id)
+        .await
+        .expect("read")
+        .expect("should have creds");
+    assert_eq!(creds, ciphertext);
+}
+
+#[tokio::test]
+async fn read_encrypted_credentials_returns_none_for_missing() {
+    let pool = init_test_db().await.expect("init db");
+
+    let creds = read_encrypted_credentials(&pool, 99999)
+        .await
+        .expect("read");
+    assert!(creds.is_none());
+}
+
+#[tokio::test]
+async fn update_connection_metadata_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(&pool, "google_drive", None, None)
+        .await
+        .expect("insert");
+
+    let metadata = r#"{"scope":"drive.readonly","linked_at":"2026-02-28T12:00:00Z"}"#;
+    update_connection_metadata(&pool, id, metadata)
+        .await
+        .expect("update");
+
+    let conn = get_connection(&pool, id)
+        .await
+        .expect("get")
+        .expect("should exist");
+    assert_eq!(conn.metadata_json, metadata);
+}

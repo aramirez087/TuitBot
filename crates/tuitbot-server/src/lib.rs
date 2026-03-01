@@ -187,6 +187,23 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),
         )
+        // Connectors
+        .route(
+            "/connectors/google-drive/link",
+            post(routes::connectors::link_google_drive),
+        )
+        .route(
+            "/connectors/google-drive/callback",
+            get(routes::connectors::callback_google_drive),
+        )
+        .route(
+            "/connectors/google-drive/status",
+            get(routes::connectors::status_google_drive),
+        )
+        .route(
+            "/connectors/google-drive/{id}",
+            delete(routes::connectors::disconnect_google_drive),
+        )
         // MCP governance
         .route(
             "/mcp/policy",

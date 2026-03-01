@@ -50,6 +50,7 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         watchtower_cancel: None,
         content_sources: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
 
     tuitbot_server::build_router(state)
@@ -269,6 +270,7 @@ async fn init_with_claim_produces_valid_session() {
         watchtower_cancel: None,
         content_sources: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 

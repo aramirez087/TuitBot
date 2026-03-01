@@ -16,6 +16,14 @@ use tuitbot_core::storage::DbPool;
 
 use crate::ws::WsEvent;
 
+/// Pending OAuth PKCE state for connector link flows.
+pub struct PendingOAuth {
+    /// The PKCE code verifier needed to complete the token exchange.
+    pub code_verifier: String,
+    /// When this entry was created (for 10-minute expiry).
+    pub created_at: Instant,
+}
+
 /// Shared application state accessible by all route handlers.
 pub struct AppState {
     /// SQLite connection pool.
@@ -48,4 +56,6 @@ pub struct AppState {
     pub content_sources: ContentSourcesConfig,
     /// Deployment mode (desktop, self_host, or cloud).
     pub deployment_mode: DeploymentMode,
+    /// Pending OAuth PKCE challenges keyed by state parameter.
+    pub pending_oauth: Mutex<HashMap<String, PendingOAuth>>,
 }

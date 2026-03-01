@@ -36,6 +36,7 @@ notify = "7"
 notify-debouncer-full = "0.4"
 serde_yaml = "0.9"
 glob = "0.3"
+aes-gcm = "0.10"
 
 [features]
 test-helpers = []

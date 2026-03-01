@@ -134,3 +134,79 @@ pub async fn delete_connection(pool: &DbPool, id: i64) -> Result<(), StorageErro
 
     Ok(())
 }
+
+/// Get active connections filtered by connector_type.
+pub async fn get_connections_by_type(
+    pool: &DbPool,
+    connector_type: &str,
+) -> Result<Vec<Connection>, StorageError> {
+    let rows: Vec<ConnectionRow> = sqlx::query_as(
+        "SELECT id, account_id, connector_type, account_email, display_name, \
+                status, metadata_json, created_at, updated_at \
+         FROM connections WHERE connector_type = ? AND status = 'active' ORDER BY id",
+    )
+    .bind(connector_type)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(row_to_connection).collect())
+}
+
+/// Store encrypted credentials for a connection (explicit opt-in).
+///
+/// This is the only function that writes to the `encrypted_credentials`
+/// column. Separated from `insert_connection` to make credential storage
+/// an intentional, auditable action.
+pub async fn store_encrypted_credentials(
+    pool: &DbPool,
+    id: i64,
+    ciphertext: &[u8],
+) -> Result<(), StorageError> {
+    sqlx::query(
+        "UPDATE connections SET encrypted_credentials = ?, updated_at = datetime('now') \
+         WHERE id = ?",
+    )
+    .bind(ciphertext)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
+/// Read encrypted credentials for a connection (explicit opt-in).
+///
+/// Returns None if the connection doesn't exist or has no credentials.
+pub async fn read_encrypted_credentials(
+    pool: &DbPool,
+    id: i64,
+) -> Result<Option<Vec<u8>>, StorageError> {
+    let row: Option<(Option<Vec<u8>>,)> =
+        sqlx::query_as("SELECT encrypted_credentials FROM connections WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.and_then(|r| r.0))
+}
+
+/// Update the metadata_json of a connection.
+pub async fn update_connection_metadata(
+    pool: &DbPool,
+    id: i64,
+    metadata_json: &str,
+) -> Result<(), StorageError> {
+    sqlx::query(
+        "UPDATE connections SET metadata_json = ?, updated_at = datetime('now') WHERE id = ?",
+    )
+    .bind(metadata_json)
+    .bind(id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}

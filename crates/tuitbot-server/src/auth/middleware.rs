@@ -46,6 +46,8 @@ const AUTH_EXEMPT_PATHS: &[&str] = &[
     "/api/auth/login",
     "/auth/status",
     "/api/auth/status",
+    "/connectors/google-drive/callback",
+    "/api/connectors/google-drive/callback",
 ];
 
 /// Axum middleware that enforces multi-strategy authentication.
