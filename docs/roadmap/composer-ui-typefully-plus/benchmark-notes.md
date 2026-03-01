@@ -94,6 +94,58 @@ Typefully still has some friction when converting a thread back to a single twee
 
 Instead of Typefully's toggle-between-modes approach, Tuitbot can show a subtle inline preview below each separator that updates live as the user types. This gives preview feedback without leaving the editor. The full preview toggle is still available for a detailed X-style rendering.
 
+## Typefully's Home Surface Model
+
+Typefully's most aggressive product decision — and the one Tuitbot has not yet matched — is that **the home screen IS the compose surface**. When you launch the app or navigate to the root URL, you land directly in the editor with a blinking cursor. There is no intermediate analytics dashboard, activity feed, or onboarding wizard between launch and writing.
+
+Key characteristics of Typefully's home surface:
+
+1. **Compose-first home** — The default route opens to a full-page writing canvas. The left sidebar provides access to drafts, published posts, analytics, and settings, but the main content area is always a writing surface on first load.
+
+2. **Full-page canvas** — The compose surface fills the entire main content area (everything right of the sidebar). It is not constrained inside a modal dialog. The writing lane is centered at roughly 800px wide with generous whitespace on either side.
+
+3. **Continuous document editor** — The writing surface is a single continuous area. Tweet segments sit on a shared vertical axis with thin visual separators. There are no isolated card boxes.
+
+4. **Split thread with `Cmd/Ctrl+Enter`** — Pressing the keyboard shortcut inserts a separator at the cursor position, instantly turning a tweet into a thread. The transition is imperceptible — no mode switch, no dialog, no confirmation.
+
+5. **Plain-text thread splitting** — Pasting multi-paragraph text auto-splits at paragraph breaks or word boundaries near the 280-character limit. Users can paste an essay and get a ready-to-edit thread in one action.
+
+6. **Configurable auto-split for X drafts** — A setting controls whether drafts auto-split at 280-character word boundaries. This is an opt-in behavior, not forced.
+
+7. **Preview mode** — A toggle in the top actions swaps the writing canvas for an X-accurate thread preview. The preview renders in the same space as the editor, not in a side column.
+
+8. **Low-chrome top actions** — The header area contains only: a publish/schedule button cluster (right-aligned), and a few small icon tools (preview, settings). No title, no breadcrumb, no tab bar. The writing surface dominates.
+
+9. **Sidebar navigation coexistence** — The sidebar remains visible while composing. You can navigate to analytics, drafts, or settings without closing the editor. Returning to home brings you back to the compose surface with your draft intact.
+
+### What this means for Tuitbot
+
+Tuitbot currently opens to an analytics dashboard (`+page.svelte` at `/`). Writing requires opening a modal (`ComposeModal.svelte`) via `Cmd+N` or a sidebar button. This is the single largest workflow gap:
+
+- **Typefully**: Launch → cursor blinking → start typing (0 clicks)
+- **Tuitbot**: Launch → analytics dashboard → Cmd+N or click compose → modal opens → start typing (1-2 clicks)
+
+Closing this gap requires making the composer the default home surface while preserving analytics as an alternate view.
+
+### Updated Feature Comparison
+
+| Feature | Typefully | Tuitbot (current) | Gap |
+|---------|-----------|-------------------|-----|
+| **Home surface** | Compose surface (write-first) | Analytics dashboard (metrics-first) | Critical — users must open a modal to write |
+| **Compose context** | Full-page canvas in main content area | Modal dialog overlaying the current page | High — modal constrains width and feels temporary |
+| **Editor persistence** | Navigate away and back, draft survives | Draft survives in localStorage, but modal must be re-opened | Medium — autosave exists but re-open friction remains |
+| **Sidebar + compose** | Coexist — sidebar visible while writing | Sidebar hidden behind modal backdrop | Medium — compose feels disconnected from the app |
+
+## Patterns to Emulate — Updated
+
+### 5. Compose-First Home (Priority: Critical)
+
+**What Typefully does**: The home route IS the compose surface. No analytics dashboard, no intermediate screen. Launch the app and start writing.
+
+**Why it matters**: Every click between "I want to write" and "cursor is blinking" is friction that erodes the core value proposition. A growth tool that opens to analytics instead of composition says "measure first, create later." The winning message is "create first, measure as you go."
+
+**How to apply**: Make `+page.svelte` at `/` render a full-page compose workspace as the default surface. Extract the compose orchestration from `ComposeModal.svelte` into a shared `ComposeWorkspace.svelte` that works in both modal and full-page contexts. Persist a `home_surface` preference (`'composer' | 'analytics'`) via `persistGet/persistSet` with `'composer'` as the fresh-install default. Analytics becomes an alternate home view accessible from Settings.
+
 ## Patterns to Skip
 
 ### 1. Auto-Numbering (e.g., "1/N" suffixes)

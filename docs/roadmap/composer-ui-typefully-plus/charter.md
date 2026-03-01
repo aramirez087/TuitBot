@@ -1,21 +1,28 @@
-# Composer UI Charter: Thread-First Unibody Redesign
+# Composer UI Charter: Composer-First Home Experience
 
 ## Problem Statement
 
-Tuitbot's composer works — submission, scheduling, AI assist, autosave, and approval flow are all solid. But the compose experience feels heavy. Drafting a 5-tweet thread requires interacting with 5 separate bordered card components, each with its own textarea, gutter number, drag handle, character counter, and action row. The modal chrome (header with title + date, mode tabs, 5-element footer) adds visual noise before the user types a single character.
+Tuitbot's composer works — submission, scheduling, AI assist, autosave, and approval flow are all solid. But two structural problems prevent it from competing with Typefully:
 
-The result is that composing in Tuitbot feels like filling out a form, not writing. Typefully — the benchmark — makes composing feel like drafting in a note app that happens to produce tweets and threads. We need to close this gap without losing our existing advantages (deeper AI integration, voice context, command palette, local-first architecture).
+1. **The compose experience feels heavy.** Drafting a 5-tweet thread requires interacting with 5 separate bordered card components, each with its own textarea, gutter number, drag handle, character counter, and action row. The modal chrome adds visual noise before the user types a single character.
+
+2. **The app opens to the wrong surface.** Tuitbot's home route (`/`) is an analytics dashboard. Writing requires opening a modal via `Cmd+N`. Typefully opens directly to a full-page compose surface — zero clicks between launch and writing. This is the single largest workflow gap.
+
+The result is that composing in Tuitbot feels like filling out a form inside a metrics tool, not writing inside a growth co-pilot. We need to close both gaps without losing our existing advantages (deeper AI integration, voice context, command palette, local-first architecture).
 
 ## Vision
 
-Transform the composer from a modal-with-form-fields into a **thread-first writing surface** where:
+Transform the application from an analytics-first dashboard into a **composer-first home experience** where:
 
-- Writing starts immediately with zero chrome overhead
+- **The app opens to writing, not metrics.** The composer is the default home surface at `/`. Analytics is a secondary view, selectable via a `home_surface` preference in Settings.
+- **A persisted UI preference controls the home surface.** `home_surface: 'composer' | 'analytics'` stored via `persistGet/persistSet` (Tauri plugin-store). Fresh installs default to `'composer'`. Users who prefer the analytics dashboard can switch back in Settings.
+- Writing starts immediately with zero chrome overhead — the full-page canvas has a blinking cursor ready
 - Tweet boundaries are fluid separators, not rigid card borders
 - A single tweet is simply a thread of one — same editor, same flow
 - Preview is inline, not a competing side column
 - Power features (AI, voice, scheduling) are accessible but hidden until needed
 - The experience is keyboard-native for power users and mouse-friendly for everyone
+- The compose orchestration logic is shared between the full-page home surface and the modal (accessible from other routes via `Cmd+N`)
 
 ## Design Principles
 
@@ -52,29 +59,53 @@ Autosave, submission, scheduling, approval flow, and API contracts remain unchan
 
 ## Non-Goals
 
-- **No new backend APIs** — The composer consumes existing endpoints. No Rust changes needed unless a frontend change reveals a missing contract, in which case it's scoped as a narrow, documented exception.
+- **No new backend APIs for UI preferences** — The `home_surface` preference uses the existing `persistGet/persistSet` path (Tauri plugin-store → `ui-state.json`). No Rust changes needed for preference storage.
+- **No new backend APIs for compose** — The composer consumes existing endpoints. No Rust changes needed unless a frontend change reveals a missing contract, in which case it's scoped as a narrow, documented exception.
 - **No new content types** — Threads and tweets only. No polls, quote-tweets-as-content, or other X content types.
-- **No analytics changes** — The analytics pipeline and display are unrelated to composer UX.
+- **No analytics pipeline changes** — The analytics data layer and API are unrelated to composer UX. The analytics dashboard UI is extracted into its own component but not redesigned.
 - **No mobile-native UI** — The responsive web UI serves mobile via Tauri/browser. No native iOS/Android.
 - **No multi-account support** — Single-account compose only.
 - **No real-time collaboration** — Local-first single-user tool.
 
 ## Session Roadmap
 
+### Phase 1: Modal Composer Overhaul (Sessions 1–5, shipped)
+
+| Session | Title | Status | Key Deliverables |
+|---------|-------|--------|-----------------|
+| **1** | Benchmark & Charter | Shipped | `charter.md`, `benchmark-notes.md`, `ui-architecture.md`, `session-01-handoff.md` |
+| **2** | Composer Shell Redesign | Shipped | `ComposerHeaderBar.svelte`, `ComposerCanvas.svelte`, refactored `ComposerShell.svelte` |
+| **3** | Thread Flow Components | Shipped | `ThreadFlowLane.svelte`, `ThreadFlowCard.svelte` |
+| **4** | Inspector & Polish | Shipped | `ComposerInspector.svelte`, `ThreadPreviewRail.svelte` |
+| **5** | Validation & Release | Shipped | `release-readiness.md` |
+
+### Phase 2: Composer-First Home Surface (Sessions 6–9)
+
 | Session | Title | Scope | Key Deliverables |
 |---------|-------|-------|-----------------|
-| **1** (this session) | Benchmark & Charter | Audit, benchmark, design direction, session planning | `charter.md`, `benchmark-notes.md`, `ui-architecture.md`, `session-01-handoff.md` |
-| **2** | Composer Shell Redesign | Strip chrome: minimal header, remove tabs, floating submit, wider canvas | `ComposerHeaderBar.svelte`, `ComposerCanvas.svelte`, refactored `ComposerShell.svelte` |
-| **3** | Thread Interactions & Media | Unibody editor with separators, auto-split, Cmd+Enter flow, inline media | `ThreadFlowEditor.svelte`, `ThreadSeparator.svelte` |
-| **4** | Inspector Actions & Polish | Collapsible inspector rail for schedule/voice/notes, command palette updates | `ComposerInspector.svelte`, refined `ComposerCanvas.svelte` |
-| **5** | Validation & Release | Full CI, regression audit, go/no-go report | `release-readiness.md` |
+| **6** (this session) | Home Surface Charter | Benchmark Typefully home surface, architecture planning, acceptance criteria | `charter.md` update, `benchmark-notes.md` update, `ui-architecture.md` update, `home-surface-plan.md`, `session-01-handoff.md` |
+| **7** | ComposeWorkspace Extraction | Extract shared compose orchestrator from `ComposeModal.svelte`; modal delegates to shared workspace | `ComposeWorkspace.svelte`, updated `ComposeModal.svelte` |
+| **8** | Full-Page Composer Home | Build the home composer surface with action cluster, avatar spine, tips | `HomeComposerSurface.svelte`, `HomeComposerHeader.svelte`, updated `+page.svelte` |
+| **9** | Settings Override & Polish | `home_surface` preference in Settings, analytics extraction, responsive QA, sidebar label update | Updated settings page, `AnalyticsDashboard.svelte`, updated `Sidebar.svelte` |
 
 ## Risk Summary
 
+### Phase 1 Risks (resolved)
+
+| Risk | Severity | Outcome |
+|------|----------|---------|
+| Unibody editor cursor management complexity | High | Resolved: used connected textareas (`ThreadFlowCard`) instead of `contenteditable` |
+| Breaking existing autosave format | Medium | Resolved: `ThreadBlock[]` format preserved |
+| Mobile responsive regression | Medium | Resolved: tested at 640px and 768px breakpoints |
+| ComposerShell exceeds 500-line limit | Low | Resolved: decomposed into HeaderBar + Canvas + Inspector subcomponents |
+
+### Phase 2 Risks (active)
+
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| Unibody editor cursor management complexity | High | Use contenteditable with block children; fall back to visually-connected textareas if fragile |
-| Breaking existing autosave format | Medium | Keep `ThreadBlock[]` localStorage format; unibody editor parses/emits blocks |
-| Mobile responsive regression | Medium | Test at 640px and 768px breakpoints every session |
-| Scope creep across sessions | Medium | Each session has explicit scope; extras documented as scope cuts |
-| ComposerShell exceeds 500-line limit | Low | Session 2 decomposes into HeaderBar + Canvas subcomponents |
+| `ComposeWorkspace` extraction breaks existing modal | High | Session 7 must maintain `ComposeModal`'s external API (`open`, `onclose`, `onsubmit` props). Extract state and handlers into `ComposeWorkspace.svelte`, then have `ComposeModal` delegate to it. Run full CI after extraction. |
+| Autosave conflict between modal and home surface | Medium | Use the same `tuitbot:compose:draft` localStorage key for both surfaces. The home composer and modal should not coexist on the same route — home replaces the need for modal on `/`. When navigating away, autosave persists; opening modal from another page uses the same recovery flow. |
+| `home_surface` preference not loading fast enough | Medium | `persistGet` is async (Tauri store load). The `+page.svelte` must render `composer` as the synchronous default while the preference resolves, avoiding layout shift. |
+| Thread flow components not designed for full-page width | Low | `ThreadFlowLane` and `ThreadFlowCard` are already width-flexible. The 760–860px centered lane is achieved via `max-width` on the parent container. |
+| Settings page line count | Low | Adding a home-surface toggle is ~20 lines. Can go in an existing section or a new "Appearance" section. Page stays well under 400 lines. |
+| Sidebar nav label confusion | Low | "Dashboard" nav item changes to "Home". ~5-line change to `Sidebar.svelte`. |
