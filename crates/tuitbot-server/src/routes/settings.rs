@@ -294,6 +294,14 @@ pub async fn get_settings(State(state): State<Arc<AppState>>) -> Result<Json<Val
         .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
 
     // Redact service_account_key from response (charter D5, rule 2).
+    redact_service_account_keys(&mut json);
+
+    Ok(Json(json))
+}
+
+/// Replace any non-null `service_account_key` values in `content_sources.sources`
+/// with `"[redacted]"` so secrets are never returned in API responses.
+fn redact_service_account_keys(json: &mut Value) {
     if let Some(sources) = json
         .get_mut("content_sources")
         .and_then(|cs| cs.get_mut("sources"))
@@ -307,8 +315,6 @@ pub async fn get_settings(State(state): State<Arc<AppState>>) -> Result<Json<Val
             }
         }
     }
-
-    Ok(Json(json))
 }
 
 /// `PATCH /api/settings` — merge partial JSON into the config and write back.
@@ -331,8 +337,11 @@ pub async fn patch_settings(
         ))
     })?;
 
-    let json = serde_json::to_value(config)
+    let mut json = serde_json::to_value(config)
         .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
+
+    // Redact service_account_key from response (charter D5, rule 2).
+    redact_service_account_keys(&mut json);
 
     Ok(Json(json))
 }

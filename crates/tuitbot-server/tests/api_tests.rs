@@ -1167,6 +1167,86 @@ loop_back_enabled = false
 }
 
 #[tokio::test]
+async fn settings_patch_response_redacts_sa_key() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Write a config with a legacy service_account_key.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[business]
+product_name = "TestBot"
+
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/secret/path/sa-key.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: std::path::PathBuf::from("/tmp"),
+        config_path: config_path.clone(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // PATCH an unrelated field — the response must redact the SA key.
+    let patch_req = Request::builder()
+        .method("PATCH")
+        .uri("/api/settings")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&serde_json::json!({
+                "business": {"product_name": "PatchedBot"}
+            }))
+            .unwrap(),
+        ))
+        .expect("build request");
+
+    let response = router.oneshot(patch_req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: serde_json::Value = serde_json::from_slice(
+        &axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+
+    let source = &body["content_sources"]["sources"][0];
+    assert_eq!(
+        source["service_account_key"], "[redacted]",
+        "PATCH response must redact service_account_key"
+    );
+    // On-disk value must remain unredacted.
+    let on_disk = std::fs::read_to_string(&config_path).unwrap();
+    assert!(on_disk.contains("/secret/path/sa-key.json"));
+}
+
+#[tokio::test]
 async fn settings_get_redacts_sa_key_alongside_connection_id() {
     let pool = storage::init_test_db().await.expect("init test db");
     let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
