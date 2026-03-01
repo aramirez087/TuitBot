@@ -404,6 +404,138 @@ pub async fn test_llm(Json(body): Json<TestLlmRequest>) -> Result<Json<Value>, A
 }
 
 // ---------------------------------------------------------------------------
+// Factory reset
+// ---------------------------------------------------------------------------
+
+/// Confirmation phrase required for factory reset (case-sensitive, exact match).
+const FACTORY_RESET_PHRASE: &str = "RESET TUITBOT";
+
+#[derive(Deserialize)]
+pub struct FactoryResetRequest {
+    confirmation: String,
+}
+
+#[derive(Serialize)]
+struct FactoryResetResponse {
+    status: String,
+    cleared: FactoryResetCleared,
+}
+
+#[derive(Serialize)]
+struct FactoryResetCleared {
+    tables_cleared: u32,
+    rows_deleted: u64,
+    config_deleted: bool,
+    passphrase_deleted: bool,
+    media_deleted: bool,
+    runtimes_stopped: u32,
+}
+
+/// `POST /api/settings/factory-reset` -- erase all Tuitbot-managed data.
+///
+/// Requires authentication (bearer or session+CSRF). Validates a typed
+/// confirmation phrase before proceeding. Stops runtimes, clears all 30
+/// DB tables in a single transaction, deletes config/passphrase/media files,
+/// clears in-memory state, and returns a response that also clears the
+/// session cookie.
+pub async fn factory_reset(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<FactoryResetRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    // 1. Validate confirmation phrase.
+    if body.confirmation != FACTORY_RESET_PHRASE {
+        return Err(ApiError::BadRequest(
+            "incorrect confirmation phrase".to_string(),
+        ));
+    }
+
+    // 2. Stop all runtimes (before DB clearing to prevent races).
+    let runtimes_stopped = {
+        let mut runtimes = state.runtimes.lock().await;
+        let count = runtimes.len() as u32;
+        for (_, mut rt) in runtimes.drain() {
+            rt.shutdown().await;
+        }
+        count
+    };
+
+    // 3. Cancel watchtower.
+    if let Some(ref token) = state.watchtower_cancel {
+        token.cancel();
+    }
+
+    // 4. Clear all DB table contents (single transaction).
+    let reset_stats = tuitbot_core::storage::reset::factory_reset(&state.db).await?;
+
+    // 5. Delete config.toml (tolerate NotFound for idempotency).
+    let config_deleted = match std::fs::remove_file(&state.config_path) {
+        Ok(()) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to delete config file");
+            false
+        }
+    };
+
+    // 6. Delete passphrase_hash file (tolerate NotFound).
+    let passphrase_path = state.data_dir.join("passphrase_hash");
+    let passphrase_deleted = match std::fs::remove_file(&passphrase_path) {
+        Ok(()) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to delete passphrase hash");
+            false
+        }
+    };
+
+    // 7. Delete media directory (tolerate NotFound).
+    let media_dir = state.data_dir.join("media");
+    let media_deleted = match std::fs::remove_dir_all(&media_dir) {
+        Ok(()) => true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to delete media directory");
+            false
+        }
+    };
+
+    // 8. Clear in-memory state.
+    *state.passphrase_hash.write().await = None;
+    state.content_generators.lock().await.clear();
+    state.login_attempts.lock().await.clear();
+
+    tracing::info!(
+        tables = reset_stats.tables_cleared,
+        rows = reset_stats.rows_deleted,
+        config = config_deleted,
+        passphrase = passphrase_deleted,
+        media = media_deleted,
+        runtimes = runtimes_stopped,
+        "Factory reset completed"
+    );
+
+    // 9. Build response with cookie-clearing header.
+    let response = FactoryResetResponse {
+        status: "reset_complete".to_string(),
+        cleared: FactoryResetCleared {
+            tables_cleared: reset_stats.tables_cleared,
+            rows_deleted: reset_stats.rows_deleted,
+            config_deleted,
+            passphrase_deleted,
+            media_deleted,
+            runtimes_stopped,
+        },
+    };
+
+    let cookie = "tuitbot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0";
+    Ok((
+        StatusCode::OK,
+        [(axum::http::header::SET_COOKIE, cookie)],
+        Json(serde_json::to_value(response).unwrap()),
+    ))
+}
+
+// ---------------------------------------------------------------------------
 // TOML utilities
 // ---------------------------------------------------------------------------
 

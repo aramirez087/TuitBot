@@ -180,6 +180,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/settings/defaults", get(routes::settings::get_defaults))
         .route("/settings/test-llm", post(routes::settings::test_llm))
         .route(
+            "/settings/factory-reset",
+            post(routes::settings::factory_reset),
+        )
+        .route(
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),
         )

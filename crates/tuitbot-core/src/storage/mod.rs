@@ -18,6 +18,7 @@ pub mod media;
 pub mod mutation_audit;
 pub mod rate_limits;
 pub mod replies;
+pub mod reset;
 pub mod scheduled_content;
 pub mod strategy;
 pub mod target_accounts;
