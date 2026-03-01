@@ -26,6 +26,7 @@ async fn test_router() -> axum::Router {
         event_tx,
         api_token: TEST_TOKEN.to_string(),
         passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
         bind_host: "127.0.0.1".to_string(),
         bind_port: 3001,
         login_attempts: Mutex::new(std::collections::HashMap::new()),

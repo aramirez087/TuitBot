@@ -60,7 +60,7 @@ cargo run -p tuitbot-server -- --help
 | `--host` | `127.0.0.1` | Bind address. Use `0.0.0.0` for LAN access |
 | `--port` | `3001` | Port number |
 | `--config` | `~/.tuitbot/config.toml` | Config file path |
-| `--reset-passphrase` | — | Generate a new passphrase and print it |
+| `--reset-passphrase` | — | Reset passphrase and print the new one (no server restart needed) |
 
 ## Passphrase Management
 
@@ -69,10 +69,20 @@ The passphrase is generated once and its bcrypt hash is stored in `~/.tuitbot/pa
 **Forgot your passphrase?** Reset it:
 
 ```bash
-cargo run -p tuitbot-server -- --reset-passphrase
+tuitbot-server --reset-passphrase
 ```
 
-This prints the new passphrase and invalidates the old one. Existing browser sessions continue working until they expire.
+This prints the new passphrase to stdout and exits. It works even while the
+server is already running — no port conflict, no startup noise. The running
+server detects the change automatically and accepts the new passphrase on
+the next login attempt. Existing browser sessions continue working until they
+expire.
+
+The output is bare (just the passphrase, no formatting), so you can script it:
+
+```bash
+NEW_PASS=$(tuitbot-server --reset-passphrase)
+```
 
 ## Security Model
 
@@ -136,8 +146,10 @@ If you already have Tuitbot installed, the update is seamless — no manual step
 If you missed the passphrase in the terminal output, reset it:
 
 ```bash
-cargo run -p tuitbot-server -- --reset-passphrase
+tuitbot-server --reset-passphrase
 ```
+
+This works even while the server is running — no restart needed.
 
 To start using LAN mode, just add `--host 0.0.0.0` to your server command.
 
@@ -171,7 +183,7 @@ Drive connector flow instead of a local file picker.
 
 **"Invalid passphrase"**
 - Passphrase is case-sensitive and space-separated (4 words if auto-generated)
-- You can reset it from the terminal: `tuitbot-server --reset-passphrase`
+- Reset from the terminal: `tuitbot-server --reset-passphrase` (no server restart needed)
 - Or from Settings → LAN Access → Reset Passphrase (requires an active session)
 
 **Session expired / redirected to login**

@@ -1,6 +1,6 @@
 # Task 07 — Observability Eval Results
 
-**Generated:** 2026-03-01 05:25 UTC
+**Generated:** 2026-03-01 20:42 UTC
 
 ## Scenarios
 
@@ -23,8 +23,8 @@
 
 | Tool | Latency (ms) | Success | Schema Valid | Error | Policy |
 |------|-------------|---------|--------------|-------|--------|
-| find_reply_opportunities | 2 | PASS | PASS | - | - |
-| draft_replies_for_candidates | 5 | PASS | PASS | - | - |
+| find_reply_opportunities | 3 | PASS | PASS | - | - |
+| draft_replies_for_candidates | 4 | PASS | PASS | - | - |
 | propose_and_queue_replies | 3 | PASS | PASS | - | allow |
 
 ### Scenario C: Blocked-by-policy mutation with telemetry verification

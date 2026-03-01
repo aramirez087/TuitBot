@@ -61,6 +61,14 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| std::path::Path::new("."));
     let db_path = db_dir.join("tuitbot.db");
 
+    // --reset-passphrase: fast path — print new passphrase and exit.
+    // Skips DB init, API token, config, LLM, watchtower, and port binding.
+    if cli.reset_passphrase {
+        let new_passphrase = passphrase::reset_passphrase(db_dir)?;
+        println!("{new_passphrase}");
+        return Ok(());
+    }
+
     tracing::info!(
         db = %db_path.display(),
         host = %cli.host,
@@ -75,13 +83,7 @@ async fn main() -> Result<()> {
     tracing::info!(token_path = %db_dir.join("api_token").display(), "API token ready");
 
     // Handle passphrase for web/LAN auth.
-    let passphrase_hash = if cli.reset_passphrase {
-        // --reset-passphrase: always reset, regardless of host.
-        let new_passphrase = passphrase::reset_passphrase(db_dir)?;
-        println!("\n  Web login passphrase (reset): {new_passphrase}\n");
-        tracing::info!("Passphrase has been reset");
-        passphrase::load_passphrase_hash(db_dir)?
-    } else if cli.host == "0.0.0.0" {
+    let passphrase_hash = if cli.host == "0.0.0.0" {
         // LAN mode: auto-generate passphrase if none exists (backward compatible).
         match passphrase::ensure_passphrase(db_dir)? {
             Some(new_passphrase) => {
@@ -107,6 +109,9 @@ async fn main() -> Result<()> {
             }
         }
     };
+
+    // Record the initial mtime so login can detect out-of-band resets.
+    let passphrase_hash_mtime = passphrase::passphrase_hash_mtime(db_dir);
 
     // Create the broadcast channel for WebSocket events.
     let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
@@ -219,6 +224,7 @@ async fn main() -> Result<()> {
         event_tx,
         api_token,
         passphrase_hash: tokio::sync::RwLock::new(passphrase_hash),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(passphrase_hash_mtime),
         bind_host: bind_host.clone(),
         bind_port,
         login_attempts: Mutex::new(HashMap::new()),

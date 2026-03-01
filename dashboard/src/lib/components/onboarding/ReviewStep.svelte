@@ -3,6 +3,7 @@
 	import { activeGoogleDrive } from '$lib/stores/connectors';
 
 	let approvalMode = $state($onboardingData.approval_mode);
+	let isBusiness = $derived($onboardingData.account_type === 'business');
 
 	$effect(() => {
 		onboardingData.updateField('approval_mode', approvalMode);
@@ -37,18 +38,18 @@
 		</div>
 
 		<div class="summary-section">
-			<h3 class="summary-heading">Business</h3>
+			<h3 class="summary-heading">{isBusiness ? 'Business' : 'Profile'}</h3>
 			<div class="summary-row">
-				<span class="summary-label">Product</span>
+				<span class="summary-label">{isBusiness ? 'Product' : 'Name'}</span>
 				<span class="summary-value">{$onboardingData.product_name || '(not set)'}</span>
 			</div>
 			<div class="summary-row">
-				<span class="summary-label">Description</span>
+				<span class="summary-label">{isBusiness ? 'Description' : 'Bio'}</span>
 				<span class="summary-value">{$onboardingData.product_description || '(not set)'}</span>
 			</div>
 			{#if $onboardingData.product_url}
 				<div class="summary-row">
-					<span class="summary-label">URL</span>
+					<span class="summary-label">{isBusiness ? 'Product URL' : 'Website'}</span>
 					<span class="summary-value">{$onboardingData.product_url}</span>
 				</div>
 			{/if}

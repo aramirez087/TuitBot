@@ -74,6 +74,8 @@ pub fn run() {
 
                 let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
 
+                let passphrase_mtime = passphrase::passphrase_hash_mtime(&dir);
+
                 Arc::new(AppState {
                     db: pool,
                     config_path,
@@ -81,6 +83,7 @@ pub fn run() {
                     event_tx,
                     api_token,
                     passphrase_hash: tokio::sync::RwLock::new(passphrase_hash),
+                    passphrase_hash_mtime: tokio::sync::RwLock::new(passphrase_mtime),
                     bind_host: "127.0.0.1".to_string(),
                     bind_port: 3001,
                     login_attempts: Mutex::new(HashMap::new()),
@@ -89,7 +92,9 @@ pub fn run() {
                     circuit_breaker: None,
                     watchtower_cancel: None,
                     content_sources: ContentSourcesConfig::default(),
+                    connector_config: Default::default(),
                     deployment_mode: DeploymentMode::Desktop,
+                    pending_oauth: Mutex::new(HashMap::new()),
                 })
             });
 

@@ -7,6 +7,7 @@
 	import { theme } from "$lib/stores/theme";
 	import { updateAvailable, installUpdate } from "$lib/stores/update";
 	import { persistGet, persistSet } from "$lib/stores/persistence";
+	import { api } from "$lib/api";
 	import { onMount } from "svelte";
 	import {
 		LayoutDashboard,
@@ -30,9 +31,16 @@
 
 	let collapsed = $state(false);
 	let updating = $state(false);
+	let serverVersion = $state('');
 
 	onMount(async () => {
 		collapsed = await persistGet('sidebar_collapsed', false);
+		try {
+			const health = await api.health();
+			serverVersion = health.version;
+		} catch {
+			// Version display is non-critical
+		}
 	});
 
 	function toggleCollapsed() {
@@ -136,6 +144,14 @@
 				</span>
 			{/if}
 		</div>
+
+		{#if serverVersion}
+			<div class="version-label" title="Tuitbot v{serverVersion}">
+				{#if !collapsed}
+					<span>v{serverVersion}</span>
+				{/if}
+			</div>
+		{/if}
 
 		<div class="footer-actions">
 			<button
@@ -293,6 +309,15 @@
 	.status-text {
 		font-size: 12px;
 		color: var(--color-text-muted);
+	}
+
+	.version-label {
+		padding: 0 6px;
+		font-size: 11px;
+		font-family: var(--font-mono);
+		color: var(--color-text-subtle);
+		opacity: 0.6;
+		letter-spacing: 0.02em;
 	}
 
 	.footer-actions {

@@ -6,9 +6,11 @@
 	let {
 		passphrase = $bindable(''),
 		saved = $bindable(false),
+		alreadyClaimed = false,
 	}: {
 		passphrase: string;
 		saved: boolean;
+		alreadyClaimed?: boolean;
 	} = $props();
 
 	let useCustom = $state(false);
@@ -19,8 +21,10 @@
 	let generatedPhrase = $state('');
 
 	onMount(() => {
-		generatedPhrase = generatePassphrase();
-		passphrase = generatedPhrase;
+		if (!alreadyClaimed) {
+			generatedPhrase = generatePassphrase();
+			passphrase = generatedPhrase;
+		}
 		return () => {
 			if (copyTimeout) clearTimeout(copyTimeout);
 		};
@@ -72,77 +76,116 @@
 </script>
 
 <div class="step">
-	<h2 class="step-title">Secure Your Instance</h2>
-	<p class="step-description">
-		This passphrase protects your dashboard when accessing it from a browser.
-		You'll need it to log in again if your session expires.
-	</p>
+	{#if alreadyClaimed}
+		<h2 class="step-title">Your Instance is Secured</h2>
+		<p class="step-description">
+			This instance already has a passphrase set. Since passphrases are stored
+			as one-way hashes, the original cannot be displayed. After setup, you'll
+			need your passphrase to log in.
+		</p>
 
-	{#if !useCustom}
-		<div class="passphrase-display">
-			<code class="passphrase-text">{generatedPhrase}</code>
-			<div class="passphrase-actions">
-				<button
-					type="button"
-					class="icon-btn"
-					onclick={regenerate}
-					aria-label="Generate new passphrase"
-					title="Generate new passphrase"
-				>
-					<RefreshCw size={16} />
-				</button>
-				<button
-					type="button"
-					class="icon-btn"
-					onclick={copyToClipboard}
-					aria-label="Copy passphrase to clipboard"
-					title="Copy to clipboard"
-				>
-					{#if copied}
-						<Check size={16} />
-					{:else}
-						<Copy size={16} />
-					{/if}
-				</button>
+		<div class="recovery-paths">
+			<div class="recovery-path">
+				<strong>Remember your passphrase?</strong>
+				<span>Use it to log in after setup completes.</span>
+			</div>
+			<div class="recovery-path">
+				<strong>Reset from the terminal</strong>
+				<code class="recovery-code">tuitbot-server --reset-passphrase</code>
+				<span class="recovery-alt">Or with cargo:</span>
+				<code class="recovery-code">cargo run -p tuitbot-server -- --reset-passphrase</code>
+			</div>
+			<div class="recovery-path">
+				<strong>Reset from the dashboard</strong>
+				<span>Settings &rarr; LAN Access once logged in.</span>
 			</div>
 		</div>
-	{/if}
 
-	<button type="button" class="toggle-custom" onclick={toggleCustom}>
-		{useCustom ? 'Use generated passphrase instead' : 'Or type your own'}
-	</button>
-
-	{#if useCustom}
-		<div class="custom-input-group">
-			<label for="custom-passphrase">Custom passphrase</label>
-			<input
-				id="custom-passphrase"
-				type="text"
-				value={customValue}
-				oninput={handleCustomInput}
-				placeholder="Minimum 8 characters"
-				autocomplete="off"
-				autocapitalize="off"
-				spellcheck="false"
-			/>
-			{#if customValue && customValue.trim().length < 8}
-				<span class="validation-hint">Minimum 8 characters ({customValue.trim().length}/8)</span>
-			{/if}
+		<div class="info-box">
+			<span class="info-icon">&#8505;</span>
+			<div class="info-content">
+				After setup, you'll be redirected to the login page. Use your passphrase
+				or reset it using the methods above.
+			</div>
 		</div>
-	{/if}
 
-	<div class="warning-box">
-		<span class="warning-icon">&#9888;</span>
-		<div class="warning-content">
-			<strong>Save this passphrase</strong> — it cannot be recovered later.
-			You can reset it from Settings &rarr; LAN Access or via the CLI.
+		<label class="save-checkbox">
+			<input type="checkbox" bind:checked={saved} />
+			<span>I understand how to access my instance</span>
+		</label>
+	{:else}
+		<h2 class="step-title">Secure Your Instance</h2>
+		<p class="step-description">
+			This passphrase protects your dashboard when accessing it from a browser.
+			You'll need it to log in again if your session expires.
+		</p>
+
+		{#if !useCustom}
+			<div class="passphrase-display">
+				<code class="passphrase-text">{generatedPhrase}</code>
+				<div class="passphrase-actions">
+					<button
+						type="button"
+						class="icon-btn"
+						onclick={regenerate}
+						aria-label="Generate new passphrase"
+						title="Generate new passphrase"
+					>
+						<RefreshCw size={16} />
+					</button>
+					<button
+						type="button"
+						class="icon-btn"
+						onclick={copyToClipboard}
+						aria-label="Copy passphrase to clipboard"
+						title="Copy to clipboard"
+					>
+						{#if copied}
+							<Check size={16} />
+						{:else}
+							<Copy size={16} />
+						{/if}
+					</button>
+				</div>
+			</div>
+		{/if}
+
+		<button type="button" class="toggle-custom" onclick={toggleCustom}>
+			{useCustom ? 'Use generated passphrase instead' : 'Or type your own'}
+		</button>
+
+		{#if useCustom}
+			<div class="custom-input-group">
+				<label for="custom-passphrase">Custom passphrase</label>
+				<input
+					id="custom-passphrase"
+					type="text"
+					value={customValue}
+					oninput={handleCustomInput}
+					placeholder="Minimum 8 characters"
+					autocomplete="off"
+					autocapitalize="off"
+					spellcheck="false"
+				/>
+				{#if customValue && customValue.trim().length < 8}
+					<span class="validation-hint">Minimum 8 characters ({customValue.trim().length}/8)</span>
+				{/if}
+			</div>
+		{/if}
+
+		<div class="warning-box">
+			<span class="warning-icon">&#9888;</span>
+			<div class="warning-content">
+				<strong>Save this passphrase</strong> — it cannot be recovered later.
+				You can reset it from Settings &rarr; LAN Access or via the CLI.
+			</div>
 		</div>
-	</div>
 
-	<label class="save-checkbox">
-		<input type="checkbox" bind:checked={saved} disabled={!isValid} />
-		<span>I've saved my passphrase</span>
-	</label>
+		<label class="save-checkbox">
+			<input type="checkbox" bind:checked={saved} disabled={!isValid} />
+			<span>I've saved my passphrase</span>
+		</label>
+	{/if}
 </div>
 
 <style>
@@ -290,6 +333,69 @@
 
 	.warning-content strong {
 		color: var(--color-text);
+	}
+
+	.recovery-paths {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.recovery-path {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 12px 14px;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 8px;
+		font-size: 13px;
+		color: var(--color-text-muted);
+		line-height: 1.5;
+	}
+
+	.recovery-path strong {
+		color: var(--color-text);
+		font-size: 13px;
+	}
+
+	.recovery-alt {
+		margin-top: 4px;
+		font-size: 12px;
+		color: var(--color-text-subtle);
+	}
+
+	.recovery-code {
+		display: block;
+		background: var(--color-base);
+		padding: 8px 12px;
+		border-radius: 6px;
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 12px;
+		color: var(--color-text);
+		word-break: break-all;
+	}
+
+	.info-box {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 12px 14px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+		border-radius: 8px;
+	}
+
+	.info-icon {
+		font-size: 16px;
+		color: var(--color-accent);
+		line-height: 1.4;
+	}
+
+	.info-content {
+		font-size: 13px;
+		color: var(--color-text-muted);
+		line-height: 1.5;
 	}
 
 	.save-checkbox {

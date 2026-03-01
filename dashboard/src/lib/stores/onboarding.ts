@@ -4,7 +4,8 @@ export interface OnboardingData {
 	// X API
 	client_id: string;
 	client_secret: string;
-	// Business
+	// Profile
+	account_type: 'individual' | 'business';
 	product_name: string;
 	product_description: string;
 	product_url: string;
@@ -35,6 +36,7 @@ function createOnboardingStore() {
 	const { subscribe, update, set } = writable<OnboardingData>({
 		client_id: '',
 		client_secret: '',
+		account_type: 'individual',
 		product_name: '',
 		product_description: '',
 		product_url: '',
@@ -67,6 +69,7 @@ function createOnboardingStore() {
 			set({
 				client_id: '',
 				client_secret: '',
+				account_type: 'individual',
 				product_name: '',
 				product_description: '',
 				product_url: '',

@@ -48,6 +48,9 @@ pub async fn reset_passphrase(State(state): State<Arc<AppState>>) -> impl IntoRe
                 Ok(new_hash) => {
                     let mut hash = state.passphrase_hash.write().await;
                     *hash = new_hash;
+                    drop(hash);
+                    let mut mtime = state.passphrase_hash_mtime.write().await;
+                    *mtime = passphrase::passphrase_hash_mtime(&state.data_dir);
                 }
                 Err(e) => {
                     tracing::error!(error = %e, "Failed to reload passphrase hash");
