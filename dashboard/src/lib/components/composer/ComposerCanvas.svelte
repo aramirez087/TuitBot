@@ -7,52 +7,85 @@
 		submitting,
 		selectedTime,
 		submitError,
+		inspectorOpen = false,
 		onsubmit,
-		children
+		children,
+		inspector
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
 		selectedTime: string | null;
 		submitError: string | null;
+		inspectorOpen?: boolean;
 		onsubmit: () => void;
 		children: Snippet;
+		inspector?: Snippet;
 	} = $props();
 </script>
 
-<div class="canvas">
+<div class="canvas" class:with-inspector={inspectorOpen && inspector}>
 	<div class="canvas-main">
 		{@render children()}
 
 		{#if submitError}
 			<div class="error-msg" role="alert">{submitError}</div>
 		{/if}
+
+		<div class="submit-anchor">
+			<button
+				class="submit-pill"
+				onclick={onsubmit}
+				disabled={!canSubmit || submitting}
+			>
+				<Send size={14} />
+				{submitting ? 'Submitting...' : selectedTime ? 'Schedule' : 'Post now'}
+			</button>
+		</div>
 	</div>
 
-	<div class="submit-anchor">
-		<button
-			class="submit-pill"
-			onclick={onsubmit}
-			disabled={!canSubmit || submitting}
-		>
-			<Send size={14} />
-			{submitting ? 'Submitting...' : selectedTime ? 'Schedule' : 'Post now'}
-		</button>
-	</div>
+	{#if inspectorOpen && inspector}
+		<div class="canvas-inspector">
+			{@render inspector()}
+		</div>
+	{/if}
 </div>
 
 <style>
 	.canvas {
 		display: flex;
-		flex-direction: column;
 		flex: 1;
 		min-height: 0;
-		overflow-y: auto;
 		position: relative;
 	}
 
+	.canvas.with-inspector {
+		display: flex;
+	}
+
 	.canvas-main {
-		padding: 4px 20px 20px;
+		display: flex;
+		flex-direction: column;
 		flex: 1;
+		min-height: 0;
+		min-width: 0;
+		overflow-y: auto;
+	}
+
+	.canvas-main > :global(:first-child) {
+		padding-top: 4px;
+	}
+
+	.canvas-main {
+		padding: 0 20px 20px;
+	}
+
+	.canvas-inspector {
+		width: 260px;
+		flex-shrink: 0;
+		border-left: 1px solid var(--color-border-subtle);
+		overflow-y: auto;
+		padding: 12px 16px;
+		background: color-mix(in srgb, var(--color-base) 50%, var(--color-surface));
 	}
 
 	.error-msg {
@@ -69,7 +102,7 @@
 		bottom: 0;
 		display: flex;
 		justify-content: flex-end;
-		padding: 0 20px 16px;
+		padding: 12px 0 0;
 		pointer-events: none;
 	}
 
@@ -107,14 +140,19 @@
 		}
 	}
 
+	@media (max-width: 768px) {
+		.canvas-inspector {
+			display: none;
+		}
+	}
+
 	@media (max-width: 640px) {
 		.canvas-main {
-			padding: 4px 16px 16px;
+			padding: 0 16px 16px;
 		}
 
 		.submit-anchor {
-			padding: 0 16px 16px;
-			padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+			padding-bottom: env(safe-area-inset-bottom, 0px);
 		}
 
 		.submit-pill {

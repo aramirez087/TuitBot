@@ -1,13 +1,21 @@
 <script lang="ts">
-	import { X, Maximize2, Minimize2 } from 'lucide-svelte';
+	import { X, Maximize2, Minimize2, PanelRight, Eye, EyeOff } from 'lucide-svelte';
 
 	let {
 		focusMode,
+		inspectorOpen = false,
+		previewVisible = false,
 		ontogglefocus,
+		ontoggleinspector,
+		ontogglepreview,
 		onclose
 	}: {
 		focusMode: boolean;
+		inspectorOpen?: boolean;
+		previewVisible?: boolean;
 		ontogglefocus: () => void;
+		ontoggleinspector?: () => void;
+		ontogglepreview?: () => void;
 		onclose: () => void;
 	} = $props();
 </script>
@@ -22,6 +30,34 @@
 	</button>
 
 	<div class="spacer"></div>
+
+	{#if ontogglepreview}
+		<button
+			class="header-btn"
+			class:active={previewVisible}
+			onclick={ontogglepreview}
+			aria-label={previewVisible ? 'Hide preview' : 'Show preview'}
+			title={previewVisible ? 'Hide preview (\u2318\u21E7P)' : 'Show preview (\u2318\u21E7P)'}
+		>
+			{#if previewVisible}
+				<Eye size={14} />
+			{:else}
+				<EyeOff size={14} />
+			{/if}
+		</button>
+	{/if}
+
+	{#if ontoggleinspector}
+		<button
+			class="header-btn"
+			class:active={inspectorOpen}
+			onclick={ontoggleinspector}
+			aria-label={inspectorOpen ? 'Close inspector' : 'Open inspector'}
+			title={inspectorOpen ? 'Close inspector (\u2318I)' : 'Open inspector (\u2318I)'}
+		>
+			<PanelRight size={14} />
+		</button>
+	{/if}
 
 	<button
 		class="header-btn focus-btn"
@@ -41,6 +77,7 @@
 	.header-bar {
 		display: flex;
 		align-items: center;
+		gap: 2px;
 		padding: 8px 16px;
 		flex-shrink: 0;
 	}
@@ -66,6 +103,14 @@
 	.header-btn:hover {
 		background: var(--color-surface-hover);
 		color: var(--color-text);
+	}
+
+	.header-btn.active {
+		color: var(--color-accent);
+	}
+
+	.header-btn.active:hover {
+		color: var(--color-accent-hover);
 	}
 
 	@media (pointer: coarse) {

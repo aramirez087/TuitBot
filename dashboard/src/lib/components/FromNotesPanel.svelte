@@ -4,6 +4,7 @@
 	let {
 		mode,
 		hasExistingContent = false,
+		compact = false,
 		ongenerate,
 		onclose,
 		onundo,
@@ -11,6 +12,7 @@
 	}: {
 		mode: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
+		compact?: boolean;
 		ongenerate: (text: string) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
@@ -48,7 +50,7 @@
 	}
 </script>
 
-<div class="from-notes-section">
+<div class="from-notes-section" class:compact>
 	<div class="notes-header">
 		<span class="notes-label">From Notes</span>
 		<button class="notes-close" onclick={onclose} aria-label="Close notes panel">
@@ -110,6 +112,14 @@
 		border: 1px solid var(--color-border-subtle);
 		border-radius: 8px;
 		background: var(--color-base);
+	}
+
+	.from-notes-section.compact {
+		margin-top: 0;
+		padding: 0;
+		border: none;
+		border-radius: 0;
+		background: transparent;
 	}
 
 	.notes-header {

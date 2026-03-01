@@ -15,7 +15,8 @@
 		ArrowUp,
 		ArrowDown,
 		Image,
-		Search
+		Search,
+		PanelRight
 	} from 'lucide-svelte';
 	let {
 		open,
@@ -40,10 +41,12 @@
 
 	const allActions: PaletteAction[] = [
 		{ id: 'focus-mode', label: 'Toggle focus mode', icon: Maximize2, category: 'Mode', shortcut: 'cmd+shift+f', when: 'always' },
+		{ id: 'toggle-inspector', label: 'Toggle inspector', icon: PanelRight, category: 'Mode', shortcut: 'cmd+i', when: 'always' },
 		{ id: 'mode-tweet', label: 'Switch to Tweet', icon: MessageSquare, category: 'Mode', shortcut: 'cmd+shift+n', when: 'always' },
 		{ id: 'mode-thread', label: 'Switch to Thread', icon: List, category: 'Mode', shortcut: 'cmd+shift+t', when: 'always' },
 		{ id: 'submit', label: 'Submit / Post now', icon: Send, category: 'Compose', shortcut: 'cmd+enter', when: 'always' },
 		{ id: 'ai-improve', label: 'AI Improve', icon: Sparkles, category: 'AI', shortcut: 'cmd+j', when: 'always' },
+		{ id: 'ai-generate', label: 'AI Generate / Improve', icon: Sparkles, category: 'AI', when: 'always' },
 		{ id: 'ai-from-notes', label: 'Generate from notes', icon: FileText, category: 'AI', when: 'always' },
 		{ id: 'attach-media', label: 'Attach media', icon: Image, category: 'Compose', when: 'always' },
 		{ id: 'add-card', label: 'Add tweet card', icon: Plus, category: 'Thread', when: 'thread' },

@@ -5,10 +5,12 @@
 
 	let {
 		cue,
-		oncuechange
+		oncuechange,
+		inline = false
 	}: {
 		cue: string;
 		oncuechange: (cue: string) => void;
+		inline?: boolean;
 	} = $props();
 
 	const EXPANDED_KEY = 'tuitbot:voice:expanded';
@@ -83,63 +85,107 @@
 	}
 </script>
 
-<div class="voice-context-panel" class:expanded>
-	<button class="voice-toggle" onclick={toggleExpanded}>
-		{#if expanded}
-			<ChevronDown size={14} />
+{#if inline}
+	<div class="voice-body">
+		{#if hasVoiceSettings}
+			<div class="voice-summary">
+				{#if brandVoice}
+					<span class="voice-chip" title={brandVoice}>{truncate(brandVoice, 40)}</span>
+				{/if}
+				{#if contentStyle}
+					<span class="voice-chip" title={contentStyle}>{truncate(contentStyle, 30)}</span>
+				{/if}
+				{#each pillars.slice(0, 3) as pillar}
+					<span class="pillar-chip">{pillar}</span>
+				{/each}
+			</div>
 		{:else}
-			<ChevronRight size={14} />
+			<div class="voice-empty">
+				<Settings size={12} />
+				<span>Set voice in Settings &rarr; Content Persona</span>
+			</div>
 		{/if}
-		<span class="voice-toggle-label">Voice context</span>
-		{#if cue.trim()}
-			<span class="active-cue-badge">{truncate(cue.trim(), 20)}</span>
-		{/if}
-	</button>
 
-	{#if expanded}
-		<div class="voice-body">
-			{#if hasVoiceSettings}
-				<div class="voice-summary">
-					{#if brandVoice}
-						<span class="voice-chip" title={brandVoice}>{truncate(brandVoice, 40)}</span>
-					{/if}
-					{#if contentStyle}
-						<span class="voice-chip" title={contentStyle}>{truncate(contentStyle, 30)}</span>
-					{/if}
-					{#each pillars.slice(0, 3) as pillar}
-						<span class="pillar-chip">{pillar}</span>
+		<div class="quick-cue-row">
+			<input
+				class="cue-input"
+				type="text"
+				placeholder="Tone cue (e.g., 'more casual')"
+				value={cue}
+				oninput={(e) => oncuechange(e.currentTarget.value)}
+				onfocus={() => { if (savedCues.length > 0) showSavedDropdown = true; }}
+				onblur={() => { setTimeout(() => { showSavedDropdown = false; }, 150); }}
+			/>
+			{#if showSavedDropdown && savedCues.length > 0}
+				<div class="saved-cues-dropdown">
+					{#each savedCues as saved}
+						<button class="saved-cue-item" onmousedown={() => selectCue(saved)}>
+							{saved}
+						</button>
 					{/each}
 				</div>
-			{:else}
-				<div class="voice-empty">
-					<Settings size={12} />
-					<span>Set voice in Settings &rarr; Content Persona</span>
-				</div>
 			{/if}
+		</div>
+	</div>
+{:else}
+	<div class="voice-context-panel" class:expanded>
+		<button class="voice-toggle" onclick={toggleExpanded}>
+			{#if expanded}
+				<ChevronDown size={14} />
+			{:else}
+				<ChevronRight size={14} />
+			{/if}
+			<span class="voice-toggle-label">Voice context</span>
+			{#if cue.trim()}
+				<span class="active-cue-badge">{truncate(cue.trim(), 20)}</span>
+			{/if}
+		</button>
 
-			<div class="quick-cue-row">
-				<input
-					class="cue-input"
-					type="text"
-					placeholder="Tone cue (e.g., 'more casual', 'add a hot take')"
-					value={cue}
-					oninput={(e) => oncuechange(e.currentTarget.value)}
-					onfocus={() => { if (savedCues.length > 0) showSavedDropdown = true; }}
-					onblur={() => { setTimeout(() => { showSavedDropdown = false; }, 150); }}
-				/>
-				{#if showSavedDropdown && savedCues.length > 0}
-					<div class="saved-cues-dropdown">
-						{#each savedCues as saved}
-							<button class="saved-cue-item" onmousedown={() => selectCue(saved)}>
-								{saved}
-							</button>
+		{#if expanded}
+			<div class="voice-body">
+				{#if hasVoiceSettings}
+					<div class="voice-summary">
+						{#if brandVoice}
+							<span class="voice-chip" title={brandVoice}>{truncate(brandVoice, 40)}</span>
+						{/if}
+						{#if contentStyle}
+							<span class="voice-chip" title={contentStyle}>{truncate(contentStyle, 30)}</span>
+						{/if}
+						{#each pillars.slice(0, 3) as pillar}
+							<span class="pillar-chip">{pillar}</span>
 						{/each}
 					</div>
+				{:else}
+					<div class="voice-empty">
+						<Settings size={12} />
+						<span>Set voice in Settings &rarr; Content Persona</span>
+					</div>
 				{/if}
+
+				<div class="quick-cue-row">
+					<input
+						class="cue-input"
+						type="text"
+						placeholder="Tone cue (e.g., 'more casual', 'add a hot take')"
+						value={cue}
+						oninput={(e) => oncuechange(e.currentTarget.value)}
+						onfocus={() => { if (savedCues.length > 0) showSavedDropdown = true; }}
+						onblur={() => { setTimeout(() => { showSavedDropdown = false; }, 150); }}
+					/>
+					{#if showSavedDropdown && savedCues.length > 0}
+						<div class="saved-cues-dropdown">
+							{#each savedCues as saved}
+								<button class="saved-cue-item" onmousedown={() => selectCue(saved)}>
+									{saved}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			</div>
-		</div>
-	{/if}
-</div>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	.voice-context-panel {

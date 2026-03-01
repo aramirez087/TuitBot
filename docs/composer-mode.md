@@ -93,19 +93,51 @@ Each thread card has its own media slot supporting file picker and drag-and-drop
 
 Media follows its card on reorder, duplicate, and split operations.
 
+## Inspector Rail
+
+The inspector is a collapsible right-side panel that houses all secondary composer controls — scheduling, voice context, and AI actions — so the main writing canvas stays clean.
+
+### Sections
+
+| Section | Content |
+|---------|---------|
+| **Schedule** | TimePicker with preferred slots and custom time input. Shows "Posts immediately unless scheduled" hint when no time is selected. |
+| **Voice** | Voice context panel (inline mode) showing brand voice, content style, pillars, and the quick cue input. |
+| **AI** | Two action buttons: "AI Generate" (or "AI Improve" when content exists) and "From Notes". Hint: ⌘J to improve selected text. |
+| **From Notes** | Expands when triggered from the AI section. Paste notes, generate content. Collapses independently. |
+
+### Toggle
+
+- **Keyboard:** `⌘I` (Mac) / `Ctrl+I` (Windows/Linux)
+- **Header button:** PanelRight icon in the compose modal header bar
+- **Command palette:** "Toggle inspector" action
+- **Default state:** Open on desktop, closed on mobile. Persisted in `localStorage` (`tuitbot:inspector:open`).
+
+### Mobile Behavior
+
+On screens narrower than 768px, the inspector renders as a bottom drawer overlay instead of an inline rail. The drawer:
+- Slides up with a pill-shaped drag handle
+- Has a semi-transparent backdrop (click to close)
+- Maxes out at 60vh height, scrollable
+- Closes on Escape (before focus mode in the escape cascade)
+
+### Layout
+
+When the inspector is open on desktop, the compose modal widens from 640px to 900px. The main canvas and inspector rail sit side-by-side using flexbox. When closed, the modal returns to its standard 640px width.
+
 ## Distraction-Free Mode
 
 Toggle with `⌘⇧F` (Mac) / `Ctrl+Shift+F` (Windows/Linux) or the focus mode button in the modal header.
 
-Focus mode expands the compose modal to fill the entire viewport, hiding surrounding UI chrome. The editor and preview panes are preserved — all functionality, shortcuts, command palette, and AI assist remain fully accessible.
+Focus mode expands the compose modal to fill the entire viewport, hiding surrounding UI chrome. The editor, preview, and inspector rail are all preserved — all functionality, shortcuts, command palette, and AI assist remain fully accessible. The inspector can be independently toggled within focus mode.
 
-Press `Escape` to exit focus mode (the modal stays open). This follows the escape cascade: pressing Escape repeatedly closes layers in order — command palette, from-notes panel, focus mode, then the modal itself.
+Press `Escape` to exit focus mode (the modal stays open). This follows the escape cascade: pressing Escape repeatedly closes layers in order — command palette, from-notes panel, inspector drawer (mobile), focus mode, then the modal itself.
 
 ## Command Palette
 
 Press `⌘K` (Mac) / `Ctrl+K` (Windows/Linux) to open the command palette.
 
-The palette provides fuzzy search over 13 compose actions organized into 4 categories: **Mode**, **Compose**, **AI**, and **Thread**. Thread-specific actions are only visible when in thread mode. Each action that has a direct keyboard shortcut displays the hint inline.
+The palette provides fuzzy search over 15 compose actions organized into 4 categories: **Mode**, **Compose**, **AI**, and **Thread**. Thread-specific actions are only visible when in thread mode. Each action that has a direct keyboard shortcut displays the hint inline.
 
 Navigate with `↑` / `↓` arrow keys, execute with `Enter`, close with `Escape`.
 
@@ -113,7 +145,7 @@ For the full list of palette actions, see the [Keyboard Shortcuts](#keyboard-sho
 
 ## Keyboard Shortcuts
 
-14 keyboard shortcuts cover all compose operations. Shortcuts are platform-aware (`⌘` on Mac, `Ctrl` on Windows/Linux) and are active only while the Compose Modal is open.
+16 keyboard shortcuts cover all compose operations. Shortcuts are platform-aware (`⌘` on Mac, `Ctrl` on Windows/Linux) and are active only while the Compose Modal is open.
 
 ### Quick Reference
 
@@ -122,10 +154,14 @@ For the full list of palette actions, see the [Keyboard Shortcuts](#keyboard-sho
 | Submit / Post | `⌘↩` | `Ctrl+Enter` | Always |
 | Command palette | `⌘K` | `Ctrl+K` | Always |
 | Focus mode | `⌘⇧F` | `Ctrl+Shift+F` | Always |
+| Toggle inspector | `⌘I` | `Ctrl+I` | Always |
+| Toggle preview | `⌘⇧P` | `Ctrl+Shift+P` | Always |
 | AI improve | `⌘J` | `Ctrl+J` | Always |
 | Tweet mode | `⌘⇧N` | `Ctrl+Shift+N` | Always |
 | Thread mode | `⌘⇧T` | `Ctrl+Shift+T` | Always |
 | Close | `Esc` | `Esc` | Always |
+| Insert separator | `⌘⇧↩` | `Ctrl+Shift+Enter` | Thread |
+| Backspace merge | `⌫` at pos 0 | `Backspace` at pos 0 | Thread |
 | Move card up/down | `⌥↑` / `⌥↓` | `Alt+↑/↓` | Thread |
 | Duplicate card | `⌘D` | `Ctrl+D` | Thread |
 | Split at cursor | `⌘⇧S` | `Ctrl+Shift+S` | Thread |
@@ -134,7 +170,7 @@ For the full list of palette actions, see the [Keyboard Shortcuts](#keyboard-sho
 
 Full reference with descriptions: [Keyboard Shortcuts](#keyboard-shortcuts).
 
-Typefully provides only `Cmd+Enter` for submission. Tuitbot provides 14 shortcuts covering every compose operation — you can create, restructure, and submit a thread without touching the mouse.
+Typefully provides only `Cmd+Enter` for submission. Tuitbot provides 16 shortcuts covering every compose operation — you can create, restructure, and submit a thread without touching the mouse.
 
 ## Auto-Save & Recovery
 
@@ -153,7 +189,7 @@ Auto-save uses the storage key `tuitbot:compose:draft` with a 7-day TTL. Saved c
 
 ## Voice Context
 
-The Voice Context panel sits between the mode tabs and the editor area, giving you visibility into and control over the persona guiding AI generation.
+The Voice Context panel lives in the inspector rail's **Voice** section, giving you visibility into and control over the persona guiding AI generation. When the inspector is closed, voice settings are still applied — they persist in memory and affect all AI calls.
 
 ### What it shows
 
@@ -162,7 +198,7 @@ The Voice Context panel sits between the mode tabs and the editor area, giving y
 - **Content pillars** — up to 3 topic pillars displayed as chips
 - If no voice settings are configured, a hint links to Settings
 
-The panel collapses by default and remembers its state in `localStorage` (`tuitbot:voice:expanded`).
+When rendered in the inspector, the panel displays in inline mode (always expanded, no toggle). The standalone version collapses by default and remembers its state in `localStorage` (`tuitbot:voice:expanded`).
 
 ### Quick Cue
 
@@ -181,7 +217,7 @@ The VoiceContextPanel reads settings from the `config` store (`$lib/stores/setti
 
 ## Preview Fidelity
 
-Both tweet and thread modes display a live preview alongside the editor. On desktop, the editor and preview sit side-by-side in a two-column layout. On mobile (< 768px), they stack vertically with the preview below the editor.
+Both tweet and thread modes display a live preview inline below the editor. The preview can be toggled with `⌘⇧P` (Mac) / `Ctrl+Shift+P` (Windows/Linux) or the eye icon in the header bar. On mobile (< 768px), the preview stacks vertically below the editor.
 
 ### What the preview emulates
 
@@ -243,10 +279,12 @@ Click the notes button in the modal footer or select "Generate from notes" from 
 
 ### AI Assist Button
 
-The footer AI Assist button has context-aware behavior:
-- **Tweet mode with content:** Runs AI Improve on the full text
-- **Tweet mode without content:** Generates a new tweet on a general topic
+The inspector rail's **AI** section contains an "AI Generate" / "AI Improve" button with context-aware behavior:
+- **Tweet mode with content:** Label shows "AI Improve" — runs AI Improve on the full text
+- **Tweet mode without content:** Label shows "AI Generate" — generates a new tweet on a general topic
 - **Thread mode:** Generates a full thread outline
+
+The same action is available from the command palette as "AI Generate / Improve".
 
 ### API Endpoints
 

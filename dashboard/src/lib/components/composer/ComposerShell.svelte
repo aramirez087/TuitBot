@@ -6,6 +6,7 @@
 		open,
 		focusMode,
 		showRecovery,
+		inspectorOpen = false,
 		onclose,
 		onrecover,
 		ondismissrecovery,
@@ -14,6 +15,7 @@
 		open: boolean;
 		focusMode: boolean;
 		showRecovery: boolean;
+		inspectorOpen?: boolean;
 		onclose: () => void;
 		onrecover: () => void;
 		ondismissrecovery: () => void;
@@ -33,6 +35,7 @@
 	<div
 		class="modal"
 		class:focus-mode={focusMode}
+		class:with-inspector={inspectorOpen}
 		role="dialog"
 		aria-modal="true"
 		aria-label="Compose content"
@@ -73,6 +76,11 @@
 		display: flex;
 		flex-direction: column;
 		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+		transition: width 0.2s ease;
+	}
+
+	.modal.with-inspector {
+		width: 900px;
 	}
 
 	.recovery-banner {
