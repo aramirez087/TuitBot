@@ -10,7 +10,7 @@
 	import { matchEvent } from '$lib/utils/shortcuts';
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import TimePicker from '../TimePicker.svelte';
-	import ThreadComposer from '../ThreadComposer.svelte';
+	import ThreadFlowLane from './ThreadFlowLane.svelte';
 	import CommandPalette from '../CommandPalette.svelte';
 	import FromNotesPanel from '../FromNotesPanel.svelte';
 	import ComposerShell from './ComposerShell.svelte';
@@ -49,7 +49,7 @@
 	let attachedMedia = $state<AttachedMedia[]>([]);
 	let focusMode = $state(false);
 	let paletteOpen = $state(false);
-	let threadComposerRef: ThreadComposer | undefined = $state();
+	let threadFlowRef: ThreadFlowLane | undefined = $state();
 	let tweetEditorRef: TweetEditor | undefined = $state();
 	let voicePanelRef: VoiceContextPanel | undefined = $state();
 	let showFromNotes = $state(false);
@@ -269,7 +269,12 @@
 			if (!embedded) toggleFocusMode();
 			return;
 		}
-		if (matchEvent(e, 'cmd+enter')) { e.preventDefault(); handleSubmit(); return; }
+		if (matchEvent(e, 'cmd+shift+enter')) { e.preventDefault(); handleSubmit(); return; }
+		if (matchEvent(e, 'cmd+enter')) {
+			if (mode === 'tweet') { e.preventDefault(); handleSubmit(); }
+			// In thread mode: let event propagate to ThreadFlowLane's card handler for split
+			return;
+		}
 		if (matchEvent(e, 'cmd+j')) { e.preventDefault(); handleInlineAssist(); return; }
 		if (matchEvent(e, 'cmd+shift+n')) { e.preventDefault(); mode = 'tweet'; return; }
 		if (matchEvent(e, 'cmd+shift+t')) { e.preventDefault(); mode = 'thread'; return; }
@@ -298,7 +303,7 @@
 			case 'attach-media': tweetEditorRef?.triggerFileSelect(); break;
 			case 'add-card': case 'duplicate': case 'split': case 'merge':
 			case 'move-up': case 'move-down':
-				threadComposerRef?.handlePaletteAction(actionId); break;
+				threadFlowRef?.handlePaletteAction(actionId); break;
 		}
 	}
 
@@ -323,7 +328,7 @@
 				submitError = e instanceof Error ? e.message : 'AI assist failed';
 			} finally { assisting = false; }
 		} else {
-			threadComposerRef?.handleInlineAssist(voiceCue || undefined);
+			threadFlowRef?.handleInlineAssist(voiceCue || undefined);
 		}
 	}
 
@@ -469,8 +474,8 @@
 					onerror={(msg) => { submitError = msg; }}
 				/>
 			{:else}
-				<ThreadComposer
-					bind:this={threadComposerRef}
+				<ThreadFlowLane
+					bind:this={threadFlowRef}
 					initialBlocks={threadBlocks.length > 0 ? threadBlocks : undefined}
 					onchange={(b) => { threadBlocks = b; }}
 					onvalidchange={(v) => { threadValid = v; }}

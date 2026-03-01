@@ -101,7 +101,8 @@ export function formatCombo(combo: string): string {
 
 /** Complete shortcut catalog for CommandPalette display. */
 export const SHORTCUT_CATALOG: ShortcutDef[] = [
-	{ combo: 'cmd+enter', label: 'Submit / Post', category: 'Compose', when: 'always' },
+	{ combo: 'cmd+enter', label: 'Submit (tweet) / Split (thread)', category: 'Compose', when: 'always' },
+	{ combo: 'cmd+shift+enter', label: 'Submit (thread)', category: 'Compose', when: 'thread' },
 	{ combo: 'cmd+shift+f', label: 'Toggle focus mode', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+k', label: 'Open command palette', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+j', label: 'AI improve selection', category: 'AI', when: 'always' },
@@ -110,11 +111,11 @@ export const SHORTCUT_CATALOG: ShortcutDef[] = [
 	{ combo: 'cmd+shift+p', label: 'Toggle preview', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+shift+n', label: 'Switch to tweet mode', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+shift+t', label: 'Switch to thread mode', category: 'Mode', when: 'always' },
-	{ combo: 'alt+arrowup', label: 'Move card up', category: 'Thread', when: 'thread' },
-	{ combo: 'alt+arrowdown', label: 'Move card down', category: 'Thread', when: 'thread' },
-	{ combo: 'cmd+d', label: 'Duplicate card', category: 'Thread', when: 'thread' },
+	{ combo: 'alt+arrowup', label: 'Move post up', category: 'Thread', when: 'thread' },
+	{ combo: 'alt+arrowdown', label: 'Move post down', category: 'Thread', when: 'thread' },
+	{ combo: 'cmd+d', label: 'Duplicate post', category: 'Thread', when: 'thread' },
 	{ combo: 'cmd+shift+s', label: 'Split at cursor', category: 'Thread', when: 'thread' },
 	{ combo: 'cmd+shift+m', label: 'Merge with next', category: 'Thread', when: 'thread' },
-	{ combo: 'tab', label: 'Next card', category: 'Thread', when: 'thread' },
-	{ combo: 'shift+tab', label: 'Previous card', category: 'Thread', when: 'thread' }
+	{ combo: 'tab', label: 'Next post', category: 'Thread', when: 'thread' },
+	{ combo: 'shift+tab', label: 'Previous post', category: 'Thread', when: 'thread' }
 ];
