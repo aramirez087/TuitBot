@@ -25,11 +25,11 @@
 	let claimPassphrase = $state('');
 	let passphraseSaved = $state(false);
 
-	// Tauri/bearer mode skips the claim step. Also skip if instance is already claimed
-	// (e.g., config.toml deleted but passphrase_hash still exists).
+	// Tauri/bearer mode skips the claim step. Web mode always shows it —
+	// either as passphrase generation (fresh) or recovery guidance (already claimed).
 	let isTauri = $derived($authModeStore === 'tauri');
 	let alreadyClaimed = $derived($page.url.searchParams.get('claimed') === '1');
-	let showClaimStep = $derived(!isTauri && !alreadyClaimed);
+	let showClaimStep = $derived(!isTauri);
 	let steps = $derived(showClaimStep ? [...BASE_STEPS, 'Secure'] : BASE_STEPS);
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
@@ -69,7 +69,8 @@
 				return true;
 			case 7: // Review
 				return true;
-			case 8: // Secure (claim) — only when not Tauri
+			case 8: // Secure — recovery acknowledgment or passphrase save
+				if (alreadyClaimed) return passphraseSaved;
 				return claimPassphrase.trim().length >= 8 && passphraseSaved;
 			default:
 				return false;
@@ -167,7 +168,11 @@
 			}
 
 			onboardingData.reset();
-			goto('/content?compose=true');
+			if (alreadyClaimed) {
+				goto('/login');
+			} else {
+				goto('/content?compose=true');
+			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : '';
 			if (msg.toLowerCase().includes('already claimed') && config.claim) {
@@ -235,7 +240,7 @@
 			{:else if currentStep === 7}
 				<ReviewStep />
 			{:else if currentStep === 8 && showClaimStep}
-				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} />
+				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} {alreadyClaimed} />
 			{/if}
 		</div>
 
