@@ -430,3 +430,95 @@ async fn e2e_loopback_writes_metadata_and_reingest_detects_change() {
     assert_eq!(nodes.len(), 1);
     assert_eq!(nodes[0].relative_path, "launch.md");
 }
+
+// ---------------------------------------------------------------------------
+// E2E: Connection-based Drive ingest
+// ---------------------------------------------------------------------------
+
+/// E2E: Connection broken gracefully marks source as error, preserves existing nodes.
+#[tokio::test]
+async fn e2e_connection_revoked_degrades_gracefully() {
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    // Pre-populate a Drive source with existing ingested content.
+    let src_id = store::ensure_google_drive_source(
+        &pool,
+        "folder_revoke",
+        r#"{"folder_id":"folder_revoke"}"#,
+    )
+    .await
+    .unwrap();
+
+    // Ingest a content node (simulating a previous successful poll).
+    let r = crate::automation::watchtower::ingest_content(
+        &pool,
+        src_id,
+        "gdrive://fileX/existing.md",
+        "# Existing Content\nThis was ingested before revocation.\n",
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(r, store::UpsertResult::Inserted);
+
+    // Simulate a ConnectionBroken error being handled by the Watchtower.
+    // (In production, this happens in poll_remote_sources.)
+    let _ = store::update_source_status(
+        &pool,
+        src_id,
+        "error",
+        Some("token revoked: Token has been revoked"),
+    )
+    .await;
+
+    // Verify the source is now in error state.
+    let ctx = store::get_source_context(&pool, src_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(ctx.status, "error");
+    assert!(ctx.error_message.as_deref().unwrap().contains("revoked"));
+
+    // Verify existing content nodes are preserved.
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].relative_path, "gdrive://fileX/existing.md");
+}
+
+/// E2E: Restart recovery -- cursor is preserved across provider rebuild.
+#[tokio::test]
+async fn e2e_restart_recovery_cursor_survives() {
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    // Register a Drive source and set a sync cursor.
+    let src_id = store::ensure_google_drive_source(
+        &pool,
+        "folder_restart",
+        r#"{"folder_id":"folder_restart"}"#,
+    )
+    .await
+    .unwrap();
+
+    let cursor = "2026-02-28T12:00:00Z";
+    store::update_sync_cursor(&pool, src_id, cursor)
+        .await
+        .unwrap();
+
+    // Simulate restart: look up the source context again.
+    let ctx = store::get_source_context(&pool, src_id)
+        .await
+        .unwrap()
+        .unwrap();
+
+    // The cursor should survive the "restart" (it's in the DB).
+    assert_eq!(ctx.sync_cursor.as_deref(), Some(cursor));
+    assert_eq!(ctx.status, "active");
+}

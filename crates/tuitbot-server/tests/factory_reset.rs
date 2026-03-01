@@ -48,6 +48,7 @@ async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     })

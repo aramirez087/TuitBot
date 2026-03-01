@@ -35,6 +35,7 @@ async fn test_router() -> axum::Router {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -250,6 +251,7 @@ async fn approval_stats_returns_counts() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -296,6 +298,7 @@ async fn approval_list_with_status_filter() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -352,6 +355,7 @@ async fn approval_edit_content() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -406,6 +410,7 @@ async fn approval_edit_empty_content() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -546,6 +551,7 @@ async fn add_and_list_target() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -588,6 +594,7 @@ async fn add_duplicate_target_fails() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -631,6 +638,7 @@ async fn remove_target_works() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -694,6 +702,7 @@ async fn runtime_start_and_stop() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -754,6 +763,7 @@ async fn settings_get_returns_json() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -788,6 +798,7 @@ async fn settings_patch_round_trips() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -879,6 +890,7 @@ async fn post_ingest_idempotent() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -983,6 +995,7 @@ async fn config_status_capabilities_match_cloud_mode() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: DeploymentMode::Cloud,
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -1050,6 +1063,7 @@ loop_back_enabled = false
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -1198,6 +1212,7 @@ async fn connector_status_with_connection() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });

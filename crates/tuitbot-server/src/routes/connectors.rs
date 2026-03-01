@@ -451,14 +451,12 @@ pub async fn disconnect_google_drive(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Load connector config from the config file at `state.config_path`.
+/// Get Google Drive connector config from AppState.
 #[allow(clippy::result_large_err)]
 fn load_connector_config(
     state: &AppState,
 ) -> Result<tuitbot_core::config::GoogleDriveConnectorConfig, Response> {
-    let config_str = std::fs::read_to_string(&state.config_path).unwrap_or_default();
-    let config: tuitbot_core::config::Config = toml::from_str(&config_str).unwrap_or_default();
-    Ok(config.connectors.google_drive)
+    Ok(state.connector_config.google_drive.clone())
 }
 
 /// Generate `n` random bytes.

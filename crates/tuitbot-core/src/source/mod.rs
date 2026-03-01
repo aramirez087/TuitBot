@@ -32,6 +32,9 @@ pub enum SourceError {
 
     #[error("not found: {0}")]
     NotFound(String),
+
+    #[error("connection broken (id={connection_id}): {reason}")]
+    ConnectionBroken { connection_id: i64, reason: String },
 }
 
 // ---------------------------------------------------------------------------

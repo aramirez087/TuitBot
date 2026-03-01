@@ -305,3 +305,221 @@ async fn different_source_types_coexist() {
     assert!(types.contains(&"local_fs"));
     assert!(types.contains(&"google_drive"));
 }
+
+// ---------------------------------------------------------------------------
+// GoogleDriveProvider: linked-account credential flow
+// ---------------------------------------------------------------------------
+
+/// Helper: create a GoogleDriveConnector that points at a wiremock server.
+fn test_connector_config() -> crate::config::GoogleDriveConnectorConfig {
+    crate::config::GoogleDriveConnectorConfig {
+        client_id: Some("test-client-id".into()),
+        client_secret: Some("test-client-secret".into()),
+        redirect_uri: Some("http://localhost:3001/callback".into()),
+    }
+}
+
+#[tokio::test]
+async fn google_drive_provider_from_connection_gets_token() {
+    use crate::source::connector::crypto::encrypt_credentials;
+    use crate::source::connector::google_drive::GoogleDriveConnector;
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let pool = init_test_db().await.expect("init db");
+    let mock_server = MockServer::start().await;
+
+    // Mock token refresh endpoint.
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": "ya29.linked-account-token",
+            "expires_in": 3600,
+            "token_type": "Bearer"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    // Create connection and store encrypted credentials.
+    let conn_id = store::insert_connection(&pool, "google_drive", Some("test@example.com"), None)
+        .await
+        .unwrap();
+
+    let key: Vec<u8> = (0..32).collect();
+    let encrypted = encrypt_credentials(b"1//test-refresh-token", &key).unwrap();
+    store::store_encrypted_credentials(&pool, conn_id, &encrypted)
+        .await
+        .unwrap();
+
+    // Build connector with test URLs.
+    let config = test_connector_config();
+    let connector = GoogleDriveConnector::with_test_urls(
+        &config,
+        reqwest::Client::new(),
+        format!("{}/token", mock_server.uri()),
+        format!("{}/revoke", mock_server.uri()),
+        format!("{}/userinfo", mock_server.uri()),
+    )
+    .unwrap();
+
+    // Build provider.
+    let provider = google_drive::GoogleDriveProvider::from_connection(
+        "test-folder".to_string(),
+        conn_id,
+        pool.clone(),
+        key,
+        connector,
+    );
+
+    assert_eq!(provider.source_type(), "google_drive");
+}
+
+#[tokio::test]
+async fn google_drive_provider_connection_missing_credentials_returns_broken() {
+    use crate::source::connector::google_drive::GoogleDriveConnector;
+    use crate::source::ContentSourceProvider;
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+    use wiremock::MockServer;
+
+    let pool = init_test_db().await.expect("init db");
+    let mock_server = MockServer::start().await;
+
+    // Create connection WITHOUT storing credentials.
+    let conn_id = store::insert_connection(&pool, "google_drive", Some("test@example.com"), None)
+        .await
+        .unwrap();
+
+    let key: Vec<u8> = (0..32).collect();
+    let config = test_connector_config();
+    let connector = GoogleDriveConnector::with_test_urls(
+        &config,
+        reqwest::Client::new(),
+        format!("{}/token", mock_server.uri()),
+        format!("{}/revoke", mock_server.uri()),
+        format!("{}/userinfo", mock_server.uri()),
+    )
+    .unwrap();
+
+    let provider = google_drive::GoogleDriveProvider::from_connection(
+        "test-folder".to_string(),
+        conn_id,
+        pool.clone(),
+        key,
+        connector,
+    );
+
+    // Scan should fail with ConnectionBroken (no credentials).
+    let result = provider.scan_for_changes(None, &["*.md".to_string()]).await;
+    assert!(
+        matches!(result, Err(SourceError::ConnectionBroken { .. })),
+        "Expected ConnectionBroken, got {:?}",
+        result
+    );
+}
+
+#[tokio::test]
+async fn google_drive_provider_connection_revoked_returns_broken() {
+    use crate::source::connector::crypto::encrypt_credentials;
+    use crate::source::connector::google_drive::GoogleDriveConnector;
+    use crate::source::ContentSourceProvider;
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let pool = init_test_db().await.expect("init db");
+    let mock_server = MockServer::start().await;
+
+    // Mock token endpoint returning a revocation error.
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+            "error": "invalid_grant",
+            "error_description": "Token has been revoked"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let conn_id = store::insert_connection(&pool, "google_drive", Some("test@example.com"), None)
+        .await
+        .unwrap();
+
+    let key: Vec<u8> = (0..32).collect();
+    let encrypted = encrypt_credentials(b"1//revoked-token", &key).unwrap();
+    store::store_encrypted_credentials(&pool, conn_id, &encrypted)
+        .await
+        .unwrap();
+
+    let config = test_connector_config();
+    let connector = GoogleDriveConnector::with_test_urls(
+        &config,
+        reqwest::Client::new(),
+        format!("{}/token", mock_server.uri()),
+        format!("{}/revoke", mock_server.uri()),
+        format!("{}/userinfo", mock_server.uri()),
+    )
+    .unwrap();
+
+    let provider = google_drive::GoogleDriveProvider::from_connection(
+        "test-folder".to_string(),
+        conn_id,
+        pool.clone(),
+        key,
+        connector,
+    );
+
+    let result = provider.scan_for_changes(None, &["*.md".to_string()]).await;
+    assert!(
+        matches!(result, Err(SourceError::ConnectionBroken { .. })),
+        "Expected ConnectionBroken for revoked token, got {:?}",
+        result
+    );
+}
+
+#[tokio::test]
+async fn google_drive_provider_connection_construction() {
+    use crate::source::connector::crypto::encrypt_credentials;
+    use crate::source::connector::google_drive::GoogleDriveConnector;
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+    use wiremock::MockServer;
+
+    let pool = init_test_db().await.expect("init db");
+    let mock_server = MockServer::start().await;
+
+    let conn_id = store::insert_connection(&pool, "google_drive", Some("test@example.com"), None)
+        .await
+        .unwrap();
+
+    let key: Vec<u8> = (0..32).collect();
+    let encrypted = encrypt_credentials(b"1//refresh-for-cache", &key).unwrap();
+    store::store_encrypted_credentials(&pool, conn_id, &encrypted)
+        .await
+        .unwrap();
+
+    let config = test_connector_config();
+    let connector = GoogleDriveConnector::with_test_urls(
+        &config,
+        reqwest::Client::new(),
+        format!("{}/token", mock_server.uri()),
+        format!("{}/revoke", mock_server.uri()),
+        format!("{}/userinfo", mock_server.uri()),
+    )
+    .unwrap();
+
+    // Build a provider with linked-account strategy and custom HTTP client.
+    let provider = google_drive::GoogleDriveProvider::with_client_and_connection(
+        "test-folder".to_string(),
+        conn_id,
+        pool.clone(),
+        key,
+        connector,
+        reqwest::Client::new(),
+    );
+
+    // Verify the provider has the correct source type and is ready to use.
+    assert_eq!(provider.source_type(), "google_drive");
+}

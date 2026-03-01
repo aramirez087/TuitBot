@@ -10,7 +10,7 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
 use tuitbot_core::automation::Runtime;
-use tuitbot_core::config::{ContentSourcesConfig, DeploymentMode};
+use tuitbot_core::config::{ConnectorConfig, ContentSourcesConfig, DeploymentMode};
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::storage::DbPool;
 
@@ -54,6 +54,8 @@ pub struct AppState {
     pub watchtower_cancel: Option<CancellationToken>,
     /// Content sources configuration for the Watchtower.
     pub content_sources: ContentSourcesConfig,
+    /// Connector configuration for remote source OAuth flows.
+    pub connector_config: ConnectorConfig,
     /// Deployment mode (desktop, self_host, or cloud).
     pub deployment_mode: DeploymentMode,
     /// Pending OAuth PKCE challenges keyed by state parameter.

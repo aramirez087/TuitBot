@@ -163,6 +163,12 @@ async fn main() -> Result<()> {
         .map(|c| c.content_sources.clone())
         .unwrap_or_default();
 
+    // Extract connector config for remote source OAuth flows.
+    let connector_config = loaded_config
+        .as_ref()
+        .map(|c| c.connectors.clone())
+        .unwrap_or_default();
+
     // Extract deployment mode from config (defaults to Desktop).
     let deployment_mode = loaded_config
         .as_ref()
@@ -189,7 +195,12 @@ async fn main() -> Result<()> {
 
         if !watch_sources.is_empty() {
             let cancel = CancellationToken::new();
-            let watchtower = WatchtowerLoop::new(pool.clone(), content_sources.clone());
+            let watchtower = WatchtowerLoop::new(
+                pool.clone(),
+                content_sources.clone(),
+                connector_config.clone(),
+                data_dir.clone(),
+            );
             let cancel_clone = cancel.clone();
             tokio::spawn(async move {
                 watchtower.run(cancel_clone).await;
@@ -216,6 +227,7 @@ async fn main() -> Result<()> {
         circuit_breaker: None,
         watchtower_cancel: watchtower_cancel.clone(),
         content_sources,
+        connector_config,
         deployment_mode,
         pending_oauth: Mutex::new(HashMap::new()),
     });

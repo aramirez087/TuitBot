@@ -49,6 +49,7 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
@@ -269,6 +270,7 @@ async fn init_with_claim_produces_valid_session() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });

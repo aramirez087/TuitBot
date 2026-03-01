@@ -22,7 +22,7 @@ use notify_debouncer_full::{
 use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
 
-use crate::config::ContentSourcesConfig;
+use crate::config::{ConnectorConfig, ContentSourcesConfig};
 use crate::source::ContentSourceProvider;
 use crate::storage::watchtower as store;
 use crate::storage::DbPool;
@@ -297,6 +297,8 @@ type RemoteSource = (i64, Box<dyn ContentSourceProvider>, Vec<String>, Duration)
 pub struct WatchtowerLoop {
     pool: DbPool,
     config: ContentSourcesConfig,
+    connector_config: ConnectorConfig,
+    data_dir: PathBuf,
     debounce_duration: Duration,
     fallback_scan_interval: Duration,
     cooldown_ttl: Duration,
@@ -304,10 +306,17 @@ pub struct WatchtowerLoop {
 
 impl WatchtowerLoop {
     /// Create a new WatchtowerLoop.
-    pub fn new(pool: DbPool, config: ContentSourcesConfig) -> Self {
+    pub fn new(
+        pool: DbPool,
+        config: ContentSourcesConfig,
+        connector_config: ConnectorConfig,
+        data_dir: PathBuf,
+    ) -> Self {
         Self {
             pool,
             config,
+            connector_config,
+            data_dir,
             debounce_duration: Duration::from_secs(2),
             fallback_scan_interval: Duration::from_secs(300), // 5 minutes
             cooldown_ttl: Duration::from_secs(5),
@@ -371,23 +380,44 @@ impl WatchtowerLoop {
                 "folder_id": folder_id,
                 "file_patterns": src.file_patterns,
                 "service_account_key": src.service_account_key,
+                "connection_id": src.connection_id,
             })
             .to_string();
 
             match store::ensure_google_drive_source(&self.pool, folder_id, &config_json).await {
                 Ok(source_id) => {
-                    let key_path = src.service_account_key.clone().unwrap_or_default();
-                    let provider = crate::source::google_drive::GoogleDriveProvider::new(
-                        folder_id.to_string(),
-                        key_path,
-                    );
                     let interval = Duration::from_secs(src.poll_interval_seconds.unwrap_or(300));
-                    remote_map.push((
-                        source_id,
-                        Box::new(provider),
-                        src.file_patterns.clone(),
-                        interval,
-                    ));
+
+                    // connection_id takes precedence over service_account_key.
+                    let provider: Box<dyn ContentSourceProvider> =
+                        if let Some(connection_id) = src.connection_id {
+                            match self.build_connection_provider(folder_id, connection_id) {
+                                Ok(p) => Box::new(p),
+                                Err(reason) => {
+                                    tracing::warn!(
+                                        folder_id,
+                                        connection_id,
+                                        reason = %reason,
+                                        "Skipping connection-based source"
+                                    );
+                                    continue;
+                                }
+                            }
+                        } else if src.service_account_key.is_some() {
+                            let key_path = src.service_account_key.clone().unwrap_or_default();
+                            Box::new(crate::source::google_drive::GoogleDriveProvider::new(
+                                folder_id.to_string(),
+                                key_path,
+                            ))
+                        } else {
+                            tracing::warn!(
+                            folder_id,
+                            "Skipping Google Drive source: no connection_id or service_account_key"
+                        );
+                            continue;
+                        };
+
+                    remote_map.push((source_id, provider, src.file_patterns.clone(), interval));
                 }
                 Err(e) => {
                     tracing::error!(
@@ -709,6 +739,22 @@ impl WatchtowerLoop {
                         tracing::warn!(error = %e, "Failed to update remote sync cursor");
                     }
                 }
+                Err(crate::source::SourceError::ConnectionBroken {
+                    connection_id,
+                    ref reason,
+                }) => {
+                    tracing::warn!(
+                        source_id,
+                        connection_id,
+                        reason = %reason,
+                        "Connection broken -- marking source as error"
+                    );
+                    let _ =
+                        store::update_source_status(&self.pool, *source_id, "error", Some(reason))
+                            .await;
+                    let _ =
+                        store::update_connection_status(&self.pool, connection_id, "expired").await;
+                }
                 Err(e) => {
                     tracing::warn!(
                         source_type = provider.source_type(),
@@ -748,6 +794,35 @@ impl WatchtowerLoop {
                 }
             }
         }
+    }
+
+    /// Build a GoogleDriveProvider backed by a linked-account connection.
+    ///
+    /// Loads the connector encryption key and constructs the connector
+    /// from config. Returns an error string if setup fails (caller
+    /// logs and skips the source).
+    fn build_connection_provider(
+        &self,
+        folder_id: &str,
+        connection_id: i64,
+    ) -> Result<crate::source::google_drive::GoogleDriveProvider, String> {
+        let key = crate::source::connector::crypto::ensure_connector_key(&self.data_dir)
+            .map_err(|e| format!("connector key error: {e}"))?;
+
+        let connector = crate::source::connector::google_drive::GoogleDriveConnector::new(
+            &self.connector_config.google_drive,
+        )
+        .map_err(|e| format!("connector config error: {e}"))?;
+
+        Ok(
+            crate::source::google_drive::GoogleDriveProvider::from_connection(
+                folder_id.to_string(),
+                connection_id,
+                self.pool.clone(),
+                key,
+                connector,
+            ),
+        )
     }
 
     /// Polling-only fallback loop when the notify watcher fails to initialize.
