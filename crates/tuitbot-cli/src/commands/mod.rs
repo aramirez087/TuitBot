@@ -13,6 +13,7 @@ pub mod settings;
 pub mod stats;
 pub mod test;
 pub mod tick;
+pub mod uninstall;
 pub mod update;
 pub mod upgrade;
 
@@ -247,6 +248,18 @@ pub struct RestoreArgs {
     /// Validate backup without restoring
     #[arg(long)]
     pub validate_only: bool,
+}
+
+/// Arguments for the `uninstall` subcommand.
+#[derive(Debug, Args)]
+pub struct UninstallArgs {
+    /// Skip confirmation prompt (for scripts)
+    #[arg(long)]
+    pub force: bool,
+
+    /// Remove data directory only, keep binaries
+    #[arg(long)]
+    pub data_only: bool,
 }
 
 /// Arguments for the `mcp` subcommand.

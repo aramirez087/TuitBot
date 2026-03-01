@@ -88,6 +88,8 @@ enum Commands {
     Backup(commands::BackupArgs),
     /// Restore database from a backup
     Restore(commands::RestoreArgs),
+    /// Remove Tuitbot data and binaries from this machine
+    Uninstall(commands::UninstallArgs),
 }
 
 #[tokio::main]
@@ -163,6 +165,9 @@ async fn run() -> anyhow::Result<()> {
     if let Commands::Restore(args) = cli.command {
         return commands::restore::execute(args).await;
     }
+    if let Commands::Uninstall(args) = cli.command {
+        return commands::uninstall::execute(args.force, args.data_only);
+    }
     if let Commands::Mcp(ref args) = cli.command {
         return match &args.command {
             commands::McpSubcommand::Manifest { ref profile } => {
@@ -217,6 +222,7 @@ async fn run() -> anyhow::Result<()> {
         | Commands::Settings(_)
         | Commands::Backup(_)
         | Commands::Restore(_)
+        | Commands::Uninstall(_)
         | Commands::Mcp(_) => {
             unreachable!()
         }

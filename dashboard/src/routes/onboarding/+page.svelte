@@ -16,7 +16,7 @@
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
 	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
 
-	const BASE_STEPS = ['Welcome', 'X API', 'Business', 'LLM', 'Language', 'Sources', 'Validate', 'Review'];
+	const BASE_STEPS = ['Welcome', 'X API', 'Profile', 'LLM', 'Language', 'Sources', 'Validate', 'Review'];
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');

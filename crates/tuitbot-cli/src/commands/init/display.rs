@@ -218,7 +218,7 @@ pub(super) fn print_x_api_guide() {
     );
     eprintln!(
         "{}",
-        dim.apply_to("     Type: \"Web App\" — Callback URL: http://127.0.0.1:8080/callback")
+        dim.apply_to("     Type: \"Native App\" — Callback URL: http://127.0.0.1:8080/callback")
     );
     eprintln!(
         "{}",
