@@ -257,6 +257,36 @@ impl Config {
                     ),
                 });
             }
+
+            // Warn if both connection_id and service_account_key are set.
+            // Not a blocking error -- session 04 handles precedence.
+            if source.source_type == "google_drive"
+                && source.connection_id.is_some()
+                && source.service_account_key.is_some()
+            {
+                tracing::warn!(
+                    source_index = i,
+                    "content_sources.sources[{}] has both connection_id and \
+                     service_account_key; connection_id takes precedence",
+                    i
+                );
+            }
+
+            // Warn if a google_drive source has neither auth method configured.
+            // The Watchtower will skip this source at runtime, but surface it
+            // during validation so the user knows to connect via the dashboard.
+            if source.source_type == "google_drive"
+                && source.connection_id.is_none()
+                && source.service_account_key.is_none()
+            {
+                tracing::warn!(
+                    source_index = i,
+                    "content_sources.sources[{}] has no authentication configured \
+                     (neither connection_id nor service_account_key); this source \
+                     will be skipped at runtime -- connect via Settings > Content Sources",
+                    i
+                );
+            }
         }
 
         if errors.is_empty() {

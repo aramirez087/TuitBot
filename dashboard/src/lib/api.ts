@@ -1,4 +1,4 @@
-function resolveBaseUrl(): string {
+export function resolveBaseUrl(): string {
 	if (typeof window === 'undefined') return '';
 	if ('__TAURI_INTERNALS__' in window) return 'http://localhost:3001';
 	if (window.location.port === '5173') return 'http://localhost:3001';
@@ -90,6 +90,7 @@ export interface DeploymentCapabilities {
 	google_drive: boolean;
 	inline_ingest: boolean;
 	file_picker_native: boolean;
+	preferred_source_default: string;
 }
 
 export interface RuntimeStatus {
@@ -348,6 +349,33 @@ export interface TargetStats {
 	interaction_frequency_days: number | null;
 }
 
+// --- Connector types ---
+
+export interface Connection {
+	id: number;
+	connector_type: string;
+	account_email: string | null;
+	display_name: string | null;
+	status: string;
+	metadata_json: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface LinkResponse {
+	authorization_url: string;
+	state: string;
+}
+
+export interface ConnectorStatusResponse {
+	connections: Connection[];
+}
+
+export interface DisconnectResponse {
+	disconnected: boolean;
+	id: number;
+}
+
 // --- Settings types ---
 
 export interface TuitbotConfig {
@@ -435,6 +463,7 @@ export interface TuitbotConfig {
 			path: string | null;
 			folder_id: string | null;
 			service_account_key: string | null;
+			connection_id: number | null;
 			watch: boolean;
 			file_patterns: string[];
 			loop_back_enabled: boolean;
@@ -442,10 +471,18 @@ export interface TuitbotConfig {
 		}>;
 	};
 	deployment_mode: DeploymentModeValue;
+	connectors?: {
+		google_drive?: {
+			client_id?: string | null;
+			client_secret?: string | null;
+			redirect_uri?: string | null;
+		};
+	};
 }
 
 export interface ConfigStatus {
 	configured: boolean;
+	claimed: boolean;
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
 }
@@ -872,14 +909,24 @@ export const api = {
 
 	settings: {
 		configStatus: () => request<ConfigStatus>('/api/settings/status'),
-		init: (data: Partial<TuitbotConfig>) =>
-			request<{ status: string; config?: TuitbotConfig; errors?: Array<{ field: string; message: string }> }>(
-				'/api/settings/init',
-				{
-					method: 'POST',
-					body: JSON.stringify(data)
-				}
-			),
+		init: async (data: Record<string, unknown>): Promise<{
+			status: string;
+			config?: TuitbotConfig;
+			csrf_token?: string;
+			errors?: Array<{ field: string; message: string }>;
+		}> => {
+			const res = await fetch(`${BASE_URL}/api/settings/init`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data),
+				credentials: 'include'
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => ({ error: res.statusText }));
+				throw new Error(body.error || res.statusText);
+			}
+			return res.json();
+		},
 		get: () => request<TuitbotConfig>('/api/settings'),
 		patch: (data: Partial<TuitbotConfig>) =>
 			request<TuitbotConfig>('/api/settings', {
@@ -901,7 +948,15 @@ export const api = {
 			request<SettingsTestResult>('/api/settings/test-llm', {
 				method: 'POST',
 				body: JSON.stringify(data)
-			})
+			}),
+		factoryReset: (confirmation: string) =>
+			request<{ status: string; cleared: Record<string, unknown> }>(
+				'/api/settings/factory-reset',
+				{
+					method: 'POST',
+					body: JSON.stringify({ confirmation })
+				}
+			)
 	},
 
 	targets: {
@@ -1107,6 +1162,23 @@ export const api = {
 			request<McpErrorBreakdown[]>(`/api/mcp/telemetry/errors?hours=${hours}`),
 		telemetryRecent: (limit: number = 50) =>
 			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`)
+	},
+
+	connectors: {
+		googleDrive: {
+			link: (force?: boolean) =>
+				request<LinkResponse>(
+					`/api/connectors/google-drive/link${force ? '?force=true' : ''}`,
+					{ method: 'POST' }
+				),
+			status: () =>
+				request<ConnectorStatusResponse>('/api/connectors/google-drive/status'),
+			disconnect: (id: number) =>
+				request<DisconnectResponse>(
+					`/api/connectors/google-drive/${id}`,
+					{ method: 'DELETE' }
+				),
+		}
 	},
 
 	discovery: {

@@ -10,11 +10,19 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
 use tuitbot_core::automation::Runtime;
-use tuitbot_core::config::{ContentSourcesConfig, DeploymentMode};
+use tuitbot_core::config::{ConnectorConfig, ContentSourcesConfig, DeploymentMode};
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::storage::DbPool;
 
 use crate::ws::WsEvent;
+
+/// Pending OAuth PKCE state for connector link flows.
+pub struct PendingOAuth {
+    /// The PKCE code verifier needed to complete the token exchange.
+    pub code_verifier: String,
+    /// When this entry was created (for 10-minute expiry).
+    pub created_at: Instant,
+}
 
 /// Shared application state accessible by all route handlers.
 pub struct AppState {
@@ -46,6 +54,10 @@ pub struct AppState {
     pub watchtower_cancel: Option<CancellationToken>,
     /// Content sources configuration for the Watchtower.
     pub content_sources: ContentSourcesConfig,
+    /// Connector configuration for remote source OAuth flows.
+    pub connector_config: ConnectorConfig,
     /// Deployment mode (desktop, self_host, or cloud).
     pub deployment_mode: DeploymentMode,
+    /// Pending OAuth PKCE challenges keyed by state parameter.
+    pub pending_oauth: Mutex<HashMap<String, PendingOAuth>>,
 }

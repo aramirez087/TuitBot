@@ -844,6 +844,7 @@ fn validate_local_fs_source_rejected_in_cloud_mode() {
         path: Some("~/notes/vault".to_string()),
         folder_id: None,
         service_account_key: None,
+        connection_id: None,
         watch: true,
         file_patterns: vec!["*.md".to_string()],
         loop_back_enabled: true,
@@ -870,6 +871,7 @@ fn validate_google_drive_source_allowed_in_cloud_mode() {
         path: None,
         folder_id: Some("abc123".to_string()),
         service_account_key: Some("/keys/sa.json".to_string()),
+        connection_id: None,
         watch: true,
         file_patterns: vec!["*.md".to_string()],
         loop_back_enabled: false,
@@ -890,6 +892,7 @@ fn validate_local_fs_source_allowed_in_desktop_mode() {
         path: Some("~/notes".to_string()),
         folder_id: None,
         service_account_key: None,
+        connection_id: None,
         watch: true,
         file_patterns: vec!["*.md".to_string()],
         loop_back_enabled: true,
@@ -906,10 +909,12 @@ fn deployment_capabilities_serde_json_roundtrip() {
         google_drive: true,
         inline_ingest: true,
         file_picker_native: false,
+        preferred_source_default: "google_drive".to_string(),
     };
     let json = serde_json::to_value(&caps).expect("serialize");
     assert_eq!(json["local_folder"], true);
     assert_eq!(json["manual_local_path"], false);
+    assert_eq!(json["preferred_source_default"], "google_drive");
     let roundtripped: DeploymentCapabilities = serde_json::from_value(json).expect("deserialize");
     assert_eq!(roundtripped, caps);
 }
@@ -919,4 +924,396 @@ fn deployment_mode_display() {
     assert_eq!(DeploymentMode::Desktop.to_string(), "desktop");
     assert_eq!(DeploymentMode::SelfHost.to_string(), "self_host");
     assert_eq!(DeploymentMode::Cloud.to_string(), "cloud");
+}
+
+// --- Preferred source default tests ---
+
+#[test]
+fn preferred_source_default_desktop() {
+    let caps = DeploymentMode::Desktop.capabilities();
+    assert_eq!(caps.preferred_source_default, "local_fs");
+}
+
+#[test]
+fn preferred_source_default_self_host() {
+    let caps = DeploymentMode::SelfHost.capabilities();
+    assert_eq!(caps.preferred_source_default, "google_drive");
+}
+
+#[test]
+fn preferred_source_default_cloud() {
+    let caps = DeploymentMode::Cloud.capabilities();
+    assert_eq!(caps.preferred_source_default, "google_drive");
+}
+
+#[test]
+fn preferred_source_default_json_roundtrip() {
+    let caps = DeploymentMode::SelfHost.capabilities();
+    let json = serde_json::to_value(&caps).expect("serialize");
+    assert_eq!(json["preferred_source_default"], "google_drive");
+    let roundtripped: DeploymentCapabilities = serde_json::from_value(json).expect("deserialize");
+    assert_eq!(roundtripped.preferred_source_default, "google_drive");
+}
+
+// --- connection_id tests ---
+
+#[test]
+fn content_source_connection_id_defaults_to_none() {
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/keys/sa.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert!(config.content_sources.sources[0].connection_id.is_none());
+}
+
+#[test]
+fn content_source_connection_id_roundtrip() {
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+connection_id = 42
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert_eq!(config.content_sources.sources[0].connection_id, Some(42));
+
+    // Round-trip to TOML.
+    let toml_out = toml::to_string_pretty(&config).expect("serialize");
+    let roundtripped: Config = toml::from_str(&toml_out).expect("re-parse");
+    assert_eq!(
+        roundtripped.content_sources.sources[0].connection_id,
+        Some(42)
+    );
+}
+
+#[test]
+fn legacy_google_drive_config_still_parses() {
+    // Existing TOML with service_account_key + folder_id (no connection_id).
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "1aBcD_eFgHiJkLmNoPqRsTuVwXyZ"
+service_account_key = "~/keys/my-project-sa.json"
+watch = true
+file_patterns = ["*.md", "*.txt"]
+loop_back_enabled = false
+poll_interval_seconds = 600
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    let source = &config.content_sources.sources[0];
+    assert_eq!(source.source_type, "google_drive");
+    assert_eq!(
+        source.folder_id.as_deref(),
+        Some("1aBcD_eFgHiJkLmNoPqRsTuVwXyZ")
+    );
+    assert_eq!(
+        source.service_account_key.as_deref(),
+        Some("~/keys/my-project-sa.json")
+    );
+    assert!(source.connection_id.is_none());
+}
+
+#[test]
+fn connection_id_json_patch_roundtrip() {
+    let patch = serde_json::json!({
+        "content_sources": {
+            "sources": [{
+                "source_type": "google_drive",
+                "folder_id": "drive_folder_abc",
+                "connection_id": 7,
+                "watch": true,
+                "file_patterns": ["*.md"],
+                "loop_back_enabled": false
+            }]
+        }
+    });
+    let config: Config = serde_json::from_value(patch).expect("valid JSON");
+    assert_eq!(config.content_sources.sources[0].connection_id, Some(7));
+
+    // Round-trip to TOML and back.
+    let toml_str = toml::to_string_pretty(&config).expect("serialize");
+    let roundtripped: Config = toml::from_str(&toml_str).expect("re-parse");
+    assert_eq!(
+        roundtripped.content_sources.sources[0].connection_id,
+        Some(7)
+    );
+}
+
+// --- Connector config tests ---
+
+#[test]
+fn connector_config_optional() {
+    let toml_str = r#"
+[business]
+product_name = "Test"
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert!(config.connectors.google_drive.client_id.is_none());
+    assert!(config.connectors.google_drive.client_secret.is_none());
+    assert!(config.connectors.google_drive.redirect_uri.is_none());
+}
+
+#[test]
+fn connector_config_toml_roundtrip() {
+    let toml_str = r#"
+[connectors.google_drive]
+client_id = "123456.apps.googleusercontent.com"
+client_secret = "GOCSPX-secret"
+redirect_uri = "http://localhost:3001/api/connectors/google-drive/callback"
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert_eq!(
+        config.connectors.google_drive.client_id.as_deref(),
+        Some("123456.apps.googleusercontent.com")
+    );
+    assert_eq!(
+        config.connectors.google_drive.client_secret.as_deref(),
+        Some("GOCSPX-secret")
+    );
+
+    // Round-trip.
+    let toml_out = toml::to_string_pretty(&config).expect("serialize");
+    let roundtripped: Config = toml::from_str(&toml_out).expect("re-parse");
+    assert_eq!(
+        roundtripped.connectors.google_drive.client_id.as_deref(),
+        Some("123456.apps.googleusercontent.com")
+    );
+}
+
+#[test]
+fn connector_config_env_overrides() {
+    with_locked_env(|| {
+        let _client_id = ScopedEnvVar::set(
+            "TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_ID",
+            "env-client-id",
+        );
+        let _client_secret = ScopedEnvVar::set(
+            "TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_SECRET",
+            "env-client-secret",
+        );
+        let _redirect = ScopedEnvVar::set(
+            "TUITBOT_CONNECTORS__GOOGLE_DRIVE__REDIRECT_URI",
+            "http://myhost:3001/callback",
+        );
+        let mut config = Config::default();
+        config.apply_env_overrides().expect("env override");
+        assert_eq!(
+            config.connectors.google_drive.client_id.as_deref(),
+            Some("env-client-id")
+        );
+        assert_eq!(
+            config.connectors.google_drive.client_secret.as_deref(),
+            Some("env-client-secret")
+        );
+        assert_eq!(
+            config.connectors.google_drive.redirect_uri.as_deref(),
+            Some("http://myhost:3001/callback")
+        );
+    });
+}
+
+#[test]
+fn service_account_key_skipped_in_serialization_when_none() {
+    // When service_account_key is None, it should not appear in TOML output.
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc"
+connection_id = 1
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    let toml_out = toml::to_string_pretty(&config).expect("serialize");
+    assert!(
+        !toml_out.contains("service_account_key"),
+        "service_account_key should not appear when None"
+    );
+}
+
+#[test]
+fn connection_id_skipped_in_serialization_when_none() {
+    // When connection_id is None, it should not appear in TOML output.
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "local_fs"
+path = "~/notes"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = true
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    let toml_out = toml::to_string_pretty(&config).expect("serialize");
+    assert!(
+        !toml_out.contains("connection_id"),
+        "connection_id should not appear when None"
+    );
+}
+
+// --- Session 06: Backward-compatibility regression tests ---
+
+#[test]
+fn mixed_old_and_new_google_drive_source() {
+    // Config with both service_account_key and connection_id parses and round-trips.
+    let toml_str = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "1aBcD_eFgHiJkLmNoPqRsTuVwXyZ"
+service_account_key = "~/keys/sa.json"
+connection_id = 42
+watch = true
+file_patterns = ["*.md", "*.txt"]
+loop_back_enabled = false
+poll_interval_seconds = 300
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    let source = &config.content_sources.sources[0];
+    assert_eq!(source.source_type, "google_drive");
+    assert_eq!(
+        source.service_account_key.as_deref(),
+        Some("~/keys/sa.json")
+    );
+    assert_eq!(source.connection_id, Some(42));
+
+    // Round-trip to TOML
+    let toml_out = toml::to_string_pretty(&config).expect("serialize");
+    let roundtripped: Config = toml::from_str(&toml_out).expect("re-parse");
+    let rt_src = &roundtripped.content_sources.sources[0];
+    assert_eq!(rt_src.connection_id, Some(42));
+    assert_eq!(
+        rt_src.service_account_key.as_deref(),
+        Some("~/keys/sa.json")
+    );
+
+    // Validation passes (non-blocking warning only for dual-auth).
+    let mut valid_config = config;
+    valid_config.business.product_name = "Test".to_string();
+    valid_config.business.product_keywords = vec!["test".to_string()];
+    valid_config.llm.provider = "ollama".to_string();
+    assert!(valid_config.validate().is_ok());
+}
+
+#[test]
+fn legacy_local_fs_config_unaffected_by_deployment_mode() {
+    // Desktop mode with local_fs validates OK.
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.deployment_mode = DeploymentMode::Desktop;
+    config.content_sources.sources.push(ContentSourceEntry {
+        source_type: "local_fs".to_string(),
+        path: Some("~/Obsidian/vault".to_string()),
+        folder_id: None,
+        service_account_key: None,
+        connection_id: None,
+        watch: true,
+        file_patterns: vec!["*.md".to_string()],
+        loop_back_enabled: true,
+        poll_interval_seconds: None,
+    });
+    assert!(config.validate().is_ok());
+
+    // SelfHost mode with local_fs also validates OK (it's allowed).
+    config.deployment_mode = DeploymentMode::SelfHost;
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn legacy_sa_key_only_config_still_valid() {
+    // A Google Drive source with only service_account_key (no connection_id)
+    // passes validation in all deployment modes that allow google_drive.
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.content_sources.sources.push(ContentSourceEntry {
+        source_type: "google_drive".to_string(),
+        path: None,
+        folder_id: Some("abc123".to_string()),
+        service_account_key: Some("/keys/sa.json".to_string()),
+        connection_id: None,
+        watch: true,
+        file_patterns: vec!["*.md".to_string()],
+        loop_back_enabled: false,
+        poll_interval_seconds: Some(300),
+    });
+
+    for mode in &[
+        DeploymentMode::Desktop,
+        DeploymentMode::SelfHost,
+        DeploymentMode::Cloud,
+    ] {
+        config.deployment_mode = mode.clone();
+        assert!(
+            config.validate().is_ok(),
+            "legacy SA-key config should be valid in {:?} mode",
+            mode
+        );
+    }
+}
+
+#[test]
+fn empty_content_sources_valid() {
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    // Explicitly empty sources
+    config.content_sources.sources = vec![];
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn connection_id_without_sa_key_valid() {
+    // A Google Drive source with only connection_id (no service_account_key).
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.content_sources.sources.push(ContentSourceEntry {
+        source_type: "google_drive".to_string(),
+        path: None,
+        folder_id: Some("folder_xyz".to_string()),
+        service_account_key: None,
+        connection_id: Some(7),
+        watch: true,
+        file_patterns: vec!["*.md".to_string()],
+        loop_back_enabled: false,
+        poll_interval_seconds: None,
+    });
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn google_drive_source_no_auth_warns() {
+    // A Google Drive source with NEITHER connection_id NOR service_account_key
+    // triggers a non-blocking validation warning (logged, not an error).
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.content_sources.sources.push(ContentSourceEntry {
+        source_type: "google_drive".to_string(),
+        path: None,
+        folder_id: Some("folder_abc".to_string()),
+        service_account_key: None,
+        connection_id: None,
+        watch: true,
+        file_patterns: vec!["*.md".to_string()],
+        loop_back_enabled: false,
+        poll_interval_seconds: None,
+    });
+    // Should still pass validation (warning is non-blocking).
+    assert!(config.validate().is_ok());
 }

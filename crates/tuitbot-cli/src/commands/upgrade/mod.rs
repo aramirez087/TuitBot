@@ -1,9 +1,11 @@
-/// `tuitbot upgrade` — detect and configure new features in an existing config.
+/// `tuitbot upgrade` -- detect and configure new features in an existing config.
 ///
 /// Parses the raw TOML file to find missing feature groups, then offers an
 /// interactive mini-wizard to configure only the missing features. Uses
 /// `toml_edit` to patch the file in-place, preserving user comments and
 /// formatting.
+mod content_sources;
+
 use std::fs;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -27,6 +29,12 @@ pub enum UpgradeGroup {
     ApprovalMode,
     /// limits.max_replies_per_author_per_day, .banned_phrases, .product_mention_ratio
     EnhancedLimits,
+    /// deployment_mode (top-level)
+    DeploymentMode,
+    /// [connectors.google_drive] section
+    Connectors,
+    /// [content_sources] section
+    ContentSources,
 }
 
 impl UpgradeGroup {
@@ -37,6 +45,9 @@ impl UpgradeGroup {
             UpgradeGroup::Targets,
             UpgradeGroup::ApprovalMode,
             UpgradeGroup::EnhancedLimits,
+            UpgradeGroup::DeploymentMode,
+            UpgradeGroup::Connectors,
+            UpgradeGroup::ContentSources,
         ]
     }
 
@@ -55,6 +66,9 @@ impl UpgradeGroup {
                 "limits.banned_phrases",
                 "limits.product_mention_ratio",
             ],
+            UpgradeGroup::DeploymentMode => &["deployment_mode"],
+            UpgradeGroup::Connectors => &["connectors.google_drive.client_id"],
+            UpgradeGroup::ContentSources => &["content_sources"],
         }
     }
 
@@ -65,6 +79,9 @@ impl UpgradeGroup {
             UpgradeGroup::Targets => "Target Accounts",
             UpgradeGroup::ApprovalMode => "Approval Mode",
             UpgradeGroup::EnhancedLimits => "Enhanced Safety Limits",
+            UpgradeGroup::DeploymentMode => "Deployment Mode",
+            UpgradeGroup::Connectors => "Google Drive Connector",
+            UpgradeGroup::ContentSources => "Content Sources",
         }
     }
 
@@ -79,6 +96,13 @@ impl UpgradeGroup {
             UpgradeGroup::EnhancedLimits => {
                 "Per-author reply limits, banned phrases, and product mention ratio"
             }
+            UpgradeGroup::DeploymentMode => {
+                "Declare how Tuitbot runs (desktop, self-hosted, or cloud)"
+            }
+            UpgradeGroup::Connectors => "OAuth credentials for Google Drive integration",
+            UpgradeGroup::ContentSources => {
+                "Configure content ingestion from local folders or Google Drive"
+            }
         }
     }
 }
@@ -89,6 +113,9 @@ struct UpgradeAnswers {
     targets: Option<Vec<String>>,
     approval_mode: Option<bool>,
     enhanced_limits: Option<(u32, Vec<String>, f32)>,
+    deployment_mode: Option<String>,
+    connectors: Option<Option<(String, String)>>,
+    content_sources_noticed: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +201,11 @@ pub async fn execute(non_interactive: bool, config_path_str: &str) -> Result<()>
 
     let missing = detect_missing_features(&config_path)?;
     if missing.is_empty() {
-        eprintln!("Config is up to date — no new features to configure.");
+        // Still check for legacy SA-key notice even when all groups present.
+        let content = fs::read_to_string(&config_path)?;
+        content_sources::print_legacy_sa_key_notice(&content);
+
+        eprintln!("Config is up to date -- no new features to configure.");
         return Ok(());
     }
 
@@ -218,6 +249,9 @@ pub(crate) fn run_upgrade_wizard(config_path: &Path, missing: &[UpgradeGroup]) -
         targets: None,
         approval_mode: None,
         enhanced_limits: None,
+        deployment_mode: None,
+        connectors: None,
+        content_sources_noticed: false,
     };
 
     for group in missing {
@@ -238,10 +272,32 @@ pub(crate) fn run_upgrade_wizard(config_path: &Path, missing: &[UpgradeGroup]) -
             UpgradeGroup::EnhancedLimits => {
                 answers.enhanced_limits = Some(prompt_enhanced_limits()?);
             }
+            UpgradeGroup::DeploymentMode => {
+                answers.deployment_mode = Some(content_sources::prompt_deployment_mode()?);
+            }
+            UpgradeGroup::Connectors => {
+                answers.connectors = Some(content_sources::prompt_connectors()?);
+            }
+            UpgradeGroup::ContentSources => {
+                let dim = Style::new().dim();
+                eprintln!(
+                    "{}",
+                    dim.apply_to(
+                        "  Configure content sources in the dashboard:\n  \
+                         Settings > Content Sources"
+                    )
+                );
+                eprintln!();
+                answers.content_sources_noticed = true;
+            }
         }
     }
 
     patch_config(config_path, missing, &answers)?;
+
+    // Print legacy SA-key notice after patching.
+    let content = fs::read_to_string(config_path).unwrap_or_default();
+    content_sources::print_legacy_sa_key_notice(&content);
 
     eprintln!("{}", bold.apply_to("Config updated successfully!"));
     eprintln!("  Backup saved to {}.bak", config_path.display());
@@ -285,15 +341,32 @@ pub(crate) fn apply_defaults(config_path: &Path, missing: &[UpgradeGroup]) -> Re
         } else {
             None
         },
+        deployment_mode: if missing.contains(&UpgradeGroup::DeploymentMode) {
+            // Check env var first; default to "desktop".
+            Some(std::env::var("TUITBOT_DEPLOYMENT_MODE").unwrap_or_else(|_| "desktop".to_string()))
+        } else {
+            None
+        },
+        connectors: if missing.contains(&UpgradeGroup::Connectors) {
+            // Non-interactive: add empty scaffold (ready for env-var override).
+            Some(Some(("".to_string(), "".to_string())))
+        } else {
+            None
+        },
+        content_sources_noticed: missing.contains(&UpgradeGroup::ContentSources),
     };
 
     patch_config(config_path, missing, &answers)?;
 
     eprintln!("Applied default values for new features:");
     for group in missing {
-        eprintln!("  • {}", group.display_name());
+        eprintln!("  * {}", group.display_name());
     }
     eprintln!("Backup saved to {}.bak", config_path.display());
+
+    // Print legacy SA-key notice.
+    let content = fs::read_to_string(config_path).unwrap_or_default();
+    content_sources::print_legacy_sa_key_notice(&content);
 
     Ok(())
 }
@@ -341,6 +414,21 @@ fn patch_config(
                     patch_enhanced_limits(&mut doc, *max_replies, banned, *ratio);
                 }
             }
+            UpgradeGroup::DeploymentMode => {
+                if let Some(mode) = &answers.deployment_mode {
+                    content_sources::patch_deployment_mode(&mut doc, mode);
+                }
+            }
+            UpgradeGroup::Connectors => {
+                if let Some(Some((client_id, client_secret))) = &answers.connectors {
+                    content_sources::patch_connectors(&mut doc, client_id, client_secret);
+                }
+            }
+            UpgradeGroup::ContentSources => {
+                if answers.content_sources_noticed {
+                    content_sources::patch_content_sources(&mut doc);
+                }
+            }
         }
     }
 
@@ -374,7 +462,7 @@ fn patch_persona(
         business.insert("persona_opinions", value(to_toml_array(opinions)));
         if let Some(mut key) = business.key_mut("persona_opinions") {
             key.leaf_decor_mut().set_prefix(
-                "\n# Persona — strong opinions, experiences, and pillars make content more authentic.\n",
+                "\n# Persona -- strong opinions, experiences, and pillars make content more authentic.\n",
             );
         }
     }
@@ -455,7 +543,7 @@ mod tests {
 
     const OLD_CONFIG: &str = r#"
 # =============================================================================
-# Tuitbot Configuration — Docklet (@getdocklet)
+# Tuitbot Configuration -- Docklet (@getdocklet)
 # =============================================================================
 
 # --- X API Credentials ---
@@ -539,13 +627,26 @@ status_interval_seconds = 3600
             missing.contains(&UpgradeGroup::EnhancedLimits),
             "should detect missing enhanced limits"
         );
-        assert_eq!(missing.len(), 4);
+        assert!(
+            missing.contains(&UpgradeGroup::DeploymentMode),
+            "should detect missing deployment_mode"
+        );
+        assert!(
+            missing.contains(&UpgradeGroup::Connectors),
+            "should detect missing connectors"
+        );
+        assert!(
+            missing.contains(&UpgradeGroup::ContentSources),
+            "should detect missing content_sources"
+        );
+        assert_eq!(missing.len(), 7);
     }
 
     #[test]
     fn detect_nothing_missing_from_full_config() {
         let full = r#"
 approval_mode = false
+deployment_mode = "desktop"
 
 [x_api]
 client_id = "cid"
@@ -576,6 +677,7 @@ mentions_check_seconds = 300
 
 [targets]
 accounts = []
+
 [llm]
 provider = "ollama"
 model = "llama3.2"
@@ -585,6 +687,11 @@ db_path = "~/.tuitbot/tuitbot.db"
 
 [logging]
 status_interval_seconds = 0
+
+[connectors.google_drive]
+client_id = "test.apps.googleusercontent.com"
+
+[content_sources]
 "#;
         let missing = detect_missing_features_from_str(full).unwrap();
         assert!(
@@ -650,6 +757,9 @@ max_replies_per_day = 10
                 vec!["check out".to_string(), "link in bio".to_string()],
                 0.3,
             )),
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: false,
         };
 
         let groups = vec![
@@ -720,6 +830,9 @@ industry_topics = ["topic"]
             targets: None,
             approval_mode: None,
             enhanced_limits: None,
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: false,
         };
 
         patch_config(tmp.path(), &[UpgradeGroup::Persona], &answers).unwrap();
@@ -753,6 +866,9 @@ product_name = "App"
             targets: Some(vec!["levelsio".to_string(), "naval".to_string()]),
             approval_mode: None,
             enhanced_limits: None,
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: false,
         };
 
         patch_config(tmp.path(), &[UpgradeGroup::Targets], &answers).unwrap();
@@ -780,6 +896,9 @@ client_id = "test"
             targets: None,
             approval_mode: Some(true),
             enhanced_limits: None,
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: false,
         };
 
         patch_config(tmp.path(), &[UpgradeGroup::ApprovalMode], &answers).unwrap();
@@ -808,6 +927,9 @@ max_replies_per_author_per_day = 2
             targets: None,
             approval_mode: None,
             enhanced_limits: Some((1, vec!["check out".to_string()], 0.15)),
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: false,
         };
 
         patch_config(tmp.path(), &[UpgradeGroup::EnhancedLimits], &answers).unwrap();
@@ -823,5 +945,302 @@ max_replies_per_author_per_day = 2
         assert!((config.limits.product_mention_ratio - 0.15).abs() < f32::EPSILON);
         // Original value preserved
         assert_eq!(config.limits.max_replies_per_day, 10);
+    }
+
+    // --- Session 06: New group tests ---
+
+    #[test]
+    fn detect_missing_deployment_mode() {
+        let config = r#"
+approval_mode = false
+[business]
+product_name = "Test"
+persona_opinions = []
+persona_experiences = []
+content_pillars = []
+product_keywords = ["test"]
+[limits]
+max_replies_per_author_per_day = 1
+banned_phrases = []
+product_mention_ratio = 0.2
+[targets]
+accounts = []
+[connectors.google_drive]
+client_id = "test"
+[content_sources]
+"#;
+        let missing = detect_missing_features_from_str(config).unwrap();
+        assert!(
+            missing.contains(&UpgradeGroup::DeploymentMode),
+            "should detect missing deployment_mode"
+        );
+        assert!(
+            !missing.contains(&UpgradeGroup::Connectors),
+            "connectors should not be missing"
+        );
+        assert!(
+            !missing.contains(&UpgradeGroup::ContentSources),
+            "content_sources should not be missing"
+        );
+    }
+
+    #[test]
+    fn detect_missing_connectors() {
+        let config = r#"
+approval_mode = false
+deployment_mode = "desktop"
+[business]
+product_name = "Test"
+persona_opinions = []
+persona_experiences = []
+content_pillars = []
+product_keywords = ["test"]
+[limits]
+max_replies_per_author_per_day = 1
+banned_phrases = []
+product_mention_ratio = 0.2
+[targets]
+accounts = []
+[content_sources]
+"#;
+        let missing = detect_missing_features_from_str(config).unwrap();
+        assert!(
+            missing.contains(&UpgradeGroup::Connectors),
+            "should detect missing connectors"
+        );
+        assert!(
+            !missing.contains(&UpgradeGroup::DeploymentMode),
+            "deployment_mode should not be missing"
+        );
+    }
+
+    #[test]
+    fn detect_missing_content_sources() {
+        let config = r#"
+approval_mode = false
+deployment_mode = "self_host"
+[business]
+product_name = "Test"
+persona_opinions = []
+persona_experiences = []
+content_pillars = []
+product_keywords = ["test"]
+[limits]
+max_replies_per_author_per_day = 1
+banned_phrases = []
+product_mention_ratio = 0.2
+[targets]
+accounts = []
+[connectors.google_drive]
+client_id = "test"
+"#;
+        let missing = detect_missing_features_from_str(config).unwrap();
+        assert!(
+            missing.contains(&UpgradeGroup::ContentSources),
+            "should detect missing content_sources"
+        );
+    }
+
+    #[test]
+    fn patch_deployment_mode_top_level() {
+        let config_str = r#"
+[x_api]
+client_id = "test"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        fs::write(tmp.path(), config_str).unwrap();
+
+        let answers = UpgradeAnswers {
+            persona: None,
+            targets: None,
+            approval_mode: None,
+            enhanced_limits: None,
+            deployment_mode: Some("self_host".to_string()),
+            connectors: None,
+            content_sources_noticed: false,
+        };
+
+        patch_config(tmp.path(), &[UpgradeGroup::DeploymentMode], &answers).unwrap();
+
+        let result = fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("deployment_mode = \"self_host\""));
+
+        let config: tuitbot_core::config::Config =
+            toml::from_str(&result).expect("patched config should parse");
+        assert_eq!(
+            config.deployment_mode,
+            tuitbot_core::config::DeploymentMode::SelfHost
+        );
+    }
+
+    #[test]
+    fn patch_connectors_section() {
+        let config_str = r#"
+[x_api]
+client_id = "test"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        fs::write(tmp.path(), config_str).unwrap();
+
+        let answers = UpgradeAnswers {
+            persona: None,
+            targets: None,
+            approval_mode: None,
+            enhanced_limits: None,
+            deployment_mode: None,
+            connectors: Some(Some((
+                "my-client.apps.googleusercontent.com".to_string(),
+                "GOCSPX-secret".to_string(),
+            ))),
+            content_sources_noticed: false,
+        };
+
+        patch_config(tmp.path(), &[UpgradeGroup::Connectors], &answers).unwrap();
+
+        let result = fs::read_to_string(tmp.path()).unwrap();
+        assert!(result.contains("[connectors.google_drive]"));
+        assert!(result.contains("my-client.apps.googleusercontent.com"));
+
+        let config: tuitbot_core::config::Config =
+            toml::from_str(&result).expect("patched config should parse");
+        assert_eq!(
+            config.connectors.google_drive.client_id.as_deref(),
+            Some("my-client.apps.googleusercontent.com")
+        );
+        assert_eq!(
+            config.connectors.google_drive.client_secret.as_deref(),
+            Some("GOCSPX-secret")
+        );
+    }
+
+    #[test]
+    fn patch_content_sources_scaffold() {
+        let config_str = r#"
+[x_api]
+client_id = "test"
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        fs::write(tmp.path(), config_str).unwrap();
+
+        let answers = UpgradeAnswers {
+            persona: None,
+            targets: None,
+            approval_mode: None,
+            enhanced_limits: None,
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: true,
+        };
+
+        patch_config(tmp.path(), &[UpgradeGroup::ContentSources], &answers).unwrap();
+
+        let result = fs::read_to_string(tmp.path()).unwrap();
+        assert!(
+            result.contains("[content_sources]"),
+            "should contain content_sources section"
+        );
+
+        // Must be parseable as valid config.
+        let _config: tuitbot_core::config::Config =
+            toml::from_str(&result).expect("patched config should parse");
+    }
+
+    #[test]
+    fn detect_legacy_sa_key_notice() {
+        let config_with_legacy = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc"
+service_account_key = "/keys/sa.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#;
+        assert!(
+            content_sources::has_legacy_sa_key(config_with_legacy),
+            "should detect legacy SA key"
+        );
+
+        let config_with_connection = r#"
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc"
+service_account_key = "/keys/sa.json"
+connection_id = 1
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#;
+        assert!(
+            !content_sources::has_legacy_sa_key(config_with_connection),
+            "should not flag when connection_id is present"
+        );
+
+        let config_no_sources = r#"
+[business]
+product_name = "Test"
+"#;
+        assert!(
+            !content_sources::has_legacy_sa_key(config_no_sources),
+            "should not flag when no sources"
+        );
+    }
+
+    #[test]
+    fn patch_all_new_groups_together() {
+        let config_str = r#"
+approval_mode = true
+[x_api]
+client_id = "test"
+[business]
+product_name = "App"
+product_keywords = ["test"]
+persona_opinions = []
+persona_experiences = []
+content_pillars = []
+[limits]
+max_replies_per_author_per_day = 1
+banned_phrases = []
+product_mention_ratio = 0.2
+[targets]
+accounts = []
+"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        fs::write(tmp.path(), config_str).unwrap();
+
+        let answers = UpgradeAnswers {
+            persona: None,
+            targets: None,
+            approval_mode: None,
+            enhanced_limits: None,
+            deployment_mode: Some("self_host".to_string()),
+            connectors: Some(Some(("cid".to_string(), "csecret".to_string()))),
+            content_sources_noticed: true,
+        };
+
+        let groups = vec![
+            UpgradeGroup::DeploymentMode,
+            UpgradeGroup::Connectors,
+            UpgradeGroup::ContentSources,
+        ];
+
+        patch_config(tmp.path(), &groups, &answers).unwrap();
+
+        let result = fs::read_to_string(tmp.path()).unwrap();
+        let config: tuitbot_core::config::Config =
+            toml::from_str(&result).expect("patched config should parse");
+
+        assert_eq!(
+            config.deployment_mode,
+            tuitbot_core::config::DeploymentMode::SelfHost
+        );
+        assert_eq!(
+            config.connectors.google_drive.client_id.as_deref(),
+            Some("cid")
+        );
+        assert!(result.contains("[content_sources]"));
+        // Original values preserved
+        assert!(config.approval_mode);
+        assert_eq!(config.business.product_name, "App");
     }
 }

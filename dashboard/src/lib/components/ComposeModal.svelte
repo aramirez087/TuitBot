@@ -12,6 +12,9 @@
 	import CommandPalette from './CommandPalette.svelte';
 	import FromNotesPanel from './FromNotesPanel.svelte';
 	import ComposerShell from './composer/ComposerShell.svelte';
+	import ComposerHeaderBar from './composer/ComposerHeaderBar.svelte';
+	import ComposerCanvas from './composer/ComposerCanvas.svelte';
+	import ComposerInspector from './composer/ComposerInspector.svelte';
 	import TweetEditor from './composer/TweetEditor.svelte';
 	import VoiceContextPanel from './composer/VoiceContextPanel.svelte';
 	import ThreadPreviewRail from './composer/ThreadPreviewRail.svelte';
@@ -50,6 +53,9 @@
 	let triggerElement: Element | null = null;
 	let assisting = $state(false);
 	let voiceCue = $state('');
+	let previewCollapsed = $state(false);
+	let inspectorOpen = $state(loadInspectorState());
+	let isMobile = $state(false);
 
 	// Undo state for notes generation
 	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[] } | null>(null);
@@ -57,9 +63,6 @@
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const targetDate = $derived(prefillDate ?? new Date());
-	const dateLabel = $derived(
-		targetDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-	);
 
 	// Auto-save
 	const AUTOSAVE_KEY = 'tuitbot:compose:draft';
@@ -70,6 +73,37 @@
 	let recoveryData = $state<{
 		mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number;
 	} | null>(null);
+
+	function loadInspectorState(): boolean {
+		try {
+			const saved = localStorage.getItem('tuitbot:inspector:open');
+			return saved === null ? true : saved === 'true';
+		} catch {
+			return true;
+		}
+	}
+
+	function persistInspectorState(v: boolean) {
+		try { localStorage.setItem('tuitbot:inspector:open', String(v)); } catch { /* quota */ }
+	}
+
+	function toggleInspector() {
+		inspectorOpen = !inspectorOpen;
+		persistInspectorState(inspectorOpen);
+	}
+
+	function togglePreview() {
+		previewCollapsed = !previewCollapsed;
+	}
+
+	// Responsive detection
+	$effect(() => {
+		const mql = window.matchMedia('(max-width: 768px)');
+		isMobile = mql.matches;
+		const handler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
+		mql.addEventListener('change', handler);
+		return () => mql.removeEventListener('change', handler);
+	});
 
 	function autoSave() {
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
@@ -121,6 +155,8 @@
 			focusMode = false; paletteOpen = false; showFromNotes = false;
 			voiceCue = '';
 			undoSnapshot = null; showUndo = false;
+			previewCollapsed = false;
+			inspectorOpen = loadInspectorState();
 			if (undoTimer) clearTimeout(undoTimer);
 		}
 	});
@@ -144,6 +180,14 @@
 	const tweetMediaPreviewMap = $derived(
 		new Map(attachedMedia.map((m) => [m.path, m.previewUrl]))
 	);
+
+	const hasPreviewContent = $derived(
+		mode === 'thread'
+			? sortedPreviewBlocks.length > 0
+			: tweetText.trim().length > 0
+	);
+
+	const desktopInspectorOpen = $derived(inspectorOpen && !isMobile);
 
 	async function handleSubmit() {
 		if (!canSubmit || submitting) return;
@@ -192,8 +236,11 @@
 		if (matchEvent(e, 'cmd+j')) { e.preventDefault(); handleInlineAssist(); return; }
 		if (matchEvent(e, 'cmd+shift+n')) { e.preventDefault(); mode = 'tweet'; return; }
 		if (matchEvent(e, 'cmd+shift+t')) { e.preventDefault(); mode = 'thread'; return; }
+		if (matchEvent(e, 'cmd+i')) { e.preventDefault(); toggleInspector(); return; }
+		if (matchEvent(e, 'cmd+shift+p')) { e.preventDefault(); togglePreview(); return; }
 		if (e.key === 'Escape') {
 			if (showFromNotes) showFromNotes = false;
+			else if (isMobile && inspectorOpen) inspectorOpen = false;
 			else if (focusMode) focusMode = false;
 			else handleCloseModal();
 			return;
@@ -208,7 +255,9 @@
 			case 'mode-thread': mode = 'thread'; break;
 			case 'submit': handleSubmit(); break;
 			case 'ai-improve': handleInlineAssist(); break;
-			case 'ai-from-notes': showFromNotes = true; break;
+			case 'ai-from-notes': showFromNotes = true; if (!inspectorOpen) inspectorOpen = true; break;
+			case 'ai-generate': handleAiAssist(); break;
+			case 'toggle-inspector': toggleInspector(); break;
 			case 'attach-media': tweetEditorRef?.triggerFileSelect(); break;
 			case 'add-card': case 'duplicate': case 'split': case 'merge':
 			case 'move-up': case 'move-down':
@@ -304,23 +353,29 @@
 
 {#if open}
 	<ComposerShell
-		{open} {mode} {focusMode} {dateLabel} {canSubmit} {submitting} {assisting}
-		tweetHasText={tweetText.trim().length > 0}
-		{showRecovery} {selectedTime} {submitError} {showFromNotes}
+		{open} {focusMode} {showRecovery}
+		inspectorOpen={desktopInspectorOpen}
 		onclose={handleCloseModal}
-		ontogglefocus={toggleFocusMode}
-		onmodechange={(m) => { mode = m; }}
-		onsubmit={handleSubmit}
-		onaiassist={handleAiAssist}
-		ontogglefromnotes={() => { showFromNotes = !showFromNotes; }}
 		onrecover={recoverDraft}
 		ondismissrecovery={dismissRecovery}
 	>
 		{#snippet children()}
-			<VoiceContextPanel bind:this={voicePanelRef} cue={voiceCue} oncuechange={(c) => { voiceCue = c; }} />
+			<ComposerHeaderBar
+				{focusMode}
+				inspectorOpen={inspectorOpen}
+				previewVisible={hasPreviewContent && !previewCollapsed}
+				ontogglefocus={toggleFocusMode}
+				ontoggleinspector={toggleInspector}
+				ontogglepreview={togglePreview}
+				onclose={handleCloseModal}
+			/>
 
-			<div class="compose-layout">
-				<div class="editor-pane">
+			<ComposerCanvas
+				{canSubmit} {submitting} {selectedTime} {submitError}
+				inspectorOpen={desktopInspectorOpen}
+				onsubmit={handleSubmit}
+			>
+				{#snippet children()}
 					{#if mode === 'tweet'}
 						<TweetEditor
 							bind:this={tweetEditorRef}
@@ -338,44 +393,141 @@
 							onvalidchange={(v) => { threadValid = v; }}
 						/>
 					{/if}
-				</div>
-				<div class="preview-pane">
-					<ThreadPreviewRail
-						{mode}
-						tweetText={tweetText}
-						tweetMediaPaths={attachedMedia.map((m) => m.path)}
-						tweetLocalPreviews={tweetMediaPreviewMap}
-						blocks={sortedPreviewBlocks}
-					/>
-				</div>
-			</div>
 
-			{#if showFromNotes}
-				<FromNotesPanel
-					{mode}
-					{hasExistingContent}
-					ongenerate={handleGenerateFromNotes}
-					onclose={() => { showFromNotes = false; }}
-					onundo={handleUndo}
-					{showUndo}
-				/>
-			{/if}
+					{#if hasPreviewContent && !previewCollapsed}
+						<div class="preview-section">
+							<button class="preview-toggle" onclick={() => { previewCollapsed = true; }}>
+								<span class="preview-label">Preview</span>
+								<span class="preview-collapse">Hide</span>
+							</button>
+							<ThreadPreviewRail
+								{mode}
+								tweetText={tweetText}
+								tweetMediaPaths={attachedMedia.map((m) => m.path)}
+								tweetLocalPreviews={tweetMediaPreviewMap}
+								blocks={sortedPreviewBlocks}
+							/>
+						</div>
+					{/if}
 
-			{#if showUndo && !showFromNotes}
-				<div class="undo-banner">
-					<span>Content replaced from notes.</span>
-					<button class="undo-btn" onclick={handleUndo}>Undo</button>
-				</div>
-			{/if}
+					{#if showUndo && !showFromNotes}
+						<div class="undo-banner">
+							<span>Content replaced from notes.</span>
+							<button class="undo-btn" onclick={handleUndo}>Undo</button>
+						</div>
+					{/if}
+				{/snippet}
 
-			<div class="schedule-section">
-				<TimePicker
-					{schedule} {selectedTime} targetDate={targetDate}
-					onselect={(time) => (selectedTime = time || null)}
-				/>
-			</div>
+				{#snippet inspector()}
+					<div class="inspector-section">
+						<div class="inspector-section-label">Schedule</div>
+						<TimePicker
+							{schedule} {selectedTime} targetDate={targetDate}
+							onselect={(time) => (selectedTime = time || null)}
+						/>
+						{#if !selectedTime}
+							<p class="inspector-hint">Posts immediately unless scheduled</p>
+						{/if}
+					</div>
+
+					<div class="inspector-section">
+						<div class="inspector-section-label">Voice</div>
+						<VoiceContextPanel
+							bind:this={voicePanelRef}
+							cue={voiceCue}
+							oncuechange={(c) => { voiceCue = c; }}
+							inline={true}
+						/>
+					</div>
+
+					<div class="inspector-section">
+						<div class="inspector-section-label">AI</div>
+						<div class="ai-actions-row">
+							<button class="ai-action-btn" onclick={handleAiAssist} disabled={assisting}>
+								{assisting ? 'Working...' : hasExistingContent ? 'AI Improve' : 'AI Generate'}
+							</button>
+							<button class="ai-action-btn secondary" onclick={() => { showFromNotes = true; }}>
+								From Notes
+							</button>
+						</div>
+						<p class="inspector-hint">{'\u2318'}J to improve selected text</p>
+					</div>
+
+					{#if showFromNotes}
+						<div class="inspector-section">
+							<FromNotesPanel
+								{mode}
+								{hasExistingContent}
+								compact={true}
+								ongenerate={handleGenerateFromNotes}
+								onclose={() => { showFromNotes = false; }}
+								onundo={handleUndo}
+								{showUndo}
+							/>
+						</div>
+					{/if}
+				{/snippet}
+			</ComposerCanvas>
 		{/snippet}
 	</ComposerShell>
+
+	{#if isMobile && inspectorOpen}
+		<ComposerInspector
+			open={inspectorOpen}
+			mobile={true}
+			onclose={() => { inspectorOpen = false; }}
+		>
+			{#snippet children()}
+				<div class="inspector-section">
+					<div class="inspector-section-label">Schedule</div>
+					<TimePicker
+						{schedule} {selectedTime} targetDate={targetDate}
+						onselect={(time) => (selectedTime = time || null)}
+					/>
+					{#if !selectedTime}
+						<p class="inspector-hint">Posts immediately unless scheduled</p>
+					{/if}
+				</div>
+
+				<div class="inspector-section">
+					<div class="inspector-section-label">Voice</div>
+					<VoiceContextPanel
+						bind:this={voicePanelRef}
+						cue={voiceCue}
+						oncuechange={(c) => { voiceCue = c; }}
+						inline={true}
+					/>
+				</div>
+
+				<div class="inspector-section">
+					<div class="inspector-section-label">AI</div>
+					<div class="ai-actions-row">
+						<button class="ai-action-btn" onclick={handleAiAssist} disabled={assisting}>
+							{assisting ? 'Working...' : hasExistingContent ? 'AI Improve' : 'AI Generate'}
+						</button>
+						<button class="ai-action-btn secondary" onclick={() => { showFromNotes = true; }}>
+							From Notes
+						</button>
+					</div>
+					<p class="inspector-hint">{'\u2318'}J to improve selected text</p>
+				</div>
+
+				{#if showFromNotes}
+					<div class="inspector-section">
+						<FromNotesPanel
+							{mode}
+							{hasExistingContent}
+							compact={true}
+							ongenerate={handleGenerateFromNotes}
+							onclose={() => { showFromNotes = false; }}
+							onundo={handleUndo}
+							{showUndo}
+						/>
+					</div>
+				{/if}
+			{/snippet}
+		</ComposerInspector>
+	{/if}
 
 	{#if paletteOpen}
 		<CommandPalette
@@ -388,26 +540,39 @@
 {/if}
 
 <style>
-	.compose-layout {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 16px;
-	}
-
-	.editor-pane {
-		min-width: 0;
-	}
-
-	.preview-pane {
-		min-width: 0;
-		border-left: 1px solid var(--color-border-subtle);
-		padding-left: 16px;
-	}
-
-	.schedule-section {
+	.preview-section {
 		margin-top: 16px;
 		padding-top: 16px;
 		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.preview-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		padding: 0 0 12px;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		color: var(--color-text-muted);
+		font-size: 11px;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.preview-toggle:hover {
+		color: var(--color-text);
+	}
+
+	.preview-collapse {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+	}
+
+	.preview-toggle:hover .preview-collapse {
+		color: var(--color-accent);
 	}
 
 	.undo-banner {
@@ -439,16 +604,72 @@
 		color: #fff;
 	}
 
-	@media (max-width: 768px) {
-		.compose-layout {
-			grid-template-columns: 1fr;
-		}
+	/* Inspector sections */
+	.inspector-section {
+		padding: 12px 0;
+		border-bottom: 1px solid var(--color-border-subtle);
+	}
 
-		.preview-pane {
-			border-left: none;
-			padding-left: 0;
-			border-top: 1px solid var(--color-border-subtle);
-			padding-top: 16px;
+	.inspector-section:last-child {
+		border-bottom: none;
+	}
+
+	.inspector-section-label {
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-text-muted);
+		margin-bottom: 8px;
+	}
+
+	.inspector-hint {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+		margin: 6px 0 0;
+	}
+
+	.ai-actions-row {
+		display: flex;
+		gap: 6px;
+	}
+
+	.ai-action-btn {
+		flex: 1;
+		padding: 6px 10px;
+		border: 1px solid var(--color-accent);
+		border-radius: 6px;
+		background: var(--color-accent);
+		color: #fff;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		white-space: nowrap;
+	}
+
+	.ai-action-btn:hover:not(:disabled) {
+		background: var(--color-accent-hover);
+		border-color: var(--color-accent-hover);
+	}
+
+	.ai-action-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.ai-action-btn.secondary {
+		background: transparent;
+		color: var(--color-accent);
+	}
+
+	.ai-action-btn.secondary:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+	}
+
+	@media (pointer: coarse) {
+		.ai-action-btn {
+			min-height: 44px;
 		}
 	}
 </style>

@@ -508,3 +508,182 @@ async fn get_seeds_for_context_joins_with_nodes() {
     assert!((seeds[0].engagement_weight - 0.8).abs() < 0.001);
     assert_eq!(seeds[1].seed_text, "Hook about async");
 }
+
+// ============================================================================
+// Connection CRUD tests
+// ============================================================================
+
+#[tokio::test]
+async fn migration_creates_connections_table() {
+    let pool = init_test_db().await.expect("init db");
+
+    let tables: Vec<(String,)> = sqlx::query_as(
+        "SELECT name FROM sqlite_master WHERE type='table' \
+         AND name = 'connections'",
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("query tables");
+
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].0, "connections");
+}
+
+#[tokio::test]
+async fn insert_and_get_connection() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(
+        &pool,
+        "google_drive",
+        Some("user@gmail.com"),
+        Some("My Drive"),
+    )
+    .await
+    .expect("insert");
+    assert!(id > 0);
+
+    let conn = get_connection(&pool, id)
+        .await
+        .expect("get")
+        .expect("should exist");
+    assert_eq!(conn.connector_type, "google_drive");
+    assert_eq!(conn.account_email.as_deref(), Some("user@gmail.com"));
+    assert_eq!(conn.display_name.as_deref(), Some("My Drive"));
+    assert_eq!(conn.status, "active");
+    assert_eq!(conn.metadata_json, "{}");
+}
+
+#[tokio::test]
+async fn get_connections_returns_active_only() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id1 = insert_connection(&pool, "google_drive", Some("a@gmail.com"), None)
+        .await
+        .expect("insert");
+    let id2 = insert_connection(&pool, "google_drive", Some("b@gmail.com"), None)
+        .await
+        .expect("insert");
+
+    // Mark id2 as expired.
+    update_connection_status(&pool, id2, "expired")
+        .await
+        .expect("update");
+
+    let active = get_connections(&pool).await.expect("get");
+    assert_eq!(active.len(), 1);
+    assert_eq!(active[0].id, id1);
+}
+
+#[tokio::test]
+async fn update_connection_status_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(&pool, "google_drive", None, None)
+        .await
+        .expect("insert");
+
+    update_connection_status(&pool, id, "expired")
+        .await
+        .expect("update");
+
+    let conn = get_connection(&pool, id)
+        .await
+        .expect("get")
+        .expect("should exist");
+    assert_eq!(conn.status, "expired");
+}
+
+#[tokio::test]
+async fn delete_connection_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(&pool, "google_drive", Some("user@gmail.com"), None)
+        .await
+        .expect("insert");
+
+    delete_connection(&pool, id).await.expect("delete");
+
+    let conn = get_connection(&pool, id).await.expect("get");
+    assert!(conn.is_none());
+}
+
+#[tokio::test]
+async fn get_connections_by_type_filters_correctly() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert two different connector types.
+    insert_connection(&pool, "google_drive", Some("a@gmail.com"), None)
+        .await
+        .expect("insert");
+    insert_connection(&pool, "onedrive", Some("b@outlook.com"), None)
+        .await
+        .expect("insert");
+
+    let gdrive = get_connections_by_type(&pool, "google_drive")
+        .await
+        .expect("get");
+    assert_eq!(gdrive.len(), 1);
+    assert_eq!(gdrive[0].account_email.as_deref(), Some("a@gmail.com"));
+
+    let onedrive = get_connections_by_type(&pool, "onedrive")
+        .await
+        .expect("get");
+    assert_eq!(onedrive.len(), 1);
+    assert_eq!(onedrive[0].account_email.as_deref(), Some("b@outlook.com"));
+}
+
+#[tokio::test]
+async fn store_and_read_encrypted_credentials() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(&pool, "google_drive", Some("user@gmail.com"), None)
+        .await
+        .expect("insert");
+
+    // Initially no credentials.
+    let creds = read_encrypted_credentials(&pool, id).await.expect("read");
+    assert!(creds.is_none());
+
+    // Store some ciphertext.
+    let ciphertext = vec![1, 2, 3, 4, 5];
+    store_encrypted_credentials(&pool, id, &ciphertext)
+        .await
+        .expect("store");
+
+    let creds = read_encrypted_credentials(&pool, id)
+        .await
+        .expect("read")
+        .expect("should have creds");
+    assert_eq!(creds, ciphertext);
+}
+
+#[tokio::test]
+async fn read_encrypted_credentials_returns_none_for_missing() {
+    let pool = init_test_db().await.expect("init db");
+
+    let creds = read_encrypted_credentials(&pool, 99999)
+        .await
+        .expect("read");
+    assert!(creds.is_none());
+}
+
+#[tokio::test]
+async fn update_connection_metadata_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_connection(&pool, "google_drive", None, None)
+        .await
+        .expect("insert");
+
+    let metadata = r#"{"scope":"drive.readonly","linked_at":"2026-02-28T12:00:00Z"}"#;
+    update_connection_metadata(&pool, id, metadata)
+        .await
+        .expect("update");
+
+    let conn = get_connection(&pool, id)
+        .await
+        .expect("get")
+        .expect("should exist");
+    assert_eq!(conn.metadata_json, metadata);
+}

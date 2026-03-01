@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { api } from '$lib/api';
 	import { onboardingData } from '$lib/stores/onboarding';
+	import { authMode as authModeStore, claimSession } from '$lib/stores/auth';
+	import { connectWs } from '$lib/stores/websocket';
 	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
 	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
 	import BusinessStep from '$lib/components/onboarding/BusinessStep.svelte';
@@ -10,12 +13,35 @@
 	import SourcesStep from '$lib/components/onboarding/SourcesStep.svelte';
 	import ValidationStep from '$lib/components/onboarding/ValidationStep.svelte';
 	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
+	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
 	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
 
-	const STEPS = ['Welcome', 'X API', 'Business', 'LLM', 'Language', 'Sources', 'Validate', 'Review'];
+	const BASE_STEPS = ['Welcome', 'X API', 'Business', 'LLM', 'Language', 'Sources', 'Validate', 'Review'];
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');
+
+	// Claim state — only used in web mode.
+	let claimPassphrase = $state('');
+	let passphraseSaved = $state(false);
+
+	// Tauri/bearer mode skips the claim step. Also skip if instance is already claimed
+	// (e.g., config.toml deleted but passphrase_hash still exists).
+	let isTauri = $derived($authModeStore === 'tauri');
+	let alreadyClaimed = $derived($page.url.searchParams.get('claimed') === '1');
+	let showClaimStep = $derived(!isTauri && !alreadyClaimed);
+	let steps = $derived(showClaimStep ? [...BASE_STEPS, 'Secure'] : BASE_STEPS);
+	let isLastStep = $derived(currentStep === steps.length - 1);
+	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
+
+	// Prevent navigation away during claim step if passphrase is generated but not submitted.
+	$effect(() => {
+		if (isClaimStep && claimPassphrase && !submitting) {
+			const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+			window.addEventListener('beforeunload', handler);
+			return () => window.removeEventListener('beforeunload', handler);
+		}
+	});
 
 	function canAdvance(): boolean {
 		const data = $onboardingData;
@@ -43,13 +69,15 @@
 				return true;
 			case 7: // Review
 				return true;
+			case 8: // Secure (claim) — only when not Tauri
+				return claimPassphrase.trim().length >= 8 && passphraseSaved;
 			default:
 				return false;
 		}
 	}
 
 	function next() {
-		if (currentStep < STEPS.length - 1) {
+		if (currentStep < steps.length - 1) {
 			currentStep++;
 			errorMsg = '';
 		}
@@ -65,10 +93,11 @@
 	async function submit() {
 		submitting = true;
 		errorMsg = '';
+		let config: Record<string, unknown> = {};
 
 		try {
 			const data = $onboardingData;
-			const config: Record<string, unknown> = {
+			config = {
 				x_api: {
 					client_id: data.client_id,
 					...(data.client_secret ? { client_secret: data.client_secret } : {}),
@@ -90,13 +119,14 @@
 				approval_mode: data.approval_mode,
 			};
 
-			if (data.source_type === 'google_drive' && data.folder_id) {
+			if (data.source_type === 'google_drive' && (data.connection_id || data.folder_id)) {
 				config.content_sources = {
 					sources: [{
 						source_type: 'google_drive',
 						path: null,
-						folder_id: data.folder_id,
-						service_account_key: data.service_account_key || null,
+						folder_id: data.folder_id || null,
+						service_account_key: null,
+						connection_id: data.connection_id,
 						watch: data.vault_watch,
 						file_patterns: ['*.md', '*.txt'],
 						loop_back_enabled: false,
@@ -118,6 +148,11 @@
 				};
 			}
 
+			// Include claim for web mode (skip if instance already claimed).
+			if (showClaimStep && claimPassphrase.trim()) {
+				config.claim = { passphrase: claimPassphrase.trim() };
+			}
+
 			const result = await api.settings.init(config);
 
 			if (result.status === 'validation_failed' && result.errors) {
@@ -125,10 +160,30 @@
 				return;
 			}
 
+			// If claim was included, establish session from response.
+			if (result.csrf_token) {
+				claimSession(result.csrf_token);
+				connectWs();
+			}
+
 			onboardingData.reset();
 			goto('/content?compose=true');
 		} catch (e) {
-			errorMsg = e instanceof Error ? e.message : 'Failed to create configuration';
+			const msg = e instanceof Error ? e.message : '';
+			if (msg.toLowerCase().includes('already claimed') && config.claim) {
+				// Instance was claimed between page load and submit (race condition).
+				// Retry without claim so the config is still created.
+				try {
+					delete config.claim;
+					await api.settings.init(config);
+					onboardingData.reset();
+					goto('/login');
+					return;
+				} catch {
+					// Retry also failed — show original error.
+				}
+			}
+			errorMsg = msg || 'Failed to create configuration';
 		} finally {
 			submitting = false;
 		}
@@ -145,7 +200,7 @@
 
 	<div class="onboarding-content">
 		<div class="progress">
-			{#each STEPS as step, i}
+			{#each steps as step, i}
 				<div class="progress-step" class:active={i === currentStep} class:completed={i < currentStep}>
 					<div class="progress-dot">
 						{#if i < currentStep}
@@ -156,7 +211,7 @@
 					</div>
 					<span class="progress-label">{step}</span>
 				</div>
-				{#if i < STEPS.length - 1}
+				{#if i < steps.length - 1}
 					<div class="progress-line" class:filled={i < currentStep}></div>
 				{/if}
 			{/each}
@@ -179,11 +234,13 @@
 				<ValidationStep />
 			{:else if currentStep === 7}
 				<ReviewStep />
+			{:else if currentStep === 8 && showClaimStep}
+				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} />
 			{/if}
 		</div>
 
 		{#if errorMsg}
-			<div class="error-banner">{errorMsg}</div>
+			<div class="error-banner" role="alert">{errorMsg}</div>
 		{/if}
 
 		<div class="actions">
@@ -196,7 +253,7 @@
 				<div></div>
 			{/if}
 
-			{#if currentStep < STEPS.length - 1}
+			{#if !isLastStep}
 				<button
 					class="btn btn-primary"
 					onclick={next}
@@ -209,7 +266,7 @@
 				<button
 					class="btn btn-primary"
 					onclick={submit}
-					disabled={submitting}
+					disabled={submitting || (isClaimStep && !canAdvance())}
 				>
 					{#if submitting}
 						<span class="spinner"><Loader2 size={16} /></span>
@@ -378,6 +435,11 @@
 		filter: brightness(1.1);
 	}
 
+	.btn-primary:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
 	.btn-secondary {
 		background: var(--color-surface);
 		color: var(--color-text-muted);
@@ -387,6 +449,11 @@
 	.btn-secondary:hover:not(:disabled) {
 		background: var(--color-surface-hover);
 		color: var(--color-text);
+	}
+
+	.btn-secondary:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 
 	.spinner {

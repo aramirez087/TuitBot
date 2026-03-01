@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { api, type ThreadBlock } from '$lib/api';
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
-	import { Plus, GripVertical } from 'lucide-svelte';
-	import MediaSlot from './MediaSlot.svelte';
-	import ThreadCardActions from './composer/ThreadCardActions.svelte';
+	import ThreadFlowLane from './composer/ThreadFlowLane.svelte';
 
 	let {
 		initialBlocks = undefined,
@@ -75,9 +73,22 @@
 
 	function addBlock() {
 		const sorted = [...blocks].sort((a, b) => a.order - b.order);
-		sorted.push({ id: crypto.randomUUID(), text: '', media_paths: [], order: 0 });
+		const newBlock = { id: crypto.randomUUID(), text: '', media_paths: [], order: 0 };
+		sorted.push(newBlock);
 		blocks = normalizeOrder(sorted);
 		emitChange();
+		focusBlock(newBlock.id);
+	}
+
+	function addBlockAfter(afterId: string) {
+		const sorted = [...blocks].sort((a, b) => a.order - b.order);
+		const idx = sorted.findIndex((b) => b.id === afterId);
+		if (idx === -1) return;
+		const newBlock = { id: crypto.randomUUID(), text: '', media_paths: [], order: 0 };
+		sorted.splice(idx + 1, 0, newBlock);
+		blocks = normalizeOrder(sorted);
+		emitChange();
+		focusBlock(newBlock.id);
 	}
 
 	function removeBlock(id: string) {
@@ -157,6 +168,32 @@
 	}
 
 	function handleCardKeydown(e: KeyboardEvent, blockId: string) {
+		// Cmd+Shift+Enter: insert separator or split at cursor
+		if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'Enter') {
+			e.preventDefault();
+			const textarea = e.target as HTMLTextAreaElement;
+			const block = blocks.find((b) => b.id === blockId);
+			if (!block) return;
+			if (textarea.selectionStart >= block.text.length || block.text.trim() === '') {
+				addBlockAfter(blockId);
+			} else {
+				splitBlock(blockId);
+			}
+			return;
+		}
+		// Backspace at position 0: merge with previous card
+		if (e.key === 'Backspace' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+			const textarea = e.target as HTMLTextAreaElement;
+			if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
+				const sorted = [...blocks].sort((a, b) => a.order - b.order);
+				const idx = sorted.findIndex((b) => b.id === blockId);
+				if (idx > 0 && sorted.length > 2) {
+					e.preventDefault();
+					mergeWithPrevious(blockId);
+					return;
+				}
+			}
+		}
 		if (e.key === 'Tab' && !e.altKey && !e.metaKey && !e.ctrlKey) {
 			e.preventDefault();
 			const sorted = [...blocks].sort((a, b) => a.order - b.order);
@@ -259,9 +296,34 @@
 		});
 	}
 
-	function getCharCount(text: string): number { return tweetWeightedLen(text); }
-	function isOverLimit(text: string): boolean { return getCharCount(text) > MAX_TWEET_CHARS; }
-	function isWarning(text: string): boolean { return getCharCount(text) > 260 && !isOverLimit(text); }
+	function mergeWithPrevious(id: string) {
+		const sorted = [...blocks].sort((a, b) => a.order - b.order);
+		const idx = sorted.findIndex((b) => b.id === id);
+		if (idx <= 0 || sorted.length <= 2) return;
+		const current = sorted[idx];
+		const prev = sorted[idx - 1];
+		const combinedMedia = [...prev.media_paths, ...current.media_paths];
+		if (combinedMedia.length > 4) {
+			mergeError = `Cannot merge: combined media would exceed 4 (has ${combinedMedia.length}).`;
+			setTimeout(() => { mergeError = null; }, 3000);
+			return;
+		}
+		const joinPoint = prev.text.length;
+		const separator = prev.text.endsWith('\n') ? '' : '\n';
+		sorted[idx - 1] = { ...prev, text: prev.text + separator + current.text, media_paths: combinedMedia };
+		sorted.splice(idx, 1);
+		blocks = normalizeOrder(sorted);
+		emitChange();
+		requestAnimationFrame(() => {
+			const textarea = document.querySelector(
+				`[data-block-id="${prev.id}"] textarea`
+			) as HTMLTextAreaElement | null;
+			if (textarea) {
+				textarea.focus();
+				textarea.setSelectionRange(joinPoint + separator.length, joinPoint + separator.length);
+			}
+		});
+	}
 
 	export function getBlocks(): ThreadBlock[] { return [...blocks]; }
 	export function setBlocks(newBlocks: ThreadBlock[]) { blocks = newBlocks; emitChange(); }
@@ -316,111 +378,56 @@
 	}
 </script>
 
-<div class="thread-composer" role="region" aria-label="Thread editor">
-	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{reorderAnnouncement}</div>
+<ThreadFlowLane
+	blocks={sortedBlocks}
+	{focusedBlockId}
+	{assistingBlockId}
+	{draggingBlockId}
+	{dropTargetBlockId}
+	{reorderAnnouncement}
+	ontext={updateBlockText}
+	onfocus={(id) => { focusedBlockId = id; }}
+	onblur={(id) => { if (focusedBlockId === id) focusedBlockId = null; }}
+	onkeydown={handleCardKeydown}
+	onmedia={updateBlockMedia}
+	onmerge={mergeWithNext}
+	onremove={removeBlock}
+	ondragstart={handleDragStart}
+	ondragend={handleDragEnd}
+	ondragover={handleCardDragOver}
+	ondragenter={handleCardDragEnter}
+	ondragleave={handleCardDragLeave}
+	ondrop={handleCardDrop}
+	onaddcard={addBlock}
+/>
 
-	{#each sortedBlocks as block, i (block.id)}
-		<div
-			class="tweet-card"
-			class:focused={focusedBlockId === block.id}
-			class:assisting={assistingBlockId === block.id}
-			class:over-limit={isOverLimit(block.text)}
-			class:dragging={draggingBlockId === block.id}
-			class:drop-target={dropTargetBlockId === block.id}
-			data-block-id={block.id}
-			role="listitem"
-			ondragover={(e) => handleCardDragOver(e, block.id)}
-			ondragenter={(e) => handleCardDragEnter(e, block.id)}
-			ondragleave={(e) => handleCardDragLeave(e, block.id)}
-			ondrop={(e) => handleCardDrop(e, block.id)}
-		>
-			<div class="card-gutter">
-				<div class="card-number" aria-hidden="true">{i + 1}</div>
-				<div class="drag-handle" title="Drag to reorder"
-					aria-label="Reorder tweet {i + 1}. Use Alt+Up or Alt+Down to move."
-					draggable="true" role="button" tabindex="-1"
-					ondragstart={(e) => handleDragStart(e, block.id)} ondragend={handleDragEnd}>
-					<GripVertical size={14} />
-				</div>
-			</div>
-			<div class="card-body">
-				<textarea class="card-textarea" class:over-limit={isOverLimit(block.text)}
-					placeholder={i === 0 ? 'Start your thread...' : `Tweet ${i + 1}...`}
-					value={block.text}
-					oninput={(e) => updateBlockText(block.id, e.currentTarget.value)}
-					onfocus={() => (focusedBlockId = block.id)}
-					onblur={() => { if (focusedBlockId === block.id) focusedBlockId = null; }}
-					onkeydown={(e) => handleCardKeydown(e, block.id)}
-					rows={3} aria-label={`Tweet ${i + 1} of ${sortedBlocks.length}`}
-				></textarea>
-				<MediaSlot mediaPaths={block.media_paths}
-					onmediachange={(paths) => updateBlockMedia(block.id, paths)} />
-				<div class="card-footer">
-					<div class="char-counter" class:over-limit={isOverLimit(block.text)}
-						class:warning={isWarning(block.text)} aria-live="polite" aria-label="Character count">
-						{getCharCount(block.text)}/{MAX_TWEET_CHARS}
-					</div>
-					<ThreadCardActions index={i} total={sortedBlocks.length}
-						onduplicate={() => duplicateBlock(block.id)} onsplit={() => splitBlock(block.id)}
-						onmerge={() => mergeWithNext(block.id)} onremove={() => removeBlock(block.id)} />
-				</div>
-			</div>
-			{#if i < sortedBlocks.length - 1}
-				<div class="thread-line" aria-hidden="true"></div>
-			{/if}
-		</div>
-	{/each}
+{#if mergeError}<div class="merge-error" role="alert">{mergeError}</div>{/if}
 
-	<button class="add-card-btn" onclick={addBlock} aria-label="Add another tweet to thread">
-		<Plus size={14} /> Add tweet
-	</button>
-
-	{#if mergeError}<div class="merge-error" role="alert">{mergeError}</div>{/if}
-
-	{#if validationErrors.length > 0}
-		<div class="validation-summary" role="status" aria-live="polite">
-			{#each validationErrors as err}<p class="validation-error">{err}</p>{/each}
-		</div>
-	{/if}
-</div>
+{#if validationErrors.length > 0}
+	<div class="validation-summary" role="status" aria-live="polite">
+		{#each validationErrors as err}<p class="validation-error">{err}</p>{/each}
+	</div>
+{/if}
 
 <style>
-	.thread-composer { display: flex; flex-direction: column; gap: 0; }
-	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
-	.tweet-card { position: relative; display: flex; gap: 8px; padding: 12px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-surface); margin-bottom: 8px; transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease; }
-	.tweet-card.focused { border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 20%, transparent); }
-	.tweet-card.over-limit { border-color: var(--color-danger); }
-	.tweet-card.assisting { border-color: var(--color-accent); opacity: 0.7; pointer-events: none; }
-	.tweet-card.dragging { opacity: 0.5; }
-	.tweet-card.drop-target { border-color: var(--color-accent); border-style: dashed; }
-	.card-gutter { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; width: 24px; padding-top: 2px; }
-	.card-number { font-size: 11px; font-weight: 600; color: var(--color-text-muted); font-family: var(--font-mono); line-height: 1; }
-	.drag-handle { color: var(--color-text-subtle); cursor: grab; opacity: 0.6; display: flex; align-items: center; transition: opacity 0.15s ease; border: none; background: none; padding: 0; }
-	.drag-handle:hover { opacity: 1; }
-	.drag-handle:active { cursor: grabbing; }
-	.card-body { flex: 1; min-width: 0; }
-	.card-textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-base); color: var(--color-text); font-size: 13px; font-family: var(--font-sans); line-height: 1.5; resize: vertical; box-sizing: border-box; transition: border-color 0.15s ease; }
-	.card-textarea:focus { outline: none; border-color: var(--color-accent); }
-	.card-textarea.over-limit { border-color: var(--color-danger); }
-	.card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
-	.char-counter { font-size: 11px; color: var(--color-text-subtle); font-family: var(--font-mono); }
-	.char-counter.warning { color: var(--color-warning); }
-	.char-counter.over-limit { color: var(--color-danger); font-weight: 600; }
-	.thread-line { position: absolute; left: 23px; bottom: -9px; width: 2px; height: 8px; background: var(--color-border-subtle); }
-	.add-card-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px dashed var(--color-border); border-radius: 6px; background: transparent; color: var(--color-text-muted); font-size: 12px; cursor: pointer; transition: all 0.15s ease; margin-top: 4px; }
-	.add-card-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
-	.merge-error { margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--color-danger) 8%, transparent); font-size: 12px; color: var(--color-danger); }
-	.validation-summary { margin-top: 8px; padding: 8px 12px; border-radius: 6px; background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
-	.validation-error { font-size: 12px; color: var(--color-danger); margin: 0; padding: 2px 0; }
-	@media (pointer: coarse) {
-		.drag-handle { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
-		.add-card-btn { min-height: 44px; }
+	.merge-error {
+		margin-top: 8px;
+		padding: 8px 12px;
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+		font-size: 12px;
+		color: var(--color-danger);
 	}
-	@media (max-width: 640px) {
-		.tweet-card { padding: 10px; }
-		.card-footer { flex-wrap: wrap; gap: 8px; }
-		.card-gutter { width: 20px; }
-		.card-textarea { font-size: 16px; }
-		.thread-line { left: 19px; }
+	.validation-summary {
+		margin-top: 8px;
+		padding: 8px 12px;
+		border-radius: 6px;
+		background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+	}
+	.validation-error {
+		font-size: 12px;
+		color: var(--color-danger);
+		margin: 0;
+		padding: 2px 0;
 	}
 </style>

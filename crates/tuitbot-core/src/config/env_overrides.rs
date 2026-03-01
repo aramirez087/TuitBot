@@ -247,6 +247,17 @@ impl Config {
                 parse_env_u32("TUITBOT_MCP_POLICY__MAX_MUTATIONS_PER_HOUR", &val)?;
         }
 
+        // Connectors
+        if let Ok(val) = env::var("TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_ID") {
+            self.connectors.google_drive.client_id = Some(val);
+        }
+        if let Ok(val) = env::var("TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_SECRET") {
+            self.connectors.google_drive.client_secret = Some(val);
+        }
+        if let Ok(val) = env::var("TUITBOT_CONNECTORS__GOOGLE_DRIVE__REDIRECT_URI") {
+            self.connectors.google_drive.redirect_uri = Some(val);
+        }
+
         // Approval mode
         let explicit_approval = if let Ok(val) = env::var("TUITBOT_APPROVAL_MODE") {
             self.approval_mode = parse_env_bool("TUITBOT_APPROVAL_MODE", &val)?;

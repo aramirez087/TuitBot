@@ -25,35 +25,57 @@
 		}
 
 		if (token) {
-			// Bearer mode: Tauri desktop or dev mode.
+			// Bearer mode: Tauri desktop or dev mode — unchanged.
 			setToken(token);
 			setAuthMode("bearer");
 			authModeStore.set("tauri");
 			connectWs(token);
+
+			// Check config for onboarding redirect.
+			try {
+				const status = await api.settings.configStatus();
+				if (!status.configured && !$page.url.pathname.startsWith("/onboarding")) {
+					goto("/onboarding");
+				}
+			} catch {
+				// Server not ready — allow through.
+			}
 		} else {
-			// Step 2: Web/LAN mode — check for existing session cookie.
-			const hasSession = await checkAuth();
-			if (hasSession) {
-				connectWs(); // Cookie-based WS auth
-			} else {
-				// Not authenticated — redirect to login (unless already there or onboarding).
-				const path = $page.url.pathname;
-				if (!path.startsWith("/login") && !path.startsWith("/onboarding")) {
-					goto("/login");
+			// Web/LAN mode: check config status FIRST, then auth.
+			const path = $page.url.pathname;
+
+			try {
+				const status = await api.settings.configStatus();
+
+				if (!status.configured) {
+					// Fresh or unconfigured instance — onboarding (skip login).
+					if (!path.startsWith("/onboarding")) {
+						const target = status.claimed
+							? "/onboarding?claimed=1"
+							: "/onboarding";
+						goto(target);
+					}
 					ready = true;
 					return;
 				}
-			}
-		}
 
-		// Step 3: Check if config exists — redirect to onboarding if not.
-		try {
-			const status = await api.settings.configStatus();
-			if (!status.configured && !$page.url.pathname.startsWith("/onboarding")) {
-				goto("/onboarding");
+				// Configured instance — check for existing session.
+				const hasSession = await checkAuth();
+				if (hasSession) {
+					connectWs();
+					if (path.startsWith("/login")) {
+						goto("/");
+					}
+				} else {
+					if (!path.startsWith("/login") && !path.startsWith("/onboarding")) {
+						goto("/login");
+						ready = true;
+						return;
+					}
+				}
+			} catch {
+				// Server not reachable — allow through.
 			}
-		} catch {
-			// Server not ready yet — allow through.
 		}
 
 		ready = true;

@@ -20,6 +20,24 @@ On first start the server generates a **4-word passphrase** and prints it to the
 
 Open that URL from any device on your network. You'll see a login screen — enter the passphrase and you're in.
 
+## First-Time Setup (Browser)
+
+When the server starts on `127.0.0.1` (the default) without an existing passphrase,
+it **does not** generate one automatically. Instead, the browser-based onboarding
+wizard handles passphrase creation:
+
+1. Start the server: `cargo run -p tuitbot-server`
+2. Open `http://localhost:3001` in your browser
+3. Complete the onboarding wizard
+4. On the final step, set your passphrase (a 4-word phrase is suggested)
+5. Save the passphrase — you'll need it to log in again after your session expires
+
+The passphrase is created during `POST /api/settings/init` and a session cookie
+is set automatically, so you're logged in immediately after onboarding.
+
+**LAN mode (`--host 0.0.0.0`)** still generates a passphrase at startup and
+prints it to the terminal, preserving backward compatibility for CLI users.
+
 ## How It Works
 
 Tuitbot has two authentication strategies that coexist:
@@ -29,7 +47,7 @@ Tuitbot has two authentication strategies that coexist:
 | **Bearer token** | Tauri desktop app, dev mode, API/MCP clients | Reads `~/.tuitbot/api_token` file, sends as `Authorization: Bearer` header |
 | **Session cookie** | Web browsers over LAN | Enter passphrase once, server sets an `HttpOnly` cookie valid for 7 days |
 
-When you open the dashboard in a browser without a bearer token (i.e., not the Tauri app), you're redirected to `/login`. After entering the correct passphrase, the server creates a session and sets a secure cookie. Subsequent requests use the cookie automatically — no need to re-enter the passphrase until the session expires (7 days) or you log out.
+When you open the dashboard in a browser without a bearer token on a fresh install, you're directed to the onboarding wizard. At the end of setup, you'll create a passphrase that protects future browser sessions. A session cookie is set automatically, so you're logged in immediately after onboarding. On subsequent visits, if your session has expired, you'll see a login screen where you enter the same passphrase. Sessions last 7 days.
 
 ## CLI Flags
 
@@ -127,6 +145,24 @@ To start using LAN mode, just add `--host 0.0.0.0` to your server command.
 
 The Tauri desktop app always uses bearer token auth (reads `~/.tuitbot/api_token` directly). LAN mode doesn't affect it — the desktop app continues to work exactly as before, even when the server is bound to `0.0.0.0`.
 
+## Content Sources
+
+LAN mode users typically run in `self_host` deployment mode. Content source
+setup works through the browser dashboard:
+
+- **Google Drive (recommended):** Open Settings > Content Sources > Connect
+  Google Drive. The browser-based OAuth flow works over LAN -- the popup
+  redirects back to the server's address.
+
+- **Local folder:** Available under "Advanced: Local Server Folder" in
+  Settings. Note that `local_fs` paths resolve relative to the **server**
+  filesystem, not the client browser's machine. Point to a path that exists
+  on the server (e.g., a mounted NAS share or synced folder).
+
+Set `deployment_mode = "self_host"` in your config (or
+`TUITBOT_DEPLOYMENT_MODE=self_host`) so the dashboard defaults to the Google
+Drive connector flow instead of a local file picker.
+
 ## Troubleshooting
 
 **"Connection refused" from another device**
@@ -134,8 +170,9 @@ The Tauri desktop app always uses bearer token auth (reads `~/.tuitbot/api_token
 - Check firewall rules: port 3001 must be open for TCP
 
 **"Invalid passphrase"**
-- Passphrase is case-sensitive and space-separated (4 words)
-- If lost, use `--reset-passphrase` to generate a new one
+- Passphrase is case-sensitive and space-separated (4 words if auto-generated)
+- You can reset it from the terminal: `tuitbot-server --reset-passphrase`
+- Or from Settings → LAN Access → Reset Passphrase (requires an active session)
 
 **Session expired / redirected to login**
 - Sessions last 7 days. Log in again with the same passphrase

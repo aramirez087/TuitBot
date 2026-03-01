@@ -45,6 +45,7 @@ Everything else uses defaults. Run `tuitbot init --advanced` for the full 8-step
 | `[mcp_policy]` | MCP mutation policy enforcement |
 | `[circuit_breaker]` | X API rate-limit protection |
 | `[content_sources]` | Content source configuration (local folders, Google Drive) |
+| `[connectors]` | OAuth credentials for remote source linking (Google Drive) |
 
 ## Progressive Enrichment
 
@@ -238,7 +239,42 @@ loop_back_enabled = true
 | `file_patterns` | `["*.md", "*.txt"]` | Glob patterns for files to ingest |
 | `loop_back_enabled` | `true` | Write tweet metadata back to source file front-matter |
 
-### Google Drive Source
+### Google Drive via Linked Account (Recommended)
+
+The recommended way to connect Google Drive is through the dashboard's OAuth
+flow. This creates a linked account connection that is simpler to set up and
+does not require a service account key file.
+
+1. Configure your GCP OAuth credentials in `[connectors.google_drive]` (see [Connectors](#connectors) below).
+2. Open the dashboard: **Settings > Content Sources > Connect Google Drive**.
+3. Complete the Google OAuth consent flow in the popup.
+4. The dashboard writes a `connection_id` to your config automatically.
+
+```toml
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "1abc..."
+connection_id = 1
+watch = true
+file_patterns = ["*.md", "*.txt"]
+poll_interval_seconds = 300
+loop_back_enabled = false
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `source_type` | -- | Must be `"google_drive"` |
+| `folder_id` | -- | Google Drive folder ID to monitor (optional; omit to index entire Drive) |
+| `connection_id` | -- | Linked account ID from the dashboard OAuth flow |
+| `service_account_key` | -- | **(Legacy)** Path to Google service account JSON key file |
+| `poll_interval_seconds` | `300` | Seconds between Drive API polls |
+| `loop_back_enabled` | `false` | Not supported for Drive (read-only) |
+
+**Auth precedence:** If both `connection_id` and `service_account_key` are present, `connection_id` takes precedence. A validation warning is logged.
+
+### Google Drive via Service Account (Legacy)
+
+Existing configs that use `service_account_key` continue to work. No action is required. If you want to migrate to the linked account flow, connect via the dashboard and the `connection_id` field will be added automatically. See [Upgrading from Service Account to Linked Account](#upgrading-from-service-account-to-linked-account) below.
 
 ```toml
 [[content_sources.sources]]
@@ -250,14 +286,6 @@ file_patterns = ["*.md", "*.txt"]
 poll_interval_seconds = 300
 loop_back_enabled = false
 ```
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| `source_type` | — | Must be `"google_drive"` |
-| `folder_id` | — | Google Drive folder ID to monitor |
-| `service_account_key` | — | Path to Google service account JSON key file |
-| `poll_interval_seconds` | `300` | Seconds between Drive API polls |
-| `loop_back_enabled` | `false` | Not supported for Drive (read-only) |
 
 ### Operational Limits
 
@@ -285,6 +313,52 @@ curl -X POST http://localhost:3001/api/ingest \
     }]
   }'
 ```
+
+## Connectors
+
+OAuth application credentials for linking remote content sources. Currently
+supports Google Drive; the design is extensible to future connectors.
+
+```toml
+[connectors.google_drive]
+client_id = "YOUR_GCP_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+client_secret = "GOCSPX-YOUR_CLIENT_SECRET"
+redirect_uri = "http://localhost:3001/api/connectors/google-drive/callback"
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `client_id` | -- | GCP OAuth 2.0 Client ID |
+| `client_secret` | -- | GCP OAuth 2.0 Client Secret |
+| `redirect_uri` | `http://localhost:3001/api/connectors/google-drive/callback` | OAuth callback URL |
+
+Get credentials from [Google Cloud Console > APIs & Services > Credentials](https://console.cloud.google.com/apis/credentials). Create an "OAuth 2.0 Client ID" of type "Web application" and add the redirect URI above.
+
+Environment variable overrides:
+
+```bash
+export TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_ID=...
+export TUITBOT_CONNECTORS__GOOGLE_DRIVE__CLIENT_SECRET=...
+export TUITBOT_CONNECTORS__GOOGLE_DRIVE__REDIRECT_URI=...
+```
+
+The connector config is required before the OAuth link flow works in the
+dashboard. Desktop apps may bundle default credentials via environment
+variables.
+
+## Upgrading from Service Account to Linked Account
+
+If your existing config uses `service_account_key` for Google Drive:
+
+1. Your current setup continues to work -- no immediate action needed.
+2. To upgrade, add `[connectors.google_drive]` credentials to your config (or set the env vars).
+3. Open the dashboard: **Settings > Content Sources > Connect Google Drive**.
+4. Complete the OAuth flow. The dashboard adds `connection_id` to the source.
+5. Once `connection_id` is set, it takes precedence over `service_account_key`.
+6. You can optionally remove `service_account_key` after verifying the linked account works.
+
+Running `tuitbot update` also detects missing connector config and offers to
+add a scaffold section.
 
 ## Production Guidance
 

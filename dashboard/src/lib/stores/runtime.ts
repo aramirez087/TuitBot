@@ -13,7 +13,8 @@ const DESKTOP_DEFAULTS: RuntimeCapabilities = {
 		manual_local_path: true,
 		google_drive: true,
 		inline_ingest: true,
-		file_picker_native: false
+		file_picker_native: false,
+		preferred_source_default: 'local_fs'
 	}
 };
 

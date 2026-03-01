@@ -76,11 +76,13 @@ async fn main() -> Result<()> {
 
     // Handle passphrase for web/LAN auth.
     let passphrase_hash = if cli.reset_passphrase {
+        // --reset-passphrase: always reset, regardless of host.
         let new_passphrase = passphrase::reset_passphrase(db_dir)?;
         println!("\n  Web login passphrase (reset): {new_passphrase}\n");
         tracing::info!("Passphrase has been reset");
         passphrase::load_passphrase_hash(db_dir)?
-    } else {
+    } else if cli.host == "0.0.0.0" {
+        // LAN mode: auto-generate passphrase if none exists (backward compatible).
         match passphrase::ensure_passphrase(db_dir)? {
             Some(new_passphrase) => {
                 println!("\n  Web login passphrase: {new_passphrase}");
@@ -91,6 +93,19 @@ async fn main() -> Result<()> {
             }
         }
         passphrase::load_passphrase_hash(db_dir)?
+    } else {
+        // Localhost mode: load existing hash if present, skip generation.
+        // The browser claim flow will handle passphrase creation.
+        match passphrase::load_passphrase_hash(db_dir)? {
+            Some(hash) => {
+                tracing::info!("Passphrase loaded from disk");
+                Some(hash)
+            }
+            None => {
+                tracing::info!("No passphrase configured — awaiting browser claim");
+                None
+            }
+        }
     };
 
     // Create the broadcast channel for WebSocket events.
@@ -148,6 +163,12 @@ async fn main() -> Result<()> {
         .map(|c| c.content_sources.clone())
         .unwrap_or_default();
 
+    // Extract connector config for remote source OAuth flows.
+    let connector_config = loaded_config
+        .as_ref()
+        .map(|c| c.connectors.clone())
+        .unwrap_or_default();
+
     // Extract deployment mode from config (defaults to Desktop).
     let deployment_mode = loaded_config
         .as_ref()
@@ -174,7 +195,12 @@ async fn main() -> Result<()> {
 
         if !watch_sources.is_empty() {
             let cancel = CancellationToken::new();
-            let watchtower = WatchtowerLoop::new(pool.clone(), content_sources.clone());
+            let watchtower = WatchtowerLoop::new(
+                pool.clone(),
+                content_sources.clone(),
+                connector_config.clone(),
+                data_dir.clone(),
+            );
             let cancel_clone = cancel.clone();
             tokio::spawn(async move {
                 watchtower.run(cancel_clone).await;
@@ -201,7 +227,9 @@ async fn main() -> Result<()> {
         circuit_breaker: None,
         watchtower_cancel: watchtower_cancel.clone(),
         content_sources,
+        connector_config,
         deployment_mode,
+        pending_oauth: Mutex::new(HashMap::new()),
     });
 
     let router = tuitbot_server::build_router(state);

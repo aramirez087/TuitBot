@@ -25,7 +25,7 @@ export interface OnboardingData {
 	vault_watch: boolean;
 	vault_loop_back: boolean;
 	folder_id: string;
-	service_account_key: string;
+	connection_id: number | null;
 	poll_interval_seconds: number;
 	// Settings
 	approval_mode: boolean;
@@ -52,7 +52,7 @@ function createOnboardingStore() {
 		vault_watch: true,
 		vault_loop_back: true,
 		folder_id: '',
-		service_account_key: '',
+		connection_id: null,
 		poll_interval_seconds: 300,
 		approval_mode: true,
 	});
@@ -84,7 +84,7 @@ function createOnboardingStore() {
 				vault_watch: true,
 				vault_loop_back: true,
 				folder_id: '',
-				service_account_key: '',
+				connection_id: null,
 				poll_interval_seconds: 300,
 				approval_mode: true,
 			});

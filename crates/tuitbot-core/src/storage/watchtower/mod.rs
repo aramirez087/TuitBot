@@ -1,10 +1,14 @@
 //! CRUD operations for Watchtower ingestion tables.
 //!
-//! Manages source contexts, content nodes, and draft seeds for the
-//! Cold-Start Watchtower RAG pipeline.
+//! Manages source contexts, content nodes, draft seeds, and remote
+//! sync connections for the Cold-Start Watchtower RAG pipeline.
+
+pub mod connections;
 
 #[cfg(test)]
 mod tests;
+
+pub use connections::*;
 
 use super::accounts::DEFAULT_ACCOUNT_ID;
 use super::DbPool;

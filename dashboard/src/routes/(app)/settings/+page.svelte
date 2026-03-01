@@ -10,7 +10,8 @@
 		Key,
 		Database,
 		FolderOpen,
-		Wifi
+		Wifi,
+		AlertTriangle
 	} from 'lucide-svelte';
 	import {
 		loading,
@@ -34,6 +35,7 @@
 	import StorageSection from './StorageSection.svelte';
 	import ContentSourcesSection from './ContentSourcesSection.svelte';
 	import LanAccessSection from './LanAccessSection.svelte';
+	import DangerZoneSection from './DangerZoneSection.svelte';
 	import SaveBar from './SaveBar.svelte';
 	import ConfirmModal from './ConfirmModal.svelte';
 
@@ -49,7 +51,8 @@
 		{ id: 'xapi', label: 'X API', icon: Key },
 		{ id: 'storage', label: 'Storage', icon: Database },
 		{ id: 'sources', label: 'Sources', icon: FolderOpen },
-		{ id: 'lan', label: 'LAN', icon: Wifi }
+		{ id: 'lan', label: 'LAN', icon: Wifi },
+		{ id: 'danger', label: 'Danger', icon: AlertTriangle }
 	];
 
 	let activeSection = $state('business');
@@ -185,6 +188,7 @@
 				<StorageSection />
 				<ContentSourcesSection />
 				<LanAccessSection />
+				<DangerZoneSection />
 			</div>
 		</div>
 	</div>

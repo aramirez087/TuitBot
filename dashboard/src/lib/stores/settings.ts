@@ -181,6 +181,18 @@ export async function testLlmConnection(): Promise<SettingsTestResult> {
 	});
 }
 
+/** Clear all settings stores (used after factory reset). */
+export function resetStores(): void {
+	config.set(null);
+	defaults.set(null);
+	draft.set(null);
+	loading.set(true);
+	error.set(null);
+	saveError.set(null);
+	validationErrors.set([]);
+	lastSaved.set(null);
+}
+
 export function hasDangerousChanges(): boolean {
 	const $config = get(config);
 	const $draft = get(draft);

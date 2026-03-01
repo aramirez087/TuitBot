@@ -35,7 +35,9 @@ async fn test_router() -> axum::Router {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
 
     tuitbot_server::build_router(state)
@@ -249,7 +251,9 @@ async fn approval_stats_returns_counts() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -294,7 +298,9 @@ async fn approval_list_with_status_filter() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -349,7 +355,9 @@ async fn approval_edit_content() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -402,7 +410,9 @@ async fn approval_edit_empty_content() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -541,7 +551,9 @@ async fn add_and_list_target() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -582,7 +594,9 @@ async fn add_duplicate_target_fails() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -624,7 +638,9 @@ async fn remove_target_works() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -686,7 +702,9 @@ async fn runtime_start_and_stop() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -745,7 +763,9 @@ async fn settings_get_returns_json() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -778,7 +798,9 @@ async fn settings_patch_round_trips() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -868,7 +890,9 @@ async fn post_ingest_idempotent() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -947,6 +971,7 @@ async fn config_status_includes_capabilities() {
     assert_eq!(body["deployment_mode"], "desktop");
     assert_eq!(body["capabilities"]["local_folder"], true);
     assert_eq!(body["capabilities"]["file_picker_native"], true);
+    assert_eq!(body["capabilities"]["preferred_source_default"], "local_fs");
 }
 
 #[tokio::test]
@@ -970,7 +995,9 @@ async fn config_status_capabilities_match_cloud_mode() {
         circuit_breaker: None,
         watchtower_cancel: None,
         content_sources: Default::default(),
+        connector_config: Default::default(),
         deployment_mode: DeploymentMode::Cloud,
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -990,4 +1017,540 @@ async fn config_status_capabilities_match_cloud_mode() {
     assert_eq!(body["capabilities"]["manual_local_path"], false);
     assert_eq!(body["capabilities"]["file_picker_native"], false);
     assert_eq!(body["capabilities"]["google_drive"], true);
+    assert_eq!(
+        body["capabilities"]["preferred_source_default"],
+        "google_drive"
+    );
+}
+
+#[tokio::test]
+async fn settings_get_redacts_service_account_key() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Write a config file with a service_account_key.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[business]
+product_name = "TestBot"
+
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/secret/path/sa-key.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: std::path::PathBuf::from("/tmp"),
+        config_path,
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let (status, body) = get_json(router, "/api/settings").await;
+    assert_eq!(status, StatusCode::OK);
+
+    // The service_account_key must be redacted.
+    let source = &body["content_sources"]["sources"][0];
+    assert_eq!(source["service_account_key"], "[redacted]");
+    // Other fields remain intact.
+    assert_eq!(source["folder_id"], "abc123");
+    assert_eq!(source["source_type"], "google_drive");
+}
+
+// --- Session 06: backward-compatibility regression tests ---
+
+#[tokio::test]
+async fn settings_patch_preserves_legacy_sa_key() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Write a config with a legacy service_account_key.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[business]
+product_name = "TestBot"
+
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/secret/path/sa-key.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: std::path::PathBuf::from("/tmp"),
+        config_path: config_path.clone(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // PATCH an unrelated field (business.product_name).
+    let patch_req = Request::builder()
+        .method("PATCH")
+        .uri("/api/settings")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&serde_json::json!({
+                "business": {"product_name": "UpdatedBot"}
+            }))
+            .unwrap(),
+        ))
+        .expect("build request");
+
+    let response = router
+        .clone()
+        .oneshot(patch_req)
+        .await
+        .expect("send request");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Read the on-disk TOML and verify service_account_key is preserved.
+    let on_disk = std::fs::read_to_string(&config_path).unwrap();
+    assert!(
+        on_disk.contains("service_account_key"),
+        "PATCH should not remove service_account_key from disk"
+    );
+    assert!(
+        on_disk.contains("/secret/path/sa-key.json"),
+        "service_account_key value should be preserved on disk"
+    );
+
+    // GET and verify the name was updated.
+    let (status, body) = get_json(router, "/api/settings").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["business"]["product_name"], "UpdatedBot");
+}
+
+#[tokio::test]
+async fn settings_patch_response_redacts_sa_key() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Write a config with a legacy service_account_key.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[business]
+product_name = "TestBot"
+
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/secret/path/sa-key.json"
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: std::path::PathBuf::from("/tmp"),
+        config_path: config_path.clone(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // PATCH an unrelated field — the response must redact the SA key.
+    let patch_req = Request::builder()
+        .method("PATCH")
+        .uri("/api/settings")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&serde_json::json!({
+                "business": {"product_name": "PatchedBot"}
+            }))
+            .unwrap(),
+        ))
+        .expect("build request");
+
+    let response = router.oneshot(patch_req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body: serde_json::Value = serde_json::from_slice(
+        &axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+
+    let source = &body["content_sources"]["sources"][0];
+    assert_eq!(
+        source["service_account_key"], "[redacted]",
+        "PATCH response must redact service_account_key"
+    );
+    // On-disk value must remain unredacted.
+    let on_disk = std::fs::read_to_string(&config_path).unwrap();
+    assert!(on_disk.contains("/secret/path/sa-key.json"));
+}
+
+#[tokio::test]
+async fn settings_get_redacts_sa_key_alongside_connection_id() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Write a config with both service_account_key AND connection_id.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[business]
+product_name = "TestBot"
+
+[[content_sources.sources]]
+source_type = "google_drive"
+folder_id = "abc123"
+service_account_key = "/secret/path/sa-key.json"
+connection_id = 42
+watch = true
+file_patterns = ["*.md"]
+loop_back_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: std::path::PathBuf::from("/tmp"),
+        config_path,
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let (status, body) = get_json(router, "/api/settings").await;
+    assert_eq!(status, StatusCode::OK);
+
+    let source = &body["content_sources"]["sources"][0];
+    // SA key is redacted.
+    assert_eq!(source["service_account_key"], "[redacted]");
+    // connection_id is returned intact.
+    assert_eq!(source["connection_id"], 42);
+    // Other fields intact.
+    assert_eq!(source["folder_id"], "abc123");
+    assert_eq!(source["source_type"], "google_drive");
+}
+
+#[tokio::test]
+async fn settings_init_with_connection_id() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let config_path = dir.path().join("config.toml");
+    // Ensure config does NOT exist yet (init creates it).
+    assert!(!config_path.exists());
+
+    let state = Arc::new(AppState {
+        db: pool,
+        data_dir: dir.path().to_path_buf(),
+        config_path: config_path.clone(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    // POST /api/settings/init with a Google Drive source using connection_id.
+    let init_body = serde_json::json!({
+        "business": {
+            "product_name": "InitBot",
+            "product_keywords": ["test"]
+        },
+        "llm": {
+            "provider": "ollama",
+            "model": "llama3.2"
+        },
+        "content_sources": {
+            "sources": [{
+                "source_type": "google_drive",
+                "folder_id": "init_folder",
+                "connection_id": 7,
+                "watch": true,
+                "file_patterns": ["*.md"],
+                "loop_back_enabled": false
+            }]
+        }
+    });
+
+    let (status, _body) = post_json(router.clone(), "/api/settings/init", init_body).await;
+    assert_eq!(status, StatusCode::OK, "init should succeed");
+
+    // Verify the config file was created and round-trips.
+    assert!(config_path.exists(), "config file should be created");
+    let on_disk = std::fs::read_to_string(&config_path).unwrap();
+    let config: tuitbot_core::config::Config =
+        toml::from_str(&on_disk).expect("on-disk config should parse");
+    assert_eq!(config.content_sources.sources.len(), 1);
+    assert_eq!(config.content_sources.sources[0].connection_id, Some(7));
+    assert_eq!(
+        config.content_sources.sources[0].folder_id.as_deref(),
+        Some("init_folder")
+    );
+    assert!(config.content_sources.sources[0]
+        .service_account_key
+        .is_none());
+
+    // GET and verify connection_id is returned.
+    let (status, body) = get_json(router, "/api/settings").await;
+    assert_eq!(status, StatusCode::OK);
+    let source = &body["content_sources"]["sources"][0];
+    assert_eq!(source["connection_id"], 7);
+    assert_eq!(source["folder_id"], "init_folder");
+}
+
+// ============================================================
+// Connector endpoints
+// ============================================================
+
+#[tokio::test]
+async fn connector_link_not_configured() {
+    let router = test_router().await;
+    // POST /link without connector config in TOML → 400 "not configured".
+    let (status, body) = post_json(
+        router,
+        "/api/connectors/google-drive/link",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        body["error"].as_str().unwrap().contains("not configured")
+            || body["error"].as_str().unwrap().contains("not set")
+    );
+}
+
+#[tokio::test]
+async fn connector_link_requires_auth() {
+    let router = test_router().await;
+    // POST /link without Bearer token → 401.
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/connectors/google-drive/link")
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn connector_callback_missing_params() {
+    let router = test_router().await;
+    // GET /callback without code/state → 400.
+    let req = Request::builder()
+        .uri("/api/connectors/google-drive/callback")
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn connector_callback_invalid_state() {
+    let router = test_router().await;
+    // GET /callback with unknown state → 400.
+    let req = Request::builder()
+        .uri("/api/connectors/google-drive/callback?code=abc&state=unknown")
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let bytes = response.into_body().collect().await.expect("read body");
+    let body: serde_json::Value = serde_json::from_slice(&bytes.to_bytes()).expect("parse JSON");
+    assert!(body["error"]
+        .as_str()
+        .unwrap()
+        .contains("invalid or expired"));
+}
+
+#[tokio::test]
+async fn connector_callback_is_auth_exempt() {
+    let router = test_router().await;
+    // GET /callback without auth should return 400 (param validation), not 401.
+    let req = Request::builder()
+        .uri("/api/connectors/google-drive/callback")
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    // Should be 400 (missing params), NOT 401 (unauthorized).
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn connector_status_empty() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/connectors/google-drive/status").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["connections"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn connector_status_requires_auth() {
+    let router = test_router().await;
+    let req = Request::builder()
+        .uri("/api/connectors/google-drive/status")
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn connector_status_with_connection() {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    // Seed a connection row.
+    tuitbot_core::storage::watchtower::insert_connection(
+        &pool,
+        "google_drive",
+        Some("test@example.com"),
+        Some("Test Drive"),
+    )
+    .await
+    .expect("insert connection");
+
+    let state = Arc::new(AppState {
+        db: pool,
+        config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
+        data_dir: std::path::PathBuf::from("/tmp"),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let (status, body) = get_json(router, "/api/connectors/google-drive/status").await;
+    assert_eq!(status, StatusCode::OK);
+
+    let conns = body["connections"].as_array().unwrap();
+    assert_eq!(conns.len(), 1);
+    assert_eq!(conns[0]["account_email"], "test@example.com");
+    assert_eq!(conns[0]["connector_type"], "google_drive");
+    // Must NOT contain encrypted_credentials.
+    assert!(conns[0]["encrypted_credentials"].is_null());
+}
+
+#[tokio::test]
+async fn connector_disconnect_not_found() {
+    let router = test_router().await;
+    let (status, body) = delete_json(router, "/api/connectors/google-drive/99999").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(body["error"].as_str().unwrap().contains("not found"));
+}
+
+#[tokio::test]
+async fn connector_disconnect_requires_auth() {
+    let router = test_router().await;
+    let req = Request::builder()
+        .method("DELETE")
+        .uri("/api/connectors/google-drive/1")
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

@@ -343,7 +343,7 @@ async fn watcher_respects_cancellation() {
         sources: Vec::new(), // No sources = immediate exit.
     };
 
-    let watchtower = WatchtowerLoop::new(pool, config);
+    let watchtower = WatchtowerLoop::new(pool, config, Default::default(), std::env::temp_dir());
     let cancel = CancellationToken::new();
     let cancel_clone = cancel.clone();
 
@@ -370,6 +370,7 @@ async fn watcher_cancels_with_sources() {
             path: Some(dir.path().to_string_lossy().to_string()),
             folder_id: None,
             service_account_key: None,
+            connection_id: None,
             watch: true,
             file_patterns: vec!["*.md".to_string()],
             loop_back_enabled: false,
@@ -377,7 +378,7 @@ async fn watcher_cancels_with_sources() {
         }],
     };
 
-    let watchtower = WatchtowerLoop::new(pool, config);
+    let watchtower = WatchtowerLoop::new(pool, config, Default::default(), std::env::temp_dir());
     let cancel = CancellationToken::new();
     let cancel_clone = cancel.clone();
 
@@ -394,5 +395,194 @@ async fn watcher_cancels_with_sources() {
     assert!(
         result.is_ok(),
         "Watcher should exit within timeout after cancellation"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Connection-based source registration
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn watchtower_skips_source_without_auth() {
+    let pool = init_test_db().await.expect("init db");
+
+    // A Google Drive source with neither service_account_key nor connection_id
+    // should be skipped during registration.
+    let config = ContentSourcesConfig {
+        sources: vec![crate::config::ContentSourceEntry {
+            source_type: "google_drive".to_string(),
+            path: None,
+            folder_id: Some("folder_no_auth".to_string()),
+            service_account_key: None,
+            connection_id: None,
+            watch: true,
+            file_patterns: vec!["*.md".to_string()],
+            loop_back_enabled: false,
+            poll_interval_seconds: Some(300),
+        }],
+    };
+
+    let watchtower = WatchtowerLoop::new(
+        pool.clone(),
+        config,
+        Default::default(),
+        std::env::temp_dir(),
+    );
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+
+    let handle = tokio::spawn(async move {
+        watchtower.run(cancel_clone).await;
+    });
+
+    // The watchtower should register no remote sources and exit quickly.
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    cancel.cancel();
+
+    let result = tokio::time::timeout(Duration::from_secs(5), handle).await;
+    assert!(
+        result.is_ok(),
+        "Watcher should handle source without auth gracefully"
+    );
+}
+
+#[tokio::test]
+async fn watchtower_handles_broken_connection() {
+    // Test that a ConnectionBroken error is properly handled by
+    // updating both the source status and connection status.
+    let pool = init_test_db().await.expect("init db");
+
+    // Create a connection and mark it as active.
+    let conn_id = store::insert_connection(&pool, "google_drive", Some("test@example.com"), None)
+        .await
+        .unwrap();
+
+    // Register a source context for the connection.
+    let src_id = store::insert_source_context(
+        &pool,
+        "google_drive",
+        &serde_json::json!({
+            "folder_id": "folder_broken",
+            "connection_id": conn_id,
+        })
+        .to_string(),
+    )
+    .await
+    .unwrap();
+
+    // Simulate what poll_remote_sources does on ConnectionBroken.
+    let reason = "token revoked: Token has been revoked";
+    store::update_source_status(&pool, src_id, "error", Some(reason))
+        .await
+        .unwrap();
+    store::update_connection_status(&pool, conn_id, "expired")
+        .await
+        .unwrap();
+
+    // Verify both statuses were updated.
+    let ctx = store::get_source_context(&pool, src_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(ctx.status, "error");
+    assert_eq!(ctx.error_message.as_deref(), Some(reason));
+
+    let conn = store::get_connection(&pool, conn_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(conn.status, "expired");
+}
+
+#[tokio::test]
+async fn watchtower_preserves_cursor_across_restart() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Register a source and set a cursor.
+    let src_id = store::ensure_google_drive_source(
+        &pool,
+        "folder_cursor",
+        r#"{"folder_id":"folder_cursor"}"#,
+    )
+    .await
+    .unwrap();
+
+    let cursor = "2026-02-28T15:30:00Z";
+    store::update_sync_cursor(&pool, src_id, cursor)
+        .await
+        .unwrap();
+
+    // Simulate restart by reading the source context (which the
+    // Watchtower does at the start of poll_remote_sources).
+    let ctx = store::get_source_context(&pool, src_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(ctx.sync_cursor.as_deref(), Some(cursor));
+}
+
+#[tokio::test]
+async fn watchtower_mixed_legacy_and_connection_sources() {
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    // Create config with both a local source and a Google Drive source
+    // (the Drive source has no auth, so it will be skipped, but the
+    // local source should still work).
+    let config = ContentSourcesConfig {
+        sources: vec![
+            crate::config::ContentSourceEntry {
+                source_type: "local_fs".to_string(),
+                path: Some(dir.path().to_string_lossy().to_string()),
+                folder_id: None,
+                service_account_key: None,
+                connection_id: None,
+                watch: true,
+                file_patterns: vec!["*.md".to_string()],
+                loop_back_enabled: false,
+                poll_interval_seconds: None,
+            },
+            crate::config::ContentSourceEntry {
+                source_type: "google_drive".to_string(),
+                path: None,
+                folder_id: Some("folder_mixed".to_string()),
+                service_account_key: None,
+                connection_id: None, // No auth = skipped
+                watch: true,
+                file_patterns: vec!["*.md".to_string()],
+                loop_back_enabled: false,
+                poll_interval_seconds: Some(300),
+            },
+        ],
+    };
+
+    // Write a test file for the local source.
+    std::fs::write(dir.path().join("note.md"), "Test content.\n").unwrap();
+
+    let watchtower = WatchtowerLoop::new(
+        pool.clone(),
+        config,
+        Default::default(),
+        std::env::temp_dir(),
+    );
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+
+    let handle = tokio::spawn(async move {
+        watchtower.run(cancel_clone).await;
+    });
+
+    // Give it time to do the initial scan.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    cancel.cancel();
+
+    let result = tokio::time::timeout(Duration::from_secs(5), handle).await;
+    assert!(result.is_ok(), "Mixed source config should not crash");
+
+    // Verify the local source was ingested.
+    let contexts = store::get_source_contexts(&pool).await.unwrap();
+    assert!(
+        !contexts.is_empty(),
+        "At least the local source should be registered"
     );
 }

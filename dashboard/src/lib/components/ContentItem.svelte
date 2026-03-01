@@ -46,6 +46,18 @@
 	const TypeIcon = $derived(
 		item.content_type === 'reply' ? MessageSquare : item.content_type === 'thread' ? GitBranch : FileText
 	);
+
+	function toggleExpanded(event?: Event) {
+		event?.stopPropagation();
+		expanded = !expanded;
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		event.stopPropagation();
+		expanded = !expanded;
+	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -55,7 +67,8 @@
 	class:posted={isPosted}
 	class:scheduled={isScheduled}
 	style:--item-color={color}
-	onclick={() => (expanded = !expanded)}
+	onclick={toggleExpanded}
+	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
 >

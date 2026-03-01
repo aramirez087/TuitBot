@@ -29,4 +29,8 @@ pub enum AuthError {
     /// Bcrypt hashing failed.
     #[error("hashing error: {message}")]
     HashError { message: String },
+
+    /// Attempted to claim an instance that already has a passphrase.
+    #[error("instance already claimed")]
+    AlreadyClaimed,
 }

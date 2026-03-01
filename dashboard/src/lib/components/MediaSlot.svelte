@@ -173,7 +173,7 @@
 
 <style>
 	.media-slot {
-		margin-top: 4px;
+		margin-top: 0;
 		border-radius: 6px;
 		transition: all 0.15s ease;
 	}
@@ -193,8 +193,8 @@
 
 	.thumb {
 		position: relative;
-		width: 48px;
-		height: 48px;
+		width: 56px;
+		height: 56px;
 		border-radius: 6px;
 		overflow: hidden;
 		border: 1px solid var(--color-border);

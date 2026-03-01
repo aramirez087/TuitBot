@@ -113,6 +113,12 @@
 			onslotclick(day, time);
 		}
 	}
+
+	function handleCellKeydown(event: KeyboardEvent, activate: () => void) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		activate();
+	}
 </script>
 
 <div class="week-view">
@@ -141,11 +147,14 @@
 				</div>
 				{#each days as day}
 					{@const slotItems = getSlotItems(day, time)}
-					<button
+					<div
 						class="slot-cell"
 						class:has-items={slotItems.length > 0}
 						class:today={isToday(day)}
+						role="button"
+						tabindex="0"
 						onclick={() => handleSlotClick(day, time)}
+						onkeydown={(event) => handleCellKeydown(event, () => handleSlotClick(day, time))}
 					>
 						{#if slotItems.length > 0}
 							{#each slotItems as item}
@@ -154,7 +163,7 @@
 						{:else}
 							<span class="empty-plus">+</span>
 						{/if}
-					</button>
+					</div>
 				{/each}
 			</div>
 		{/each}
@@ -168,7 +177,14 @@
 			</div>
 			{#each days as day}
 				{@const unslotted = preferredTimes.length > 0 ? getUnslottedItems(day) : (itemsByDate().get(dateKey(day)) ?? [])}
-				<button class="slot-cell overflow-cell" class:today={isToday(day)} onclick={() => ondayclick?.(day)}>
+				<div
+					class="slot-cell overflow-cell"
+					class:today={isToday(day)}
+					role="button"
+					tabindex="0"
+					onclick={() => ondayclick?.(day)}
+					onkeydown={(event) => handleCellKeydown(event, () => ondayclick?.(day))}
+				>
 					{#if unslotted.length > 0}
 						{#each unslotted as item}
 							<ContentItem {item} {oncancel} {onedit} />
@@ -176,7 +192,7 @@
 					{:else}
 						<span class="empty-plus">+</span>
 					{/if}
-				</button>
+				</div>
 			{/each}
 		</div>
 	{/if}

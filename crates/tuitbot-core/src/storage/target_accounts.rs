@@ -503,7 +503,7 @@ pub async fn get_target_stats_for(
 ) -> Result<Option<TargetStats>, StorageError> {
     let row: Option<StatsRow> = sqlx::query_as(
         "SELECT ta.total_replies_sent, \
-                COALESCE(AVG(tt.relevance_score), 0), \
+                COALESCE(AVG(tt.relevance_score), 0.0), \
                 ta.first_engagement_at, ta.last_reply_at \
          FROM target_accounts ta \
          LEFT JOIN target_tweets tt ON tt.account_id = ta.account_id AND tt.replied_to = 1 \
@@ -836,5 +836,25 @@ mod tests {
 
         let stats = get_target_stats(&pool, "nobody").await.expect("stats");
         assert!(stats.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_target_stats_returns_zero_avg_for_target_without_replies() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+
+        let stats = get_target_stats(&pool, "alice")
+            .await
+            .expect("stats")
+            .expect("found");
+        assert_eq!(stats.total_replies, 0);
+        assert_eq!(stats.avg_score, 0.0);
+        assert!(stats.best_reply_content.is_none());
+        assert!(stats.best_reply_score.is_none());
+        assert!(stats.first_interaction.is_none());
+        assert!(stats.interaction_frequency_days.is_none());
     }
 }

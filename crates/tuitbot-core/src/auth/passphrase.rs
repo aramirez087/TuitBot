@@ -100,6 +100,63 @@ pub fn load_passphrase_hash(data_dir: &Path) -> Result<Option<String>, AuthError
     Ok(Some(trimmed))
 }
 
+/// Check if a passphrase hash file exists (i.e., the instance has been claimed).
+pub fn is_claimed(data_dir: &Path) -> bool {
+    let hash_path = data_dir.join("passphrase_hash");
+    if !hash_path.exists() {
+        return false;
+    }
+    std::fs::read_to_string(&hash_path)
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+}
+
+/// Create a passphrase hash from a user-provided plaintext.
+///
+/// This is the "claim" operation for first-time web setup. It:
+/// - Validates the passphrase (minimum 8 characters)
+/// - Checks that no hash file exists (returns `AlreadyClaimed` if it does)
+/// - Hashes with bcrypt (cost 12)
+/// - Writes the hash to `data_dir/passphrase_hash` with 0600 permissions
+///
+/// The plaintext is never logged or persisted.
+pub fn create_passphrase_hash(data_dir: &Path, plaintext: &str) -> Result<(), AuthError> {
+    if plaintext.len() < 8 {
+        return Err(AuthError::Storage {
+            message: "passphrase must be at least 8 characters".to_string(),
+        });
+    }
+
+    let hash_path = data_dir.join("passphrase_hash");
+
+    // Reject if already claimed.
+    if hash_path.exists() {
+        let existing = std::fs::read_to_string(&hash_path).map_err(|e| AuthError::Storage {
+            message: format!("failed to read passphrase hash: {e}"),
+        })?;
+        if !existing.trim().is_empty() {
+            return Err(AuthError::AlreadyClaimed);
+        }
+    }
+
+    let hash = hash_passphrase(plaintext)?;
+
+    std::fs::create_dir_all(data_dir).map_err(|e| AuthError::Storage {
+        message: format!("failed to create data directory: {e}"),
+    })?;
+    std::fs::write(&hash_path, &hash).map_err(|e| AuthError::Storage {
+        message: format!("failed to write passphrase hash: {e}"),
+    })?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&hash_path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(())
+}
+
 /// Re-generate a passphrase (for `--reset-passphrase`).
 ///
 /// Overwrites the existing hash file and returns the new plaintext passphrase.
@@ -168,6 +225,53 @@ mod tests {
         let passphrase = ensure_passphrase(dir.path()).unwrap().unwrap();
         let hash = load_passphrase_hash(dir.path()).unwrap().unwrap();
         assert!(verify_passphrase(&passphrase, &hash).unwrap());
+    }
+
+    #[test]
+    fn is_claimed_returns_false_on_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!is_claimed(dir.path()));
+    }
+
+    #[test]
+    fn is_claimed_returns_true_after_create() {
+        let dir = tempfile::tempdir().unwrap();
+        create_passphrase_hash(dir.path(), "test passphrase here").unwrap();
+        assert!(is_claimed(dir.path()));
+    }
+
+    #[test]
+    fn create_passphrase_hash_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let plaintext = "alpha bravo charlie delta";
+        create_passphrase_hash(dir.path(), plaintext).unwrap();
+
+        let hash = load_passphrase_hash(dir.path()).unwrap().unwrap();
+        assert!(verify_passphrase(plaintext, &hash).unwrap());
+    }
+
+    #[test]
+    fn create_passphrase_hash_rejects_short_passphrase() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = create_passphrase_hash(dir.path(), "short");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("at least 8 characters"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn create_passphrase_hash_rejects_already_claimed() {
+        let dir = tempfile::tempdir().unwrap();
+        create_passphrase_hash(dir.path(), "first passphrase ok").unwrap();
+        let result = create_passphrase_hash(dir.path(), "second passphrase ok");
+        assert!(result.is_err());
+        assert!(
+            matches!(result.unwrap_err(), AuthError::AlreadyClaimed),
+            "expected AlreadyClaimed error"
+        );
     }
 
     #[test]
