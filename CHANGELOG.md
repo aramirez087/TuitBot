@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.19](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.18...tuitbot-cli-v0.1.19) - 2026-03-01
+
+### Added
+
+- Session 3 — reset command fast path and live reload
+
+### Other
+
+- Uninstall process.
+
 ## [0.1.18](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.17...tuitbot-cli-v0.1.18) - 2026-03-01
 
 ### Added
