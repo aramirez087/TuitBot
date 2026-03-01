@@ -40,6 +40,8 @@ const AUTH_EXEMPT_PATHS: &[&str] = &[
     "/api/settings/status",
     "/settings/init",
     "/api/settings/init",
+    "/settings/test-llm",
+    "/api/settings/test-llm",
     "/ws",
     "/api/ws",
     "/auth/login",

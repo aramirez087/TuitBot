@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import {
 		api,
 		type ScheduleConfig,
@@ -145,19 +146,21 @@
 
 	$effect(() => {
 		if (open) {
-			triggerElement = document.activeElement;
-			selectedTime = prefillTime ?? null;
-			checkRecovery();
-			if (!showRecovery) { tweetText = ''; threadBlocks = []; mode = 'tweet'; }
-			submitting = false; submitError = null;
-			for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
-			attachedMedia = [];
-			focusMode = false; paletteOpen = false; showFromNotes = false;
-			voiceCue = '';
-			undoSnapshot = null; showUndo = false;
-			previewCollapsed = false;
-			inspectorOpen = loadInspectorState();
-			if (undoTimer) clearTimeout(undoTimer);
+			untrack(() => {
+				triggerElement = document.activeElement;
+				selectedTime = prefillTime ?? null;
+				checkRecovery();
+				if (!showRecovery) { tweetText = ''; threadBlocks = []; mode = 'tweet'; }
+				submitting = false; submitError = null;
+				for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
+				attachedMedia = [];
+				focusMode = false; paletteOpen = false; showFromNotes = false;
+				voiceCue = '';
+				undoSnapshot = null; showUndo = false;
+				previewCollapsed = false;
+				inspectorOpen = loadInspectorState();
+				if (undoTimer) clearTimeout(undoTimer);
+			});
 		}
 	});
 
