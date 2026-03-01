@@ -15,11 +15,16 @@
 	import FromNotesPanel from '../FromNotesPanel.svelte';
 	import ComposerShell from './ComposerShell.svelte';
 	import ComposerHeaderBar from './ComposerHeaderBar.svelte';
+	import HomeComposerHeader from './HomeComposerHeader.svelte';
 	import ComposerCanvas from './ComposerCanvas.svelte';
 	import ComposerInspector from './ComposerInspector.svelte';
 	import TweetEditor from './TweetEditor.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ThreadPreviewRail from './ThreadPreviewRail.svelte';
+	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
+	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
+	import { currentAccount } from '$lib/stores/accounts';
+	import { persistGet, persistSet } from '$lib/stores/persistence';
 	import type { AttachedMedia } from './TweetEditor.svelte';
 
 	let {
@@ -58,6 +63,10 @@
 	let previewCollapsed = $state(false);
 	let inspectorOpen = $state(loadInspectorState());
 	let isMobile = $state(false);
+
+	// Home-surface state (only active when embedded)
+	let tipsVisible = $state(false);
+	let promptDismissed = $state(false);
 
 	// Undo state for notes generation
 	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[] } | null>(null);
@@ -102,6 +111,14 @@
 
 	const desktopInspectorOpen = $derived(inspectorOpen && !isMobile);
 
+	const showPromptCard = $derived(
+		embedded && !hasExistingContent && !promptDismissed
+	);
+
+	const threadBlockCount = $derived(
+		mode === 'thread' ? threadBlocks.filter((b) => b.text.trim().length > 0).length || threadBlocks.length : 1
+	);
+
 	// ── Inspector persistence ──────────────────────────────
 	function loadInspectorState(): boolean {
 		try {
@@ -136,7 +153,7 @@
 
 	$effect(() => { void mode; void tweetText; void threadBlocks; autoSave(); });
 
-	onMount(() => {
+	onMount(async () => {
 		selectedTime = prefillTime ?? null;
 		checkRecovery();
 		if (!showRecovery) {
@@ -154,6 +171,11 @@
 		showUndo = false;
 		previewCollapsed = false;
 		inspectorOpen = loadInspectorState();
+
+		if (embedded) {
+			const tipsDismissed = await persistGet('home_tips_dismissed', false);
+			tipsVisible = !tipsDismissed;
+		}
 	});
 
 	onDestroy(() => {
@@ -365,6 +387,32 @@
 		if (undoTimer) clearTimeout(undoTimer);
 	}
 
+	async function dismissTips() {
+		tipsVisible = false;
+		await persistSet('home_tips_dismissed', true);
+	}
+
+	function handleUseExample(text: string) {
+		if (mode === 'tweet') {
+			tweetText = text;
+		} else {
+			const sorted = [...threadBlocks].sort((a, b) => a.order - b.order);
+			if (sorted.length > 0 && sorted[0].text.trim() === '') {
+				threadBlocks = threadBlocks.map((b) =>
+					b.id === sorted[0].id ? { ...b, text } : b
+				);
+			}
+		}
+		promptDismissed = true;
+	}
+
+	function openScheduleInInspector() {
+		if (!inspectorOpen) {
+			inspectorOpen = true;
+			persistInspectorState(true);
+		}
+	}
+
 	async function handleAiAssist() {
 		assisting = true; submitError = null;
 		try {
@@ -420,7 +468,11 @@
 	</div>
 
 	<div class="inspector-section">
-		<div class="inspector-section-label">AI</div>
+		<div class="inspector-section-label">
+			<span>AI</span>
+			<kbd class="inspector-kbd">{'\u2318'}J</kbd>
+		</div>
+		<p class="inspector-subtitle">Improve selected text or generate new content</p>
 		<div class="ai-actions-row">
 			<button class="ai-action-btn" onclick={handleAiAssist} disabled={assisting}>
 				{assisting ? 'Working...' : hasExistingContent ? 'AI Improve' : 'AI Generate'}
@@ -429,7 +481,6 @@
 				From Notes
 			</button>
 		</div>
-		<p class="inspector-hint">{'\u2318'}J to improve selected text</p>
 	</div>
 
 	{#if showFromNotes}
@@ -461,6 +512,7 @@
 	<ComposerCanvas
 		{canSubmit} {submitting} {selectedTime} {submitError}
 		inspectorOpen={desktopInspectorOpen}
+		{embedded}
 		onsubmit={handleSubmit}
 	>
 		{#snippet children()}
@@ -555,7 +607,37 @@
 	</ComposerShell>
 {:else}
 	<div class="embedded-workspace">
+		<HomeComposerHeader
+			{canSubmit}
+			{submitting}
+			{selectedTime}
+			{inspectorOpen}
+			previewVisible={hasPreviewContent && !previewCollapsed}
+			handle={$currentAccount?.x_username ?? null}
+			{mode}
+			blockCount={threadBlockCount}
+			hasContent={hasExistingContent}
+			onsubmit={handleSubmit}
+			ontoggleinspector={toggleInspector}
+			ontogglepreview={togglePreview}
+			onschedule={openScheduleInInspector}
+			onopenpalette={() => { paletteOpen = true; }}
+		/>
+		{#if tipsVisible}
+			<ComposerTipsTray
+				visible={tipsVisible}
+				ondismiss={dismissTips}
+			/>
+		{/if}
 		{@render composeBody()}
+		{#if showPromptCard}
+			<ComposerPromptCard
+				visible={showPromptCard}
+				{mode}
+				ondismiss={() => { promptDismissed = true; }}
+				onuseexample={handleUseExample}
+			/>
+		{/if}
 	</div>
 {/if}
 
@@ -676,7 +758,7 @@
 
 	/* Inspector sections */
 	.inspector-section {
-		padding: 12px 0;
+		padding: 14px 0;
 		border-bottom: 1px solid var(--color-border-subtle);
 	}
 
@@ -685,12 +767,37 @@
 	}
 
 	.inspector-section-label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		font-size: 11px;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 		color: var(--color-text-muted);
 		margin-bottom: 8px;
+	}
+
+	.inspector-kbd {
+		display: inline-flex;
+		align-items: center;
+		padding: 0 4px;
+		border-radius: 3px;
+		background: var(--color-surface-hover);
+		color: var(--color-text-subtle);
+		font-size: 10px;
+		font-family: var(--font-mono);
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: 0;
+		line-height: 1.6;
+	}
+
+	.inspector-subtitle {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+		margin: 0 0 8px;
+		line-height: 1.4;
 	}
 
 	.inspector-hint {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { ThreadBlock } from '$lib/api';
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
 	import { GripVertical, Merge, Trash2, Plus } from 'lucide-svelte';
@@ -69,6 +70,34 @@
 		if (e.isComposing) return;
 		onkeydown(e);
 	}
+
+	function autoResize(el: HTMLTextAreaElement) {
+		el.style.height = 'auto';
+		el.style.height = el.scrollHeight + 'px';
+	}
+
+	function handleInput(e: Event) {
+		const textarea = e.currentTarget as HTMLTextAreaElement;
+		ontext(textarea.value);
+		autoResize(textarea);
+	}
+
+	let textareaEl: HTMLTextAreaElement | undefined = $state();
+
+	onMount(() => {
+		if (textareaEl && block.text) {
+			autoResize(textareaEl);
+		}
+	});
+
+	$effect(() => {
+		void block.text;
+		if (textareaEl) {
+			requestAnimationFrame(() => {
+				if (textareaEl) autoResize(textareaEl);
+			});
+		}
+	});
 </script>
 
 <div
@@ -86,15 +115,15 @@
 	<div class="card-writing-area" class:focused class:over-limit={overLimit}>
 		<div class="spine-dot" class:focused class:over-limit={overLimit} aria-hidden="true"></div>
 		<textarea
+			bind:this={textareaEl}
 			class="flow-textarea"
 			placeholder={index === 0 ? 'Start writing...' : 'Continue...'}
 			value={block.text}
-			oninput={(e) => ontext(e.currentTarget.value)}
+			oninput={handleInput}
 			onfocus={() => onfocus()}
 			onblur={() => onblur()}
 			onkeydown={handleKeydownGuarded}
 			onpaste={handlePaste}
-			rows={3}
 			aria-label={`Post ${index + 1} of ${total}`}
 		></textarea>
 		<MediaSlot mediaPaths={block.media_paths} onmediachange={(paths) => onmedia(paths)} />
@@ -202,6 +231,8 @@
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
+		min-height: 72px;
+		overflow: hidden;
 	}
 
 	.flow-textarea::placeholder {
@@ -214,7 +245,7 @@
 		align-items: center;
 		height: 24px;
 		padding: 0;
-		margin: 2px 0;
+		margin: 0;
 		gap: 8px;
 	}
 
@@ -298,7 +329,7 @@
 	/* Between-block "+" affordance */
 	.between-zone {
 		position: relative;
-		height: 16px;
+		height: 20px;
 		display: flex;
 		align-items: center;
 		justify-content: flex-start;
