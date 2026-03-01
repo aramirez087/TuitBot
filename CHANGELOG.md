@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.17...tuitbot-cli-v0.1.18) - 2026-03-01
+
+### Added
+
+- Session 6 — desktop compatibility and migration
+- Session 4 — Watchtower provider refactor for linked-account auth
+- Session 3 — drive connection backend
+- Session 2 — config and credential model
+- Session 2 — backend factory reset
+- Session 4 — validation and release readiness
+- Session 2 — backend claim bootstrap
+
 ## [0.1.17](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.16...tuitbot-cli-v0.1.17) - 2026-02-28
 
 ### Added
