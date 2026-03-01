@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-03-01T03:21:28.486828+00:00",
+  "timestamp": "2026-03-01T03:40:35.955346+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -8,41 +8,7 @@
       "steps": [
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 7,
-          "success": true,
-          "response_valid": true,
-          "error_code": null,
-          "policy_decision": null
-        },
-        {
-          "tool_name": "propose_and_queue_replies",
-          "latency_ms": 4,
-          "success": true,
-          "response_valid": true,
-          "error_code": null,
-          "policy_decision": "allow"
-        }
-      ],
-      "total_latency_ms": 11,
-      "success": true,
-      "telemetry_entries": 1,
-      "schema_valid": true
-    },
-    {
-      "scenario": "B",
-      "description": "Composite flow: find -> draft -> queue",
-      "steps": [
-        {
-          "tool_name": "find_reply_opportunities",
-          "latency_ms": 2,
-          "success": true,
-          "response_valid": true,
-          "error_code": null,
-          "policy_decision": null
-        },
-        {
-          "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 5,
+          "latency_ms": 9,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -57,7 +23,41 @@
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 10,
+      "total_latency_ms": 12,
+      "success": true,
+      "telemetry_entries": 1,
+      "schema_valid": true
+    },
+    {
+      "scenario": "B",
+      "description": "Composite flow: find -> draft -> queue",
+      "steps": [
+        {
+          "tool_name": "find_reply_opportunities",
+          "latency_ms": 3,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": null
+        },
+        {
+          "tool_name": "draft_replies_for_candidates",
+          "latency_ms": 6,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": null
+        },
+        {
+          "tool_name": "propose_and_queue_replies",
+          "latency_ms": 6,
+          "success": true,
+          "response_valid": true,
+          "error_code": null,
+          "policy_decision": "allow"
+        }
+      ],
+      "total_latency_ms": 15,
       "success": true,
       "telemetry_entries": 3,
       "schema_valid": true
@@ -76,14 +76,14 @@
         },
         {
           "tool_name": "get_mcp_error_breakdown",
-          "latency_ms": 0,
+          "latency_ms": 1,
           "success": true,
           "response_valid": true,
           "error_code": null,
           "policy_decision": null
         }
       ],
-      "total_latency_ms": 0,
+      "total_latency_ms": 1,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true
