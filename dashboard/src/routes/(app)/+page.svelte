@@ -3,16 +3,12 @@
 	import { api, type ComposeRequest, type ScheduleConfig } from '$lib/api';
 	import ComposeWorkspace from '$lib/components/composer/ComposeWorkspace.svelte';
 	import AnalyticsHome from '$lib/components/home/AnalyticsHome.svelte';
-	import { persistGet } from '$lib/stores/persistence';
+	import { homeSurface, homeSurfaceReady, loadHomeSurface } from '$lib/stores/homeSurface';
 
-	type HomeSurface = 'composer' | 'analytics';
-	let homeSurface = $state<HomeSurface>('composer');
-	let loaded = $state(false);
 	let schedule = $state<ScheduleConfig | null>(null);
 
 	onMount(async () => {
-		homeSurface = await persistGet<HomeSurface>('home_surface', 'composer');
-		loaded = true;
+		await loadHomeSurface();
 		try {
 			const cfg = await api.content.schedule();
 			schedule = cfg;
@@ -27,12 +23,12 @@
 </script>
 
 <svelte:head>
-	<title>{homeSurface === 'composer' ? 'Compose' : 'Dashboard'} — Tuitbot</title>
+	<title>{$homeSurface === 'composer' ? 'Compose' : 'Dashboard'} — Tuitbot</title>
 </svelte:head>
 
-{#if !loaded}
+{#if !$homeSurfaceReady}
 	<div class="loading-skeleton"></div>
-{:else if homeSurface === 'composer'}
+{:else if $homeSurface === 'composer'}
 	<div class="home-composer">
 		<ComposeWorkspace
 			{schedule}

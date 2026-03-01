@@ -10,7 +10,7 @@
 	import { api } from "$lib/api";
 	import { onMount } from "svelte";
 	import {
-		LayoutDashboard,
+		Home,
 		Activity,
 		CheckCircle,
 		FileText,
@@ -55,7 +55,7 @@
 	}
 
 	const navItems = [
-		{ href: "/", label: "Dashboard", icon: LayoutDashboard },
+		{ href: "/", label: "Home", icon: Home },
 		{ href: "/activity", label: "Activity", icon: Activity },
 		{ href: "/approval", label: "Approval", icon: CheckCircle },
 		{ href: "/content", label: "Content", icon: FileText },
