@@ -23,6 +23,7 @@
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
+	import ComposerShortcutBar from '../home/ComposerShortcutBar.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
 	import { persistGet, persistSet } from '$lib/stores/persistence';
 	import type { AttachedMedia } from './TweetEditor.svelte';
@@ -70,8 +71,12 @@
 	let promptDismissed = $state(false);
 
 	// Undo state for notes generation
-	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[] } | null>(null);
+	let undoSnapshot = $state<{
+		mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[];
+		media?: AttachedMedia[]; selectedTime?: string | null;
+	} | null>(null);
 	let showUndo = $state(false);
+	let undoMessage = $state('Content replaced.');
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Auto-save
@@ -189,6 +194,9 @@
 
 	onDestroy(() => {
 		for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
+		if (undoSnapshot?.media) {
+			for (const m of undoSnapshot.media) URL.revokeObjectURL(m.previewUrl);
+		}
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		if (undoTimer) clearTimeout(undoTimer);
 		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
@@ -197,6 +205,21 @@
 	function handleComposeEvent() {
 		const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
 		textarea?.focus();
+	}
+
+	function switchMode(newMode: 'tweet' | 'thread') {
+		if (newMode === mode) return;
+		if (newMode === 'thread' && tweetText.trim()) {
+			const hasThreadContent = threadBlocks.some((b) => b.text.trim());
+			if (!hasThreadContent) {
+				threadBlocks = [
+					{ id: crypto.randomUUID(), text: tweetText, media_paths: [], order: 0 },
+					{ id: crypto.randomUUID(), text: '', media_paths: [], order: 1 }
+				];
+				tweetText = '';
+			}
+		}
+		mode = newMode;
 	}
 
 	// ── Autosave / Recovery ────────────────────────────────
@@ -251,20 +274,36 @@
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount
 			if (embedded) {
+				// Snapshot current state so user can undo the clear
+				undoSnapshot = {
+					mode, text: tweetText, blocks: [...threadBlocks],
+					media: [...attachedMedia], selectedTime
+				};
+				undoMessage = 'Published.';
+
 				tweetText = '';
 				threadBlocks = [];
 				mode = 'tweet';
 				selectedTime = null;
-				for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
+				// Don't revoke media URLs yet — undo may need them
 				attachedMedia = [];
 				submitting = false;
 				submitError = null;
 				focusMode = false;
 				showFromNotes = false;
 				voiceCue = '';
-				undoSnapshot = null;
-				showUndo = false;
 				previewMode = false;
+
+				showUndo = true;
+				if (undoTimer) clearTimeout(undoTimer);
+				undoTimer = setTimeout(() => {
+					showUndo = false;
+					// Revoke media URLs now that undo window has closed
+					if (undoSnapshot?.media) {
+						for (const m of undoSnapshot.media) URL.revokeObjectURL(m.previewUrl);
+					}
+					undoSnapshot = null;
+				}, 10000);
 			}
 		} catch (e) {
 			submitError = e instanceof Error ? e.message : 'Failed to submit';
@@ -304,8 +343,8 @@
 			return;
 		}
 		if (matchEvent(e, 'cmd+j')) { e.preventDefault(); handleInlineAssist(); return; }
-		if (matchEvent(e, 'cmd+shift+n')) { e.preventDefault(); mode = 'tweet'; return; }
-		if (matchEvent(e, 'cmd+shift+t')) { e.preventDefault(); mode = 'thread'; return; }
+		if (matchEvent(e, 'cmd+shift+n')) { e.preventDefault(); switchMode('tweet'); return; }
+		if (matchEvent(e, 'cmd+shift+t')) { e.preventDefault(); switchMode('thread'); return; }
 		if (matchEvent(e, 'cmd+i')) { e.preventDefault(); toggleInspector(); return; }
 		if (matchEvent(e, 'cmd+shift+p')) { e.preventDefault(); togglePreview(); return; }
 		if (e.key === 'Escape') {
@@ -321,8 +360,8 @@
 		paletteOpen = false;
 		switch (actionId) {
 			case 'focus-mode': toggleFocusMode(); break;
-			case 'mode-tweet': mode = 'tweet'; break;
-			case 'mode-thread': mode = 'thread'; break;
+			case 'mode-tweet': switchMode('tweet'); break;
+			case 'mode-thread': switchMode('thread'); break;
 			case 'submit': handleSubmit(); break;
 			case 'ai-improve': handleInlineAssist(); break;
 			case 'ai-from-notes': showFromNotes = true; if (!inspectorOpen) inspectorOpen = true; break;
@@ -347,6 +386,7 @@
 
 			// Snapshot before replacement for undo
 			undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
+			undoMessage = 'Content replaced.';
 
 			assisting = true; submitError = null;
 			try {
@@ -367,6 +407,7 @@
 		} else {
 			// Thread mode: snapshot all blocks before delegating
 			undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
+			undoMessage = 'Content replaced.';
 			try {
 				await threadFlowRef?.handleInlineAssist(voiceCue || undefined);
 				showUndo = true;
@@ -381,6 +422,7 @@
 	async function handleGenerateFromNotes(notesInput: string) {
 		submitError = null;
 		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
+		undoMessage = 'Content replaced.';
 
 		if (mode === 'thread') {
 			const result = await api.assist.thread(topicWithCue(voiceCue, notesInput));
@@ -403,8 +445,11 @@
 
 	function handleUndo() {
 		if (!undoSnapshot) return;
+		mode = undoSnapshot.mode;
 		tweetText = undoSnapshot.text;
 		threadBlocks = undoSnapshot.blocks;
+		if (undoSnapshot.media) attachedMedia = undoSnapshot.media;
+		if (undoSnapshot.selectedTime !== undefined) selectedTime = undoSnapshot.selectedTime;
 		undoSnapshot = null;
 		showUndo = false;
 		if (undoTimer) clearTimeout(undoTimer);
@@ -497,7 +542,7 @@
 
 			{#if showUndo && !showFromNotes}
 				<div class="undo-banner">
-					<span>Content replaced.</span>
+					<span>{undoMessage}</span>
 					<button class="undo-btn" onclick={handleUndo}>Undo</button>
 				</div>
 			{/if}
@@ -596,6 +641,12 @@
 				{mode}
 				ondismiss={dismissTips}
 			/>
+		{:else}
+			<ComposerShortcutBar
+				{mode}
+				onopenpalette={() => { paletteOpen = true; }}
+				onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
+			/>
 		{/if}
 		{@render composeBody()}
 		{#if showPromptCard}
@@ -639,6 +690,7 @@
 		flex-direction: column;
 		flex: 1;
 		min-height: 0;
+		position: relative;
 	}
 
 	/* Undo banner */

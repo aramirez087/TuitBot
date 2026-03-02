@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatCombo, SHORTCUT_CATALOG } from '$lib/utils/shortcuts';
+	import { formatCombo, matchEvent, SHORTCUT_CATALOG } from '$lib/utils/shortcuts';
 	import { focusTrap } from '$lib/actions/focusTrap';
 	import {
 		Maximize2,
@@ -132,6 +132,16 @@
 				onaction(flatActions[selectedIndex].id);
 			}
 			return;
+		}
+
+		// Match keyboard shortcut combos against visible actions
+		for (const action of flatActions) {
+			if (action.shortcut && matchEvent(e, action.shortcut)) {
+				e.preventDefault();
+				e.stopPropagation();
+				onaction(action.id);
+				return;
+			}
 		}
 	}
 
