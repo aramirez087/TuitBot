@@ -101,12 +101,12 @@ export function formatCombo(combo: string): string {
 
 /** Complete shortcut catalog for CommandPalette display. */
 export const SHORTCUT_CATALOG: ShortcutDef[] = [
-	{ combo: 'cmd+n', label: 'New compose', category: 'Mode', when: 'always' },
-	{ combo: 'cmd+enter', label: 'Publish (tweet) / Split below (thread)', category: 'Compose', when: 'always' },
-	{ combo: 'cmd+shift+enter', label: 'Publish (thread)', category: 'Compose', when: 'thread' },
+	{ combo: 'cmd+enter', label: 'Publish', category: 'Compose', when: 'tweet' },
+	{ combo: 'cmd+enter', label: 'Split / add post below', category: 'Thread', when: 'thread' },
+	{ combo: 'cmd+shift+enter', label: 'Publish thread', category: 'Compose', when: 'thread' },
 	{ combo: 'cmd+shift+f', label: 'Focus mode', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+k', label: 'Command palette', category: 'Mode', when: 'always' },
-	{ combo: 'cmd+j', label: 'Improve with AI', category: 'AI', when: 'always' },
+	{ combo: 'cmd+j', label: 'AI improve (selection or full post)', category: 'AI', when: 'always' },
 	{ combo: 'escape', label: 'Close / dismiss', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+i', label: 'Inspector', category: 'Mode', when: 'always' },
 	{ combo: 'cmd+shift+p', label: 'Preview', category: 'Mode', when: 'always' },

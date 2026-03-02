@@ -344,6 +344,10 @@
 			const end = textarea.selectionEnd;
 			const selectedText = start !== end ? tweetText.slice(start, end) : tweetText;
 			if (!selectedText.trim()) return;
+
+			// Snapshot before replacement for undo
+			undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
+
 			assisting = true; submitError = null;
 			try {
 				const result = await api.assist.improve(selectedText, voiceCue || undefined);
@@ -353,11 +357,24 @@
 					tweetText = result.content;
 				}
 				voicePanelRef?.saveCueToHistory();
+				showUndo = true;
+				if (undoTimer) clearTimeout(undoTimer);
+				undoTimer = setTimeout(() => { showUndo = false; }, 10000);
 			} catch (e) {
 				submitError = e instanceof Error ? e.message : 'AI assist failed';
+				undoSnapshot = null;
 			} finally { assisting = false; }
 		} else {
-			threadFlowRef?.handleInlineAssist(voiceCue || undefined);
+			// Thread mode: snapshot all blocks before delegating
+			undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
+			try {
+				await threadFlowRef?.handleInlineAssist(voiceCue || undefined);
+				showUndo = true;
+				if (undoTimer) clearTimeout(undoTimer);
+				undoTimer = setTimeout(() => { showUndo = false; }, 10000);
+			} catch {
+				undoSnapshot = null;
+			}
 		}
 	}
 
@@ -480,7 +497,7 @@
 
 			{#if showUndo && !showFromNotes}
 				<div class="undo-banner">
-					<span>Content replaced from notes.</span>
+					<span>Content replaced.</span>
 					<button class="undo-btn" onclick={handleUndo}>Undo</button>
 				</div>
 			{/if}
@@ -576,6 +593,7 @@
 		{#if tipsVisible}
 			<ComposerTipsTray
 				visible={tipsVisible}
+				{mode}
 				ondismiss={dismissTips}
 			/>
 		{/if}

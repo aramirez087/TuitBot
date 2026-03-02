@@ -1,22 +1,32 @@
 <script lang="ts">
-	import { Scissors, Search, Sparkles } from 'lucide-svelte';
+	import { Scissors, Search, Send, Sparkles } from 'lucide-svelte';
 
 	let {
 		visible,
+		mode = 'tweet',
 		ondismiss
 	}: {
 		visible: boolean;
+		mode?: 'tweet' | 'thread';
 		ondismiss: () => void;
 	} = $props();
 
 	const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 	const mod = isMac ? '\u2318' : 'Ctrl+';
 
-	const tips = [
-		{ icon: Scissors, label: 'Split into thread', shortcut: `${mod}Enter` },
-		{ icon: Search, label: 'Command palette', shortcut: `${mod}K` },
-		{ icon: Sparkles, label: 'AI improve', shortcut: `${mod}J` }
-	];
+	const tips = $derived(
+		mode === 'thread'
+			? [
+				{ icon: Scissors, label: 'Split / add post', shortcut: `${mod}Enter` },
+				{ icon: Search, label: 'Command palette', shortcut: `${mod}K` },
+				{ icon: Sparkles, label: 'AI improve', shortcut: `${mod}J` }
+			]
+			: [
+				{ icon: Send, label: 'Publish', shortcut: `${mod}Enter` },
+				{ icon: Search, label: 'Command palette', shortcut: `${mod}K` },
+				{ icon: Sparkles, label: 'AI improve', shortcut: `${mod}J` }
+			]
+	);
 </script>
 
 {#if visible}

@@ -96,8 +96,8 @@
 				<button
 					class="icon-btn"
 					onclick={onaiassist}
-					aria-label="Improve with AI"
-					title="Improve with AI (\u2318J)"
+					aria-label="AI improve selection or post"
+					title="AI improve selection or post (\u2318J)"
 				>
 					<Sparkles size={15} />
 				</button>
