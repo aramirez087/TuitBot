@@ -77,7 +77,7 @@
 
 <style>
 	.prompt-card {
-		margin: 16px 20px 0;
+		margin: 12px 16px 0;
 		padding: 14px 16px;
 		border: 1px solid var(--color-border-subtle);
 		border-radius: 8px;
@@ -181,9 +181,4 @@
 		}
 	}
 
-	@media (max-width: 640px) {
-		.prompt-card {
-			margin: 12px 16px 0;
-		}
-	}
 </style>

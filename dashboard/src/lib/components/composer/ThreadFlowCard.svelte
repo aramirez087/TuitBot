@@ -130,9 +130,11 @@
 	</div>
 
 	<div class="card-separator" class:last={isLast}>
-		<span class="sep-char-count" class:over-limit={overLimit} class:warning>
-			{charCount}/{MAX_TWEET_CHARS}
-		</span>
+		{#if charCount > 240 || overLimit}
+			<span class="sep-char-count" class:over-limit={overLimit} class:warning>
+				{charCount}/{MAX_TWEET_CHARS}
+			</span>
+		{/if}
 		<div class="sep-tools">
 			<div
 				class="sep-handle"
@@ -174,7 +176,7 @@
 		onclick={() => onaddafter()}
 	>
 		<span class="between-plus">
-			<Plus size={12} />
+			<Plus size={10} />
 		</span>
 	</button>
 </div>
@@ -208,12 +210,12 @@
 	/* Spine dot marker — aligned to the lane spine */
 	.spine-dot {
 		position: absolute;
-		left: -28px;
+		left: -21px;
 		top: 14px;
-		width: 10px;
-		height: 10px;
+		width: 8px;
+		height: 8px;
 		border-radius: 50%;
-		border: 2px solid var(--color-border-subtle);
+		border: 1.5px solid var(--color-border-subtle);
 		background: var(--color-surface);
 		transition: border-color 0.15s ease, background 0.15s ease;
 		z-index: 1;
@@ -235,13 +237,13 @@
 		border: none;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 14px;
+		font-size: 15px;
 		font-family: var(--font-sans);
-		line-height: 1.6;
+		line-height: 1.4;
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
-		min-height: 72px;
+		min-height: 60px;
 		overflow: hidden;
 	}
 
@@ -339,7 +341,7 @@
 	/* Between-block "+" affordance */
 	.between-zone {
 		position: relative;
-		height: 20px;
+		height: 12px;
 		display: flex;
 		align-items: center;
 		justify-content: flex-start;
@@ -348,8 +350,8 @@
 
 	.between-plus {
 		opacity: 0;
-		width: 18px;
-		height: 18px;
+		width: 14px;
+		height: 14px;
 		border-radius: 50%;
 		border: 1px solid var(--color-border-subtle);
 		display: flex;
@@ -358,7 +360,7 @@
 		color: var(--color-text-subtle);
 		background: var(--color-surface);
 		transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-		margin-left: -32px;
+		margin-left: -25px;
 		z-index: 2;
 	}
 

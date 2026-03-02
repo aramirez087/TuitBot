@@ -115,14 +115,16 @@
 		rows={4}
 		aria-label="Tweet content"
 	></textarea>
-	<div
-		class="char-counter"
-		class:over-limit={tweetOverLimit}
-		aria-live="polite"
-		aria-label="Character count"
-	>
-		{tweetChars}/{TWEET_MAX}
-	</div>
+	{#if tweetChars > 240 || tweetOverLimit}
+		<div
+			class="char-counter"
+			class:over-limit={tweetOverLimit}
+			aria-live="polite"
+			aria-label="Character count"
+		>
+			{tweetChars}/{TWEET_MAX}
+		</div>
+	{/if}
 </div>
 
 {#if attachedMedia.length > 0}
@@ -148,13 +150,15 @@
 
 {#if canAttachMore}
 	<div class="media-attach-section">
-		<button class="attach-btn" onclick={() => fileInput?.click()} disabled={uploading}>
-			<Image size={14} />
-			{uploading ? 'Uploading...' : 'Attach media'}
+		<button
+			class="attach-icon-btn"
+			onclick={() => fileInput?.click()}
+			disabled={uploading}
+			title="Attach media (JPEG, PNG, WebP, GIF, MP4)"
+			aria-label={uploading ? 'Uploading media' : 'Attach media'}
+		>
+			<Image size={16} />
 		</button>
-		<span class="attach-hint">
-			JPEG, PNG, WebP, GIF, MP4 &middot; max 4 images or 1 GIF/video
-		</span>
 		<input
 			bind:this={fileInput}
 			type="file"
@@ -173,26 +177,24 @@
 
 	.compose-input {
 		width: 100%;
-		padding: 10px 12px;
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		background: var(--color-base);
+		padding: 12px 0;
+		border: none;
+		border-radius: 0;
+		background: transparent;
 		color: var(--color-text);
-		font-size: 14px;
+		font-size: 15px;
 		font-family: var(--font-sans);
-		line-height: 1.5;
+		line-height: 1.4;
 		resize: vertical;
 		box-sizing: border-box;
-		transition: border-color 0.15s ease;
 	}
 
 	.compose-input:focus {
 		outline: none;
-		border-color: var(--color-accent);
 	}
 
 	.compose-input.over-limit {
-		border-color: var(--color-danger);
+		box-shadow: inset 2px 0 0 var(--color-danger);
 	}
 
 	.char-counter {
@@ -212,7 +214,7 @@
 		display: flex;
 		gap: 8px;
 		flex-wrap: wrap;
-		margin-top: 12px;
+		margin-top: 8px;
 	}
 
 	.media-thumb {
@@ -271,36 +273,31 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		margin-top: 12px;
+		margin-top: 8px;
 	}
 
-	.attach-btn {
+	.attach-icon-btn {
 		display: flex;
 		align-items: center;
-		gap: 5px;
-		padding: 6px 12px;
-		border: 1px solid var(--color-border);
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: none;
 		border-radius: 6px;
 		background: transparent;
 		color: var(--color-text-muted);
-		font-size: 12px;
 		cursor: pointer;
 		transition: all 0.15s ease;
 	}
 
-	.attach-btn:hover:not(:disabled) {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
+	.attach-icon-btn:hover:not(:disabled) {
+		background: var(--color-surface-hover);
+		color: var(--color-text);
 	}
 
-	.attach-btn:disabled {
+	.attach-icon-btn:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
-	}
-
-	.attach-hint {
-		font-size: 11px;
-		color: var(--color-text-subtle);
 	}
 
 	.hidden-file-input {
@@ -312,14 +309,14 @@
 			width: 32px;
 			height: 32px;
 		}
+
+		.attach-icon-btn {
+			min-width: 44px;
+			min-height: 44px;
+		}
 	}
 
 	@media (max-width: 640px) {
-		.media-attach-section {
-			flex-direction: column;
-			align-items: flex-start;
-		}
-
 		.compose-input {
 			font-size: 16px;
 		}

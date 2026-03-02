@@ -418,16 +418,16 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		padding-left: 40px;
+		padding-left: 32px;
 	}
 
 	.lane-spine {
 		position: absolute;
-		left: 19px;
+		left: 15px;
 		top: 24px;
 		bottom: 24px;
 		width: 1px;
-		background: var(--color-border-subtle);
+		background: color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
 		pointer-events: none;
 	}
 

@@ -41,7 +41,7 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		padding: 8px 20px;
+		padding: 6px 16px;
 		background: color-mix(in srgb, var(--color-accent) 4%, transparent);
 		border-bottom: 1px solid color-mix(in srgb, var(--color-accent) 8%, transparent);
 		flex-shrink: 0;
@@ -109,7 +109,6 @@
 
 	@media (max-width: 640px) {
 		.tips-tray {
-			padding: 8px 16px;
 			gap: 8px;
 		}
 

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import {
-		Calendar,
 		Send,
 		Eye,
 		EyeOff,
@@ -23,7 +22,6 @@
 		onsubmit,
 		ontoggleinspector,
 		ontogglepreview,
-		onschedule,
 		onopenpalette,
 		onaiassist
 	}: {
@@ -39,7 +37,6 @@
 		onsubmit: () => void;
 		ontoggleinspector: () => void;
 		ontogglepreview: () => void;
-		onschedule: () => void;
 		onopenpalette: () => void;
 		onaiassist?: () => void;
 	} = $props();
@@ -52,12 +49,6 @@
 		submitting ? 'Posting\u2026' : selectedTime ? 'Schedule' : 'Publish'
 	);
 
-	function formatTime(time: string): string {
-		const [h, m] = time.split(':').map(Number);
-		const period = h >= 12 ? 'PM' : 'AM';
-		const h12 = h % 12 || 12;
-		return `${h12}:${String(m).padStart(2, '0')} ${period}`;
-	}
 </script>
 
 <header class="home-header">
@@ -71,20 +62,6 @@
 	</div>
 
 	<div class="header-right">
-		<button
-			class="cta-pill schedule-pill"
-			onclick={onschedule}
-			title="Schedule post"
-			aria-label={selectedTime ? `Scheduled for ${formatTime(selectedTime)}` : 'Schedule post'}
-		>
-			<Calendar size={14} />
-			{#if selectedTime}
-				<span>{formatTime(selectedTime)}</span>
-			{:else}
-				<span>Schedule</span>
-			{/if}
-		</button>
-
 		<button
 			class="cta-pill publish-pill"
 			onclick={onsubmit}
@@ -154,7 +131,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding: 10px 20px;
+		padding: 8px 16px;
 		flex-shrink: 0;
 		border-bottom: 1px solid color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
 	}
@@ -220,17 +197,6 @@
 		transition: all 0.15s ease;
 		white-space: nowrap;
 		border: none;
-	}
-
-	.schedule-pill {
-		background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-		color: var(--color-warning);
-		border: 1px solid color-mix(in srgb, var(--color-warning) 25%, transparent);
-	}
-
-	.schedule-pill:hover {
-		background: color-mix(in srgb, var(--color-warning) 20%, transparent);
-		border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
 	}
 
 	.publish-pill {
@@ -313,7 +279,6 @@
 
 	@media (max-width: 640px) {
 		.home-header {
-			padding: 8px 16px;
 			gap: 8px;
 		}
 

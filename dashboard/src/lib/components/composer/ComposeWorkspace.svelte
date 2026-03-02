@@ -20,7 +20,6 @@
 	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
-	import ThreadPreviewRail from './ThreadPreviewRail.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
@@ -470,22 +469,6 @@
 				/>
 			{/if}
 
-			{#if hasPreviewContent && !previewCollapsed}
-				<div class="preview-section">
-					<button class="preview-toggle" onclick={() => { previewCollapsed = true; }}>
-						<span class="preview-label">Preview</span>
-						<span class="preview-collapse">Hide</span>
-					</button>
-					<ThreadPreviewRail
-						{mode}
-						tweetText={tweetText}
-						tweetMediaPaths={attachedMedia.map((m) => m.path)}
-						tweetLocalPreviews={tweetMediaPreviewMap}
-						blocks={sortedPreviewBlocks}
-					/>
-				</div>
-			{/if}
-
 			{#if showUndo && !showFromNotes}
 				<div class="undo-banner">
 					<span>Content replaced from notes.</span>
@@ -578,7 +561,6 @@
 			onsubmit={handleSubmit}
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
-			onschedule={openScheduleInInspector}
 			onopenpalette={() => { paletteOpen = true; }}
 			onaiassist={handleInlineAssist}
 		/>
@@ -618,42 +600,6 @@
 		flex-direction: column;
 		flex: 1;
 		min-height: 0;
-	}
-
-	/* Preview section */
-	.preview-section {
-		margin-top: 16px;
-		padding-top: 16px;
-		border-top: 1px solid var(--color-border-subtle);
-	}
-
-	.preview-toggle {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		width: 100%;
-		padding: 0 0 12px;
-		border: none;
-		background: transparent;
-		cursor: pointer;
-		color: var(--color-text-muted);
-		font-size: 11px;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.preview-toggle:hover {
-		color: var(--color-text);
-	}
-
-	.preview-collapse {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-	}
-
-	.preview-toggle:hover .preview-collapse {
-		color: var(--color-accent);
 	}
 
 	/* Undo banner */
