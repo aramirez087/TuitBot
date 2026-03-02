@@ -36,8 +36,8 @@
 			class="header-btn"
 			class:active={previewVisible}
 			onclick={ontogglepreview}
-			aria-label={previewVisible ? 'Hide preview' : 'Show preview'}
-			title={previewVisible ? 'Hide preview (\u2318\u21E7P)' : 'Show preview (\u2318\u21E7P)'}
+			aria-label={previewVisible ? 'Close preview' : 'Open preview'}
+			title={previewVisible ? 'Close preview (\u2318\u21E7P)' : 'Open preview (\u2318\u21E7P)'}
 		>
 			{#if previewVisible}
 				<Eye size={14} />

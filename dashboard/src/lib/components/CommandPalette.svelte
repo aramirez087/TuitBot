@@ -46,7 +46,7 @@
 		{ id: 'mode-tweet', label: 'Switch to tweet', icon: MessageSquare, category: 'Mode', shortcut: 'cmd+shift+n', when: 'always' },
 		{ id: 'mode-thread', label: 'Switch to thread', icon: List, category: 'Mode', shortcut: 'cmd+shift+t', when: 'always' },
 		{ id: 'submit', label: 'Publish', icon: Send, category: 'Compose', shortcut: mode === 'thread' ? 'cmd+shift+enter' : 'cmd+enter', when: 'always' },
-		{ id: 'toggle-preview', label: 'Preview', icon: Eye, category: 'Mode', shortcut: 'cmd+shift+p', when: 'always' },
+		{ id: 'toggle-preview', label: 'Toggle preview', icon: Eye, category: 'Mode', shortcut: 'cmd+shift+p', when: 'always' },
 		{ id: 'ai-improve', label: 'Improve with AI', icon: Sparkles, category: 'AI', shortcut: 'cmd+j', when: 'always' },
 		{ id: 'ai-generate', label: 'AI generate', icon: Sparkles, category: 'AI', when: 'always' },
 		{ id: 'ai-from-notes', label: 'From notes', icon: FileText, category: 'AI', when: 'always' },

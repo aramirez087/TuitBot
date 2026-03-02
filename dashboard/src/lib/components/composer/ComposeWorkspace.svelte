@@ -19,6 +19,7 @@
 	import InspectorContent from './InspectorContent.svelte';
 	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
+	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
@@ -59,7 +60,7 @@
 	let showFromNotes = $state(false);
 	let assisting = $state(false);
 	let voiceCue = $state('');
-	let previewCollapsed = $state(false);
+	let previewMode = $state(false);
 	let inspectorOpen = $state(loadInspectorState());
 	let isMobile = $state(false);
 	let statusAnnouncement = $state('');
@@ -139,7 +140,7 @@
 	}
 
 	function togglePreview() {
-		previewCollapsed = !previewCollapsed;
+		previewMode = !previewMode;
 	}
 
 	// ── Lifecycle ──────────────────────────────────────────
@@ -176,7 +177,7 @@
 		voiceCue = '';
 		undoSnapshot = null;
 		showUndo = false;
-		previewCollapsed = false;
+		previewMode = false;
 		inspectorOpen = loadInspectorState();
 
 		if (embedded) {
@@ -263,7 +264,7 @@
 				voiceCue = '';
 				undoSnapshot = null;
 				showUndo = false;
-				previewCollapsed = false;
+				previewMode = false;
 			}
 		} catch (e) {
 			submitError = e instanceof Error ? e.message : 'Failed to submit';
@@ -282,6 +283,14 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (paletteOpen) return;
+
+		// When preview overlay is open, only allow Escape and toggle
+		if (previewMode) {
+			if (e.key === 'Escape') { e.preventDefault(); previewMode = false; return; }
+			if (matchEvent(e, 'cmd+shift+p')) { e.preventDefault(); togglePreview(); return; }
+			return;
+		}
+
 		if (matchEvent(e, 'cmd+k')) { e.preventDefault(); paletteOpen = true; return; }
 		if (matchEvent(e, 'cmd+shift+f')) {
 			e.preventDefault();
@@ -537,7 +546,7 @@
 			<ComposerHeaderBar
 				{focusMode}
 				inspectorOpen={inspectorOpen}
-				previewVisible={hasPreviewContent && !previewCollapsed}
+				previewVisible={previewMode}
 				ontogglefocus={toggleFocusMode}
 				ontoggleinspector={toggleInspector}
 				ontogglepreview={togglePreview}
@@ -553,7 +562,7 @@
 			{submitting}
 			{selectedTime}
 			{inspectorOpen}
-			previewVisible={hasPreviewContent && !previewCollapsed}
+			previewVisible={previewMode}
 			handle={$currentAccount?.x_username ?? null}
 			{mode}
 			blockCount={threadBlockCount}
@@ -580,6 +589,18 @@
 			/>
 		{/if}
 	</div>
+{/if}
+
+{#if previewMode}
+	<ComposerPreviewSurface
+		{mode}
+		{tweetText}
+		blocks={sortedPreviewBlocks}
+		tweetMediaPaths={attachedMedia.map((m) => m.path)}
+		tweetLocalPreviews={tweetMediaPreviewMap}
+		handle={$currentAccount?.x_username ? `@${$currentAccount.x_username}` : '@you'}
+		onclose={() => { previewMode = false; }}
+	/>
 {/if}
 
 <style>
