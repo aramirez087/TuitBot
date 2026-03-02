@@ -119,4 +119,10 @@
 			min-height: 44px;
 		}
 	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.header-btn {
+			transition: none;
+		}
+	}
 </style>

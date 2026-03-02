@@ -150,6 +150,12 @@
 		}
 	}
 
+	@media (prefers-reduced-motion: reduce) {
+		.submit-pill {
+			transition: none;
+		}
+	}
+
 	@media (max-width: 640px) {
 		.canvas-main {
 			padding: 0 16px 16px;

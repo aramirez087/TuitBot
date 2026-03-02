@@ -316,6 +316,13 @@
 		}
 	}
 
+	@media (prefers-reduced-motion: reduce) {
+		.remove-media-btn,
+		.attach-icon-btn {
+			transition: none;
+		}
+	}
+
 	@media (max-width: 640px) {
 		.compose-input {
 			font-size: 16px;

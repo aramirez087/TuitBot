@@ -327,4 +327,12 @@
 		background: var(--color-surface-hover);
 		color: var(--color-text);
 	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.voice-toggle,
+		.cue-input,
+		.saved-cue-item {
+			transition: none;
+		}
+	}
 </style>

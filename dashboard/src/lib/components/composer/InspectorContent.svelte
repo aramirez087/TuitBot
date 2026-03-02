@@ -182,6 +182,12 @@
 		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 	}
 
+	@media (prefers-reduced-motion: reduce) {
+		.ai-action-btn {
+			transition: none;
+		}
+	}
+
 	@media (pointer: coarse) {
 		.ai-action-btn {
 			min-height: 44px;
