@@ -8,11 +8,11 @@
 	import ThreadFlowLane from './composer/ThreadFlowLane.svelte';
 
 	let {
-		initialBlocks = undefined,
+		blocks = [],
 		onchange,
 		onvalidchange
 	}: {
-		initialBlocks?: ThreadBlock[];
+		blocks?: ThreadBlock[];
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
 	} = $props();
@@ -31,7 +31,7 @@
 
 <ThreadFlowLane
 	bind:this={laneRef}
-	{initialBlocks}
+	{blocks}
 	{onchange}
 	{onvalidchange}
 />

@@ -5,34 +5,27 @@
 	import ThreadFlowCard from './ThreadFlowCard.svelte';
 
 	let {
-		initialBlocks = undefined,
+		blocks: externalBlocks = [],
 		onchange,
 		onvalidchange
 	}: {
-		initialBlocks?: ThreadBlock[];
+		blocks?: ThreadBlock[];
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
-	let blocks = $state<ThreadBlock[]>(threadOps.createDefaultBlocks());
+	// Stable fallback for when parent has no blocks yet
+	const fallbackBlocks = threadOps.createDefaultBlocks();
+	// Single source of truth: always derived from parent prop
+	const blocks = $derived(externalBlocks.length > 0 ? externalBlocks : fallbackBlocks);
+
 	let focusedBlockId = $state<string | null>(null);
 	let draggingBlockId = $state<string | null>(null);
 	let dropTargetBlockId = $state<string | null>(null);
 	let reorderAnnouncement = $state('');
 	let mergeError = $state<string | null>(null);
 	let assistingBlockId = $state<string | null>(null);
-
-	// ── Sync from parent ───────────────────────────────────
-	$effect(() => {
-		if (initialBlocks && initialBlocks.length > 0) {
-			const currentIds = blocks.map((b) => b.id).join(',');
-			const incomingIds = initialBlocks.map((b) => b.id).join(',');
-			if (currentIds !== incomingIds) {
-				blocks = [...initialBlocks];
-			}
-		}
-	});
 
 	// ── Derived ────────────────────────────────────────────
 	const sortedBlocks = $derived(threadOps.sortBlocks(blocks));
@@ -51,8 +44,6 @@
 	$effect(() => { onvalidchange(canSubmit); });
 
 	// ── Helpers ────────────────────────────────────────────
-	function emitChange() { onchange([...blocks]); }
-
 	function focusBlock(blockId: string, cursorPos?: number) {
 		requestAnimationFrame(() => {
 			const textarea = document.querySelector(
@@ -70,49 +61,42 @@
 	// ── Block operations ───────────────────────────────────
 	function addBlock() {
 		const result = threadOps.addBlock(blocks);
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(result.newId);
 	}
 
 	function addBlockAfter(afterId: string) {
 		const result = threadOps.addBlockAfter(blocks, afterId);
 		if (!result) return;
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(result.newId);
 	}
 
 	function removeBlock(id: string) {
 		const result = threadOps.removeBlock(blocks, id);
 		if (!result) return;
-		blocks = result;
-		emitChange();
+		onchange(result);
 	}
 
 	function updateBlockText(id: string, text: string) {
-		blocks = threadOps.updateBlockText(blocks, id, text);
-		emitChange();
+		onchange(threadOps.updateBlockText(blocks, id, text));
 	}
 
 	function updateBlockMedia(id: string, paths: string[]) {
-		blocks = threadOps.updateBlockMedia(blocks, id, paths);
-		emitChange();
+		onchange(threadOps.updateBlockMedia(blocks, id, paths));
 	}
 
 	function moveBlock(blockId: string, newIndex: number) {
 		const result = threadOps.moveBlockToIndex(blocks, blockId, newIndex);
 		if (!result) return;
-		blocks = result;
+		onchange(result);
 		announce(`Post moved to position ${newIndex + 1}`);
-		emitChange();
 	}
 
 	function duplicateBlock(id: string) {
 		const result = threadOps.duplicateBlock(blocks, id);
 		if (!result) return;
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(result.newId);
 	}
 
@@ -130,10 +114,9 @@
 		const cursorPos = textarea?.selectionStart ?? Math.floor(block.text.length / 2);
 		const result = threadOps.splitBlockAt(blocks, id, cursorPos);
 		if (!result) return;
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(result.newId);
-		announce(`Post split. Now ${blocks.length} posts in thread.`);
+		announce(`Post split. Now ${result.blocks.length} posts in thread.`);
 	}
 
 	function mergeWithNext(id: string) {
@@ -151,10 +134,9 @@
 			}
 			return;
 		}
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(id, result.cursorPos);
-		announce(`Posts merged. Now ${blocks.length} posts in thread.`);
+		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
 	function mergeWithPrevious(id: string) {
@@ -172,10 +154,9 @@
 			}
 			return;
 		}
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(result.targetId, result.cursorPos);
-		announce(`Posts merged. Now ${blocks.length} posts in thread.`);
+		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
 	// ── Paste handler ──────────────────────────────────────
@@ -184,8 +165,7 @@
 		if (!block || block.text.trim() !== '') return;
 		const result = threadOps.splitFromPaste(blocks, blockId, pastedText);
 		if (!result) return;
-		blocks = result.blocks;
-		emitChange();
+		onchange(result.blocks);
 		focusBlock(result.lastNewId);
 	}
 
@@ -314,8 +294,7 @@
 	export function getBlocks(): ThreadBlock[] { return [...blocks]; }
 
 	export function setBlocks(newBlocks: ThreadBlock[]) {
-		blocks = newBlocks;
-		emitChange();
+		onchange([...newBlocks]);
 	}
 
 	export async function handleInlineAssist(voiceCue?: string): Promise<void> {

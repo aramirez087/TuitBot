@@ -544,7 +544,7 @@
 			{:else}
 				<ThreadFlowLane
 					bind:this={threadFlowRef}
-					initialBlocks={threadBlocks.length > 0 ? threadBlocks : undefined}
+					blocks={threadBlocks}
 					onchange={(b) => { threadBlocks = b; }}
 					onvalidchange={(v) => { threadValid = v; }}
 				/>
