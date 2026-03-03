@@ -105,7 +105,7 @@ export function duplicateBlock(
 }
 
 /**
- * Split a block at the given cursor position, snapping to word boundaries (±10 chars).
+ * Split a block at the given cursor position.
  * Returns null if either half would be empty after trim.
  */
 export function splitBlockAt(
@@ -118,7 +118,7 @@ export function splitBlockAt(
 	if (idx === -1) return null;
 	const source = sorted[idx];
 
-	let splitPos = cursorPos;
+	const splitPos = cursorPos;
 
 	// If cursor is at start or end, just add an empty block
 	if (splitPos <= 0 || splitPos >= source.text.length) {
@@ -135,15 +135,6 @@ export function splitBlockAt(
 			sorted.splice(idx + 1, 0, newBlock);
 		}
 		return { blocks: normalizeOrder(sorted), newId: newBlock.id };
-	}
-
-	// Word boundary snapping (±10 chars)
-	if (splitPos > 0 && splitPos < source.text.length) {
-		const before = source.text.slice(0, splitPos);
-		const lastSpace = before.lastIndexOf(' ');
-		const nextSpace = source.text.indexOf(' ', splitPos);
-		if (lastSpace > splitPos - 10) splitPos = lastSpace + 1;
-		else if (nextSpace !== -1 && nextSpace < splitPos + 10) splitPos = nextSpace + 1;
 	}
 
 	const textBefore = source.text.slice(0, splitPos).trim();
