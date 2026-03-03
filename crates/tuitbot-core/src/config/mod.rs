@@ -16,6 +16,8 @@ mod validation;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_backend;
 
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
 pub use types::{

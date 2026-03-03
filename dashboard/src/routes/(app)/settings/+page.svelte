@@ -51,7 +51,7 @@
 		{ id: 'limits', label: 'Limits', icon: Shield },
 		{ id: 'schedule', label: 'Schedule', icon: Clock },
 		{ id: 'llm', label: 'LLM', icon: Brain },
-		{ id: 'xapi', label: 'X API', icon: Key },
+		{ id: 'xapi', label: 'X Access', icon: Key },
 		{ id: 'storage', label: 'Storage', icon: Database },
 		{ id: 'sources', label: 'Sources', icon: FolderOpen },
 		{ id: 'lan', label: 'LAN', icon: Wifi },

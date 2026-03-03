@@ -170,6 +170,7 @@ fn validate_threshold_boundary_values() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
 
     config.scoring.threshold = 0;
     assert!(config.validate().is_ok());
@@ -203,6 +204,7 @@ fn validate_valid_config_passes() {
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
     config.llm.model = "llama2".to_string();
+    config.x_api.client_id = "test-id".to_string();
     assert!(config.validate().is_ok());
 }
 
@@ -249,6 +251,7 @@ fn validate_preferred_times_valid() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.schedule.preferred_times = vec!["09:15".to_string(), "12:30".to_string()];
     assert!(config.validate().is_ok());
 }
@@ -259,6 +262,7 @@ fn validate_preferred_times_auto() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.schedule.preferred_times = vec!["auto".to_string()];
     assert!(config.validate().is_ok());
 }
@@ -865,6 +869,7 @@ fn validate_google_drive_source_allowed_in_cloud_mode() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.deployment_mode = DeploymentMode::Cloud;
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
@@ -886,6 +891,7 @@ fn validate_local_fs_source_allowed_in_desktop_mode() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.deployment_mode = DeploymentMode::Desktop;
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "local_fs".to_string(),
@@ -1200,6 +1206,7 @@ poll_interval_seconds = 300
     valid_config.business.product_name = "Test".to_string();
     valid_config.business.product_keywords = vec!["test".to_string()];
     valid_config.llm.provider = "ollama".to_string();
+    valid_config.x_api.client_id = "test-id".to_string();
     assert!(valid_config.validate().is_ok());
 }
 
@@ -1210,6 +1217,7 @@ fn legacy_local_fs_config_unaffected_by_deployment_mode() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.deployment_mode = DeploymentMode::Desktop;
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "local_fs".to_string(),
@@ -1237,6 +1245,7 @@ fn legacy_sa_key_only_config_still_valid() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
         path: None,
@@ -1269,6 +1278,7 @@ fn empty_content_sources_valid() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     // Explicitly empty sources
     config.content_sources.sources = vec![];
     assert!(config.validate().is_ok());
@@ -1281,6 +1291,7 @@ fn connection_id_without_sa_key_valid() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
         path: None,
@@ -1303,6 +1314,7 @@ fn google_drive_source_no_auth_warns() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
         path: None,

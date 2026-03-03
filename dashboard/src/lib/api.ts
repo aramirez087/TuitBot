@@ -382,6 +382,8 @@ export interface TuitbotConfig {
 	x_api: {
 		client_id: string;
 		client_secret: string | null;
+		provider_backend: string;
+		scraper_allow_mutations: boolean;
 	};
 	auth: {
 		mode: string;

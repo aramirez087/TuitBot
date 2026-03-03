@@ -202,6 +202,7 @@ export function hasDangerousChanges(): boolean {
 		$config.llm.provider !== $draft.llm.provider ||
 		$config.llm.api_key !== $draft.llm.api_key ||
 		$config.x_api.client_id !== $draft.x_api.client_id ||
-		$config.x_api.client_secret !== $draft.x_api.client_secret
+		$config.x_api.client_secret !== $draft.x_api.client_secret ||
+		$config.x_api.provider_backend !== $draft.x_api.provider_backend
 	);
 }

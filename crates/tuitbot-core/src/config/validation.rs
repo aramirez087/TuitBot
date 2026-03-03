@@ -246,6 +246,38 @@ impl Config {
             });
         }
 
+        // Validate provider_backend value
+        let backend = self.x_api.provider_backend.as_str();
+        if !backend.is_empty() && backend != "x_api" && backend != "scraper" {
+            errors.push(ConfigError::InvalidValue {
+                field: "x_api.provider_backend".to_string(),
+                message: format!(
+                    "must be 'x_api' or 'scraper', got '{}'",
+                    self.x_api.provider_backend
+                ),
+            });
+        }
+
+        // Reject scraper mode in cloud deployment
+        if self.deployment_mode == super::DeploymentMode::Cloud
+            && self.x_api.provider_backend == "scraper"
+        {
+            errors.push(ConfigError::InvalidValue {
+                field: "x_api.provider_backend".to_string(),
+                message: "Local No-Key Mode is not available in cloud deployment. \
+                          Use the Official X API (provider_backend = \"x_api\")."
+                    .to_string(),
+            });
+        }
+
+        // Require client_id when using official X API backend
+        let is_x_api_backend = backend.is_empty() || backend == "x_api";
+        if is_x_api_backend && self.x_api.client_id.trim().is_empty() {
+            errors.push(ConfigError::MissingField {
+                field: "x_api.client_id".to_string(),
+            });
+        }
+
         // Validate content sources against deployment capabilities
         for (i, source) in self.content_sources.sources.iter().enumerate() {
             if !self.deployment_mode.allows_source_type(&source.source_type) {

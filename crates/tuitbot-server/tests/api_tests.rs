@@ -1357,6 +1357,9 @@ async fn settings_init_with_connection_id() {
 
     // POST /api/settings/init with a Google Drive source using connection_id.
     let init_body = serde_json::json!({
+        "x_api": {
+            "client_id": "test-client-id"
+        },
         "business": {
             "product_name": "InitBot",
             "product_keywords": ["test"]

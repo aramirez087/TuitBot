@@ -52,6 +52,13 @@ impl Config {
         if let Ok(val) = env::var("TUITBOT_X_API__CLIENT_SECRET") {
             self.x_api.client_secret = Some(val);
         }
+        if let Ok(val) = env::var("TUITBOT_X_API__PROVIDER_BACKEND") {
+            self.x_api.provider_backend = val;
+        }
+        if let Ok(val) = env::var("TUITBOT_X_API__SCRAPER_ALLOW_MUTATIONS") {
+            self.x_api.scraper_allow_mutations =
+                parse_env_bool("TUITBOT_X_API__SCRAPER_ALLOW_MUTATIONS", &val)?;
+        }
 
         // Auth
         if let Ok(val) = env::var("TUITBOT_AUTH__MODE") {
