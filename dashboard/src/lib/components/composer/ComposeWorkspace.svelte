@@ -87,6 +87,7 @@
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
 		mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number;
+		tweetMedia?: Array<{ path: string; mediaType: string }>;
 	} | null>(null);
 
 	// ── Derived ────────────────────────────────────────────
@@ -157,7 +158,7 @@
 		return () => mql.removeEventListener('change', handler);
 	});
 
-	$effect(() => { void mode; void tweetText; void threadBlocks; autoSave(); });
+	$effect(() => { void mode; void tweetText; void threadBlocks; void attachedMedia; autoSave(); });
 
 	// Announce mode switches to screen readers (skip initial render)
 	let modeInitialized = false;
@@ -226,7 +227,8 @@
 	function autoSave() {
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		autoSaveTimer = setTimeout(() => {
-			const payload = { mode, tweetText, blocks: threadBlocks, timestamp: Date.now() };
+			const tweetMedia = attachedMedia.map((m) => ({ path: m.path, mediaType: m.mediaType }));
+			const payload = { mode, tweetText, blocks: threadBlocks, tweetMedia, timestamp: Date.now() };
 			try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
 		}, AUTOSAVE_DEBOUNCE_MS);
 	}
@@ -245,7 +247,7 @@
 				localStorage.removeItem(AUTOSAVE_KEY);
 				return;
 			}
-			const hasContent = data.tweetText?.trim() || data.blocks?.some((b: ThreadBlock) => b.text.trim());
+			const hasContent = data.tweetText?.trim() || data.blocks?.some((b: ThreadBlock) => b.text.trim()) || data.tweetMedia?.length > 0;
 			if (hasContent) { recoveryData = data; showRecovery = true; }
 		} catch { localStorage.removeItem(AUTOSAVE_KEY); }
 	}
@@ -255,6 +257,14 @@
 		mode = (recoveryData.mode as 'tweet' | 'thread') ?? 'tweet';
 		tweetText = recoveryData.tweetText || '';
 		threadBlocks = recoveryData.blocks || [];
+		// Restore tweet media from saved paths (use server URL for preview)
+		if (recoveryData.tweetMedia?.length) {
+			attachedMedia = recoveryData.tweetMedia.map((m) => ({
+				path: m.path,
+				previewUrl: api.media.fileUrl(m.path),
+				mediaType: m.mediaType
+			}));
+		}
 		showRecovery = false;
 		clearAutoSave();
 	}

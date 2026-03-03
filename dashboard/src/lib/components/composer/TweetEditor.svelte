@@ -5,7 +5,7 @@
 
 	export interface AttachedMedia {
 		path: string;
-		file: File;
+		file?: File;
 		previewUrl: string;
 		mediaType: string;
 	}
