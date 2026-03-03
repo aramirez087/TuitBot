@@ -28,6 +28,7 @@ Built for **founders**, **indie hackers**, and **solo makers** who'd rather buil
 |---------|------------|
 | **X API tools for my AI assistant** (Claude Code, Cursor, etc.) | [MCP Setup](#mcp-setup) — 2 commands |
 | **An autonomous growth co-pilot** (desktop app, CLI, self-hosted) | [Growth Co-Pilot](#growth-co-pilot) |
+| **Try without an X API key** (discovery + drafting, no posting) | [Local No-Key Mode](#5-local-no-key-mode-no-x-api-credentials) |
 
 ---
 
@@ -246,6 +247,47 @@ tuitbot init                         # guided setup: config → auth → test �
 That's it — one command. `init` asks 5 questions (product name, keywords, LLM provider, API key, X Client ID), validates your LLM connection, then walks you through auth, validation, and a dry-run preview. Everything else gets safe defaults. Customize later with `tuitbot settings` or `tuitbot init --advanced` for full control.
 
 Individual commands (`tuitbot auth`, `tuitbot test`, `tuitbot tick --dry-run`) still work standalone if you prefer step-by-step setup.
+
+### 5. Local No-Key Mode (No X API Credentials)
+
+Don't have an X Developer Portal account? Tuitbot can run discovery and
+content drafting without any API credentials:
+
+```bash
+tuitbot init  # select "Local No-Key Mode" when prompted
+```
+
+Or set it manually in `config.toml`:
+
+```toml
+[x_api]
+provider_backend = "scraper"
+```
+
+**What works:** Tweet discovery (public data), conversation scoring,
+LLM-powered reply/tweet/thread drafting, approval queue staging, thread
+planning.
+
+**What doesn't:** Posting, liking, following, mentions, home timeline,
+bookmarks, analytics, media upload. These require the Official X API —
+you can switch anytime in Settings.
+
+**Tradeoffs vs. Official API:**
+- Data comes from public endpoints, not the authenticated API. Results
+  may be less complete.
+- Write operations are blocked by default (`scraper_allow_mutations = false`).
+  Enabling them carries elevated risk of account restrictions.
+- Only available in desktop and self-hosted modes (not cloud).
+
+> **Note:** The scraper transport is under active development. Discovery
+> will return "transport unavailable" errors until the transport backend
+> ships in a future release. The infrastructure is fully wired — the
+> config, settings UI, onboarding flow, and runtime branching all work
+> today.
+
+> **Recommendation:** Start with Local No-Key Mode to evaluate Tuitbot's
+> UI and drafting capabilities, then upgrade to the Official X API when
+> you're ready to post.
 
 ---
 
