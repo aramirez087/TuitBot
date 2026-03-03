@@ -49,6 +49,9 @@ pub(super) fn toolkit_to_loop_error(e: ToolkitError) -> LoopError {
             XApiError::RateLimited { retry_after } => LoopError::RateLimited { retry_after },
             XApiError::AuthExpired => LoopError::AuthExpired,
             XApiError::Network { source } => LoopError::NetworkError(source.to_string()),
+            XApiError::ScraperMutationBlocked { .. }
+            | XApiError::ScraperTransportUnavailable { .. }
+            | XApiError::FeatureRequiresAuth { .. } => LoopError::Other(xe.to_string()),
             other => LoopError::Other(other.to_string()),
         },
         other => LoopError::Other(other.to_string()),

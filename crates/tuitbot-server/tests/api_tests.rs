@@ -38,6 +38,7 @@ async fn test_router() -> axum::Router {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
 
@@ -255,6 +256,7 @@ async fn approval_stats_returns_counts() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -303,6 +305,7 @@ async fn approval_list_with_status_filter() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -361,6 +364,7 @@ async fn approval_edit_content() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -417,6 +421,7 @@ async fn approval_edit_empty_content() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -559,6 +564,7 @@ async fn add_and_list_target() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -603,6 +609,7 @@ async fn add_duplicate_target_fails() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -648,6 +655,7 @@ async fn remove_target_works() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -713,6 +721,7 @@ async fn runtime_start_and_stop() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -775,6 +784,7 @@ async fn settings_get_returns_json() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -811,6 +821,7 @@ async fn settings_patch_round_trips() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -904,6 +915,7 @@ async fn post_ingest_idempotent() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1010,6 +1022,7 @@ async fn config_status_capabilities_match_cloud_mode() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: DeploymentMode::Cloud,
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1079,6 +1092,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1139,6 +1153,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1224,6 +1239,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1306,6 +1322,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1351,6 +1368,7 @@ async fn settings_init_with_connection_id() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -1541,6 +1559,7 @@ async fn connector_status_with_connection() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);

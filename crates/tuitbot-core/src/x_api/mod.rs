@@ -6,15 +6,34 @@
 
 pub mod auth;
 pub mod client;
+pub mod local_mode;
 pub mod media;
 pub mod scopes;
 pub mod tier;
 pub mod types;
 
 pub use client::XApiHttpClient;
+pub use local_mode::LocalModeXClient;
 pub use types::*;
 
+use std::sync::Arc;
+
+use crate::config::XApiConfig;
 use crate::error::XApiError;
+
+/// Create a local-mode X API client if `provider_backend = "scraper"`.
+///
+/// Returns `Some(Arc<dyn XApiClient>)` for scraper backend, `None` for
+/// official backend (caller must construct `XApiHttpClient` with OAuth tokens).
+pub fn create_local_client(config: &XApiConfig) -> Option<Arc<dyn XApiClient>> {
+    if config.provider_backend == "scraper" {
+        Some(Arc::new(LocalModeXClient::new(
+            config.scraper_allow_mutations,
+        )))
+    } else {
+        None
+    }
+}
 
 /// Trait abstracting all X API v2 operations.
 ///
