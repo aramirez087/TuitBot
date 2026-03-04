@@ -202,9 +202,10 @@ pub async fn assist_improve(
     Json(body): Json<AssistImproveRequest>,
 ) -> Result<Json<AssistImproveResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
 
     let output = gen
-        .improve_draft(&body.draft, body.context.as_deref())
+        .improve_draft_with_context(&body.draft, body.context.as_deref(), rag_context.as_deref())
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
