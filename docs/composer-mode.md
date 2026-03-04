@@ -298,6 +298,39 @@ The same action is available from the command palette as "AI Generate / Improve"
 | `GET` | `/api/assist/optimal-times` | Get recommended posting times based on historical engagement |
 | `GET` | `/api/assist/mode` | Get the current operating mode (`autopilot` or `composer`) |
 
+### Vault Context (Automatic)
+
+When you use AI Assist — whether generating a tweet, generating a thread, or improving a draft — the backend automatically enriches the LLM prompt with context from your vault:
+
+- **Winning patterns:** Your historically best-performing tweets (scored by engagement) provide examples of content that resonated with your audience.
+- **Relevant ideas:** Notes ingested into the vault via content sources are surfaced as topic seeds when they match your configured product, competitor, or industry keywords.
+
+This context is injected into the LLM system prompt alongside your existing voice settings and persona — it augments generation without replacing any user-supplied input.
+
+#### How it works
+
+1. When an assist endpoint is called, the server loads your business profile keywords (`product_keywords`, `competitor_keywords`, `industry_topics` from `config.toml`).
+2. It queries the local SQLite database for winning ancestors (high-engagement tweets) and content seeds (vault notes matching your keywords).
+3. The resulting context block (capped at ~2000 characters) is injected into the system prompt before the generation task.
+4. The response shape is unchanged — no new fields, no new request parameters.
+
+#### Affected endpoints
+
+| Endpoint | Context injected |
+|----------|-----------------|
+| `POST /api/assist/tweet` | Vault context (automatic) |
+| `POST /api/assist/thread` | Vault context (automatic) |
+| `POST /api/assist/improve` | Vault context (automatic) + user-supplied tone cue (if provided) |
+| `POST /api/assist/reply` | No vault context (uses different generation path) |
+
+#### Fallback behavior
+
+If vault data is unavailable — no keywords configured, empty database, config error, or a fresh account with no posting history — generation proceeds exactly as before. The feature is additive: its absence has zero impact on existing functionality.
+
+#### No UI changes required
+
+The vault context is resolved server-side and injected transparently. The existing quick-cue input, "From Notes" panel, and AI Generate/Improve actions in the composer all work through the same endpoints with unchanged request payloads. No frontend code was modified for this feature.
+
 ## Compose Endpoint
 
 The primary submission endpoint for tweets and threads:
