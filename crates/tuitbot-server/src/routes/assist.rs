@@ -11,6 +11,9 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use tuitbot_core::content::ContentGenerator;
+// Used by resolve_composer_rag_context (wired in Session 04).
+#[allow(unused_imports)]
+use tuitbot_core::context::winning_dna;
 use tuitbot_core::storage;
 
 use crate::account::AccountContext;
@@ -32,6 +35,51 @@ async fn get_generator(
         .ok_or(ApiError::BadRequest(
             "LLM not configured — set llm.provider and llm.api_key in config.toml".to_string(),
         ))
+}
+
+/// Resolve optional RAG context from the vault for composer assist handlers.
+///
+/// Loads the business profile's keyword set, queries winning ancestors and
+/// content seeds via `build_draft_context()`, and returns the formatted
+/// prompt block. Returns `None` (fail-open) on any error or when no
+/// relevant context exists.
+// Allow dead_code: wired into handlers in Session 04.
+#[allow(dead_code)]
+async fn resolve_composer_rag_context(state: &AppState, _account_id: &str) -> Option<String> {
+    let config =
+        match tuitbot_core::config::Config::load(Some(&state.config_path.to_string_lossy())) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("composer RAG: failed to load config: {e}");
+                return None;
+            }
+        };
+
+    let keywords = config.business.draft_context_keywords();
+    if keywords.is_empty() {
+        return None;
+    }
+
+    let draft_context = match winning_dna::build_draft_context(
+        &state.db,
+        &keywords,
+        winning_dna::MAX_ANCESTORS,
+        winning_dna::RECENCY_HALF_LIFE_DAYS,
+    )
+    .await
+    {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            tracing::warn!("composer RAG: failed to build draft context: {e}");
+            return None;
+        }
+    };
+
+    if draft_context.prompt_block.is_empty() {
+        None
+    } else {
+        Some(draft_context.prompt_block)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -259,4 +307,89 @@ pub async fn get_mode(
             approval_mode: config.effective_approval_mode(),
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    use tokio::sync::{broadcast, Mutex, RwLock};
+
+    use crate::ws::WsEvent;
+
+    /// Build a minimal `AppState` for testing the RAG resolver.
+    async fn test_state(config_path: PathBuf) -> AppState {
+        let db = tuitbot_core::storage::init_test_db()
+            .await
+            .expect("init test db");
+        let (event_tx, _) = broadcast::channel::<WsEvent>(16);
+        AppState {
+            db,
+            config_path: config_path.clone(),
+            data_dir: config_path.parent().unwrap_or(&config_path).to_path_buf(),
+            event_tx,
+            api_token: "test-token".to_string(),
+            passphrase_hash: RwLock::new(None),
+            passphrase_hash_mtime: RwLock::new(None),
+            bind_host: "127.0.0.1".to_string(),
+            bind_port: 3001,
+            login_attempts: Mutex::new(HashMap::new()),
+            runtimes: Mutex::new(HashMap::new()),
+            content_generators: Mutex::new(HashMap::new()),
+            circuit_breaker: None,
+            watchtower_cancel: None,
+            content_sources: Default::default(),
+            connector_config: Default::default(),
+            deployment_mode: Default::default(),
+            provider_backend: String::new(),
+            pending_oauth: Mutex::new(HashMap::new()),
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_rag_returns_none_when_config_missing() {
+        let state = test_state(PathBuf::from("/nonexistent/config.toml")).await;
+        let result = resolve_composer_rag_context(&state, "test-account").await;
+        assert!(
+            result.is_none(),
+            "should return None when config is missing"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_rag_returns_none_when_db_empty() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[business]\nproduct_name = \"TestProduct\"\nproduct_keywords = [\"rust\", \"testing\"]\n",
+        )
+        .expect("write config");
+
+        let state = test_state(config_path).await;
+        let result = resolve_composer_rag_context(&state, "test-account").await;
+        assert!(
+            result.is_none(),
+            "should return None when DB has no ancestor data"
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_rag_returns_none_when_no_keywords() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let config_path = dir.path().join("config.toml");
+        // Empty business profile → no keywords → early return None.
+        std::fs::write(&config_path, "[business]\nproduct_name = \"Empty\"\n")
+            .expect("write config");
+
+        let state = test_state(config_path).await;
+        let result = resolve_composer_rag_context(&state, "test-account").await;
+        assert!(
+            result.is_none(),
+            "should return None when keywords are empty"
+        );
+    }
 }
