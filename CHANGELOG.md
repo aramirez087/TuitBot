@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.19...tuitbot-cli-v0.1.20) - 2026-03-04
+
+### Added
+
+- Session 3 — runtime scraper backend
+- Update AI action keyboard shortcut to Cmd+Shift+J and refresh generated documentation and roadmap artifacts.
+- Session 2 — settings x access mode
+
 ## [0.1.19](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.18...tuitbot-cli-v0.1.19) - 2026-03-01
 
 ### Added
