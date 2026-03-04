@@ -81,9 +81,11 @@
 
 	// Auto-save
 	const AUTOSAVE_KEY = 'tuitbot:compose:draft';
+	const AUTOSAVE_ACTIVE_KEY = 'tuitbot:compose:active';
 	const AUTOSAVE_DEBOUNCE_MS = 500;
 	const AUTOSAVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let initialized = $state(false);
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
 		mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number;
@@ -158,7 +160,7 @@
 		return () => mql.removeEventListener('change', handler);
 	});
 
-	$effect(() => { void mode; void tweetText; void threadBlocks; void attachedMedia; autoSave(); });
+	$effect(() => { void mode; void tweetText; void threadBlocks; void attachedMedia; if (initialized) autoSave(); });
 
 	// Announce mode switches to screen readers (skip initial render)
 	let modeInitialized = false;
@@ -170,10 +172,11 @@
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
 		checkRecovery();
-		if (!showRecovery) {
+		if (!showRecovery && !initialized) {
 			tweetText = '';
 			threadBlocks = [];
 			mode = 'tweet';
+			initialized = true;
 		}
 		submitting = false;
 		submitError = null;
@@ -201,6 +204,8 @@
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		if (undoTimer) clearTimeout(undoTimer);
 		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
+		// Signal that this was a normal teardown (navigation), not a crash
+		try { sessionStorage.setItem(AUTOSAVE_ACTIVE_KEY, '1'); } catch { /* unavailable */ }
 	});
 
 	function handleComposeEvent() {
@@ -238,6 +243,19 @@
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 	}
 
+	function restoreDraft(data: NonNullable<typeof recoveryData>) {
+		mode = (data.mode as 'tweet' | 'thread') ?? 'tweet';
+		tweetText = data.tweetText || '';
+		threadBlocks = data.blocks || [];
+		if (data.tweetMedia?.length) {
+			attachedMedia = data.tweetMedia.map((m) => ({
+				path: m.path,
+				previewUrl: api.media.fileUrl(m.path),
+				mediaType: m.mediaType
+			}));
+		}
+	}
+
 	function checkRecovery() {
 		try {
 			const raw = localStorage.getItem(AUTOSAVE_KEY);
@@ -248,28 +266,39 @@
 				return;
 			}
 			const hasContent = data.tweetText?.trim() || data.blocks?.some((b: ThreadBlock) => b.text.trim()) || data.tweetMedia?.length > 0;
-			if (hasContent) { recoveryData = data; showRecovery = true; }
+			if (!hasContent) return;
+
+			// Distinguish navigation (sessionStorage flag) from crash recovery
+			let wasNavigation = false;
+			try {
+				wasNavigation = sessionStorage.getItem(AUTOSAVE_ACTIVE_KEY) === '1';
+				sessionStorage.removeItem(AUTOSAVE_ACTIVE_KEY);
+			} catch { /* sessionStorage unavailable — treat as crash */ }
+
+			if (wasNavigation) {
+				// Silent restore — user just navigated away and back
+				restoreDraft(data);
+				initialized = true;
+			} else {
+				// Genuine crash recovery — show banner
+				recoveryData = data;
+				showRecovery = true;
+			}
 		} catch { localStorage.removeItem(AUTOSAVE_KEY); }
 	}
 
 	function recoverDraft() {
 		if (!recoveryData) return;
-		mode = (recoveryData.mode as 'tweet' | 'thread') ?? 'tweet';
-		tweetText = recoveryData.tweetText || '';
-		threadBlocks = recoveryData.blocks || [];
-		// Restore tweet media from saved paths (use server URL for preview)
-		if (recoveryData.tweetMedia?.length) {
-			attachedMedia = recoveryData.tweetMedia.map((m) => ({
-				path: m.path,
-				previewUrl: api.media.fileUrl(m.path),
-				mediaType: m.mediaType
-			}));
-		}
+		restoreDraft(recoveryData);
 		showRecovery = false;
-		clearAutoSave();
+		initialized = true;
 	}
 
-	function dismissRecovery() { showRecovery = false; clearAutoSave(); }
+	function dismissRecovery() {
+		showRecovery = false;
+		clearAutoSave();
+		initialized = true;
+	}
 
 	// ── Handlers ───────────────────────────────────────────
 	async function handleSubmit() {
@@ -280,6 +309,7 @@
 				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
 			});
 			clearAutoSave();
+			try { sessionStorage.removeItem(AUTOSAVE_ACTIVE_KEY); } catch { /* unavailable */ }
 			onsubmit(data);
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount
@@ -352,7 +382,7 @@
 			// In thread mode: let event propagate to ThreadFlowLane's card handler for split
 			return;
 		}
-		if (matchEvent(e, 'cmd+j')) { e.preventDefault(); handleInlineAssist(); return; }
+		if (matchEvent(e, 'cmd+shift+j')) { e.preventDefault(); handleInlineAssist(); return; }
 		if (matchEvent(e, 'cmd+shift+n')) { e.preventDefault(); switchMode('tweet'); return; }
 		if (matchEvent(e, 'cmd+shift+t')) { e.preventDefault(); switchMode('thread'); return; }
 		if (matchEvent(e, 'cmd+i')) { e.preventDefault(); toggleInspector(); return; }

@@ -67,7 +67,7 @@
 <div class="inspector-section">
 	<div class="inspector-section-label">
 		<span>AI</span>
-		<kbd class="inspector-kbd">{'\u2318'}J</kbd>
+		<kbd class="inspector-kbd">{'\u2318\u21e7'}J</kbd>
 	</div>
 	<p class="inspector-subtitle">Improve selected text or generate new content</p>
 	<div class="ai-actions-row">

@@ -21,7 +21,6 @@
 		onmerge,
 		onremove,
 		onaddafter,
-		onpaste,
 		ondragstart,
 		ondragend,
 		ondragover,
@@ -44,7 +43,6 @@
 		onmerge: () => void;
 		onremove: () => void;
 		onaddafter: () => void;
-		onpaste: (text: string) => void;
 		ondragstart: (e: DragEvent) => void;
 		ondragend: () => void;
 		ondragover: (e: DragEvent) => void;
@@ -57,14 +55,6 @@
 	const overLimit = $derived(charCount > MAX_TWEET_CHARS);
 	const warning = $derived(charCount > 260 && !overLimit);
 	const isLast = $derived(index >= total - 1);
-
-	function handlePaste(e: ClipboardEvent) {
-		const text = e.clipboardData?.getData('text/plain');
-		if (text && text.includes('\n\n') && block.text.trim() === '') {
-			e.preventDefault();
-			onpaste(text);
-		}
-	}
 
 	function handleKeydownGuarded(e: KeyboardEvent) {
 		if (e.isComposing) return;
@@ -123,7 +113,6 @@
 			onfocus={() => onfocus()}
 			onblur={() => onblur()}
 			onkeydown={handleKeydownGuarded}
-			onpaste={handlePaste}
 			aria-label={`Post ${index + 1} of ${total}`}
 		></textarea>
 		<MediaSlot mediaPaths={block.media_paths} onmediachange={(paths) => onmedia(paths)} />

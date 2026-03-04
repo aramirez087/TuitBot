@@ -213,44 +213,6 @@ export function mergeWithPrevious(
 }
 
 /**
- * Split pasted text containing paragraph breaks into multiple blocks.
- * Only triggers when the target block is empty and paste has ≥2 non-empty paragraphs.
- * Returns null if conditions aren't met (caller should fall through to normal paste).
- */
-export function splitFromPaste(
-	blocks: ThreadBlock[],
-	id: string,
-	pastedText: string
-): { blocks: ThreadBlock[]; lastNewId: string } | null {
-	const paragraphs = pastedText
-		.split(/\n\n+/)
-		.map((p) => p.trim())
-		.filter((p) => p.length > 0);
-	if (paragraphs.length < 2) return null;
-
-	const sorted = sortBlocks(blocks);
-	const idx = sorted.findIndex((b) => b.id === id);
-	if (idx === -1) return null;
-
-	// Set the current block to the first paragraph
-	sorted[idx] = { ...sorted[idx], text: paragraphs[0] };
-
-	// Create new blocks for the remaining paragraphs
-	const newBlocks: ThreadBlock[] = paragraphs.slice(1).map((text) => ({
-		id: crypto.randomUUID(),
-		text,
-		media_paths: [],
-		order: 0
-	}));
-
-	sorted.splice(idx + 1, 0, ...newBlocks);
-	return {
-		blocks: normalizeOrder(sorted),
-		lastNewId: newBlocks[newBlocks.length - 1].id
-	};
-}
-
-/**
  * Validate a thread for submission readiness.
  */
 export function validateThread(

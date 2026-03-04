@@ -37,7 +37,7 @@
 		</button>
 		<span class="hint ai-hint">
 			<span class="hint-icon"><Sparkles size={12} /></span>
-			<kbd>{formatCombo('cmd+j')}</kbd>
+			<kbd>{formatCombo('cmd+shift+j')}</kbd>
 			<span class="hint-label">AI</span>
 		</span>
 	</div>

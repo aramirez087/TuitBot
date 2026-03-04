@@ -268,6 +268,56 @@ impl ContentGenerator {
     }
 
     // -----------------------------------------------------------------
+    // Draft improvement
+    // -----------------------------------------------------------------
+
+    /// Rewrite/improve an existing draft tweet with an optional tone cue.
+    pub async fn improve_draft(
+        &self,
+        draft: &str,
+        tone_cue: Option<&str>,
+    ) -> Result<GenerationOutput, LlmError> {
+        tracing::debug!(
+            draft_len = draft.len(),
+            tone_cue = ?tone_cue,
+            "Improving draft",
+        );
+
+        let voice_section = self.format_voice_section();
+        let persona_section = self.format_persona_context();
+
+        let tone_instruction = match tone_cue {
+            Some(cue) if !cue.is_empty() => {
+                format!("\n\nTone/style directive (MUST follow): {cue}")
+            }
+            _ => String::new(),
+        };
+
+        let system = format!(
+            "You are {}'s social media voice. {}.\
+             {voice_section}\
+             {persona_section}\n\n\
+             Task: Rewrite and improve the draft tweet below. \
+             Keep the core message but make it sharper, more engaging, \
+             and better-written.{tone_instruction}\n\n\
+             Rules:\n\
+             - Maximum 280 characters.\n\
+             - Do not use hashtags.\n\
+             - Output only the improved tweet text, nothing else.",
+            self.business.product_name, self.business.product_description,
+        );
+
+        let user_message = format!("Draft to improve:\n{draft}");
+        let params = GenerationParams {
+            max_tokens: 150,
+            temperature: 0.7,
+            ..Default::default()
+        };
+
+        self.generate_single(&system, &user_message, &params).await
+    }
+
+    // -----------------------------------------------------------------
     // Thread generation
     // -----------------------------------------------------------------
 

@@ -159,16 +159,6 @@
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
-	// ── Paste handler ──────────────────────────────────────
-	function handlePaste(blockId: string, pastedText: string) {
-		const block = blocks.find((b) => b.id === blockId);
-		if (!block || block.text.trim() !== '') return;
-		const result = threadOps.splitFromPaste(blocks, blockId, pastedText);
-		if (!result) return;
-		onchange(result.blocks);
-		focusBlock(result.lastNewId);
-	}
-
 	// ── Drag-and-drop ──────────────────────────────────────
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
@@ -372,7 +362,6 @@
 			onmerge={() => mergeWithNext(block.id)}
 			onremove={() => removeBlock(block.id)}
 			onaddafter={() => addBlockAfter(block.id)}
-			onpaste={(text) => handlePaste(block.id, text)}
 			ondragstart={(e) => handleDragStart(e, block.id)}
 			ondragend={handleDragEnd}
 			ondragover={(e) => handleCardDragOver(e, block.id)}
