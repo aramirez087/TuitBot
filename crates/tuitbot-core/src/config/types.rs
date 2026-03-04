@@ -156,6 +156,19 @@ impl BusinessProfile {
     /// Enrichment fields are: `brand_voice`, `reply_style`, `content_style`,
     /// `persona_opinions`, `persona_experiences`, `content_pillars`.
     /// Used by progressive enrichment to decide whether to show setup hints.
+    /// Returns the merged keyword set used for draft-context retrieval.
+    ///
+    /// Combines `product_keywords`, `competitor_keywords`, and the
+    /// effective industry topics into a single owned `Vec<String>`.
+    /// This is the single source of truth for keyword assembly across
+    /// draft workflows, composer RAG resolution, and engagement scoring.
+    pub fn draft_context_keywords(&self) -> Vec<String> {
+        let mut keywords: Vec<String> = self.product_keywords.clone();
+        keywords.extend(self.competitor_keywords.clone());
+        keywords.extend(self.effective_industry_topics().to_vec());
+        keywords
+    }
+
     pub fn is_enriched(&self) -> bool {
         self.brand_voice.as_ref().is_some_and(|v| !v.is_empty())
             || self.reply_style.as_ref().is_some_and(|v| !v.is_empty())
