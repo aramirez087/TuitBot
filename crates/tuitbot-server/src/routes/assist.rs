@@ -11,8 +11,6 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use tuitbot_core::content::ContentGenerator;
-// Used by resolve_composer_rag_context (wired in Session 04).
-#[allow(unused_imports)]
 use tuitbot_core::context::winning_dna;
 use tuitbot_core::storage;
 
@@ -43,8 +41,6 @@ async fn get_generator(
 /// content seeds via `build_draft_context()`, and returns the formatted
 /// prompt block. Returns `None` (fail-open) on any error or when no
 /// relevant context exists.
-// Allow dead_code: wired into handlers in Session 04.
-#[allow(dead_code)]
 async fn resolve_composer_rag_context(state: &AppState, _account_id: &str) -> Option<String> {
     let config =
         match tuitbot_core::config::Config::load(Some(&state.config_path.to_string_lossy())) {
@@ -103,9 +99,10 @@ pub async fn assist_tweet(
     Json(body): Json<AssistTweetRequest>,
 ) -> Result<Json<AssistTweetResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
 
     let output = gen
-        .generate_tweet(&body.topic)
+        .generate_tweet_with_context(&body.topic, None, rag_context.as_deref())
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
@@ -170,9 +167,10 @@ pub async fn assist_thread(
     Json(body): Json<AssistThreadRequest>,
 ) -> Result<Json<AssistThreadResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
 
     let output = gen
-        .generate_thread(&body.topic)
+        .generate_thread_with_context(&body.topic, None, rag_context.as_deref())
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
