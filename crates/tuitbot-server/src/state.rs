@@ -60,6 +60,8 @@ pub struct AppState {
     pub connector_config: ConnectorConfig,
     /// Deployment mode (desktop, self_host, or cloud).
     pub deployment_mode: DeploymentMode,
+    /// Provider backend ("", "x_api", or "scraper").
+    pub provider_backend: String,
     /// Pending OAuth PKCE challenges keyed by state parameter.
     pub pending_oauth: Mutex<HashMap<String, PendingOAuth>>,
 }

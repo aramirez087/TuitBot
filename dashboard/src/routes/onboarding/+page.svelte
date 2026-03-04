@@ -16,7 +16,7 @@
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
 	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
 
-	const BASE_STEPS = ['Welcome', 'X API', 'Profile', 'LLM', 'Language', 'Sources', 'Validate', 'Review'];
+	const BASE_STEPS = ['Welcome', 'X Access', 'Profile', 'LLM', 'Language', 'Sources', 'Validate', 'Review'];
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');
@@ -48,7 +48,8 @@
 		switch (currentStep) {
 			case 0: // Welcome
 				return true;
-			case 1: // X API
+			case 1: // X Access
+				if (data.provider_backend === 'scraper') return true;
 				return data.client_id.trim().length > 0;
 			case 2: // Business
 				return (
@@ -99,10 +100,12 @@
 		try {
 			const data = $onboardingData;
 			config = {
-				x_api: {
-					client_id: data.client_id,
-					...(data.client_secret ? { client_secret: data.client_secret } : {}),
-				},
+				x_api: data.provider_backend === 'scraper'
+					? { provider_backend: 'scraper' }
+					: {
+						client_id: data.client_id,
+						...(data.client_secret ? { client_secret: data.client_secret } : {}),
+					},
 				business: {
 					product_name: data.product_name,
 					product_description: data.product_description,

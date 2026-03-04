@@ -8,6 +8,7 @@
 		selectedTime,
 		submitError,
 		inspectorOpen = false,
+		embedded = false,
 		onsubmit,
 		children,
 		inspector
@@ -17,6 +18,7 @@
 		selectedTime: string | null;
 		submitError: string | null;
 		inspectorOpen?: boolean;
+		embedded?: boolean;
 		onsubmit: () => void;
 		children: Snippet;
 		inspector?: Snippet;
@@ -31,16 +33,18 @@
 			<div class="error-msg" role="alert">{submitError}</div>
 		{/if}
 
-		<div class="submit-anchor">
-			<button
-				class="submit-pill"
-				onclick={onsubmit}
-				disabled={!canSubmit || submitting}
-			>
-				<Send size={14} />
-				{submitting ? 'Submitting...' : selectedTime ? 'Schedule' : 'Post now'}
-			</button>
-		</div>
+		{#if !embedded}
+			<div class="submit-anchor">
+				<button
+					class="submit-pill"
+					onclick={onsubmit}
+					disabled={!canSubmit || submitting}
+				>
+					<Send size={14} />
+					{submitting ? 'Submitting...' : selectedTime ? 'Schedule' : 'Post now'}
+				</button>
+			</div>
+		{/if}
 	</div>
 
 	{#if inspectorOpen && inspector}
@@ -143,6 +147,12 @@
 	@media (max-width: 768px) {
 		.canvas-inspector {
 			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.submit-pill {
+			transition: none;
 		}
 	}
 

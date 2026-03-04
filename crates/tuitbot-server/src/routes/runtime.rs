@@ -31,6 +31,7 @@ pub async fn status(
         "task_count": task_count,
         "deployment_mode": state.deployment_mode,
         "capabilities": capabilities,
+        "provider_backend": state.provider_backend,
     })))
 }
 

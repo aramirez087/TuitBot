@@ -28,7 +28,7 @@ use tuitbot_core::startup::{
 use tuitbot_core::storage;
 use tuitbot_core::x_api::auth::{TokenManager, Tokens};
 use tuitbot_core::x_api::tier::{self, detect_tier};
-use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
+use tuitbot_core::x_api::{create_local_client, XApiClient, XApiHttpClient};
 
 /// All shared dependencies needed by the automation loops.
 pub struct RuntimeDeps {
@@ -43,6 +43,9 @@ pub struct RuntimeDeps {
     pub profile_adapter: Arc<XApiProfileAdapter>,
     pub post_executor: Arc<XApiPostExecutorAdapter>,
     pub thread_poster: Arc<XApiThreadPosterAdapter>,
+
+    // Dynamic client (official or local mode)
+    pub dyn_client: Arc<dyn XApiClient>,
 
     // LLM adapters
     pub reply_gen: Arc<LlmReplyAdapter>,
@@ -72,9 +75,9 @@ pub struct RuntimeDeps {
     // Approval
     pub approval_queue: Option<Arc<dyn ApprovalQueue>>,
 
-    // Token refresh
-    pub token_manager: Arc<TokenManager>,
-    pub x_client: Arc<XApiHttpClient>,
+    // Token refresh (None in scraper mode)
+    pub token_manager: Option<Arc<TokenManager>>,
+    pub x_client: Option<Arc<XApiHttpClient>>,
 
     // Config slices needed by loops
     pub keywords: Vec<String>,
@@ -86,7 +89,20 @@ impl RuntimeDeps {
     ///
     /// This encapsulates DB init, token loading, tier detection,
     /// adapter creation, and posting queue setup.
+    ///
+    /// In scraper mode (`provider_backend = "scraper"`), skips OAuth token
+    /// loading, tier detection, and `get_me()`. Creates a `LocalModeXClient`
+    /// instead of `XApiHttpClient`.
     pub async fn init(config: &Config, dry_run: bool) -> anyhow::Result<Self> {
+        if config.x_api.provider_backend == "scraper" {
+            return Self::init_scraper_mode(config, dry_run).await;
+        }
+
+        Self::init_official_mode(config, dry_run).await
+    }
+
+    /// Initialize in official X API mode (existing behavior).
+    async fn init_official_mode(config: &Config, dry_run: bool) -> anyhow::Result<Self> {
         // 1. Validate database path.
         let db_path = expand_tilde(&config.storage.db_path);
         tracing::info!(path = %db_path.display(), "Database path configured");
@@ -195,11 +211,141 @@ impl RuntimeDeps {
         // 10. Create adapter structs.
         // Cast to trait object once for all adapters (AD-06).
         let dyn_client: Arc<dyn XApiClient> = x_client.clone() as Arc<dyn XApiClient>;
+
+        let deps = Self::build_adapters(
+            pool,
+            tier,
+            capabilities,
+            dyn_client,
+            own_user_id,
+            content_gen,
+            scoring_engine,
+            safety_guard,
+            post_tx,
+            post_rx,
+            config,
+            dry_run,
+            Some(token_manager),
+            Some(x_client.clone()),
+            keywords,
+        );
+
+        Ok(deps)
+    }
+
+    /// Initialize in scraper mode — no OAuth tokens, no tier detection.
+    async fn init_scraper_mode(config: &Config, dry_run: bool) -> anyhow::Result<Self> {
+        tracing::info!("Starting in Local No-Key Mode (scraper backend)");
+
+        // 1. Validate database path.
+        let db_path = expand_tilde(&config.storage.db_path);
+        tracing::info!(path = %db_path.display(), "Database path configured");
+
+        // 2. Create LocalModeXClient (no tokens needed).
+        let dyn_client = create_local_client(&config.x_api)
+            .expect("scraper backend should produce a local client");
+        tracing::info!(
+            allow_mutations = config.x_api.scraper_allow_mutations,
+            "Local mode X client created"
+        );
+
+        // 3. Synthetic tier: Basic capabilities minus mentions.
+        let tier = ApiTier::Basic;
+        let capabilities = TierCapabilities {
+            mentions: false,
+            discovery: true,
+            posting: config.x_api.scraper_allow_mutations,
+            search: true,
+        };
+        tracing::info!(tier = %tier, "Scraper mode capabilities: discovery=true, mentions=false, posting={}", capabilities.posting);
+
+        // 4. Initialize database.
+        let pool = storage::init_db(&config.storage.db_path)
+            .await
+            .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
+        tracing::info!("Database initialized");
+
+        // 5. Initialize rate limits.
+        storage::rate_limits::init_rate_limits(&pool, &config.limits, &config.intervals)
+            .await
+            .map_err(|e| anyhow::anyhow!("Rate limit initialization failed: {e}"))?;
+        tracing::info!("Rate limits initialized");
+
+        // 5b. Persist tier for MCP tools.
+        storage::cursors::set_cursor(&pool, "api_tier", &tier.to_string())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to persist API tier: {e}"))?;
+
+        // 6. Create LLM provider and content generator.
+        let provider = create_provider(&config.llm)
+            .map_err(|e| anyhow::anyhow!("LLM provider creation failed: {e}"))?;
+        let content_gen = Arc::new(ContentGenerator::new(provider, config.business.clone()));
+        tracing::info!("LLM provider and content generator initialized");
+
+        // 7. Create scoring engine and safety guard.
+        let keywords: Vec<String> = config
+            .business
+            .product_keywords
+            .iter()
+            .chain(config.business.competitor_keywords.iter())
+            .cloned()
+            .collect();
+        let scoring_engine = Arc::new(ScoringEngine::new(config.scoring.clone(), keywords.clone()));
+        let safety_guard = Arc::new(SafetyGuard::new(pool.clone()));
+        tracing::info!("Scoring engine and safety guard initialized");
+
+        // 8. No get_me() — use empty user ID (mentions loop won't run).
+        let own_user_id = String::new();
+
+        // 9. Create posting queue.
+        let (post_tx, post_rx) = create_posting_queue();
+
+        // 10. Create adapter structs.
+        let deps = Self::build_adapters(
+            pool,
+            tier,
+            capabilities,
+            dyn_client,
+            own_user_id,
+            content_gen,
+            scoring_engine,
+            safety_guard,
+            post_tx,
+            post_rx,
+            config,
+            dry_run,
+            None, // No token manager in scraper mode
+            None, // No XApiHttpClient in scraper mode
+            keywords,
+        );
+
+        Ok(deps)
+    }
+
+    /// Build all adapter structs from shared dependencies.
+    ///
+    /// Common to both official and scraper init paths.
+    #[allow(clippy::too_many_arguments)]
+    fn build_adapters(
+        pool: sqlx::SqlitePool,
+        tier: ApiTier,
+        capabilities: TierCapabilities,
+        dyn_client: Arc<dyn XApiClient>,
+        own_user_id: String,
+        content_gen: Arc<ContentGenerator>,
+        scoring_engine: Arc<ScoringEngine>,
+        safety_guard: Arc<SafetyGuard>,
+        post_tx: mpsc::Sender<PostAction>,
+        post_rx: mpsc::Receiver<PostAction>,
+        config: &Config,
+        dry_run: bool,
+        token_manager: Option<Arc<TokenManager>>,
+        x_client: Option<Arc<XApiHttpClient>>,
+        keywords: Vec<String>,
+    ) -> Self {
         let searcher: Arc<XApiSearchAdapter> = Arc::new(XApiSearchAdapter::new(dyn_client.clone()));
-        let mentions_fetcher: Arc<XApiMentionsAdapter> = Arc::new(XApiMentionsAdapter::new(
-            dyn_client.clone(),
-            own_user_id.clone(),
-        ));
+        let mentions_fetcher: Arc<XApiMentionsAdapter> =
+            Arc::new(XApiMentionsAdapter::new(dyn_client.clone(), own_user_id));
         let target_adapter: Arc<XApiTargetAdapter> =
             Arc::new(XApiTargetAdapter::new(dyn_client.clone()));
         let profile_adapter: Arc<XApiProfileAdapter> =
@@ -207,7 +353,7 @@ impl RuntimeDeps {
         let post_executor: Arc<XApiPostExecutorAdapter> =
             Arc::new(XApiPostExecutorAdapter::new(dyn_client.clone()));
         let thread_poster: Arc<XApiThreadPosterAdapter> =
-            Arc::new(XApiThreadPosterAdapter::new(dyn_client));
+            Arc::new(XApiThreadPosterAdapter::new(dyn_client.clone()));
 
         let reply_gen: Arc<LlmReplyAdapter> =
             Arc::new(LlmReplyAdapter::new(content_gen.clone(), pool.clone()));
@@ -259,7 +405,7 @@ impl RuntimeDeps {
             dry_run,
         };
 
-        Ok(Self {
+        Self {
             pool,
             tier,
             capabilities,
@@ -269,6 +415,7 @@ impl RuntimeDeps {
             profile_adapter,
             post_executor,
             thread_poster,
+            dyn_client,
             reply_gen,
             tweet_gen,
             thread_gen,
@@ -286,9 +433,9 @@ impl RuntimeDeps {
             post_rx: Some(post_rx),
             approval_queue,
             token_manager,
-            x_client: x_client.clone(),
+            x_client,
             keywords,
             target_loop_config,
-        })
+        }
     }
 }

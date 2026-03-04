@@ -22,6 +22,9 @@ const TEST_TOKEN: &str = "test-token-abc123";
 /// A valid minimal config body that passes `Config::validate()`.
 fn valid_config_body() -> serde_json::Value {
     serde_json::json!({
+        "x_api": {
+            "client_id": "test-client-id"
+        },
         "business": {
             "product_name": "TestBot",
             "product_keywords": ["rust", "testing"]
@@ -52,6 +55,7 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
 
@@ -274,6 +278,7 @@ async fn init_with_claim_produces_valid_session() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -356,6 +361,7 @@ async fn login_detects_out_of_band_passphrase_reset() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);
@@ -419,6 +425,7 @@ async fn login_detects_new_passphrase_file() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     });
     let router = tuitbot_server::build_router(state);

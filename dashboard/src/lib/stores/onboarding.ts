@@ -1,7 +1,8 @@
 import { writable } from 'svelte/store';
 
 export interface OnboardingData {
-	// X API
+	// X Access
+	provider_backend: string;
 	client_id: string;
 	client_secret: string;
 	// Profile
@@ -34,6 +35,7 @@ export interface OnboardingData {
 
 function createOnboardingStore() {
 	const { subscribe, update, set } = writable<OnboardingData>({
+		provider_backend: '',
 		client_id: '',
 		client_secret: '',
 		account_type: 'individual',
@@ -67,6 +69,7 @@ function createOnboardingStore() {
 		},
 		reset: () => {
 			set({
+				provider_backend: '',
 				client_id: '',
 				client_secret: '',
 				account_type: 'individual',

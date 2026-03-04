@@ -21,6 +21,9 @@ const TEST_TOKEN: &str = "test-token-abc123";
 /// A valid minimal config body that passes `Config::validate()`.
 fn valid_config_body() -> serde_json::Value {
     serde_json::json!({
+        "x_api": {
+            "client_id": "test-client-id"
+        },
         "business": {
             "product_name": "TestBot",
             "product_keywords": ["rust", "testing"]
@@ -51,6 +54,7 @@ async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
+        provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
     })
 }

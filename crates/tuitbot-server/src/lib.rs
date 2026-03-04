@@ -14,6 +14,7 @@ pub mod ws;
 
 use std::sync::Arc;
 
+use axum::extract::DefaultBodyLimit;
 use axum::middleware;
 use axum::routing::{delete, get, patch, post};
 use axum::Router;
@@ -158,8 +159,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/discovery/{tweet_id}/queue-reply",
             post(routes::discovery::queue_reply),
         )
-        // Media
-        .route("/media/upload", post(routes::media::upload))
+        // Media — raise body limit for uploads (default 2MB is too small for images/video).
+        .route(
+            "/media/upload",
+            post(routes::media::upload).layer(DefaultBodyLimit::max(520 * 1024 * 1024)),
+        )
         .route("/media/file", get(routes::media::serve_file))
         // LAN settings
         .route(

@@ -106,6 +106,27 @@ pub enum XApiError {
         /// Number of seconds waited before timing out.
         seconds: u64,
     },
+
+    /// Mutation blocked because scraper backend has mutations disabled.
+    #[error("scraper mutation blocked: {message}. Enable scraper_allow_mutations in config or switch to provider_backend = \"x_api\"")]
+    ScraperMutationBlocked {
+        /// The operation that was blocked.
+        message: String,
+    },
+
+    /// Scraper transport is unavailable or not yet implemented.
+    #[error("scraper transport unavailable: {message}")]
+    ScraperTransportUnavailable {
+        /// Details about the transport issue.
+        message: String,
+    },
+
+    /// Feature requires authenticated X API access (not available in scraper mode).
+    #[error("feature requires X API authentication: {message}. Switch to provider_backend = \"x_api\" to use this feature")]
+    FeatureRequiresAuth {
+        /// The feature or method that requires authentication.
+        message: String,
+    },
 }
 
 /// Errors from interacting with LLM providers (OpenAI, Anthropic, Ollama).
@@ -322,5 +343,38 @@ mod tests {
     fn x_api_error_media_processing_timeout_message() {
         let err = XApiError::MediaProcessingTimeout { seconds: 300 };
         assert_eq!(err.to_string(), "media processing timed out after 300s");
+    }
+
+    #[test]
+    fn x_api_error_scraper_mutation_blocked_message() {
+        let err = XApiError::ScraperMutationBlocked {
+            message: "post_tweet".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "scraper mutation blocked: post_tweet. Enable scraper_allow_mutations in config or switch to provider_backend = \"x_api\""
+        );
+    }
+
+    #[test]
+    fn x_api_error_scraper_transport_unavailable_message() {
+        let err = XApiError::ScraperTransportUnavailable {
+            message: "search_tweets: scraper transport not yet implemented".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "scraper transport unavailable: search_tweets: scraper transport not yet implemented"
+        );
+    }
+
+    #[test]
+    fn x_api_error_feature_requires_auth_message() {
+        let err = XApiError::FeatureRequiresAuth {
+            message: "get_me requires authenticated API access".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "feature requires X API authentication: get_me requires authenticated API access. Switch to provider_backend = \"x_api\" to use this feature"
+        );
     }
 }

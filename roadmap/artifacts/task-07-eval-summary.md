@@ -1,6 +1,6 @@
 # Task 07 — Observability Eval Results
 
-**Generated:** 2026-03-01 20:42 UTC
+**Generated:** 2026-03-04 01:50 UTC
 
 ## Scenarios
 
@@ -16,16 +16,16 @@
 
 | Tool | Latency (ms) | Success | Schema Valid | Error | Policy |
 |------|-------------|---------|--------------|-------|--------|
-| draft_replies_for_candidates | 5 | PASS | PASS | - | - |
-| propose_and_queue_replies | 4 | PASS | PASS | - | allow |
+| draft_replies_for_candidates | 6 | PASS | PASS | - | - |
+| propose_and_queue_replies | 3 | PASS | PASS | - | allow |
 
 ### Scenario B: Composite flow: find -> draft -> queue
 
 | Tool | Latency (ms) | Success | Schema Valid | Error | Policy |
 |------|-------------|---------|--------------|-------|--------|
-| find_reply_opportunities | 3 | PASS | PASS | - | - |
-| draft_replies_for_candidates | 4 | PASS | PASS | - | - |
-| propose_and_queue_replies | 3 | PASS | PASS | - | allow |
+| find_reply_opportunities | 1 | PASS | PASS | - | - |
+| draft_replies_for_candidates | 5 | PASS | PASS | - | - |
+| propose_and_queue_replies | 4 | PASS | PASS | - | allow |
 
 ### Scenario C: Blocked-by-policy mutation with telemetry verification
 

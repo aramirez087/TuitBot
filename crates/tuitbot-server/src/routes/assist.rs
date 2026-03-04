@@ -157,22 +157,8 @@ pub async fn assist_improve(
 ) -> Result<Json<AssistImproveResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
 
-    // Use the tweet generation path with the draft as the "topic",
-    // rephrased as an improvement request.
-    let prompt = if let Some(ctx) = &body.context {
-        format!(
-            "Rewrite and improve this draft tweet in the brand voice. Context: {}. Draft: {}",
-            ctx, body.draft
-        )
-    } else {
-        format!(
-            "Rewrite and improve this draft tweet in the brand voice. Draft: {}",
-            body.draft
-        )
-    };
-
     let output = gen
-        .generate_tweet(&prompt)
+        .improve_draft(&body.draft, body.context.as_deref())
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 

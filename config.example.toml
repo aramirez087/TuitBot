@@ -51,6 +51,25 @@ client_id = "your-client-id-here"
 # Optional: Client secret (only needed for confidential clients).
 # client_secret = "your-client-secret-here"
 
+# --- X Access Mode ---
+# Controls how Tuitbot connects to X.
+#   "" or "x_api" (default) — Official X API with OAuth credentials. Full features.
+#   "scraper"               — Local No-Key Mode. No API credentials needed.
+#                              Read-only by default. Discovery and drafting work;
+#                              posting, mentions, and analytics are unavailable.
+#                              Only available in desktop and self_host deployment modes.
+# provider_backend = ""
+#
+# Environment variable override: TUITBOT_X_API__PROVIDER_BACKEND=x_api|scraper
+
+# Allow write operations in Local No-Key Mode (provider_backend = "scraper").
+# Default: false. When false, all posting/liking/following is blocked.
+# When true, writes are attempted via the scraper transport (elevated risk
+# of account restrictions — the Official X API is recommended for posting).
+# scraper_allow_mutations = false
+#
+# Environment variable override: TUITBOT_X_API__SCRAPER_ALLOW_MUTATIONS=true|false
+
 # --- Authentication Settings ---
 [auth]
 # Auth mode: "manual" (paste code from browser — works on VPS/headless)
