@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.21](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.20...tuitbot-cli-v0.1.21) - 2026-03-05
+
+### Added
+
+- Add account profile fields to the database schema, X API types, and integrate them across core, server, and dashboard components.
+- Session 2 — extend core generator contract
+
+### Other
+
+- Composer UI improvements.
+- update media preview URL handling in TweetEditor and regenerate roadmap artifacts.
+- Merge branch 'main' into feat/composer-rag
+
 ## [0.1.20](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.19...tuitbot-cli-v0.1.20) - 2026-03-04
 
 ### Added
