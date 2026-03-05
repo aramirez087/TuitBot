@@ -126,6 +126,10 @@
 		if (input.files?.length) handleFiles(input.files);
 		input.value = '';
 	}
+
+	export function triggerAttach() {
+		fileInput?.click();
+	}
 </script>
 
 <div

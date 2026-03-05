@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import type { ThreadBlock } from "$lib/api";
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
-	import { GripVertical, Merge, Trash2, Plus } from "lucide-svelte";
+	import { GripVertical, Merge, Trash2, Image } from "lucide-svelte";
 	import MediaSlot from "../MediaSlot.svelte";
 
 	let {
@@ -60,7 +60,6 @@
 	const charCount = $derived(tweetWeightedLen(block.text));
 	const overLimit = $derived(charCount > MAX_TWEET_CHARS);
 	const warning = $derived(charCount > 260 && !overLimit);
-	const isLast = $derived(index >= total - 1);
 	const isFirst = $derived(index === 0);
 
 	function handleKeydownGuarded(e: KeyboardEvent) {
@@ -80,6 +79,7 @@
 	}
 
 	let textareaEl: HTMLTextAreaElement | undefined = $state();
+	let mediaSlotRef: MediaSlot | undefined = $state();
 
 	onMount(() => {
 		if (textareaEl && block.text) {
@@ -110,7 +110,7 @@
 	ondragleave={(e) => ondragleave(e)}
 	ondrop={(e) => ondrop(e)}
 >
-	<!-- Gutter: avatar + spine -->
+	<!-- Gutter: avatar -->
 	<div class="card-gutter">
 		{#if avatarUrl}
 			<img
@@ -124,9 +124,6 @@
 				class="gutter-avatar-placeholder"
 				class:over-limit={overLimit}
 			></div>
-		{/if}
-		{#if !isLast}
-			<div class="gutter-spine"></div>
 		{/if}
 	</div>
 
@@ -153,26 +150,37 @@
 				aria-label={`Post ${index + 1} of ${total}`}
 			></textarea>
 			<MediaSlot
+				bind:this={mediaSlotRef}
 				mediaPaths={block.media_paths}
 				onmediachange={(paths) => onmedia(paths)}
 			/>
 		</div>
 
-		<!-- Separator row: character count + tools -->
-		<div class="card-separator" class:last={isLast}>
-			<span class="sep-post-number">#{index + 1}</span>
-			{#if charCount > 240 || overLimit}
-				<span
-					class="sep-char-count"
-					class:over-limit={overLimit}
-					class:warning
+		<!-- Card footer: post number + char count + actions -->
+		<div class="card-footer">
+			<span class="footer-badge">#{index + 1}</span>
+			<div class="footer-center">
+				{#if charCount > 240 || overLimit}
+					<span
+						class="footer-char-count"
+						class:over-limit={overLimit}
+						class:warning
+					>
+						{charCount}/{MAX_TWEET_CHARS}
+					</span>
+				{/if}
+			</div>
+			<div class="footer-actions">
+				<button
+					class="footer-action-btn"
+					onclick={() => mediaSlotRef?.triggerAttach()}
+					title="Attach media"
+					aria-label={`Attach media to post ${index + 1}`}
 				>
-					{charCount}/{MAX_TWEET_CHARS}
-				</span>
-			{/if}
-			<div class="sep-tools">
+					<Image size={13} />
+				</button>
 				<div
-					class="sep-handle"
+					class="footer-handle"
 					draggable="true"
 					role="button"
 					tabindex="-1"
@@ -181,40 +189,28 @@
 					ondragstart={(e) => ondragstart(e)}
 					ondragend={() => ondragend()}
 				>
-					<GripVertical size={12} />
+					<GripVertical size={13} />
 				</div>
 				{#if total > 2}
 					<button
-						class="sep-action-btn"
+						class="footer-action-btn"
 						onclick={() => onmerge()}
 						title="Merge with next ({'\u2318'}{'\u21e7'}M)"
 						aria-label={`Merge post ${index + 1} with post ${index + 2}`}
 					>
-						<Merge size={12} />
+						<Merge size={13} />
 					</button>
 					<button
-						class="sep-action-btn sep-remove"
+						class="footer-action-btn footer-remove"
 						onclick={() => onremove()}
 						title="Remove post"
 						aria-label={`Remove post ${index + 1}`}
 					>
-						<Trash2 size={12} />
+						<Trash2 size={13} />
 					</button>
 				{/if}
 			</div>
 		</div>
-
-		<!-- Add post below zone -->
-		<button
-			class="add-post-zone"
-			tabindex="-1"
-			aria-label={`Add post after post ${index + 1}`}
-			onclick={() => onaddafter()}
-		>
-			<span class="add-post-icon"><Plus size={11} /></span>
-			<span class="add-post-label">Add post below</span>
-			<kbd class="add-post-kbd">⌘↩</kbd>
-		</button>
 	</div>
 </div>
 
@@ -235,11 +231,11 @@
 		pointer-events: none;
 	}
 
-	/* ── Gutter (avatar + spine) ────────────── */
+	/* ── Gutter (avatar) ───────────────────── */
 	.card-gutter {
 		display: flex;
-		flex-direction: column;
-		align-items: center;
+		align-items: flex-start;
+		justify-content: center;
 		width: 36px;
 		flex-shrink: 0;
 		padding-top: 4px;
@@ -279,24 +275,6 @@
 
 	.gutter-avatar-placeholder.over-limit {
 		border-color: var(--color-danger);
-	}
-
-	.gutter-spine {
-		flex: 1;
-		width: 2px;
-		margin-top: 4px;
-		background: color-mix(
-			in srgb,
-			var(--color-border-subtle) 35%,
-			transparent
-		);
-		border-radius: 1px;
-		min-height: 16px;
-		transition: background 0.15s ease;
-	}
-
-	.flow-card.focused .gutter-spine {
-		background: color-mix(in srgb, var(--color-accent) 30%, transparent);
 	}
 
 	/* ── Card body ──────────────────────────── */
@@ -374,189 +352,126 @@
 		opacity: 0.5;
 	}
 
-	/* ── Separator ──────────────────────────── */
-	.card-separator {
+	/* ── Card Footer ───────────────────────── */
+	.card-footer {
 		display: flex;
 		align-items: center;
-		height: 24px;
-		padding: 0;
-		margin: 0;
-		gap: 8px;
+		justify-content: space-between;
+		padding: 6px 0 0;
+		margin-top: 8px;
+		border-top: 1px solid color-mix(in srgb, var(--color-border-subtle) 30%, transparent);
+		min-height: 28px;
 	}
 
-	.sep-post-number {
+	.footer-badge {
 		font-size: 11px;
 		font-family: var(--font-mono);
 		color: var(--color-text-subtle);
-		opacity: 0.6;
+		opacity: 0.5;
+		padding: 1px 6px;
+		border-radius: 4px;
+		background: color-mix(in srgb, var(--color-surface-active) 50%, transparent);
 	}
 
-	.sep-char-count {
+	.footer-center {
+		flex: 1;
+		display: flex;
+		justify-content: center;
+	}
+
+	.footer-char-count {
 		font-size: 11px;
 		font-family: var(--font-mono);
 		color: var(--color-text-subtle);
-		min-width: 60px;
+		letter-spacing: -0.02em;
 	}
 
-	.sep-char-count.warning {
+	.footer-char-count.warning {
 		color: var(--color-warning);
 	}
 
-	.sep-char-count.over-limit {
+	.footer-char-count.over-limit {
 		color: var(--color-danger);
 		font-weight: 600;
 	}
 
-	.sep-tools {
+	.footer-actions {
 		display: flex;
 		align-items: center;
 		gap: 2px;
-		opacity: 0;
+		opacity: 0.35;
 		transition: opacity 0.15s ease;
 	}
 
-	.card-separator:hover .sep-tools {
+	.card-footer:hover .footer-actions,
+	.flow-card.focused .footer-actions {
 		opacity: 1;
 	}
 
-	.sep-handle {
+	.footer-action-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 20px;
-		height: 20px;
-		color: var(--color-text-subtle);
-		cursor: grab;
+		width: 24px;
+		height: 24px;
 		border: none;
-		background: none;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
 		padding: 0;
-		border-radius: 3px;
 		transition:
 			color 0.15s ease,
 			background 0.15s ease;
 	}
 
-	.sep-handle:hover {
-		color: var(--color-text);
-		background: var(--color-surface-hover);
-	}
-
-	.sep-handle:active {
-		cursor: grabbing;
-	}
-
-	.sep-action-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		height: 20px;
-		border: none;
-		border-radius: 3px;
-		background: transparent;
-		color: var(--color-text-subtle);
-		cursor: pointer;
-		transition: all 0.15s ease;
-		padding: 0;
-	}
-
-	.sep-action-btn:hover {
+	.footer-action-btn:hover {
 		background: var(--color-surface-hover);
 		color: var(--color-text);
 	}
 
-	.sep-action-btn.sep-remove:hover {
+	.footer-remove:hover {
 		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 		color: var(--color-danger);
 	}
 
-	/* ── Add Post Zone ──────────────────────── */
-	.add-post-zone {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		width: 100%;
-		padding: 6px 0;
-		border: none;
-		background: none;
-		cursor: pointer;
-		opacity: 0;
-		transition: opacity 0.15s ease;
-	}
-
-	.flow-card:hover .add-post-zone,
-	.flow-card.focused .add-post-zone {
-		opacity: 1;
-	}
-
-	.add-post-icon {
-		width: 18px;
-		height: 18px;
-		border-radius: 50%;
-		border: 1.5px solid
-			color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
+	.footer-handle {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		width: 24px;
+		height: 24px;
 		color: var(--color-text-subtle);
-		transition: all 0.15s ease;
-		flex-shrink: 0;
+		cursor: grab;
+		border: none;
+		background: none;
+		padding: 0;
+		border-radius: 4px;
+		transition:
+			color 0.15s ease,
+			background 0.15s ease;
 	}
 
-	.add-post-zone:hover .add-post-icon {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+	.footer-handle:hover {
+		color: var(--color-text);
+		background: var(--color-surface-hover);
 	}
 
-	.add-post-label {
-		font-size: 12px;
-		color: var(--color-text-subtle);
-		transition: color 0.15s ease;
-	}
-
-	.add-post-zone:hover .add-post-label {
-		color: var(--color-accent);
-	}
-
-	.add-post-kbd {
-		font-size: 10px;
-		font-family: var(--font-mono);
-		padding: 1px 5px;
-		border-radius: 3px;
-		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-		color: var(--color-accent);
-		border: 1px solid
-			color-mix(in srgb, var(--color-accent) 12%, transparent);
-		opacity: 0;
-		transition: opacity 0.15s ease;
-	}
-
-	.add-post-zone:hover .add-post-kbd {
-		opacity: 1;
+	.footer-handle:active {
+		cursor: grabbing;
 	}
 
 	/* Touch: always show tools */
 	@media (hover: none) {
-		.sep-tools {
-			opacity: 1;
-		}
-		.add-post-zone {
-			opacity: 1;
-		}
-		.add-post-kbd {
+		.footer-actions {
 			opacity: 1;
 		}
 	}
 
 	@media (pointer: coarse) {
-		.sep-handle,
-		.sep-action-btn {
+		.footer-action-btn,
+		.footer-handle {
 			min-width: 44px;
-			min-height: 44px;
-		}
-
-		.add-post-zone {
 			min-height: 44px;
 		}
 	}
@@ -564,16 +479,11 @@
 	@media (prefers-reduced-motion: reduce) {
 		.flow-card,
 		.card-writing-area,
-		.sep-tools,
-		.add-post-zone,
-		.add-post-icon,
-		.add-post-label,
-		.add-post-kbd,
+		.footer-actions,
+		.footer-action-btn,
+		.footer-handle,
 		.gutter-avatar,
-		.gutter-avatar-placeholder,
-		.gutter-spine,
-		.sep-handle,
-		.sep-action-btn {
+		.gutter-avatar-placeholder {
 			transition: none;
 		}
 	}

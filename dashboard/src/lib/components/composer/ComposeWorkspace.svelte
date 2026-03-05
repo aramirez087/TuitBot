@@ -94,7 +94,6 @@
 	} | null>(null);
 
 	// Toolbar state
-	let focusedThreadIndex = $state(0);
 
 	// ── Derived ────────────────────────────────────────────
 	const targetDate = $derived(prefillDate ?? new Date());
@@ -661,7 +660,6 @@
 			displayName={$currentAccount?.x_display_name ?? null}
 			{mode}
 			blockCount={threadBlockCount}
-			hasContent={hasExistingContent}
 			onsubmit={handleSubmit}
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
@@ -677,10 +675,6 @@
 		{:else}
 			<ComposerToolbar
 				{mode}
-				charCount={tweetChars}
-				charMax={TWEET_MAX}
-				blockIndex={focusedThreadIndex}
-				blockCount={threadBlockCount}
 				canAttachMedia={mode === 'tweet'}
 				uploading={false}
 				onattachmedia={() => { tweetEditorRef?.triggerFileSelect(); }}

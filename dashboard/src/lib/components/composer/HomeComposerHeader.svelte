@@ -21,7 +21,6 @@
 		displayName = null,
 		mode = 'tweet',
 		blockCount = 1,
-		hasContent,
 		onsubmit,
 		onpublishnow,
 		onschedule,
@@ -40,7 +39,6 @@
 		displayName?: string | null;
 		mode?: 'tweet' | 'thread';
 		blockCount?: number;
-		hasContent: boolean;
 		onsubmit: () => void;
 		onpublishnow?: () => void;
 		onschedule?: () => void;
@@ -62,7 +60,6 @@
 		{#if handle}
 			<span class="header-handle">@{handle}</span>
 		{/if}
-		<span class="header-dot" class:active={hasContent} aria-label={hasContent ? 'Has content' : 'Empty draft'}></span>
 	</div>
 
 	<div class="header-right">
@@ -203,19 +200,6 @@
 		max-width: 140px;
 	}
 
-	.header-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--color-border-subtle);
-		flex-shrink: 0;
-		transition: background 0.2s ease;
-	}
-
-	.header-dot.active {
-		background: var(--color-success, #22c55e);
-	}
-
 	.header-right {
 		display: flex;
 		align-items: center;
@@ -233,11 +217,11 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		height: 36px;
-		padding: 0 16px;
+		height: 38px;
+		padding: 0 20px;
 		border-radius: 20px;
-		font-size: 13px;
-		font-weight: 500;
+		font-size: 13.5px;
+		font-weight: 600;
 		cursor: pointer;
 		transition: all 0.15s ease;
 		white-space: nowrap;
@@ -248,7 +232,7 @@
 	.schedule-pill {
 		background: var(--color-accent);
 		color: #fff;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 	}
 
 	.publish-pill:hover:not(:disabled),
@@ -285,7 +269,13 @@
 		display: flex;
 		align-items: center;
 		gap: 2px;
-		margin-left: 4px;
+		margin-left: 8px;
+		opacity: 0.7;
+		transition: opacity 0.15s ease;
+	}
+
+	.icon-tools:hover {
+		opacity: 1;
 	}
 
 	.icon-btn {
@@ -329,7 +319,7 @@
 			animation: none;
 		}
 
-		.header-dot {
+		.icon-tools {
 			transition: none;
 		}
 	}

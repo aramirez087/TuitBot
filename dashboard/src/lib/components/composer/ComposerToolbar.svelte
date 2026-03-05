@@ -1,19 +1,9 @@
 <script lang="ts">
-	import {
-		Image,
-		Sparkles,
-		MessageSquare,
-		List,
-		Search,
-	} from "lucide-svelte";
+	import { Image, Sparkles, MessageSquare, List, Search } from "lucide-svelte";
 	import { formatCombo } from "$lib/utils/shortcuts";
 
 	let {
 		mode = "tweet",
-		charCount = 0,
-		charMax = 280,
-		blockIndex = 0,
-		blockCount = 1,
 		canAttachMedia = true,
 		uploading = false,
 		onattachmedia,
@@ -22,10 +12,6 @@
 		onopenpalette,
 	}: {
 		mode: "tweet" | "thread";
-		charCount: number;
-		charMax: number;
-		blockIndex: number;
-		blockCount: number;
 		canAttachMedia: boolean;
 		uploading: boolean;
 		onattachmedia: () => void;
@@ -39,9 +25,6 @@
 	const switchLabel = $derived(
 		mode === "tweet" ? "Switch to thread" : "Switch to tweet",
 	);
-	const showCharCount = $derived(mode === "tweet" || charCount > 200);
-	const charWarning = $derived(charCount > 260 && charCount <= charMax);
-	const charOver = $derived(charCount > charMax);
 </script>
 
 <div class="toolbar-anchor">
@@ -80,28 +63,6 @@
 		</div>
 
 		<div class="toolbar-right">
-			{#if showCharCount}
-				<span
-					class="char-badge"
-					class:warning={charWarning}
-					class:over={charOver}
-					aria-label="Character count: {charCount} of {charMax}"
-				>
-					{charCount}/{charMax}
-				</span>
-			{/if}
-
-			{#if mode === "thread"}
-				<span
-					class="thread-position"
-					aria-label="Post {blockIndex + 1} of {blockCount}"
-				>
-					#{blockIndex + 1}<span class="thread-total"
-						>/{blockCount}</span
-					>
-				</span>
-			{/if}
-
 			<button
 				class="palette-trigger"
 				onclick={onopenpalette}
@@ -227,34 +188,6 @@
 
 	.mode-label {
 		letter-spacing: 0.01em;
-	}
-
-	.char-badge {
-		font-size: 11px;
-		font-family: var(--font-mono);
-		color: var(--color-text-subtle);
-		letter-spacing: -0.02em;
-		white-space: nowrap;
-	}
-
-	.char-badge.warning {
-		color: var(--color-warning);
-	}
-
-	.char-badge.over {
-		color: var(--color-danger);
-		font-weight: 600;
-	}
-
-	.thread-position {
-		font-size: 11px;
-		font-family: var(--font-mono);
-		color: var(--color-text-subtle);
-		letter-spacing: -0.02em;
-	}
-
-	.thread-total {
-		opacity: 0.5;
 	}
 
 	.palette-trigger {

@@ -2,6 +2,7 @@
 	import { api, type ThreadBlock } from "$lib/api";
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
 	import * as threadOps from "$lib/utils/threadOps";
+	import { Plus } from "lucide-svelte";
 	import ThreadFlowCard from "./ThreadFlowCard.svelte";
 
 	let {
@@ -414,6 +415,20 @@
 	</div>
 
 	{#each sortedBlocks as block, i (block.id)}
+		{#if i > 0}
+			<div class="thread-connector" aria-hidden="true">
+				<div class="connector-line-top"></div>
+				<button
+					class="add-post-circle"
+					tabindex="-1"
+					aria-label={`Add post between ${i} and ${i + 1}`}
+					onclick={() => addBlockAfter(sortedBlocks[i - 1].id)}
+				>
+					<Plus size={10} />
+				</button>
+				<div class="connector-line-bottom"></div>
+			</div>
+		{/if}
 		<ThreadFlowCard
 			{block}
 			index={i}
@@ -445,6 +460,19 @@
 			ondrop={(e) => handleCardDrop(e, block.id)}
 		/>
 	{/each}
+
+	<!-- Tail connector: add post at end -->
+	<div class="thread-connector thread-connector-tail" aria-hidden="true">
+		<div class="connector-line-top"></div>
+		<button
+			class="add-post-circle"
+			tabindex="-1"
+			aria-label="Add post at end"
+			onclick={() => addBlock()}
+		>
+			<Plus size={10} />
+		</button>
+	</div>
 </div>
 
 {#if mergeError}<div class="merge-error" role="alert">{mergeError}</div>{/if}
@@ -477,6 +505,52 @@
 		border-width: 0;
 	}
 
+	/* ── Thread Connectors ──────────────────── */
+	.thread-connector {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		width: 36px;
+		height: 24px;
+		position: relative;
+	}
+
+	.connector-line-top,
+	.connector-line-bottom {
+		flex: 1;
+		width: 2.5px;
+		background: color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		border-radius: 1.5px;
+	}
+
+	.add-post-circle {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		border: 1.5px solid color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
+		background: var(--color-surface);
+		color: var(--color-text-subtle);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		padding: 0;
+		flex-shrink: 0;
+		opacity: 0;
+		transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+		z-index: 1;
+	}
+
+	.thread-connector:hover .add-post-circle {
+		opacity: 1;
+	}
+
+	.add-post-circle:hover {
+		border-color: var(--color-accent);
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+	}
+
 	.merge-error {
 		margin-top: 8px;
 		padding: 8px 12px;
@@ -503,6 +577,33 @@
 	@media (max-width: 640px) {
 		.flow-lane {
 			padding-left: 0;
+		}
+
+		.thread-connector {
+			width: 28px;
+		}
+	}
+
+	@media (hover: none) {
+		.add-post-circle {
+			opacity: 0.5;
+		}
+	}
+
+	@media (pointer: coarse) {
+		.add-post-circle {
+			min-width: 36px;
+			min-height: 36px;
+		}
+
+		.thread-connector {
+			height: 32px;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.add-post-circle {
+			transition: none;
 		}
 	}
 </style>
