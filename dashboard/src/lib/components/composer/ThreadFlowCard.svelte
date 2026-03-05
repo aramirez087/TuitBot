@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import type { ThreadBlock } from "$lib/api";
-	import { tweetWeightedLen, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
+	import { tweetWeightedLen, wordCount, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
 	import { GripVertical, Merge, Trash2, Image } from "lucide-svelte";
 	import MediaSlot from "../MediaSlot.svelte";
+	import CharRing from "./CharRing.svelte";
 
 	let {
 		block,
@@ -61,6 +62,7 @@
 	const overLimit = $derived(charCount > MAX_TWEET_CHARS);
 	const warning = $derived(charCount > 260 && !overLimit);
 	const isFirst = $derived(index === 0);
+	const words = $derived(wordCount(block.text));
 
 	function handleKeydownGuarded(e: KeyboardEvent) {
 		if (e.isComposing) return;
@@ -156,21 +158,16 @@
 			/>
 		</div>
 
-		<!-- Card footer: post number + char count + actions -->
+		<!-- Card footer: post number + actions -->
 		<div class="card-footer">
-			<span class="footer-badge">#{index + 1}</span>
-			<div class="footer-center">
-				{#if charCount > 240 || overLimit}
-					<span
-						class="footer-char-count"
-						class:over-limit={overLimit}
-						class:warning
-					>
-						{charCount}/{MAX_TWEET_CHARS}
-					</span>
+			<div class="footer-left">
+				<span class="footer-badge">#{index + 1}</span>
+				{#if focused && words > 0}
+					<span class="footer-words">{words} {words === 1 ? "word" : "words"}</span>
 				{/if}
 			</div>
 			<div class="footer-actions">
+				<CharRing current={charCount} />
 				<button
 					class="footer-action-btn"
 					onclick={() => mediaSlotRef?.triggerAttach()}
@@ -252,7 +249,7 @@
 	}
 
 	.flow-card.focused .gutter-avatar {
-		border-color: var(--color-accent);
+		border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
 	}
 
 	.gutter-avatar.over-limit {
@@ -270,7 +267,7 @@
 	}
 
 	.flow-card.focused .gutter-avatar-placeholder {
-		border-color: var(--color-accent);
+		border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
 	}
 
 	.gutter-avatar-placeholder.over-limit {
@@ -285,13 +282,51 @@
 
 	.card-writing-area {
 		position: relative;
-		padding: 4px 0;
-		transition: border-color 0.15s ease;
+		padding: 4px 0 4px 10px;
+		border-radius: 6px;
+		transition:
+			border-color 0.15s ease,
+			background 0.2s ease;
+	}
+
+	/* Focus glow: left accent bar */
+	.card-writing-area::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 8px;
+		bottom: 8px;
+		width: 2px;
+		border-radius: 1px;
+		background: var(--color-accent);
+		opacity: 0;
+		transition: opacity 0.2s ease;
+	}
+
+	.flow-card.focused .card-writing-area::before {
+		opacity: 0.3;
+	}
+
+	.flow-card.focused .card-writing-area {
+		background: color-mix(in srgb, var(--color-accent) 1.5%, transparent);
+	}
+
+	/* Subtle de-emphasis on unfocused cards */
+	.flow-card:not(.focused) .card-writing-area {
+		opacity: 0.95;
+	}
+
+	.flow-card:not(.focused):hover .card-writing-area {
+		opacity: 1;
+	}
+
+	.card-writing-area.over-limit::before {
+		background: var(--color-danger);
+		opacity: 1;
 	}
 
 	.card-writing-area.over-limit {
-		border-left: 2px solid var(--color-danger);
-		padding-left: 12px;
+		padding-left: 10px;
 	}
 
 	.flow-card.drop-target .card-writing-area {
@@ -337,9 +372,13 @@
 		border: none;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 16px;
+		font-size: 17px;
 		font-family: var(--font-sans);
-		line-height: 1.55;
+		line-height: 1.65;
+		letter-spacing: -0.01em;
+		caret-color: var(--color-accent);
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
@@ -349,7 +388,8 @@
 
 	.flow-textarea::placeholder {
 		color: var(--color-text-subtle);
-		opacity: 0.5;
+		opacity: 0.35;
+		font-style: italic;
 	}
 
 	/* ── Card Footer ───────────────────────── */
@@ -357,42 +397,37 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 6px 0 0;
-		margin-top: 8px;
-		border-top: 1px solid color-mix(in srgb, var(--color-border-subtle) 30%, transparent);
+		padding: 4px 0 0;
+		margin-top: 6px;
 		min-height: 28px;
 	}
 
+	.footer-left {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.footer-badge {
-		font-size: 11px;
+		font-size: 10px;
 		font-family: var(--font-mono);
 		color: var(--color-text-subtle);
-		opacity: 0.5;
+		opacity: 0.4;
 		padding: 1px 6px;
-		border-radius: 4px;
+		border-radius: 8px;
 		background: color-mix(in srgb, var(--color-surface-active) 50%, transparent);
 	}
 
-	.footer-center {
-		flex: 1;
-		display: flex;
-		justify-content: center;
+	.flow-card.focused .footer-badge {
+		opacity: 0.7;
 	}
 
-	.footer-char-count {
-		font-size: 11px;
+	.footer-words {
+		font-size: 10px;
 		font-family: var(--font-mono);
 		color: var(--color-text-subtle);
-		letter-spacing: -0.02em;
-	}
-
-	.footer-char-count.warning {
-		color: var(--color-warning);
-	}
-
-	.footer-char-count.over-limit {
-		color: var(--color-danger);
-		font-weight: 600;
+		opacity: 0.4;
+		letter-spacing: 0.02em;
 	}
 
 	.footer-actions {
@@ -405,7 +440,7 @@
 
 	.card-footer:hover .footer-actions,
 	.flow-card.focused .footer-actions {
-		opacity: 1;
+		opacity: 0.7;
 	}
 
 	.footer-action-btn {
@@ -479,6 +514,7 @@
 	@media (prefers-reduced-motion: reduce) {
 		.flow-card,
 		.card-writing-area,
+		.card-writing-area::before,
 		.footer-actions,
 		.footer-action-btn,
 		.footer-handle,

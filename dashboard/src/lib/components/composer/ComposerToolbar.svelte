@@ -1,20 +1,14 @@
 <script lang="ts">
-	import { Image, Sparkles, MessageSquare, List, Search } from "lucide-svelte";
+	import { Sparkles, MessageSquare, List, Search } from "lucide-svelte";
 	import { formatCombo } from "$lib/utils/shortcuts";
 
 	let {
 		mode = "tweet",
-		canAttachMedia = true,
-		uploading = false,
-		onattachmedia,
 		onaiassist,
 		onswitchmode,
 		onopenpalette,
 	}: {
 		mode: "tweet" | "thread";
-		canAttachMedia: boolean;
-		uploading: boolean;
-		onattachmedia: () => void;
 		onaiassist: () => void;
 		onswitchmode: () => void;
 		onopenpalette: () => void;
@@ -30,16 +24,6 @@
 <div class="toolbar-anchor">
 	<div class="floating-toolbar" role="toolbar" aria-label="Composer actions">
 		<div class="toolbar-left">
-			<button
-				class="toolbar-btn"
-				onclick={onattachmedia}
-				disabled={!canAttachMedia || uploading}
-				title="Attach media"
-				aria-label={uploading ? "Uploading media" : "Attach media"}
-			>
-				<Image size={15} />
-			</button>
-
 			<button
 				class="toolbar-btn ai-btn"
 				onclick={onaiassist}

@@ -3,6 +3,7 @@
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
 	import { X, Film } from 'lucide-svelte';
 	import MediaAltBadge from './MediaAltBadge.svelte';
+	import CharRing from './CharRing.svelte';
 
 	export interface AttachedMedia {
 		path: string;
@@ -121,16 +122,9 @@
 		rows={4}
 		aria-label="Tweet content"
 	></textarea>
-	{#if tweetChars > 240 || tweetOverLimit}
-		<div
-			class="char-counter"
-			class:over-limit={tweetOverLimit}
-			aria-live="polite"
-			aria-label="Character count"
-		>
-			{tweetChars}/{TWEET_MAX}
-		</div>
-	{/if}
+	<div class="char-ring-row">
+		<CharRing current={tweetChars} max={TWEET_MAX} />
+	</div>
 </div>
 
 {#if mediaCount > 0}
@@ -205,11 +199,21 @@
 		border-radius: 0;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 17px;
+		font-size: 18px;
 		font-family: var(--font-sans);
-		line-height: 1.55;
+		line-height: 1.65;
+		letter-spacing: -0.01em;
+		caret-color: var(--color-accent);
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
 		resize: vertical;
 		box-sizing: border-box;
+	}
+
+	.compose-input::placeholder {
+		color: var(--color-text-subtle);
+		opacity: 0.35;
+		font-style: italic;
 	}
 
 	.compose-input:focus {
@@ -220,17 +224,10 @@
 		box-shadow: inset 2px 0 0 var(--color-danger);
 	}
 
-	.char-counter {
-		text-align: right;
-		font-size: 11px;
-		color: var(--color-text-subtle);
+	.char-ring-row {
+		display: flex;
+		justify-content: flex-end;
 		margin-top: 4px;
-		font-family: var(--font-mono);
-	}
-
-	.char-counter.over-limit {
-		color: var(--color-danger);
-		font-weight: 600;
 	}
 
 	.media-preview-grid {

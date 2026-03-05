@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
-	import { Image, X, Film } from 'lucide-svelte';
+	import { X, Film } from 'lucide-svelte';
 	import MediaAltBadge from './composer/MediaAltBadge.svelte';
 
 	let {
@@ -174,20 +174,14 @@
 			{/each}
 		</div>
 	{/if}
-	{#if canAttachMore}
-		<button class="attach-btn" onclick={() => fileInput?.click()} disabled={uploading}>
-			<Image size={12} />
-			{uploading ? 'Uploading...' : mediaPaths.length > 0 ? 'Add more' : 'Attach media'}
-		</button>
-		<input
-			bind:this={fileInput}
-			type="file"
-			accept={ACCEPTED_TYPES}
-			multiple
-			class="hidden"
-			onchange={handleFileSelect}
-		/>
-	{/if}
+	<input
+		bind:this={fileInput}
+		type="file"
+		accept={ACCEPTED_TYPES}
+		multiple
+		class="hidden"
+		onchange={handleFileSelect}
+	/>
 	{#if error}
 		<div class="slot-error" role="alert">{error}</div>
 	{/if}
@@ -284,33 +278,6 @@
 		background: rgba(0, 0, 0, 0.85);
 	}
 
-	.attach-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		padding: 6px 12px;
-		border: 1px dashed var(--color-border-subtle);
-		border-radius: 8px;
-		background: transparent;
-		color: var(--color-text-muted);
-		font-size: 12px;
-		cursor: pointer;
-		transition: all 0.15s ease;
-		margin-top: 4px;
-	}
-
-	.attach-btn:hover:not(:disabled) {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 4%, transparent);
-	}
-
-	.attach-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
 	.hidden { display: none; }
 
 	.slot-error {
@@ -321,10 +288,9 @@
 
 	@media (pointer: coarse) {
 		.remove-btn { width: 32px; height: 32px; }
-		.attach-btn { min-height: 44px; padding: 8px 12px; }
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.media-slot, .remove-btn, .attach-btn { transition: none; }
+		.media-slot, .remove-btn { transition: none; }
 	}
 </style>
