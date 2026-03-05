@@ -43,6 +43,7 @@ pub struct Tokens {
     /// When the access token expires (UTC).
     pub expires_at: DateTime<Utc>,
     /// Granted OAuth scopes.
+    #[serde(default)]
     pub scopes: Vec<String>,
 }
 
@@ -52,6 +53,10 @@ pub struct TokenManager {
     client_id: String,
     http_client: reqwest::Client,
     token_path: std::path::PathBuf,
+    /// Serializes refresh attempts so only one runs at a time.
+    /// X API refresh tokens are single-use, so concurrent refreshes
+    /// would invalidate the token used by the second caller.
+    refresh_lock: tokio::sync::Mutex<()>,
 }
 
 impl TokenManager {
@@ -62,6 +67,7 @@ impl TokenManager {
             client_id,
             http_client: reqwest::Client::new(),
             token_path,
+            refresh_lock: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -78,19 +84,40 @@ impl TokenManager {
     }
 
     /// Refresh the access token if it is within 5 minutes of expiring.
+    ///
+    /// Acquires `refresh_lock` to prevent concurrent refresh attempts.
+    /// X API refresh tokens are single-use, so a second concurrent refresh
+    /// with the old token would fail and revoke the session.
     pub async fn refresh_if_needed(&self) -> Result<(), XApiError> {
-        let should_refresh = {
+        // Fast path: no refresh needed.
+        {
             let tokens = self.tokens.read().await;
-            let now = Utc::now();
-            let seconds_until_expiry = tokens.expires_at.signed_duration_since(now).num_seconds();
-            seconds_until_expiry < REFRESH_WINDOW_SECS
-        };
-
-        if should_refresh {
-            self.do_refresh().await?;
+            let seconds_until_expiry = tokens
+                .expires_at
+                .signed_duration_since(Utc::now())
+                .num_seconds();
+            if seconds_until_expiry >= REFRESH_WINDOW_SECS {
+                return Ok(());
+            }
         }
 
-        Ok(())
+        // Serialize refresh attempts.
+        let _guard = self.refresh_lock.lock().await;
+
+        // Re-check after acquiring the lock — another caller may have
+        // already refreshed while we were waiting.
+        {
+            let tokens = self.tokens.read().await;
+            let seconds_until_expiry = tokens
+                .expires_at
+                .signed_duration_since(Utc::now())
+                .num_seconds();
+            if seconds_until_expiry >= REFRESH_WINDOW_SECS {
+                return Ok(());
+            }
+        }
+
+        self.do_refresh().await
     }
 
     /// Perform the token refresh.

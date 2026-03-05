@@ -305,6 +305,147 @@ mod tests {
         assert!((5..=8).contains(&output.tweets.len()));
     }
 
+    // --- improve_draft tests ---
+
+    #[tokio::test]
+    async fn improve_draft_success() {
+        let provider = MockProvider::single("A sharper version of the draft tweet.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .improve_draft("This is my draft tweet about testing.", None)
+            .await
+            .expect("improve");
+        assert!(!output.text.is_empty());
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
+    }
+
+    #[tokio::test]
+    async fn improve_draft_with_tone_cue() {
+        let provider = MockProvider::single("A punchy take on testing best practices.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .improve_draft(
+                "Testing is important for code quality.",
+                Some("Be punchy and bold"),
+            )
+            .await
+            .expect("improve with tone");
+        assert!(!output.text.is_empty());
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
+    }
+
+    #[tokio::test]
+    async fn improve_draft_with_context_success() {
+        let provider = MockProvider::single("An improved tweet grounded in winning patterns.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let rag_block = "Winning patterns:\n1. [tip] (tweet): \"Great advice\"";
+        let output = gen
+            .improve_draft_with_context("Draft about testing.", Some("Be casual"), Some(rag_block))
+            .await
+            .expect("improve with context");
+        assert!(!output.text.is_empty());
+        assert!(output.text.len() <= MAX_TWEET_CHARS);
+    }
+
+    #[tokio::test]
+    async fn improve_draft_with_context_none_matches_base() {
+        let provider = MockProvider::single("Improved tweet without context.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .improve_draft_with_context("Draft tweet.", Some("Be concise"), None)
+            .await
+            .expect("improve with None context");
+        assert!(!output.text.is_empty());
+    }
+
+    // --- PromptCapturingProvider for system prompt assertions ---
+
+    /// Mock LLM that captures the system prompt for assertion.
+    struct PromptCapturingProvider {
+        response: String,
+        captured_system: Arc<tokio::sync::Mutex<Option<String>>>,
+    }
+
+    impl PromptCapturingProvider {
+        fn new(response: &str) -> (Self, Arc<tokio::sync::Mutex<Option<String>>>) {
+            let captured = Arc::new(tokio::sync::Mutex::new(None));
+            (
+                Self {
+                    response: response.to_string(),
+                    captured_system: Arc::clone(&captured),
+                },
+                captured,
+            )
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl LlmProvider for PromptCapturingProvider {
+        fn name(&self) -> &str {
+            "prompt_capturing_mock"
+        }
+
+        async fn complete(
+            &self,
+            system: &str,
+            _user_message: &str,
+            _params: &GenerationParams,
+        ) -> Result<LlmResponse, LlmError> {
+            let mut guard = self.captured_system.lock().await;
+            *guard = Some(system.to_string());
+            Ok(LlmResponse {
+                text: self.response.clone(),
+                usage: TokenUsage::default(),
+                model: "mock".to_string(),
+            })
+        }
+
+        async fn health_check(&self) -> Result<(), LlmError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn improve_draft_with_context_injects_rag_in_prompt() {
+        let (provider, captured) = PromptCapturingProvider::new("Improved tweet with RAG context.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let rag_block = "Winning patterns:\n1. [tip] (tweet): \"Great testing advice\"";
+        gen.improve_draft_with_context("Draft tweet.", None, Some(rag_block))
+            .await
+            .expect("improve with RAG");
+
+        let system = captured.lock().await;
+        let system = system.as_ref().expect("system prompt captured");
+        assert!(
+            system.contains("Winning patterns"),
+            "RAG block should appear in system prompt"
+        );
+    }
+
+    #[tokio::test]
+    async fn improve_draft_with_context_no_rag_when_none() {
+        let (provider, captured) = PromptCapturingProvider::new("Improved tweet without RAG.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        gen.improve_draft_with_context("Draft tweet.", None, None)
+            .await
+            .expect("improve without RAG");
+
+        let system = captured.lock().await;
+        let system = system.as_ref().expect("system prompt captured");
+        // When rag_context is None, format_rag_section returns empty string.
+        // The system prompt should not contain any RAG-specific content.
+        assert!(
+            !system.contains("Winning patterns"),
+            "No RAG block should appear when context is None"
+        );
+    }
+
     // --- GenerationParams tests ---
 
     #[test]

@@ -58,6 +58,9 @@ pub struct User {
     pub username: String,
     /// Display name.
     pub name: String,
+    /// Profile image URL.
+    #[serde(default)]
+    pub profile_image_url: Option<String>,
     /// User engagement metrics.
     #[serde(default)]
     pub public_metrics: UserMetrics,

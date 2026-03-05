@@ -23,9 +23,15 @@
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
-	import ComposerShortcutBar from '../home/ComposerShortcutBar.svelte';
+	import ComposerToolbar from './ComposerToolbar.svelte';
+	import ComposerInsertBar from './ComposerInsertBar.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
 	import { persistGet, persistSet } from '$lib/stores/persistence';
+	import {
+		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
+		readAutoSave, restoreMedia, wasNavigationExit,
+		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS
+	} from '$lib/utils/composerAutosave';
 	import type { AttachedMedia } from './TweetEditor.svelte';
 
 	let {
@@ -79,18 +85,16 @@
 	let undoMessage = $state('Content replaced.');
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// Auto-save
-	const AUTOSAVE_KEY = 'tuitbot:compose:draft';
-	const AUTOSAVE_ACTIVE_KEY = 'tuitbot:compose:active';
-	const AUTOSAVE_DEBOUNCE_MS = 500;
-	const AUTOSAVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+	// Auto-save (logic extracted to composerAutosave.ts)
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 	let initialized = $state(false);
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
 		mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number;
-		tweetMedia?: Array<{ path: string; mediaType: string }>;
+		tweetMedia?: Array<{ path: string; mediaType: string; altText?: string }>;
 	} | null>(null);
+
+	// Toolbar state
 
 	// ── Derived ────────────────────────────────────────────
 	const targetDate = $derived(prefillDate ?? new Date());
@@ -169,6 +173,18 @@
 		statusAnnouncement = mode === 'tweet' ? 'Switched to tweet mode' : 'Switched to thread mode';
 	});
 
+	function flushAutoSave() {
+		if (autoSaveTimer) clearTimeout(autoSaveTimer);
+		autoSaveTimer = null;
+		if (!initialized) return;
+		saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
+	}
+
+	function handleBeforeUnload() {
+		flushAutoSave();
+		markSessionActive();
+	}
+
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
 		checkRecovery();
@@ -189,6 +205,8 @@
 		previewMode = false;
 		inspectorOpen = loadInspectorState();
 
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
 		if (embedded) {
 			const tipsDismissed = await persistGet('home_tips_dismissed', false);
 			tipsVisible = !tipsDismissed;
@@ -197,15 +215,12 @@
 	});
 
 	onDestroy(() => {
-		for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
-		if (undoSnapshot?.media) {
-			for (const m of undoSnapshot.media) URL.revokeObjectURL(m.previewUrl);
-		}
-		if (autoSaveTimer) clearTimeout(autoSaveTimer);
+		window.removeEventListener('beforeunload', handleBeforeUnload);
+		flushAutoSave();
 		if (undoTimer) clearTimeout(undoTimer);
 		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
 		// Signal that this was a normal teardown (navigation), not a crash
-		try { sessionStorage.setItem(AUTOSAVE_ACTIVE_KEY, '1'); } catch { /* unavailable */ }
+		markSessionActive();
 	});
 
 	function handleComposeEvent() {
@@ -232,14 +247,12 @@
 	function autoSave() {
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		autoSaveTimer = setTimeout(() => {
-			const tweetMedia = attachedMedia.map((m) => ({ path: m.path, mediaType: m.mediaType }));
-			const payload = { mode, tweetText, blocks: threadBlocks, tweetMedia, timestamp: Date.now() };
-			try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
+			saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
 		}, AUTOSAVE_DEBOUNCE_MS);
 	}
 
 	function clearAutoSave() {
-		localStorage.removeItem(AUTOSAVE_KEY);
+		clearAutoSaveStorage();
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 	}
 
@@ -247,44 +260,20 @@
 		mode = (data.mode as 'tweet' | 'thread') ?? 'tweet';
 		tweetText = data.tweetText || '';
 		threadBlocks = data.blocks || [];
-		if (data.tweetMedia?.length) {
-			attachedMedia = data.tweetMedia.map((m) => ({
-				path: m.path,
-				previewUrl: api.media.fileUrl(m.path),
-				mediaType: m.mediaType
-			}));
-		}
+		attachedMedia = restoreMedia(data.tweetMedia);
 	}
 
 	function checkRecovery() {
-		try {
-			const raw = localStorage.getItem(AUTOSAVE_KEY);
-			if (!raw) return;
-			const data = JSON.parse(raw);
-			if (Date.now() - data.timestamp > AUTOSAVE_TTL_MS) {
-				localStorage.removeItem(AUTOSAVE_KEY);
-				return;
-			}
-			const hasContent = data.tweetText?.trim() || data.blocks?.some((b: ThreadBlock) => b.text.trim()) || data.tweetMedia?.length > 0;
-			if (!hasContent) return;
+		const data = readAutoSave();
+		if (!data) return;
 
-			// Distinguish navigation (sessionStorage flag) from crash recovery
-			let wasNavigation = false;
-			try {
-				wasNavigation = sessionStorage.getItem(AUTOSAVE_ACTIVE_KEY) === '1';
-				sessionStorage.removeItem(AUTOSAVE_ACTIVE_KEY);
-			} catch { /* sessionStorage unavailable — treat as crash */ }
-
-			if (wasNavigation) {
-				// Silent restore — user just navigated away and back
-				restoreDraft(data);
-				initialized = true;
-			} else {
-				// Genuine crash recovery — show banner
-				recoveryData = data;
-				showRecovery = true;
-			}
-		} catch { localStorage.removeItem(AUTOSAVE_KEY); }
+		if (wasNavigationExit()) {
+			restoreDraft(data);
+			initialized = true;
+		} else {
+			recoveryData = data;
+			showRecovery = true;
+		}
 	}
 
 	function recoverDraft() {
@@ -309,7 +298,7 @@
 				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
 			});
 			clearAutoSave();
-			try { sessionStorage.removeItem(AUTOSAVE_ACTIVE_KEY); } catch { /* unavailable */ }
+			clearSessionFlag();
 			onsubmit(data);
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount
@@ -521,6 +510,43 @@
 		}
 	}
 
+	function handleInsertText(text: string) {
+		// Find the currently focused textarea and insert text at cursor
+		const textarea = document.activeElement as HTMLTextAreaElement | null;
+		if (!textarea || textarea.tagName !== 'TEXTAREA') {
+			// Fallback: try the main compose input or first thread textarea
+			const fallback = document.querySelector('.compose-input, .flow-textarea') as HTMLTextAreaElement | null;
+			if (fallback) {
+				fallback.focus();
+				const pos = fallback.selectionStart ?? fallback.value.length;
+				const before = fallback.value.slice(0, pos);
+				const after = fallback.value.slice(pos);
+				const newVal = before + text + after;
+				if (mode === 'tweet') {
+					tweetText = newVal;
+				}
+				// For thread mode the textarea dispatches its own input event
+				fallback.value = newVal;
+				fallback.dispatchEvent(new Event('input', { bubbles: true }));
+				const newPos = pos + text.length;
+				fallback.setSelectionRange(newPos, newPos);
+			}
+			return;
+		}
+		const pos = textarea.selectionStart ?? textarea.value.length;
+		const before = textarea.value.slice(0, pos);
+		const after = textarea.value.slice(pos);
+		const newVal = before + text + after;
+		if (mode === 'tweet') {
+			tweetText = newVal;
+		}
+		textarea.value = newVal;
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		const newPos = pos + text.length;
+		textarea.setSelectionRange(newPos, newPos);
+		textarea.focus();
+	}
+
 	async function handleAiAssist() {
 		assisting = true; submitError = null;
 		try {
@@ -570,15 +596,21 @@
 					{attachedMedia}
 					onmediachange={(m) => { attachedMedia = m; }}
 					onerror={(msg) => { submitError = msg; }}
+					avatarUrl={$currentAccount?.x_avatar_url ?? null}
 				/>
 			{:else}
 				<ThreadFlowLane
 					bind:this={threadFlowRef}
 					blocks={threadBlocks}
+					avatarUrl={$currentAccount?.x_avatar_url ?? null}
+					displayName={$currentAccount?.x_display_name ?? null}
+					handle={$currentAccount?.x_username ?? null}
 					onchange={(b) => { threadBlocks = b; }}
 					onvalidchange={(v) => { threadValid = v; }}
 				/>
 			{/if}
+
+			<ComposerInsertBar oninsert={handleInsertText} />
 
 			{#if showUndo && !showFromNotes}
 				<div class="undo-banner">
@@ -666,9 +698,10 @@
 			{inspectorOpen}
 			previewVisible={previewMode}
 			handle={$currentAccount?.x_username ?? null}
+			avatarUrl={$currentAccount?.x_avatar_url ?? null}
+			displayName={$currentAccount?.x_display_name ?? null}
 			{mode}
 			blockCount={threadBlockCount}
-			hasContent={hasExistingContent}
 			onsubmit={handleSubmit}
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
@@ -682,10 +715,11 @@
 				ondismiss={dismissTips}
 			/>
 		{:else}
-			<ComposerShortcutBar
+			<ComposerToolbar
 				{mode}
-				onopenpalette={() => { paletteOpen = true; }}
+				onaiassist={handleInlineAssist}
 				onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
+				onopenpalette={() => { paletteOpen = true; }}
 			/>
 		{/if}
 		{@render composeBody()}

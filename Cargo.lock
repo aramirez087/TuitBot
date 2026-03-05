@@ -3521,6 +3521,7 @@ name = "tuitbot-server"
 version = "0.1.18"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "base64 0.22.1",
  "chrono",
@@ -3533,6 +3534,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "sqlx",
  "tempfile",
  "tokio",
  "tokio-util",

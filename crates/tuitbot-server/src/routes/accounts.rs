@@ -3,13 +3,15 @@
 //! CRUD for the account registry, role management, and per-account
 //! configuration overrides.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tuitbot_core::storage::accounts;
+use tuitbot_core::storage::accounts::{self, UpdateAccountParams};
+use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext, Role};
 use crate::error::ApiError;
@@ -83,12 +85,11 @@ pub async fn update_account(
     accounts::update_account(
         &state.db,
         &id,
-        body.label.as_deref(),
-        None,
-        None,
-        body.config_overrides.as_deref(),
-        None,
-        None,
+        UpdateAccountParams {
+            label: body.label.as_deref(),
+            config_overrides: body.config_overrides.as_deref(),
+            ..Default::default()
+        },
     )
     .await?;
 
@@ -165,4 +166,59 @@ pub async fn remove_role(
     require_mutate(&ctx)?;
     accounts::remove_role(&state.db, &id, &body.actor).await?;
     Ok(Json(json!({"status": "ok"})))
+}
+
+// ---- Profile sync ----
+
+/// `POST /api/accounts/{id}/sync-profile` — fetch X profile and update account.
+///
+/// Loads the OAuth token for the account, calls `/users/me` on the X API,
+/// and stores the display name and avatar URL on the account record.
+pub async fn sync_profile(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutate(&ctx)?;
+
+    let account = accounts::get_account(&state.db, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("account not found: {id}")))?;
+
+    // Resolve token path: account-specific or default.
+    let token_path = account
+        .token_path
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| state.data_dir.join("tokens.json"));
+
+    let access_token = state
+        .get_x_access_token(&token_path, &id)
+        .await
+        .map_err(|e| ApiError::Internal(format!("X API error: {e}")))?;
+
+    let client = XApiHttpClient::new(access_token);
+    let user = client
+        .get_me()
+        .await
+        .map_err(|e| ApiError::Internal(format!("X API error: {e}")))?;
+
+    accounts::update_account(
+        &state.db,
+        &id,
+        UpdateAccountParams {
+            x_user_id: Some(&user.id),
+            x_username: Some(&user.username),
+            x_display_name: Some(&user.name),
+            x_avatar_url: user.profile_image_url.as_deref(),
+            ..Default::default()
+        },
+    )
+    .await?;
+
+    let updated = accounts::get_account(&state.db, &id)
+        .await?
+        .ok_or_else(|| ApiError::Internal("account disappeared".to_string()))?;
+
+    Ok(Json(json!(updated)))
 }

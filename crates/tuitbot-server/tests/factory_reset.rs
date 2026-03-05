@@ -56,6 +56,8 @@ async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
         deployment_mode: Default::default(),
         provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
     })
 }
 

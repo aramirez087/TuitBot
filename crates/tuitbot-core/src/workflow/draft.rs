@@ -49,9 +49,7 @@ pub async fn execute(
     let banned = &config.limits.banned_phrases;
 
     // Build RAG context from winning ancestors + content seeds (one DB call, shared)
-    let mut topic_keywords: Vec<String> = config.business.product_keywords.clone();
-    topic_keywords.extend(config.business.competitor_keywords.clone());
-    topic_keywords.extend(config.business.effective_industry_topics().to_vec());
+    let topic_keywords = config.business.draft_context_keywords();
 
     let rag_context = winning_dna::build_draft_context(
         db,

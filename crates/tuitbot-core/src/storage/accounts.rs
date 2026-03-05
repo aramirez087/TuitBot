@@ -16,6 +16,8 @@ pub struct Account {
     pub label: String,
     pub x_user_id: Option<String>,
     pub x_username: Option<String>,
+    pub x_display_name: Option<String>,
+    pub x_avatar_url: Option<String>,
     pub config_overrides: String,
     pub token_path: Option<String>,
     pub status: String,
@@ -69,43 +71,58 @@ pub async fn create_account(pool: &DbPool, id: &str, label: &str) -> Result<Stri
     Ok(id.to_string())
 }
 
+/// Parameters for updating an account's mutable fields.
+#[derive(Debug, Default)]
+pub struct UpdateAccountParams<'a> {
+    pub label: Option<&'a str>,
+    pub x_user_id: Option<&'a str>,
+    pub x_username: Option<&'a str>,
+    pub x_display_name: Option<&'a str>,
+    pub x_avatar_url: Option<&'a str>,
+    pub config_overrides: Option<&'a str>,
+    pub token_path: Option<&'a str>,
+    pub status: Option<&'a str>,
+}
+
 /// Update an account's mutable fields.
-#[allow(clippy::too_many_arguments)]
 pub async fn update_account(
     pool: &DbPool,
     id: &str,
-    label: Option<&str>,
-    x_user_id: Option<&str>,
-    x_username: Option<&str>,
-    config_overrides: Option<&str>,
-    token_path: Option<&str>,
-    status: Option<&str>,
+    params: UpdateAccountParams<'_>,
 ) -> Result<(), StorageError> {
     // Build SET clauses dynamically to only update provided fields.
     let mut sets = vec!["updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')".to_string()];
     let mut binds: Vec<String> = Vec::new();
 
-    if let Some(v) = label {
+    if let Some(v) = params.label {
         sets.push(format!("label = ?{}", binds.len() + 1));
         binds.push(v.to_string());
     }
-    if let Some(v) = x_user_id {
+    if let Some(v) = params.x_user_id {
         sets.push(format!("x_user_id = ?{}", binds.len() + 1));
         binds.push(v.to_string());
     }
-    if let Some(v) = x_username {
+    if let Some(v) = params.x_username {
         sets.push(format!("x_username = ?{}", binds.len() + 1));
         binds.push(v.to_string());
     }
-    if let Some(v) = config_overrides {
+    if let Some(v) = params.x_display_name {
+        sets.push(format!("x_display_name = ?{}", binds.len() + 1));
+        binds.push(v.to_string());
+    }
+    if let Some(v) = params.x_avatar_url {
+        sets.push(format!("x_avatar_url = ?{}", binds.len() + 1));
+        binds.push(v.to_string());
+    }
+    if let Some(v) = params.config_overrides {
         sets.push(format!("config_overrides = ?{}", binds.len() + 1));
         binds.push(v.to_string());
     }
-    if let Some(v) = token_path {
+    if let Some(v) = params.token_path {
         sets.push(format!("token_path = ?{}", binds.len() + 1));
         binds.push(v.to_string());
     }
-    if let Some(v) = status {
+    if let Some(v) = params.status {
         sets.push(format!("status = ?{}", binds.len() + 1));
         binds.push(v.to_string());
     }
@@ -271,12 +288,14 @@ mod tests {
         update_account(
             &pool,
             &id,
-            Some("Updated"),
-            Some("12345"),
-            Some("testuser"),
-            None,
-            None,
-            None,
+            UpdateAccountParams {
+                label: Some("Updated"),
+                x_user_id: Some("12345"),
+                x_username: Some("testuser"),
+                x_display_name: Some("Test User"),
+                x_avatar_url: Some("https://pbs.twimg.com/profile_images/test.jpg"),
+                ..Default::default()
+            },
         )
         .await
         .expect("update");
@@ -285,6 +304,11 @@ mod tests {
         assert_eq!(account.label, "Updated");
         assert_eq!(account.x_user_id.as_deref(), Some("12345"));
         assert_eq!(account.x_username.as_deref(), Some("testuser"));
+        assert_eq!(account.x_display_name.as_deref(), Some("Test User"));
+        assert_eq!(
+            account.x_avatar_url.as_deref(),
+            Some("https://pbs.twimg.com/profile_images/test.jpg")
+        );
     }
 
     #[tokio::test]

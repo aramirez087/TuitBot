@@ -45,3 +45,9 @@ export function tweetWeightedLen(text: string): number {
 export function validateTweetLength(text: string, maxChars: number = MAX_TWEET_CHARS): boolean {
 	return tweetWeightedLen(text) <= maxChars;
 }
+
+/** Count the number of words in text. */
+export function wordCount(text: string): number {
+	const trimmed = text.trim();
+	return trimmed ? trimmed.split(/\s+/).length : 0;
+}

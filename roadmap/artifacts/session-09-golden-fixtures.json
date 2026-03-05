@@ -95,6 +95,7 @@
       "data_keys": [
         "id",
         "name",
+        "profile_image_url",
         "public_metrics",
         "username"
       ],
@@ -102,6 +103,7 @@
       "sample_shape": {
         "id": "string",
         "name": "string",
+        "profile_image_url": "null",
         "public_metrics": {
           "followers_count": "number",
           "following_count": "number",
@@ -149,6 +151,7 @@
             {
               "id": "string",
               "name": "string",
+              "profile_image_url": "null",
               "public_metrics": {
                 "followers_count": "number",
                 "following_count": "number",
@@ -184,6 +187,7 @@
           {
             "id": "string",
             "name": "string",
+            "profile_image_url": "null",
             "public_metrics": {
               "followers_count": "number",
               "following_count": "number",

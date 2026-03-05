@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		Send,
+		Clock,
 		Eye,
 		EyeOff,
 		PanelRight,
@@ -16,10 +17,13 @@
 		inspectorOpen,
 		previewVisible,
 		handle = null,
-		mode,
+		avatarUrl = null,
+		displayName = null,
+		mode = 'tweet',
 		blockCount = 1,
-		hasContent,
 		onsubmit,
+		onpublishnow,
+		onschedule,
 		ontoggleinspector,
 		ontogglepreview,
 		onopenpalette,
@@ -31,51 +35,76 @@
 		inspectorOpen: boolean;
 		previewVisible: boolean;
 		handle?: string | null;
-		mode: 'tweet' | 'thread';
+		avatarUrl?: string | null;
+		displayName?: string | null;
+		mode?: 'tweet' | 'thread';
 		blockCount?: number;
-		hasContent: boolean;
 		onsubmit: () => void;
+		onpublishnow?: () => void;
+		onschedule?: () => void;
 		ontoggleinspector: () => void;
 		ontogglepreview: () => void;
 		onopenpalette: () => void;
 		onaiassist?: () => void;
 	} = $props();
-
-	const postLabel = $derived(
-		mode === 'tweet' ? '1 tweet' : `${blockCount} post${blockCount !== 1 ? 's' : ''}`
-	);
-
-	const publishLabel = $derived(
-		submitting ? 'Posting\u2026' : selectedTime ? 'Schedule' : 'Publish'
-	);
-
 </script>
 
 <header class="home-header">
 	<div class="header-left">
+		{#if avatarUrl}
+			<img src={avatarUrl} alt="" class="header-avatar" />
+		{/if}
+		{#if displayName}
+			<span class="header-name">{displayName}</span>
+		{/if}
 		{#if handle}
 			<span class="header-handle">@{handle}</span>
-			<span class="header-sep" aria-hidden="true">&middot;</span>
 		{/if}
-		<span class="header-meta">{postLabel}</span>
-		<span class="header-dot" class:active={hasContent} aria-label={hasContent ? 'Has content' : 'Empty draft'}></span>
 	</div>
 
 	<div class="header-right">
-		<button
-			class="cta-pill publish-pill"
-			onclick={onsubmit}
-			disabled={!canSubmit || submitting}
-			title={selectedTime ? 'Schedule post' : 'Publish now'}
-			aria-label={submitting ? 'Posting' : selectedTime ? 'Schedule post' : 'Publish now'}
-		>
-			{#if submitting}
-				<Loader2 size={14} class="spin-icon" />
-			{:else}
-				<Send size={14} />
-			{/if}
-			<span>{publishLabel}</span>
-		</button>
+		{#if selectedTime}
+			<div class="button-group">
+				<button
+					class="cta-pill schedule-pill"
+					onclick={onsubmit}
+					disabled={!canSubmit || submitting}
+					title="Schedule post"
+					aria-label={submitting ? 'Scheduling' : 'Schedule post'}
+				>
+					{#if submitting}
+						<Loader2 size={14} class="spin-icon" />
+					{:else}
+						<Clock size={14} />
+					{/if}
+					<span>{submitting ? 'Scheduling\u2026' : 'Schedule'}</span>
+				</button>
+				<button
+					class="cta-pill publish-now-btn"
+					onclick={onpublishnow ?? onsubmit}
+					disabled={!canSubmit || submitting}
+					title="Publish immediately"
+					aria-label="Publish now"
+				>
+					<Send size={14} />
+				</button>
+			</div>
+		{:else}
+			<button
+				class="cta-pill publish-pill"
+				onclick={onsubmit}
+				disabled={!canSubmit || submitting}
+				title="Publish now"
+				aria-label={submitting ? 'Posting' : 'Publish now'}
+			>
+				{#if submitting}
+					<Loader2 size={14} class="spin-icon" />
+				{:else}
+					<Send size={14} />
+				{/if}
+				<span>{submitting ? 'Posting\u2026' : 'Publish'}</span>
+			</button>
+		{/if}
 
 		<div class="icon-tools">
 			<button
@@ -131,7 +160,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding: 8px 16px;
+		padding: 10px 20px;
 		flex-shrink: 0;
 		border-bottom: 1px solid color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
 	}
@@ -141,6 +170,24 @@
 		align-items: center;
 		gap: 6px;
 		min-width: 0;
+	}
+
+	.header-avatar {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
+	}
+
+	.header-name {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 120px;
 	}
 
 	.header-handle {
@@ -153,30 +200,6 @@
 		max-width: 140px;
 	}
 
-	.header-sep {
-		color: var(--color-text-subtle);
-		font-size: 12px;
-	}
-
-	.header-meta {
-		font-size: 12px;
-		color: var(--color-text-subtle);
-		white-space: nowrap;
-	}
-
-	.header-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--color-border-subtle);
-		flex-shrink: 0;
-		transition: background 0.2s ease;
-	}
-
-	.header-dot.active {
-		background: var(--color-success, #22c55e);
-	}
-
 	.header-right {
 		display: flex;
 		align-items: center;
@@ -184,32 +207,60 @@
 		flex-shrink: 0;
 	}
 
+	.button-group {
+		display: flex;
+		align-items: center;
+		gap: 3px;
+	}
+
 	.cta-pill {
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		height: 36px;
-		padding: 0 16px;
+		height: 38px;
+		padding: 0 20px;
 		border-radius: 20px;
-		font-size: 13px;
-		font-weight: 500;
+		font-size: 13.5px;
+		font-weight: 600;
 		cursor: pointer;
 		transition: all 0.15s ease;
 		white-space: nowrap;
 		border: none;
 	}
 
-	.publish-pill {
+	.publish-pill,
+	.schedule-pill {
 		background: var(--color-accent);
 		color: #fff;
-	}
-
-	.publish-pill:hover:not(:disabled) {
-		background: var(--color-accent-hover);
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 	}
 
-	.publish-pill:disabled {
+	.publish-pill:hover:not(:disabled),
+	.schedule-pill:hover:not(:disabled) {
+		background: var(--color-accent-hover);
+		box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+		transform: translateY(-1px);
+	}
+
+	.publish-pill:disabled,
+	.schedule-pill:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
+	}
+
+	.publish-now-btn {
+		background: transparent;
+		border: 1.5px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+		color: var(--color-accent);
+		padding: 0 10px;
+	}
+
+	.publish-now-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+		border-color: var(--color-accent);
+	}
+
+	.publish-now-btn:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
 	}
@@ -218,7 +269,13 @@
 		display: flex;
 		align-items: center;
 		gap: 2px;
-		margin-left: 4px;
+		margin-left: 8px;
+		opacity: 0.7;
+		transition: opacity 0.15s ease;
+	}
+
+	.icon-tools:hover {
+		opacity: 1;
 	}
 
 	.icon-btn {
@@ -262,7 +319,7 @@
 			animation: none;
 		}
 
-		.header-dot {
+		.icon-tools {
 			transition: none;
 		}
 	}
@@ -282,11 +339,9 @@
 			gap: 8px;
 		}
 
+		.header-avatar,
+		.header-name,
 		.header-handle {
-			display: none;
-		}
-
-		.header-sep {
 			display: none;
 		}
 

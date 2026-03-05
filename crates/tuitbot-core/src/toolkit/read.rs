@@ -238,6 +238,7 @@ mod tests {
             id: id.into(),
             username: id.into(),
             name: "Test".into(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         }
     }

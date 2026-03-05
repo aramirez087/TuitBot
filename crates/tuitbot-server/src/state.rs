@@ -13,6 +13,10 @@ use tuitbot_core::automation::Runtime;
 use tuitbot_core::config::{ConnectorConfig, ContentSourcesConfig, DeploymentMode};
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::storage::DbPool;
+use tuitbot_core::x_api::auth::TokenManager;
+
+use tuitbot_core::error::XApiError;
+use tuitbot_core::x_api::auth;
 
 use crate::ws::WsEvent;
 
@@ -64,4 +68,46 @@ pub struct AppState {
     pub provider_backend: String,
     /// Pending OAuth PKCE challenges keyed by state parameter.
     pub pending_oauth: Mutex<HashMap<String, PendingOAuth>>,
+    /// Per-account X API token managers for automatic token refresh.
+    pub token_managers: Mutex<HashMap<String, Arc<TokenManager>>>,
+    /// X API client ID from config (needed to create token managers).
+    pub x_client_id: String,
+}
+
+impl AppState {
+    /// Get a fresh X API access token for the given account.
+    ///
+    /// Lazily creates a `TokenManager` on first use (loading tokens from disk),
+    /// then returns a token that is automatically refreshed before expiry.
+    pub async fn get_x_access_token(
+        &self,
+        token_path: &std::path::Path,
+        account_id: &str,
+    ) -> Result<String, XApiError> {
+        // Fast path: token manager already exists.
+        {
+            let managers = self.token_managers.lock().await;
+            if let Some(tm) = managers.get(account_id) {
+                return tm.get_access_token().await;
+            }
+        }
+
+        // Load tokens from disk and create a new manager.
+        let tokens = auth::load_tokens(token_path)?.ok_or(XApiError::AuthExpired)?;
+
+        let tm = Arc::new(TokenManager::new(
+            tokens,
+            self.x_client_id.clone(),
+            token_path.to_path_buf(),
+        ));
+
+        let access_token = tm.get_access_token().await?;
+
+        self.token_managers
+            .lock()
+            .await
+            .insert(account_id.to_string(), tm);
+
+        Ok(access_token)
+    }
 }

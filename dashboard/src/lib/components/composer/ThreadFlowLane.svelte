@@ -1,33 +1,43 @@
 <script lang="ts">
-	import { api, type ThreadBlock } from '$lib/api';
-	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
-	import * as threadOps from '$lib/utils/threadOps';
-	import ThreadFlowCard from './ThreadFlowCard.svelte';
+	import { api, type ThreadBlock } from "$lib/api";
+	import { tweetWeightedLen, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
+	import * as threadOps from "$lib/utils/threadOps";
+	import { fly, fade } from "svelte/transition";
+	import { flip } from "svelte/animate";
+	import ThreadFlowCard from "./ThreadFlowCard.svelte";
 
 	let {
 		blocks: externalBlocks = [],
+		avatarUrl = null,
+		displayName = null,
+		handle = null,
 		onchange,
-		onvalidchange
+		onvalidchange,
+		onfocusindexchange,
 	}: {
 		blocks?: ThreadBlock[];
+		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
+		onfocusindexchange?: (index: number) => void;
 	} = $props();
 
-	// ── State ──────────────────────────────────────────────
 	// Stable fallback for when parent has no blocks yet
 	const fallbackBlocks = threadOps.createDefaultBlocks();
 	// Single source of truth: always derived from parent prop
-	const blocks = $derived(externalBlocks.length > 0 ? externalBlocks : fallbackBlocks);
+	const blocks = $derived(
+		externalBlocks.length > 0 ? externalBlocks : fallbackBlocks,
+	);
 
 	let focusedBlockId = $state<string | null>(null);
 	let draggingBlockId = $state<string | null>(null);
 	let dropTargetBlockId = $state<string | null>(null);
-	let reorderAnnouncement = $state('');
+	let reorderAnnouncement = $state("");
 	let mergeError = $state<string | null>(null);
 	let assistingBlockId = $state<string | null>(null);
 
-	// ── Derived ────────────────────────────────────────────
 	const sortedBlocks = $derived(threadOps.sortBlocks(blocks));
 
 	const validationErrors = $derived.by(() => {
@@ -38,16 +48,24 @@
 	const canSubmit = $derived(
 		blocks.filter((b) => b.text.trim().length > 0).length >= 2 &&
 			blocks.every((b) => tweetWeightedLen(b.text) <= MAX_TWEET_CHARS) &&
-			blocks.every((b) => b.media_paths.length <= 4)
+			blocks.every((b) => b.media_paths.length <= 4),
 	);
 
-	$effect(() => { onvalidchange(canSubmit); });
+	$effect(() => {
+		onvalidchange(canSubmit);
+	});
 
-	// ── Helpers ────────────────────────────────────────────
+	// Report focused block index to parent for toolbar display
+	$effect(() => {
+		if (!focusedBlockId || !onfocusindexchange) return;
+		const idx = sortedBlocks.findIndex((b) => b.id === focusedBlockId);
+		if (idx >= 0) onfocusindexchange(idx);
+	});
+
 	function focusBlock(blockId: string, cursorPos?: number) {
 		requestAnimationFrame(() => {
 			const textarea = document.querySelector(
-				`[data-block-id="${blockId}"] textarea`
+				`[data-block-id="${blockId}"] textarea`,
 			) as HTMLTextAreaElement | null;
 			if (textarea) {
 				textarea.focus();
@@ -58,7 +76,6 @@
 		});
 	}
 
-	// ── Block operations ───────────────────────────────────
 	function addBlock() {
 		const result = threadOps.addBlock(blocks);
 		onchange(result.blocks);
@@ -102,21 +119,34 @@
 
 	function announce(msg: string) {
 		reorderAnnouncement = msg;
-		setTimeout(() => { reorderAnnouncement = ''; }, 1000);
+		setTimeout(() => {
+			reorderAnnouncement = "";
+		}, 1000);
 	}
 
 	function splitBlock(id: string) {
 		const textarea = document.querySelector(
-			`[data-block-id="${id}"] textarea`
+			`[data-block-id="${id}"] textarea`,
 		) as HTMLTextAreaElement | null;
 		const block = blocks.find((b) => b.id === id);
 		if (!block) return;
-		const cursorPos = textarea?.selectionStart ?? Math.floor(block.text.length / 2);
+		const cursorPos =
+			textarea?.selectionStart ?? Math.floor(block.text.length / 2);
 		const result = threadOps.splitBlockAt(blocks, id, cursorPos);
 		if (!result) return;
 		onchange(result.blocks);
 		focusBlock(result.newId);
 		announce(`Post split. Now ${result.blocks.length} posts in thread.`);
+	}
+
+	function showMergeMediaError(a: string[], b: string[]) {
+		const total = a.length + b.length;
+		if (total > 4) {
+			mergeError = `Cannot merge: combined media would exceed 4 (has ${total}).`;
+			setTimeout(() => {
+				mergeError = null;
+			}, 3000);
+		}
 	}
 
 	function mergeWithNext(id: string) {
@@ -125,13 +155,10 @@
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
 			if (idx >= sorted.length - 1 || sorted.length <= 2) return;
-			const current = sorted[idx];
-			const next = sorted[idx + 1];
-			const combinedMedia = [...current.media_paths, ...next.media_paths];
-			if (combinedMedia.length > 4) {
-				mergeError = `Cannot merge: combined media would exceed 4 (has ${combinedMedia.length}).`;
-				setTimeout(() => { mergeError = null; }, 3000);
-			}
+			showMergeMediaError(
+				sorted[idx].media_paths,
+				sorted[idx + 1].media_paths,
+			);
 			return;
 		}
 		onchange(result.blocks);
@@ -145,13 +172,10 @@
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
 			if (idx <= 0 || sorted.length <= 2) return;
-			const prev = sorted[idx - 1];
-			const current = sorted[idx];
-			const combinedMedia = [...prev.media_paths, ...current.media_paths];
-			if (combinedMedia.length > 4) {
-				mergeError = `Cannot merge: combined media would exceed 4 (has ${combinedMedia.length}).`;
-				setTimeout(() => { mergeError = null; }, 3000);
-			}
+			showMergeMediaError(
+				sorted[idx - 1].media_paths,
+				sorted[idx].media_paths,
+			);
 			return;
 		}
 		onchange(result.blocks);
@@ -159,12 +183,11 @@
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
-	// ── Drag-and-drop ──────────────────────────────────────
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
 		if (e.dataTransfer) {
-			e.dataTransfer.effectAllowed = 'move';
-			e.dataTransfer.setData('text/plain', blockId);
+			e.dataTransfer.effectAllowed = "move";
+			e.dataTransfer.setData("text/plain", blockId);
 		}
 	}
 
@@ -175,12 +198,14 @@
 
 	function handleCardDragOver(e: DragEvent, blockId: string) {
 		e.preventDefault();
-		if (draggingBlockId && draggingBlockId !== blockId) dropTargetBlockId = blockId;
+		if (draggingBlockId && draggingBlockId !== blockId)
+			dropTargetBlockId = blockId;
 	}
 
 	function handleCardDragEnter(e: DragEvent, blockId: string) {
 		e.preventDefault();
-		if (draggingBlockId && draggingBlockId !== blockId) dropTargetBlockId = blockId;
+		if (draggingBlockId && draggingBlockId !== blockId)
+			dropTargetBlockId = blockId;
 	}
 
 	function handleCardDragLeave(e: DragEvent, blockId: string) {
@@ -201,16 +226,18 @@
 		dropTargetBlockId = null;
 	}
 
-	// ── Keyboard handling ──────────────────────────────────
 	function handleCardKeydown(e: KeyboardEvent, blockId: string) {
 		// Cmd+Enter: split at cursor (fast path for thread mode)
-		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'Enter') {
+		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "Enter") {
 			e.preventDefault();
 			e.stopPropagation();
 			const textarea = e.target as HTMLTextAreaElement;
 			const block = blocks.find((b) => b.id === blockId);
 			if (!block) return;
-			if (textarea.selectionStart >= block.text.length || block.text.trim() === '') {
+			if (
+				textarea.selectionStart >= block.text.length ||
+				block.text.trim() === ""
+			) {
 				addBlockAfter(blockId);
 			} else {
 				splitBlock(blockId);
@@ -219,7 +246,13 @@
 		}
 
 		// Backspace at position 0: merge with previous
-		if (e.key === 'Backspace' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+		if (
+			e.key === "Backspace" &&
+			!e.metaKey &&
+			!e.ctrlKey &&
+			!e.shiftKey &&
+			!e.altKey
+		) {
 			const textarea = e.target as HTMLTextAreaElement;
 			if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
 				const sorted = threadOps.sortBlocks(blocks);
@@ -233,55 +266,68 @@
 		}
 
 		// Tab / Shift+Tab: navigate between blocks
-		if (e.key === 'Tab' && !e.altKey && !e.metaKey && !e.ctrlKey) {
+		if (e.key === "Tab" && !e.altKey && !e.metaKey && !e.ctrlKey) {
 			e.preventDefault();
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (e.shiftKey) { if (idx > 0) focusBlock(sorted[idx - 1].id); }
-			else { if (idx < sorted.length - 1) focusBlock(sorted[idx + 1].id); }
+			if (e.shiftKey) {
+				if (idx > 0) focusBlock(sorted[idx - 1].id);
+			} else {
+				if (idx < sorted.length - 1) focusBlock(sorted[idx + 1].id);
+			}
 			return;
 		}
 
 		// Alt+Arrow: reorder
-		if (e.altKey && e.key === 'ArrowUp') {
+		if (e.altKey && e.key === "ArrowUp") {
 			e.preventDefault();
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (idx > 0) { moveBlock(blockId, idx - 1); focusBlock(blockId); }
+			if (idx > 0) {
+				moveBlock(blockId, idx - 1);
+				focusBlock(blockId);
+			}
 			return;
 		}
-		if (e.altKey && e.key === 'ArrowDown') {
+		if (e.altKey && e.key === "ArrowDown") {
 			e.preventDefault();
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (idx < sorted.length - 1) { moveBlock(blockId, idx + 1); focusBlock(blockId); }
+			if (idx < sorted.length - 1) {
+				moveBlock(blockId, idx + 1);
+				focusBlock(blockId);
+			}
 			return;
 		}
 
-		// Cmd+D: duplicate
-		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'd') {
+		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "d") {
 			e.preventDefault();
 			duplicateBlock(blockId);
 			return;
 		}
-
-		// Cmd+Shift+S: split (secondary shortcut)
-		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+		if (
+			(e.metaKey || e.ctrlKey) &&
+			e.shiftKey &&
+			(e.key === "s" || e.key === "S")
+		) {
 			e.preventDefault();
 			splitBlock(blockId);
 			return;
 		}
-
-		// Cmd+Shift+M: merge with next
-		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
+		if (
+			(e.metaKey || e.ctrlKey) &&
+			e.shiftKey &&
+			(e.key === "m" || e.key === "M")
+		) {
 			e.preventDefault();
 			mergeWithNext(blockId);
 			return;
 		}
 	}
 
-	// ── Exported API (matches ThreadComposer contract) ────
-	export function getBlocks(): ThreadBlock[] { return [...blocks]; }
+	export function getBlocks(): ThreadBlock[] {
+		return [...blocks];
+	}
 
 	export function setBlocks(newBlocks: ThreadBlock[]) {
 		onchange([...newBlocks]);
@@ -292,18 +338,27 @@
 		const block = blocks.find((b) => b.id === focusedBlockId);
 		if (!block) return;
 		const textarea = document.querySelector(
-			`[data-block-id="${focusedBlockId}"] textarea`
+			`[data-block-id="${focusedBlockId}"] textarea`,
 		) as HTMLTextAreaElement | null;
 		if (!textarea) return;
 		const start = textarea.selectionStart;
 		const end = textarea.selectionEnd;
-		const selectedText = start !== end ? block.text.slice(start, end) : block.text;
+		const selectedText =
+			start !== end ? block.text.slice(start, end) : block.text;
 		if (!selectedText.trim()) return;
 		assistingBlockId = focusedBlockId;
 		try {
-			const result = await api.assist.improve(selectedText, voiceCue || undefined);
+			const result = await api.assist.improve(
+				selectedText,
+				voiceCue || undefined,
+			);
 			if (start !== end) {
-				updateBlockText(block.id, block.text.slice(0, start) + result.content + block.text.slice(end));
+				updateBlockText(
+					block.id,
+					block.text.slice(0, start) +
+						result.content +
+						block.text.slice(end),
+				);
 			} else {
 				updateBlockText(block.id, result.content);
 			}
@@ -321,62 +376,94 @@
 		}
 		if (!focusedBlockId) return;
 		switch (actionId) {
-			case 'add-card': addBlock(); break;
-			case 'duplicate': duplicateBlock(focusedBlockId); break;
-			case 'split': splitBlock(focusedBlockId); break;
-			case 'merge': mergeWithNext(focusedBlockId); break;
-			case 'move-up': {
+			case "add-card":
+				addBlock();
+				break;
+			case "duplicate":
+				duplicateBlock(focusedBlockId);
+				break;
+			case "split":
+				splitBlock(focusedBlockId);
+				break;
+			case "merge":
+				mergeWithNext(focusedBlockId);
+				break;
+			case "move-up": {
 				const s = threadOps.sortBlocks(blocks);
 				const idx = s.findIndex((b) => b.id === focusedBlockId);
-				if (idx > 0) { moveBlock(focusedBlockId, idx - 1); focusBlock(focusedBlockId); }
+				if (idx > 0) {
+					moveBlock(focusedBlockId, idx - 1);
+					focusBlock(focusedBlockId);
+				}
 				break;
 			}
-			case 'move-down': {
+			case "move-down": {
 				const s = threadOps.sortBlocks(blocks);
 				const idx = s.findIndex((b) => b.id === focusedBlockId);
-				if (idx < s.length - 1) { moveBlock(focusedBlockId, idx + 1); focusBlock(focusedBlockId); }
+				if (idx < s.length - 1) {
+					moveBlock(focusedBlockId, idx + 1);
+					focusBlock(focusedBlockId);
+				}
 				break;
 			}
 		}
 	}
 </script>
 
-<div class="flow-lane" role="list" aria-label="Thread editor">
-	<div class="lane-spine" aria-hidden="true"></div>
-	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{reorderAnnouncement}</div>
+<div class="flow-lane" class:has-multiple={sortedBlocks.length > 1} role="list" aria-label="Thread editor">
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+		{reorderAnnouncement}
+	</div>
 
 	{#each sortedBlocks as block, i (block.id)}
-		<ThreadFlowCard
-			{block}
-			index={i}
-			total={sortedBlocks.length}
-			focused={focusedBlockId === block.id}
-			assisting={assistingBlockId === block.id}
-			dragging={draggingBlockId === block.id}
-			dropTarget={dropTargetBlockId === block.id}
-			ontext={(text) => updateBlockText(block.id, text)}
-			onfocus={() => { focusedBlockId = block.id; }}
-			onblur={() => { if (focusedBlockId === block.id) focusedBlockId = null; }}
-			onkeydown={(e) => handleCardKeydown(e, block.id)}
-			onmedia={(paths) => updateBlockMedia(block.id, paths)}
-			onmerge={() => mergeWithNext(block.id)}
-			onremove={() => removeBlock(block.id)}
-			onaddafter={() => addBlockAfter(block.id)}
-			ondragstart={(e) => handleDragStart(e, block.id)}
-			ondragend={handleDragEnd}
-			ondragover={(e) => handleCardDragOver(e, block.id)}
-			ondragenter={(e) => handleCardDragEnter(e, block.id)}
-			ondragleave={(e) => handleCardDragLeave(e, block.id)}
-			ondrop={(e) => handleCardDrop(e, block.id)}
-		/>
+		<div
+			class="card-wrapper"
+			in:fly={{ y: 20, duration: 200 }}
+			out:fade={{ duration: 150 }}
+			animate:flip={{ duration: 250 }}
+		>
+			<ThreadFlowCard
+				{block}
+				index={i}
+				total={sortedBlocks.length}
+				{avatarUrl}
+				{displayName}
+				{handle}
+				focused={focusedBlockId === block.id}
+				assisting={assistingBlockId === block.id}
+				dragging={draggingBlockId === block.id}
+				dropTarget={dropTargetBlockId === block.id}
+				ontext={(text) => updateBlockText(block.id, text)}
+				onfocus={() => {
+					focusedBlockId = block.id;
+				}}
+				onblur={() => {
+					if (focusedBlockId === block.id) focusedBlockId = null;
+				}}
+				onkeydown={(e) => handleCardKeydown(e, block.id)}
+				onmedia={(paths) => updateBlockMedia(block.id, paths)}
+				onmerge={() => mergeWithNext(block.id)}
+				onremove={() => removeBlock(block.id)}
+				onaddafter={() => addBlockAfter(block.id)}
+				ondragstart={(e) => handleDragStart(e, block.id)}
+				ondragend={handleDragEnd}
+				ondragover={(e) => handleCardDragOver(e, block.id)}
+				ondragenter={(e) => handleCardDragEnter(e, block.id)}
+				ondragleave={(e) => handleCardDragLeave(e, block.id)}
+				ondrop={(e) => handleCardDrop(e, block.id)}
+			/>
+		</div>
 	{/each}
+
 </div>
 
 {#if mergeError}<div class="merge-error" role="alert">{mergeError}</div>{/if}
 
 {#if validationErrors.length > 0}
 	<div class="validation-summary" role="status" aria-live="polite">
-		{#each validationErrors as err}<p class="validation-error">{err}</p>{/each}
+		{#each validationErrors as err}<p class="validation-error">
+				{err}
+			</p>{/each}
 	</div>
 {/if}
 
@@ -385,18 +472,25 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 0;
-		padding-left: 32px;
+		gap: 4px;
 	}
 
-	.lane-spine {
+	.card-wrapper {
+		position: relative;
+		z-index: 1;
+		padding-bottom: 8px;
+	}
+
+	/* Clean horizontal separator between cards */
+	.flow-lane.has-multiple .card-wrapper:not(:last-child)::after {
+		content: "";
 		position: absolute;
-		left: 15px;
-		top: 24px;
-		bottom: 24px;
-		width: 1px;
-		background: color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
-		pointer-events: none;
+		bottom: 0;
+		/* Inset to align with content area (past the avatar gutter) */
+		left: 50px;
+		right: 0;
+		height: 1px;
+		background: color-mix(in srgb, var(--color-border-subtle) 25%, transparent);
 	}
 
 	.sr-only {
@@ -439,8 +533,8 @@
 			padding-left: 0;
 		}
 
-		.lane-spine {
-			display: none;
+		.flow-lane.has-multiple .card-wrapper:not(:last-child)::after {
+			left: 36px;
 		}
 	}
 </style>

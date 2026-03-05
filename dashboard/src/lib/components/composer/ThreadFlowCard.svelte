@@ -1,14 +1,18 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import type { ThreadBlock } from '$lib/api';
-	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
-	import { GripVertical, Merge, Trash2, Plus } from 'lucide-svelte';
-	import MediaSlot from '../MediaSlot.svelte';
+	import { onMount } from "svelte";
+	import type { ThreadBlock } from "$lib/api";
+	import { tweetWeightedLen, wordCount, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
+	import { GripVertical, Merge, Trash2, Image } from "lucide-svelte";
+	import MediaSlot from "../MediaSlot.svelte";
+	import CharRing from "./CharRing.svelte";
 
 	let {
 		block,
 		index,
 		total,
+		avatarUrl = null,
+		displayName = null,
+		handle = null,
 		focused = false,
 		assisting = false,
 		dragging = false,
@@ -26,11 +30,14 @@
 		ondragover,
 		ondragenter,
 		ondragleave,
-		ondrop
+		ondrop,
 	}: {
 		block: ThreadBlock;
 		index: number;
 		total: number;
+		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 		focused?: boolean;
 		assisting?: boolean;
 		dragging?: boolean;
@@ -54,7 +61,8 @@
 	const charCount = $derived(tweetWeightedLen(block.text));
 	const overLimit = $derived(charCount > MAX_TWEET_CHARS);
 	const warning = $derived(charCount > 260 && !overLimit);
-	const isLast = $derived(index >= total - 1);
+	const isFirst = $derived(index === 0);
+	const words = $derived(wordCount(block.text));
 
 	function handleKeydownGuarded(e: KeyboardEvent) {
 		if (e.isComposing) return;
@@ -62,8 +70,8 @@
 	}
 
 	function autoResize(el: HTMLTextAreaElement) {
-		el.style.height = 'auto';
-		el.style.height = el.scrollHeight + 'px';
+		el.style.height = "auto";
+		el.style.height = el.scrollHeight + "px";
 	}
 
 	function handleInput(e: Event) {
@@ -73,6 +81,7 @@
 	}
 
 	let textareaEl: HTMLTextAreaElement | undefined = $state();
+	let mediaSlotRef: MediaSlot | undefined = $state();
 
 	onMount(() => {
 		if (textareaEl && block.text) {
@@ -95,6 +104,7 @@
 	class:dragging
 	class:drop-target={dropTarget}
 	class:assisting
+	class:focused
 	data-block-id={block.id}
 	role="listitem"
 	ondragover={(e) => ondragover(e)}
@@ -102,77 +112,107 @@
 	ondragleave={(e) => ondragleave(e)}
 	ondrop={(e) => ondrop(e)}
 >
-	<div class="card-writing-area" class:focused class:over-limit={overLimit}>
-		<div class="spine-dot" class:focused class:over-limit={overLimit} aria-hidden="true"></div>
-		<textarea
-			bind:this={textareaEl}
-			class="flow-textarea"
-			placeholder={index === 0 ? 'Start writing...' : 'Continue...'}
-			value={block.text}
-			oninput={handleInput}
-			onfocus={() => onfocus()}
-			onblur={() => onblur()}
-			onkeydown={handleKeydownGuarded}
-			aria-label={`Post ${index + 1} of ${total}`}
-		></textarea>
-		<MediaSlot mediaPaths={block.media_paths} onmediachange={(paths) => onmedia(paths)} />
+	<!-- Gutter: avatar -->
+	<div class="card-gutter">
+		{#if avatarUrl}
+			<img
+				src={avatarUrl}
+				alt=""
+				class="gutter-avatar"
+				class:over-limit={overLimit}
+			/>
+		{:else}
+			<div
+				class="gutter-avatar-placeholder"
+				class:over-limit={overLimit}
+			></div>
+		{/if}
 	</div>
 
-	<div class="card-separator" class:last={isLast}>
-		{#if charCount > 240 || overLimit}
-			<span class="sep-char-count" class:over-limit={overLimit} class:warning>
-				{charCount}/{MAX_TWEET_CHARS}
-			</span>
-		{/if}
-		<div class="sep-tools">
-			<div
-				class="sep-handle"
-				draggable="true"
-				role="button"
-				tabindex="-1"
-				title="Drag to reorder"
-				aria-label={`Reorder post ${index + 1}. Use Alt+Up or Alt+Down to move.`}
-				ondragstart={(e) => ondragstart(e)}
-				ondragend={() => ondragend()}
-			>
-				<GripVertical size={12} />
+	<!-- Main content area -->
+	<div class="card-body">
+		<div class="card-writing-area" class:over-limit={overLimit}>
+			<div class="card-meta">
+				{#if displayName}
+					<span class="meta-name">{displayName}</span>
+				{/if}
+				{#if handle}
+					<span class="meta-handle">@{handle}</span>
+				{/if}
 			</div>
-			{#if total > 2}
+			<textarea
+				bind:this={textareaEl}
+				class="flow-textarea"
+				placeholder={isFirst ? "Start writing..." : "Continue..."}
+				value={block.text}
+				oninput={handleInput}
+				onfocus={() => onfocus()}
+				onblur={() => onblur()}
+				onkeydown={handleKeydownGuarded}
+				aria-label={`Post ${index + 1} of ${total}`}
+			></textarea>
+			<MediaSlot
+				bind:this={mediaSlotRef}
+				mediaPaths={block.media_paths}
+				onmediachange={(paths) => onmedia(paths)}
+			/>
+		</div>
+
+		<!-- Card footer: post number + actions -->
+		<div class="card-footer">
+			<div class="footer-left">
+				<span class="footer-badge">#{index + 1}{#if words > 0} &middot; {words} {words === 1 ? "word" : "words"}{/if}</span>
+			</div>
+			<div class="footer-actions">
+				<CharRing current={charCount} />
 				<button
-					class="sep-action-btn"
-					onclick={() => onmerge()}
-					title="Merge with next ({'\u2318'}{'\u21e7'}M)"
-					aria-label={`Merge post ${index + 1} with post ${index + 2}`}
+					class="footer-action-btn"
+					onclick={() => mediaSlotRef?.triggerAttach()}
+					title="Attach media"
+					aria-label={`Attach media to post ${index + 1}`}
 				>
-					<Merge size={12} />
+					<Image size={13} />
 				</button>
-				<button
-					class="sep-action-btn sep-remove"
-					onclick={() => onremove()}
-					title="Remove post"
-					aria-label={`Remove post ${index + 1}`}
+				<div
+					class="footer-handle"
+					draggable="true"
+					role="button"
+					tabindex="-1"
+					title="Drag to reorder"
+					aria-label={`Reorder post ${index + 1}. Use Alt+Up or Alt+Down to move.`}
+					ondragstart={(e) => ondragstart(e)}
+					ondragend={() => ondragend()}
 				>
-					<Trash2 size={12} />
-				</button>
-			{/if}
+					<GripVertical size={13} />
+				</div>
+				{#if total > 2}
+					<button
+						class="footer-action-btn"
+						onclick={() => onmerge()}
+						title="Merge with next ({'\u2318'}{'\u21e7'}M)"
+						aria-label={`Merge post ${index + 1} with post ${index + 2}`}
+					>
+						<Merge size={13} />
+					</button>
+					<button
+						class="footer-action-btn footer-remove"
+						onclick={() => onremove()}
+						title="Remove post"
+						aria-label={`Remove post ${index + 1}`}
+					>
+						<Trash2 size={13} />
+					</button>
+				{/if}
+			</div>
 		</div>
 	</div>
-
-	<button
-		class="between-zone"
-		tabindex="-1"
-		aria-label={`Add post after post ${index + 1}`}
-		onclick={() => onaddafter()}
-	>
-		<span class="between-plus">
-			<Plus size={10} />
-		</span>
-	</button>
 </div>
 
 <style>
 	.flow-card {
 		position: relative;
+		display: flex;
+		gap: 14px;
 		transition: opacity 0.15s ease;
 	}
 
@@ -185,202 +225,233 @@
 		pointer-events: none;
 	}
 
-	.card-writing-area {
-		position: relative;
+	/* ── Gutter (avatar) ───────────────────── */
+	.card-gutter {
+		display: flex;
+		align-items: flex-start;
+		justify-content: center;
+		width: 36px;
+		flex-shrink: 0;
+		padding-top: 4px;
+	}
+
+	.gutter-avatar {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
+		border: 2px solid transparent;
 		transition: border-color 0.15s ease;
 	}
 
-	/* Drop target visual */
-	.flow-card.drop-target .card-writing-area {
-		background: color-mix(in srgb, var(--color-accent) 3%, transparent);
-		border-radius: 4px;
-	}
-
-	/* Spine dot marker — aligned to the lane spine */
-	.spine-dot {
-		position: absolute;
-		left: -21px;
-		top: 14px;
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		border: 1.5px solid var(--color-border-subtle);
-		background: var(--color-surface);
-		transition: border-color 0.15s ease, background 0.15s ease;
-		z-index: 1;
-	}
-
-	.spine-dot.focused {
-		border-color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 15%, var(--color-surface));
-	}
-
-	.spine-dot.over-limit {
+	.gutter-avatar.over-limit {
 		border-color: var(--color-danger);
-		background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+	}
+
+	.gutter-avatar-placeholder {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		background: var(--color-surface-active);
+		border: 2px solid transparent;
+		flex-shrink: 0;
+		transition: border-color 0.15s ease;
+	}
+
+	.gutter-avatar-placeholder.over-limit {
+		border-color: var(--color-danger);
+	}
+
+	/* ── Card body ──────────────────────────── */
+	.card-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.card-writing-area {
+		position: relative;
+		padding: 4px 0;
+		border-radius: 6px;
+		transition: opacity 0.2s ease;
+	}
+
+	/* Subtle de-emphasis on unfocused cards */
+	.flow-card:not(.focused) .card-writing-area {
+		opacity: 0.85;
+	}
+
+	.flow-card:not(.focused):hover .card-writing-area {
+		opacity: 1;
+	}
+
+	.flow-card.drop-target .card-writing-area {
+		background: color-mix(in srgb, var(--color-accent) 4%, transparent);
+		border-radius: 8px;
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+
+	.card-meta {
+		display: flex;
+		align-items: baseline;
+		gap: 5px;
+		min-width: 0;
+		margin-bottom: 2px;
+	}
+
+	.meta-name {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 160px;
+		line-height: 1;
+	}
+
+	.meta-handle {
+		font-size: 12px;
+		font-family: var(--font-mono);
+		color: var(--color-text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 120px;
+		line-height: 1;
 	}
 
 	.flow-textarea {
 		width: 100%;
-		padding: 10px 0;
+		padding: 4px 0;
 		border: none;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 15px;
+		font-size: 18px;
 		font-family: var(--font-sans);
-		line-height: 1.4;
+		line-height: 1.65;
+		letter-spacing: -0.01em;
+		caret-color: var(--color-accent);
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
-		min-height: 60px;
+		min-height: 72px;
 		overflow: hidden;
 	}
 
 	.flow-textarea::placeholder {
 		color: var(--color-text-subtle);
-		opacity: 0.6;
+		opacity: 0.35;
+		font-style: italic;
 	}
 
-	.card-separator {
+	/* ── Card Footer ───────────────────────── */
+	.card-footer {
 		display: flex;
 		align-items: center;
-		height: 24px;
-		padding: 0;
-		margin: 0;
+		justify-content: space-between;
+		padding: 4px 0 0;
+		margin-top: 6px;
+		min-height: 28px;
+	}
+
+	.footer-left {
+		display: flex;
+		align-items: center;
 		gap: 8px;
 	}
 
-	.sep-char-count {
-		font-size: 11px;
+	.footer-badge {
+		font-size: 10px;
 		font-family: var(--font-mono);
 		color: var(--color-text-subtle);
-		min-width: 60px;
+		opacity: 0.6;
+		padding: 1px 6px;
+		border-radius: 8px;
+		background: color-mix(in srgb, var(--color-surface-active) 50%, transparent);
+		letter-spacing: 0.02em;
 	}
 
-	.sep-char-count.warning {
-		color: var(--color-warning);
-	}
-
-	.sep-char-count.over-limit {
-		color: var(--color-danger);
-		font-weight: 600;
-	}
-
-	.sep-tools {
+	.footer-actions {
 		display: flex;
 		align-items: center;
 		gap: 2px;
-		opacity: 0;
+		opacity: 0.5;
 		transition: opacity 0.15s ease;
 	}
 
-	.card-separator:hover .sep-tools {
-		opacity: 1;
+	.card-footer:hover .footer-actions,
+	.flow-card.focused .footer-actions {
+		opacity: 0.9;
 	}
 
-	.sep-handle {
+	.footer-action-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 20px;
-		height: 20px;
+		width: 24px;
+		height: 24px;
+		border: none;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
+		padding: 0;
+		transition:
+			color 0.15s ease,
+			background 0.15s ease;
+	}
+
+	.footer-action-btn:hover {
+		background: var(--color-surface-hover);
+		color: var(--color-text);
+	}
+
+	.footer-remove:hover {
+		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+		color: var(--color-danger);
+	}
+
+	.footer-handle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
 		color: var(--color-text-subtle);
 		cursor: grab;
 		border: none;
 		background: none;
 		padding: 0;
-		border-radius: 3px;
-		transition: color 0.15s ease, background 0.15s ease;
+		border-radius: 4px;
+		transition:
+			color 0.15s ease,
+			background 0.15s ease;
 	}
 
-	.sep-handle:hover {
+	.footer-handle:hover {
 		color: var(--color-text);
 		background: var(--color-surface-hover);
 	}
 
-	.sep-handle:active {
+	.footer-handle:active {
 		cursor: grabbing;
 	}
 
-	.sep-action-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 20px;
-		height: 20px;
-		border: none;
-		border-radius: 3px;
-		background: transparent;
-		color: var(--color-text-subtle);
-		cursor: pointer;
-		transition: all 0.15s ease;
-		padding: 0;
-	}
-
-	.sep-action-btn:hover {
-		background: var(--color-surface-hover);
-		color: var(--color-text);
-	}
-
-	.sep-action-btn.sep-remove:hover {
-		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-		color: var(--color-danger);
-	}
-
-	/* Between-block "+" affordance */
-	.between-zone {
-		position: relative;
-		height: 12px;
-		display: flex;
-		align-items: center;
-		justify-content: flex-start;
-		cursor: pointer;
-	}
-
-	.between-plus {
-		opacity: 0;
-		width: 14px;
-		height: 14px;
-		border-radius: 50%;
-		border: 1px solid var(--color-border-subtle);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--color-text-subtle);
-		background: var(--color-surface);
-		transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-		margin-left: -25px;
-		z-index: 2;
-	}
-
-	.between-zone:hover .between-plus,
-	.between-zone:focus-within .between-plus {
-		opacity: 1;
-	}
-
-	.between-zone:hover .between-plus {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
-	}
-
-	/* Touch: always show separator tools */
+	/* Touch: always show tools */
 	@media (hover: none) {
-		.sep-tools {
-			opacity: 1;
-		}
-		.between-plus {
+		.footer-actions {
 			opacity: 1;
 		}
 	}
 
 	@media (pointer: coarse) {
-		.sep-handle,
-		.sep-action-btn {
+		.footer-action-btn,
+		.footer-handle {
 			min-width: 44px;
-			min-height: 44px;
-		}
-
-		.between-zone {
 			min-height: 44px;
 		}
 	}
@@ -388,40 +459,33 @@
 	@media (prefers-reduced-motion: reduce) {
 		.flow-card,
 		.card-writing-area,
-		.spine-dot,
-		.sep-tools,
-		.between-plus,
-		.sep-handle,
-		.sep-action-btn {
+		.card-writing-area::before,
+		.footer-actions,
+		.footer-action-btn,
+		.footer-handle,
+		.gutter-avatar,
+		.gutter-avatar-placeholder {
 			transition: none;
 		}
 	}
 
 	@media (max-width: 640px) {
-		.flow-textarea {
-			font-size: 16px;
+		.card-gutter {
+			width: 28px;
 		}
 
-		/* Hide spine dot on mobile, show thin accent bar instead */
-		.spine-dot {
+		.gutter-avatar,
+		.gutter-avatar-placeholder {
+			width: 28px;
+			height: 28px;
+		}
+
+		.flow-card {
+			gap: 8px;
+		}
+
+		.card-meta {
 			display: none;
-		}
-
-		.card-writing-area {
-			border-left: 1px solid transparent;
-			padding-left: 12px;
-		}
-
-		.card-writing-area.focused {
-			border-left-color: var(--color-accent);
-		}
-
-		.card-writing-area.over-limit {
-			border-left-color: var(--color-danger);
-		}
-
-		.between-plus {
-			margin-left: 0;
 		}
 	}
 </style>

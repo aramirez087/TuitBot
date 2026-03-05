@@ -495,6 +495,59 @@ fn is_enriched_true_with_brand_voice() {
     assert!(profile.is_enriched());
 }
 
+// --- draft_context_keywords tests ---
+
+#[test]
+fn draft_context_keywords_empty_profile() {
+    let profile = BusinessProfile::default();
+    assert!(profile.draft_context_keywords().is_empty());
+}
+
+#[test]
+fn draft_context_keywords_only_product() {
+    let profile = BusinessProfile {
+        product_keywords: vec!["rust".to_string(), "cli".to_string()],
+        ..Default::default()
+    };
+    // When industry_topics is empty, effective_industry_topics() falls back to product_keywords.
+    // So product_keywords appear twice: once from product, once from industry fallback.
+    let keywords = profile.draft_context_keywords();
+    assert_eq!(
+        keywords,
+        vec!["rust", "cli", "rust", "cli"],
+        "product_keywords duplicated via effective_industry_topics fallback"
+    );
+}
+
+#[test]
+fn draft_context_keywords_all_keyword_types() {
+    let profile = BusinessProfile {
+        product_keywords: vec!["rust".to_string()],
+        competitor_keywords: vec!["go".to_string(), "python".to_string()],
+        industry_topics: vec!["systems programming".to_string()],
+        ..Default::default()
+    };
+    let keywords = profile.draft_context_keywords();
+    // Order: product → competitor → industry
+    assert_eq!(
+        keywords,
+        vec!["rust", "go", "python", "systems programming"]
+    );
+}
+
+#[test]
+fn draft_context_keywords_deduplication_not_applied() {
+    let profile = BusinessProfile {
+        product_keywords: vec!["rust".to_string()],
+        competitor_keywords: vec!["rust".to_string(), "go".to_string()],
+        industry_topics: vec!["rust ecosystem".to_string()],
+        ..Default::default()
+    };
+    let keywords = profile.draft_context_keywords();
+    // "rust" appears in both product and competitor — no dedup applied.
+    assert_eq!(keywords, vec!["rust", "rust", "go", "rust ecosystem"]);
+}
+
 // --- Content sources config tests ---
 
 #[test]

@@ -103,6 +103,7 @@ impl XApiClient for MockXApiClient {
             id: "u1".to_string(),
             username: "testuser".to_string(),
             name: "Test User".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -130,6 +131,7 @@ impl XApiClient for MockXApiClient {
             id: "u2".to_string(),
             username: username.to_string(),
             name: "Looked Up User".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -221,6 +223,7 @@ impl XApiClient for MockXApiClient {
                 id: "f1".to_string(),
                 username: "follower1".to_string(),
                 name: "Follower One".to_string(),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {
@@ -241,6 +244,7 @@ impl XApiClient for MockXApiClient {
                 id: "fw1".to_string(),
                 username: "following1".to_string(),
                 name: "Following One".to_string(),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {
@@ -255,6 +259,7 @@ impl XApiClient for MockXApiClient {
             id: user_id.to_string(),
             username: "iduser".to_string(),
             name: "ID User".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -316,6 +321,7 @@ impl XApiClient for MockXApiClient {
                 id: id.to_string(),
                 username: format!("user_{id}"),
                 name: format!("User {id}"),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             })
             .collect::<Vec<_>>();
@@ -340,6 +346,7 @@ impl XApiClient for MockXApiClient {
                 id: "lu1".to_string(),
                 username: "liker1".to_string(),
                 name: "Liker One".to_string(),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {

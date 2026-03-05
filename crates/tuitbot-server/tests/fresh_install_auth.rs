@@ -57,6 +57,8 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         deployment_mode: Default::default(),
         provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
     });
 
     tuitbot_server::build_router(state)
@@ -280,6 +282,8 @@ async fn init_with_claim_produces_valid_session() {
         deployment_mode: Default::default(),
         provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -363,6 +367,8 @@ async fn login_detects_out_of_band_passphrase_reset() {
         deployment_mode: Default::default(),
         provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
     });
     let router = tuitbot_server::build_router(state);
 
@@ -427,6 +433,8 @@ async fn login_detects_new_passphrase_file() {
         deployment_mode: Default::default(),
         provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
     });
     let router = tuitbot_server::build_router(state);
 

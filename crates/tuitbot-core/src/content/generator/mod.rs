@@ -57,6 +57,11 @@ impl ContentGenerator {
         Self { provider, business }
     }
 
+    /// Returns a reference to the business profile.
+    pub fn business(&self) -> &BusinessProfile {
+        &self.business
+    }
+
     // -----------------------------------------------------------------
     // Reply generation
     // -----------------------------------------------------------------
@@ -277,14 +282,37 @@ impl ContentGenerator {
         draft: &str,
         tone_cue: Option<&str>,
     ) -> Result<GenerationOutput, LlmError> {
+        self.improve_draft_inner(draft, tone_cue, None).await
+    }
+
+    /// Rewrite/improve an existing draft tweet with optional RAG context
+    /// injected into the system prompt.
+    pub async fn improve_draft_with_context(
+        &self,
+        draft: &str,
+        tone_cue: Option<&str>,
+        rag_context: Option<&str>,
+    ) -> Result<GenerationOutput, LlmError> {
+        self.improve_draft_inner(draft, tone_cue, rag_context).await
+    }
+
+    /// Internal draft improvement with optional RAG context.
+    async fn improve_draft_inner(
+        &self,
+        draft: &str,
+        tone_cue: Option<&str>,
+        rag_context: Option<&str>,
+    ) -> Result<GenerationOutput, LlmError> {
         tracing::debug!(
             draft_len = draft.len(),
             tone_cue = ?tone_cue,
+            has_rag_context = rag_context.is_some(),
             "Improving draft",
         );
 
         let voice_section = self.format_voice_section();
         let persona_section = self.format_persona_context();
+        let rag_section = Self::format_rag_section(rag_context);
 
         let tone_instruction = match tone_cue {
             Some(cue) if !cue.is_empty() => {
@@ -296,7 +324,8 @@ impl ContentGenerator {
         let system = format!(
             "You are {}'s social media voice. {}.\
              {voice_section}\
-             {persona_section}\n\n\
+             {persona_section}\
+             {rag_section}\n\n\
              Task: Rewrite and improve the draft tweet below. \
              Keep the core message but make it sharper, more engaging, \
              and better-written.{tone_instruction}\n\n\
