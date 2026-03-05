@@ -345,6 +345,8 @@ mod tests {
             deployment_mode: Default::default(),
             provider_backend: String::new(),
             pending_oauth: Mutex::new(HashMap::new()),
+            token_managers: Mutex::new(HashMap::new()),
+            x_client_id: String::new(),
         }
     }
 

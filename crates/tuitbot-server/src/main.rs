@@ -243,6 +243,11 @@ async fn main() -> Result<()> {
         deployment_mode,
         provider_backend,
         pending_oauth: Mutex::new(HashMap::new()),
+        token_managers: Mutex::new(HashMap::new()),
+        x_client_id: loaded_config
+            .as_ref()
+            .map(|c| c.x_api.client_id.clone())
+            .unwrap_or_default(),
     });
 
     let router = tuitbot_server::build_router(state);

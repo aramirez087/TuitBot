@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
-	import { X, Film } from 'lucide-svelte';
+	import { X, Film, Users, Captions } from 'lucide-svelte';
 	import MediaAltBadge from './MediaAltBadge.svelte';
 	import CharRing from './CharRing.svelte';
 
@@ -160,6 +160,27 @@
 			</div>
 		{/each}
 	</div>
+	<div class="media-links">
+		<button class="media-link disabled" title="Coming soon" aria-label="Tag people (coming soon)">
+			<Users size={12} />
+			<span>Tag People</span>
+		</button>
+		{#if attachedMedia.some((m) => m.mediaType !== 'video/mp4')}
+			<button
+				class="media-link"
+				onclick={() => {
+					const badge = document.querySelector<HTMLButtonElement>(
+						'.media-preview-grid [aria-label^="Add alt text"], .media-preview-grid [aria-label^="Edit alt text"]'
+					);
+					badge?.click();
+				}}
+				aria-label="Edit media descriptions"
+			>
+				<Captions size={12} />
+				<span>Descriptions</span>
+			</button>
+		{/if}
+	</div>
 {/if}
 
 <!-- File input kept for triggerFileSelect() called from toolbar -->
@@ -304,6 +325,40 @@
 
 	.remove-media-btn:hover {
 		background: rgba(0, 0, 0, 0.85);
+	}
+
+	.media-links {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 6px 2px 0;
+	}
+
+	.media-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		color: var(--color-text-muted);
+		background: none;
+		border: none;
+		padding: 2px 4px;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: color 0.12s ease;
+	}
+
+	.media-link:hover {
+		color: var(--color-accent);
+	}
+
+	.media-link.disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	.media-link.disabled:hover {
+		color: var(--color-text-muted);
 	}
 
 	.hidden-file-input {

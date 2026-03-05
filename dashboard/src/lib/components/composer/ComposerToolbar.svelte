@@ -21,96 +21,74 @@
 	);
 </script>
 
-<div class="toolbar-anchor">
-	<div class="floating-toolbar" role="toolbar" aria-label="Composer actions">
-		<div class="toolbar-left">
-			<button
-				class="toolbar-btn ai-btn"
-				onclick={onaiassist}
-				title="AI improve ({formatCombo('cmd+shift+j')})"
-				aria-label="AI improve selection or post"
-			>
-				<Sparkles size={15} />
-			</button>
+<div class="subheader-bar" role="toolbar" aria-label="Composer actions">
+	<div class="bar-left">
+		<button
+			class="bar-btn ai-btn"
+			onclick={onaiassist}
+			title="AI improve ({formatCombo('cmd+shift+j')})"
+			aria-label="AI improve selection or post"
+		>
+			<Sparkles size={14} />
+		</button>
 
-			<span class="toolbar-divider" aria-hidden="true"></span>
+		<span class="bar-divider" aria-hidden="true"></span>
 
-			<button
-				class="mode-badge"
-				onclick={onswitchmode}
-				title={switchLabel}
-				aria-label={switchLabel}
-			>
-				<ModeIcon size={13} />
-				<span class="mode-label">{modeLabel}</span>
-			</button>
-		</div>
+		<button
+			class="mode-tab"
+			onclick={onswitchmode}
+			title={switchLabel}
+			aria-label={switchLabel}
+		>
+			<ModeIcon size={13} />
+			<span class="mode-label">{modeLabel}</span>
+		</button>
+	</div>
 
-		<div class="toolbar-right">
-			<button
-				class="palette-trigger"
-				onclick={onopenpalette}
-				aria-label="Command palette"
-			>
-				<Search size={12} />
-				<kbd>{formatCombo("cmd+k")}</kbd>
-				<span class="palette-label">All shortcuts</span>
-			</button>
-		</div>
+	<div class="bar-right">
+		<button
+			class="shortcut-trigger"
+			onclick={onopenpalette}
+			aria-label="Command palette"
+		>
+			<Search size={12} />
+			<kbd>{formatCombo("cmd+k")}</kbd>
+			<span class="shortcut-label">All shortcuts</span>
+		</button>
 	</div>
 </div>
 
 <style>
-	.toolbar-anchor {
-		position: sticky;
-		bottom: 0;
-		display: flex;
-		justify-content: center;
-		padding: 8px 16px 12px;
-		pointer-events: none;
-		z-index: 5;
-	}
-
-	.floating-toolbar {
+	.subheader-bar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 8px;
-		padding: 6px 14px;
-		border-radius: 22px;
-		background: color-mix(in srgb, var(--color-surface) 85%, transparent);
-		backdrop-filter: blur(16px) saturate(180%);
-		-webkit-backdrop-filter: blur(16px) saturate(180%);
-		border: 1px solid
-			color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
-		box-shadow:
-			0 4px 24px rgba(0, 0, 0, 0.15),
-			0 1px 4px rgba(0, 0, 0, 0.08);
-		pointer-events: auto;
-		width: 100%;
-		max-width: 520px;
+		padding: 4px 20px;
+		border-bottom: 1px solid
+			color-mix(in srgb, var(--color-border-subtle) 35%, transparent);
+		flex-shrink: 0;
+		min-height: 36px;
 	}
 
-	.toolbar-left {
+	.bar-left {
 		display: flex;
 		align-items: center;
 		gap: 2px;
 	}
 
-	.toolbar-right {
+	.bar-right {
 		display: flex;
 		align-items: center;
-		gap: 10px;
 	}
 
-	.toolbar-btn {
+	.bar-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
+		width: 30px;
+		height: 30px;
 		border: none;
-		border-radius: 50%;
+		border-radius: 6px;
 		background: transparent;
 		color: var(--color-text-muted);
 		cursor: pointer;
@@ -118,17 +96,12 @@
 		padding: 0;
 	}
 
-	.toolbar-btn:hover:not(:disabled) {
+	.bar-btn:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 		color: var(--color-accent);
 	}
 
-	.toolbar-btn:disabled {
-		opacity: 0.35;
-		cursor: not-allowed;
-	}
-
-	.toolbar-btn.ai-btn:hover:not(:disabled) {
+	.bar-btn.ai-btn:hover:not(:disabled) {
 		color: var(--color-warning, #d29922);
 		background: color-mix(
 			in srgb,
@@ -137,7 +110,7 @@
 		);
 	}
 
-	.toolbar-divider {
+	.bar-divider {
 		width: 1px;
 		height: 16px;
 		background: color-mix(
@@ -145,107 +118,98 @@
 			var(--color-border-subtle) 50%,
 			transparent
 		);
-		margin: 0 4px;
+		margin: 0 6px;
 	}
 
-	.mode-badge {
+	.mode-tab {
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
 		padding: 4px 10px;
-		border: 1px solid
-			color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
-		border-radius: 12px;
+		border: none;
+		border-radius: 6px;
 		background: transparent;
 		color: var(--color-text-muted);
-		font-size: 11px;
+		font-size: 12px;
 		font-weight: 500;
 		cursor: pointer;
 		transition: all 0.12s ease;
 	}
 
-	.mode-badge:hover {
-		border-color: var(--color-accent);
-		color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+	.mode-tab:hover {
+		color: var(--color-text);
+		background: var(--color-surface-hover);
 	}
 
 	.mode-label {
 		letter-spacing: 0.01em;
 	}
 
-	.palette-trigger {
+	.shortcut-trigger {
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		padding: 2px 8px;
+		padding: 4px 8px;
 		border: none;
 		border-radius: 4px;
 		background: transparent;
-		color: var(--color-text-muted);
+		color: var(--color-text-subtle);
 		font-size: 11px;
 		cursor: pointer;
 		transition: color 0.12s ease;
+		opacity: 0.7;
 	}
 
-	.palette-trigger:hover {
-		color: var(--color-accent);
+	.shortcut-trigger:hover {
+		color: var(--color-text-muted);
+		opacity: 1;
 	}
 
-	.palette-trigger kbd {
+	.shortcut-trigger kbd {
 		display: inline-flex;
 		align-items: center;
 		padding: 0 4px;
 		border-radius: 3px;
-		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-surface-active) 60%, transparent);
+		color: var(--color-text-subtle);
 		font-size: 10px;
 		font-family: var(--font-mono);
 		font-weight: 500;
 		border: 1px solid
-			color-mix(in srgb, var(--color-accent) 12%, transparent);
+			color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
 		line-height: 1.5;
 	}
 
 	@media (max-width: 480px) {
-		.palette-label {
+		.shortcut-label {
 			display: none;
-		}
-
-		.palette-trigger kbd {
-			font-size: 9px;
 		}
 
 		.mode-label {
 			display: none;
 		}
 
-		.toolbar-right {
-			gap: 6px;
-		}
-
-		.floating-toolbar {
-			border-radius: 16px;
-			padding: 4px 10px;
+		.subheader-bar {
+			padding: 4px 12px;
 		}
 	}
 
 	@media (pointer: coarse) {
-		.toolbar-btn {
+		.bar-btn {
 			min-width: 44px;
 			min-height: 44px;
 		}
 
-		.mode-badge {
+		.mode-tab {
 			min-height: 36px;
 			padding: 4px 12px;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.toolbar-btn,
-		.mode-badge,
-		.palette-trigger {
+		.bar-btn,
+		.mode-tab,
+		.shortcut-trigger {
 			transition: none;
 		}
 	}

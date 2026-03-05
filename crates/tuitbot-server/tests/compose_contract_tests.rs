@@ -39,6 +39,8 @@ async fn test_router() -> axum::Router {
         deployment_mode: Default::default(),
         provider_backend: String::new(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
     });
 
     tuitbot_server::build_router(state)

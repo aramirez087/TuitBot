@@ -24,6 +24,7 @@
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
 	import ComposerToolbar from './ComposerToolbar.svelte';
+	import ComposerInsertBar from './ComposerInsertBar.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
 	import { persistGet, persistSet } from '$lib/stores/persistence';
 	import {
@@ -509,6 +510,43 @@
 		}
 	}
 
+	function handleInsertText(text: string) {
+		// Find the currently focused textarea and insert text at cursor
+		const textarea = document.activeElement as HTMLTextAreaElement | null;
+		if (!textarea || textarea.tagName !== 'TEXTAREA') {
+			// Fallback: try the main compose input or first thread textarea
+			const fallback = document.querySelector('.compose-input, .flow-textarea') as HTMLTextAreaElement | null;
+			if (fallback) {
+				fallback.focus();
+				const pos = fallback.selectionStart ?? fallback.value.length;
+				const before = fallback.value.slice(0, pos);
+				const after = fallback.value.slice(pos);
+				const newVal = before + text + after;
+				if (mode === 'tweet') {
+					tweetText = newVal;
+				}
+				// For thread mode the textarea dispatches its own input event
+				fallback.value = newVal;
+				fallback.dispatchEvent(new Event('input', { bubbles: true }));
+				const newPos = pos + text.length;
+				fallback.setSelectionRange(newPos, newPos);
+			}
+			return;
+		}
+		const pos = textarea.selectionStart ?? textarea.value.length;
+		const before = textarea.value.slice(0, pos);
+		const after = textarea.value.slice(pos);
+		const newVal = before + text + after;
+		if (mode === 'tweet') {
+			tweetText = newVal;
+		}
+		textarea.value = newVal;
+		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		const newPos = pos + text.length;
+		textarea.setSelectionRange(newPos, newPos);
+		textarea.focus();
+	}
+
 	async function handleAiAssist() {
 		assisting = true; submitError = null;
 		try {
@@ -571,6 +609,8 @@
 					onvalidchange={(v) => { threadValid = v; }}
 				/>
 			{/if}
+
+			<ComposerInsertBar oninsert={handleInsertText} />
 
 			{#if showUndo && !showFromNotes}
 				<div class="undo-banner">

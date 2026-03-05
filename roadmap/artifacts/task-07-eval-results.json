@@ -1,6 +1,6 @@
 {
   "eval_name": "task-07-observability-evals",
-  "timestamp": "2026-03-05T02:00:57.712828+00:00",
+  "timestamp": "2026-03-05T21:40:31.040165+00:00",
   "scenarios": [
     {
       "scenario": "A",
@@ -8,7 +8,7 @@
       "steps": [
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 6,
+          "latency_ms": 4,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -23,7 +23,7 @@
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 10,
+      "total_latency_ms": 8,
       "success": true,
       "telemetry_entries": 1,
       "schema_valid": true
@@ -34,7 +34,7 @@
       "steps": [
         {
           "tool_name": "find_reply_opportunities",
-          "latency_ms": 1,
+          "latency_ms": 2,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -42,7 +42,7 @@
         },
         {
           "tool_name": "draft_replies_for_candidates",
-          "latency_ms": 4,
+          "latency_ms": 6,
           "success": true,
           "response_valid": true,
           "error_code": null,
@@ -57,7 +57,7 @@
           "policy_decision": "allow"
         }
       ],
-      "total_latency_ms": 8,
+      "total_latency_ms": 11,
       "success": true,
       "telemetry_entries": 3,
       "schema_valid": true

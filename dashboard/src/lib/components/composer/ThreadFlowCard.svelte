@@ -161,10 +161,7 @@
 		<!-- Card footer: post number + actions -->
 		<div class="card-footer">
 			<div class="footer-left">
-				<span class="footer-badge">#{index + 1}</span>
-				{#if focused && words > 0}
-					<span class="footer-words">{words} {words === 1 ? "word" : "words"}</span>
-				{/if}
+				<span class="footer-badge">#{index + 1}{#if words > 0} &middot; {words} {words === 1 ? "word" : "words"}{/if}</span>
 			</div>
 			<div class="footer-actions">
 				<CharRing current={charCount} />
@@ -215,7 +212,7 @@
 	.flow-card {
 		position: relative;
 		display: flex;
-		gap: 12px;
+		gap: 14px;
 		transition: opacity 0.15s ease;
 	}
 
@@ -248,10 +245,6 @@
 		transition: border-color 0.15s ease;
 	}
 
-	.flow-card.focused .gutter-avatar {
-		border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-	}
-
 	.gutter-avatar.over-limit {
 		border-color: var(--color-danger);
 	}
@@ -266,10 +259,6 @@
 		transition: border-color 0.15s ease;
 	}
 
-	.flow-card.focused .gutter-avatar-placeholder {
-		border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-	}
-
 	.gutter-avatar-placeholder.over-limit {
 		border-color: var(--color-danger);
 	}
@@ -282,51 +271,18 @@
 
 	.card-writing-area {
 		position: relative;
-		padding: 4px 0 4px 10px;
+		padding: 4px 0;
 		border-radius: 6px;
-		transition:
-			border-color 0.15s ease,
-			background 0.2s ease;
-	}
-
-	/* Focus glow: left accent bar */
-	.card-writing-area::before {
-		content: "";
-		position: absolute;
-		left: 0;
-		top: 8px;
-		bottom: 8px;
-		width: 2px;
-		border-radius: 1px;
-		background: var(--color-accent);
-		opacity: 0;
 		transition: opacity 0.2s ease;
-	}
-
-	.flow-card.focused .card-writing-area::before {
-		opacity: 0.3;
-	}
-
-	.flow-card.focused .card-writing-area {
-		background: color-mix(in srgb, var(--color-accent) 1.5%, transparent);
 	}
 
 	/* Subtle de-emphasis on unfocused cards */
 	.flow-card:not(.focused) .card-writing-area {
-		opacity: 0.95;
+		opacity: 0.85;
 	}
 
 	.flow-card:not(.focused):hover .card-writing-area {
 		opacity: 1;
-	}
-
-	.card-writing-area.over-limit::before {
-		background: var(--color-danger);
-		opacity: 1;
-	}
-
-	.card-writing-area.over-limit {
-		padding-left: 10px;
 	}
 
 	.flow-card.drop-target .card-writing-area {
@@ -372,7 +328,7 @@
 		border: none;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 17px;
+		font-size: 18px;
 		font-family: var(--font-sans);
 		line-height: 1.65;
 		letter-spacing: -0.01em;
@@ -382,7 +338,7 @@
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
-		min-height: 56px;
+		min-height: 72px;
 		overflow: hidden;
 	}
 
@@ -412,21 +368,10 @@
 		font-size: 10px;
 		font-family: var(--font-mono);
 		color: var(--color-text-subtle);
-		opacity: 0.4;
+		opacity: 0.6;
 		padding: 1px 6px;
 		border-radius: 8px;
 		background: color-mix(in srgb, var(--color-surface-active) 50%, transparent);
-	}
-
-	.flow-card.focused .footer-badge {
-		opacity: 0.7;
-	}
-
-	.footer-words {
-		font-size: 10px;
-		font-family: var(--font-mono);
-		color: var(--color-text-subtle);
-		opacity: 0.4;
 		letter-spacing: 0.02em;
 	}
 
@@ -434,13 +379,13 @@
 		display: flex;
 		align-items: center;
 		gap: 2px;
-		opacity: 0.35;
+		opacity: 0.5;
 		transition: opacity 0.15s ease;
 	}
 
 	.card-footer:hover .footer-actions,
 	.flow-card.focused .footer-actions {
-		opacity: 0.7;
+		opacity: 0.9;
 	}
 
 	.footer-action-btn {

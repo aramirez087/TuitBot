@@ -11,7 +11,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tuitbot_core::storage::accounts::{self, UpdateAccountParams};
-use tuitbot_core::x_api::{auth as x_auth, XApiClient, XApiHttpClient};
+use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext, Role};
 use crate::error::ApiError;
@@ -192,13 +192,12 @@ pub async fn sync_profile(
         .map(PathBuf::from)
         .unwrap_or_else(|| state.data_dir.join("tokens.json"));
 
-    let tokens = x_auth::load_tokens(&token_path)
-        .map_err(|e| ApiError::Internal(format!("failed to load tokens: {e}")))?
-        .ok_or_else(|| {
-            ApiError::BadRequest("no OAuth tokens found — connect X account first".to_string())
-        })?;
+    let access_token = state
+        .get_x_access_token(&token_path, &id)
+        .await
+        .map_err(|e| ApiError::Internal(format!("X API error: {e}")))?;
 
-    let client = XApiHttpClient::new(tokens.access_token);
+    let client = XApiHttpClient::new(access_token);
     let user = client
         .get_me()
         .await

@@ -83,7 +83,7 @@
 		min-height: 0;
 		min-width: 0;
 		overflow-y: auto;
-		max-width: 620px;
+		max-width: 660px;
 		margin-left: auto;
 		margin-right: auto;
 		width: 100%;

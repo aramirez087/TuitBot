@@ -472,32 +472,25 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 0;
-	}
-
-	/* ── Continuous Thread Spine ────────────── */
-	.flow-lane.has-multiple::before {
-		content: "";
-		position: absolute;
-		left: 18px;
-		top: 22px;
-		bottom: 40px;
-		width: 2px;
-		border-radius: 1px;
-		background: linear-gradient(
-			to bottom,
-			color-mix(in srgb, var(--color-accent) 30%, transparent),
-			color-mix(in srgb, var(--color-border-subtle) 35%, transparent) 12%,
-			color-mix(in srgb, var(--color-border-subtle) 35%, transparent) 88%,
-			color-mix(in srgb, var(--color-accent) 30%, transparent)
-		);
-		z-index: 0;
-		pointer-events: none;
+		gap: 4px;
 	}
 
 	.card-wrapper {
 		position: relative;
 		z-index: 1;
+		padding-bottom: 8px;
+	}
+
+	/* Clean horizontal separator between cards */
+	.flow-lane.has-multiple .card-wrapper:not(:last-child)::after {
+		content: "";
+		position: absolute;
+		bottom: 0;
+		/* Inset to align with content area (past the avatar gutter) */
+		left: 50px;
+		right: 0;
+		height: 1px;
+		background: color-mix(in srgb, var(--color-border-subtle) 25%, transparent);
 	}
 
 	.sr-only {
@@ -540,9 +533,8 @@
 			padding-left: 0;
 		}
 
-		.flow-lane.has-multiple::before {
-			left: 14px;
+		.flow-lane.has-multiple .card-wrapper:not(:last-child)::after {
+			left: 36px;
 		}
-
 	}
 </style>
