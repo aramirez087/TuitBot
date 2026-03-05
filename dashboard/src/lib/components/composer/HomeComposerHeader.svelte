@@ -16,6 +16,8 @@
 		inspectorOpen,
 		previewVisible,
 		handle = null,
+		avatarUrl = null,
+		displayName = null,
 		mode,
 		blockCount = 1,
 		hasContent,
@@ -31,6 +33,8 @@
 		inspectorOpen: boolean;
 		previewVisible: boolean;
 		handle?: string | null;
+		avatarUrl?: string | null;
+		displayName?: string | null;
 		mode: 'tweet' | 'thread';
 		blockCount?: number;
 		hasContent: boolean;
@@ -53,6 +57,12 @@
 
 <header class="home-header">
 	<div class="header-left">
+		{#if avatarUrl}
+			<img src={avatarUrl} alt="" class="header-avatar" />
+		{/if}
+		{#if displayName}
+			<span class="header-name">{displayName}</span>
+		{/if}
 		{#if handle}
 			<span class="header-handle">@{handle}</span>
 			<span class="header-sep" aria-hidden="true">&middot;</span>
@@ -131,7 +141,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding: 8px 16px;
+		padding: 10px 20px;
 		flex-shrink: 0;
 		border-bottom: 1px solid color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
 	}
@@ -141,6 +151,24 @@
 		align-items: center;
 		gap: 6px;
 		min-width: 0;
+	}
+
+	.header-avatar {
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
+	}
+
+	.header-name {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 120px;
 	}
 
 	.header-handle {
@@ -202,11 +230,13 @@
 	.publish-pill {
 		background: var(--color-accent);
 		color: #fff;
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 	}
 
 	.publish-pill:hover:not(:disabled) {
 		background: var(--color-accent-hover);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+		box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+		transform: translateY(-1px);
 	}
 
 	.publish-pill:disabled {
@@ -282,10 +312,9 @@
 			gap: 8px;
 		}
 
-		.header-handle {
-			display: none;
-		}
-
+		.header-avatar,
+		.header-name,
+		.header-handle,
 		.header-sep {
 			display: none;
 		}

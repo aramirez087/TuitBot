@@ -570,11 +570,13 @@
 					{attachedMedia}
 					onmediachange={(m) => { attachedMedia = m; }}
 					onerror={(msg) => { submitError = msg; }}
+					avatarUrl={$currentAccount?.x_avatar_url ?? null}
 				/>
 			{:else}
 				<ThreadFlowLane
 					bind:this={threadFlowRef}
 					blocks={threadBlocks}
+					avatarUrl={$currentAccount?.x_avatar_url ?? null}
 					onchange={(b) => { threadBlocks = b; }}
 					onvalidchange={(v) => { threadValid = v; }}
 				/>
@@ -666,6 +668,8 @@
 			{inspectorOpen}
 			previewVisible={previewMode}
 			handle={$currentAccount?.x_username ?? null}
+			avatarUrl={$currentAccount?.x_avatar_url ?? null}
+			displayName={$currentAccount?.x_display_name ?? null}
 			{mode}
 			blockCount={threadBlockCount}
 			hasContent={hasExistingContent}

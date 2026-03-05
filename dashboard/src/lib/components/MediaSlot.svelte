@@ -25,6 +25,7 @@
 	let dragOver = $state(false);
 
 	let localPreviews = $state<Map<string, { url: string; type: string }>>(new Map());
+	const mediaCount = $derived(mediaPaths.length);
 
 	const hasGifOrVideo = $derived(
 		mediaPaths.some((p) => {
@@ -131,13 +132,19 @@
 	role="region"
 	aria-label="Media attachment zone"
 >
-	{#if mediaPaths.length > 0}
-		<div class="media-thumbs">
+	{#if mediaCount > 0}
+		<div
+			class="media-thumbs"
+			class:single={mediaCount === 1}
+			class:double={mediaCount === 2}
+			class:triple={mediaCount === 3}
+			class:quad={mediaCount >= 4}
+		>
 			{#each mediaPaths as path (path)}
 				<div class="thumb">
 					{#if isVideo(path)}
 						<video src={getPreviewUrl(path)} class="thumb-img" muted></video>
-						<span class="media-badge"><Film size={10} /> Video</span>
+						<span class="media-badge"><Film size={12} /> Video</span>
 					{:else}
 						<img src={getPreviewUrl(path)} alt="" class="thumb-img" />
 					{/if}
@@ -146,7 +153,7 @@
 						onclick={() => removeMedia(path)}
 						aria-label="Remove media attachment {mediaPaths.indexOf(path) + 1}"
 					>
-						<X size={10} />
+						<X size={12} />
 					</button>
 				</div>
 			{/each}
@@ -185,20 +192,36 @@
 	}
 
 	.media-thumbs {
-		display: flex;
-		gap: 4px;
-		flex-wrap: wrap;
-		margin-bottom: 4px;
+		display: grid;
+		gap: 2px;
+		border-radius: 12px;
+		overflow: hidden;
+		margin-top: 8px;
+		margin-bottom: 8px;
+		border: 1px solid var(--color-border-subtle);
+	}
+
+	.media-thumbs.single { grid-template-columns: 1fr; }
+	.media-thumbs.double { grid-template-columns: 1fr 1fr; }
+	.media-thumbs.triple {
+		grid-template-columns: 1fr 1fr;
+		grid-template-rows: 1fr 1fr;
+	}
+	.media-thumbs.triple .thumb:first-child { grid-row: 1 / 3; }
+	.media-thumbs.quad {
+		grid-template-columns: 1fr 1fr;
+		grid-template-rows: 1fr 1fr;
 	}
 
 	.thumb {
 		position: relative;
-		width: 56px;
-		height: 56px;
-		border-radius: 6px;
 		overflow: hidden;
-		border: 1px solid var(--color-border);
+		min-height: 80px;
+		background: var(--color-surface-active);
 	}
+
+	.media-thumbs.single .thumb { aspect-ratio: 16 / 9; }
+	.media-thumbs.double .thumb { aspect-ratio: 1; }
 
 	.thumb-img {
 		width: 100%;
@@ -209,25 +232,26 @@
 
 	.media-badge {
 		position: absolute;
-		bottom: 2px;
-		left: 2px;
+		bottom: 6px;
+		left: 6px;
 		display: flex;
 		align-items: center;
-		gap: 2px;
-		font-size: 8px;
+		gap: 3px;
+		font-size: 10px;
 		font-weight: 600;
-		padding: 1px 3px;
-		border-radius: 2px;
+		padding: 2px 6px;
+		border-radius: 4px;
 		background: rgba(0, 0, 0, 0.7);
 		color: #fff;
+		backdrop-filter: blur(4px);
 	}
 
 	.remove-btn {
 		position: absolute;
-		top: 2px;
-		right: 2px;
-		width: 16px;
-		height: 16px;
+		top: 6px;
+		right: 6px;
+		width: 24px;
+		height: 24px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -238,6 +262,7 @@
 		cursor: pointer;
 		transition: background 0.15s ease;
 		padding: 0;
+		backdrop-filter: blur(4px);
 	}
 
 	.remove-btn:hover {
@@ -247,20 +272,23 @@
 	.attach-btn {
 		display: flex;
 		align-items: center;
-		gap: 4px;
-		padding: 3px 8px;
-		border: 1px solid var(--color-border);
-		border-radius: 4px;
+		justify-content: center;
+		gap: 6px;
+		padding: 6px 12px;
+		border: 1px dashed var(--color-border-subtle);
+		border-radius: 8px;
 		background: transparent;
 		color: var(--color-text-muted);
-		font-size: 11px;
+		font-size: 12px;
 		cursor: pointer;
 		transition: all 0.15s ease;
+		margin-top: 4px;
 	}
 
 	.attach-btn:hover:not(:disabled) {
 		border-color: var(--color-accent);
 		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 4%, transparent);
 	}
 
 	.attach-btn:disabled {
@@ -268,9 +296,7 @@
 		cursor: not-allowed;
 	}
 
-	.hidden {
-		display: none;
-	}
+	.hidden { display: none; }
 
 	.slot-error {
 		margin-top: 4px;
@@ -278,16 +304,12 @@
 		color: var(--color-danger);
 	}
 
-	/* Touch targets */
 	@media (pointer: coarse) {
-		.remove-btn {
-			width: 32px;
-			height: 32px;
-		}
+		.remove-btn { width: 32px; height: 32px; }
+		.attach-btn { min-height: 44px; padding: 8px 12px; }
+	}
 
-		.attach-btn {
-			min-height: 44px;
-			padding: 8px 12px;
-		}
+	@media (prefers-reduced-motion: reduce) {
+		.media-slot, .remove-btn, .attach-btn { transition: none; }
 	}
 </style>

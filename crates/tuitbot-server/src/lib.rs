@@ -244,6 +244,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                 .delete(routes::accounts::remove_role),
         )
         .route(
+            "/accounts/{id}/sync-profile",
+            post(routes::accounts::sync_profile),
+        )
+        .route(
             "/accounts/{id}",
             get(routes::accounts::get_account)
                 .patch(routes::accounts::update_account)

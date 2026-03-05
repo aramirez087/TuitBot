@@ -76,11 +76,11 @@
 	}
 
 	.canvas-main > :global(:first-child) {
-		padding-top: 4px;
+		padding-top: 12px;
 	}
 
 	.canvas-main {
-		padding: 0 20px 20px;
+		padding: 0 24px 24px;
 	}
 
 	.canvas-inspector {

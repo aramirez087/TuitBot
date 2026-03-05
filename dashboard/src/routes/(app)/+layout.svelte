@@ -4,7 +4,7 @@
 	import { loadStats as loadApprovalStats } from "$lib/stores/approval";
 	import { connected } from "$lib/stores/websocket";
 	import { checkForUpdate } from "$lib/stores/update";
-	import { initAccounts, fetchAccounts } from "$lib/stores/accounts";
+	import { initAccounts, fetchAccounts, syncCurrentProfile } from "$lib/stores/accounts";
 	import { onMount, onDestroy } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -54,7 +54,7 @@
 		initAccounts();
 		loadApprovalStats();
 		checkForUpdate();
-		fetchAccounts();
+		fetchAccounts().then(() => syncCurrentProfile());
 		window.addEventListener('keydown', handleKeydown);
 	});
 

@@ -99,6 +99,7 @@ impl XApiClient for MockXApiClient {
             id: "me".into(),
             username: "testuser".into(),
             name: "Test".into(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -126,6 +127,7 @@ impl XApiClient for MockXApiClient {
             id: format!("uid_{u}"),
             username: u.into(),
             name: "Test".into(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }

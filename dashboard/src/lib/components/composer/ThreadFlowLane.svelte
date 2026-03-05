@@ -6,15 +6,16 @@
 
 	let {
 		blocks: externalBlocks = [],
+		avatarUrl = null,
 		onchange,
 		onvalidchange
 	}: {
 		blocks?: ThreadBlock[];
+		avatarUrl?: string | null;
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
 	} = $props();
 
-	// ── State ──────────────────────────────────────────────
 	// Stable fallback for when parent has no blocks yet
 	const fallbackBlocks = threadOps.createDefaultBlocks();
 	// Single source of truth: always derived from parent prop
@@ -27,7 +28,6 @@
 	let mergeError = $state<string | null>(null);
 	let assistingBlockId = $state<string | null>(null);
 
-	// ── Derived ────────────────────────────────────────────
 	const sortedBlocks = $derived(threadOps.sortBlocks(blocks));
 
 	const validationErrors = $derived.by(() => {
@@ -43,7 +43,6 @@
 
 	$effect(() => { onvalidchange(canSubmit); });
 
-	// ── Helpers ────────────────────────────────────────────
 	function focusBlock(blockId: string, cursorPos?: number) {
 		requestAnimationFrame(() => {
 			const textarea = document.querySelector(
@@ -58,7 +57,6 @@
 		});
 	}
 
-	// ── Block operations ───────────────────────────────────
 	function addBlock() {
 		const result = threadOps.addBlock(blocks);
 		onchange(result.blocks);
@@ -119,19 +117,21 @@
 		announce(`Post split. Now ${result.blocks.length} posts in thread.`);
 	}
 
+	function showMergeMediaError(a: string[], b: string[]) {
+		const total = a.length + b.length;
+		if (total > 4) {
+			mergeError = `Cannot merge: combined media would exceed 4 (has ${total}).`;
+			setTimeout(() => { mergeError = null; }, 3000);
+		}
+	}
+
 	function mergeWithNext(id: string) {
 		const result = threadOps.mergeWithNext(blocks, id);
 		if (!result) {
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
 			if (idx >= sorted.length - 1 || sorted.length <= 2) return;
-			const current = sorted[idx];
-			const next = sorted[idx + 1];
-			const combinedMedia = [...current.media_paths, ...next.media_paths];
-			if (combinedMedia.length > 4) {
-				mergeError = `Cannot merge: combined media would exceed 4 (has ${combinedMedia.length}).`;
-				setTimeout(() => { mergeError = null; }, 3000);
-			}
+			showMergeMediaError(sorted[idx].media_paths, sorted[idx + 1].media_paths);
 			return;
 		}
 		onchange(result.blocks);
@@ -145,13 +145,7 @@
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
 			if (idx <= 0 || sorted.length <= 2) return;
-			const prev = sorted[idx - 1];
-			const current = sorted[idx];
-			const combinedMedia = [...prev.media_paths, ...current.media_paths];
-			if (combinedMedia.length > 4) {
-				mergeError = `Cannot merge: combined media would exceed 4 (has ${combinedMedia.length}).`;
-				setTimeout(() => { mergeError = null; }, 3000);
-			}
+			showMergeMediaError(sorted[idx - 1].media_paths, sorted[idx].media_paths);
 			return;
 		}
 		onchange(result.blocks);
@@ -159,7 +153,6 @@
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
-	// ── Drag-and-drop ──────────────────────────────────────
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
 		if (e.dataTransfer) {
@@ -201,7 +194,6 @@
 		dropTargetBlockId = null;
 	}
 
-	// ── Keyboard handling ──────────────────────────────────
 	function handleCardKeydown(e: KeyboardEvent, blockId: string) {
 		// Cmd+Enter: split at cursor (fast path for thread mode)
 		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'Enter') {
@@ -258,29 +250,17 @@
 			return;
 		}
 
-		// Cmd+D: duplicate
 		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'd') {
-			e.preventDefault();
-			duplicateBlock(blockId);
-			return;
+			e.preventDefault(); duplicateBlock(blockId); return;
 		}
-
-		// Cmd+Shift+S: split (secondary shortcut)
 		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
-			e.preventDefault();
-			splitBlock(blockId);
-			return;
+			e.preventDefault(); splitBlock(blockId); return;
 		}
-
-		// Cmd+Shift+M: merge with next
 		if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
-			e.preventDefault();
-			mergeWithNext(blockId);
-			return;
+			e.preventDefault(); mergeWithNext(blockId); return;
 		}
 	}
 
-	// ── Exported API (matches ThreadComposer contract) ────
 	export function getBlocks(): ThreadBlock[] { return [...blocks]; }
 
 	export function setBlocks(newBlocks: ThreadBlock[]) {
@@ -350,6 +330,7 @@
 			{block}
 			index={i}
 			total={sortedBlocks.length}
+			{avatarUrl}
 			focused={focusedBlockId === block.id}
 			assisting={assistingBlockId === block.id}
 			dragging={draggingBlockId === block.id}
@@ -386,16 +367,17 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0;
-		padding-left: 32px;
+		padding-left: 40px;
 	}
 
 	.lane-spine {
 		position: absolute;
-		left: 15px;
-		top: 24px;
-		bottom: 24px;
-		width: 1px;
-		background: color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
+		left: 19px;
+		top: 32px;
+		bottom: 32px;
+		width: 2px;
+		background: color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		border-radius: 1px;
 		pointer-events: none;
 	}
 

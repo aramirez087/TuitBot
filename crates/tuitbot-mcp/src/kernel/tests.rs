@@ -33,6 +33,7 @@ impl SocialReadProvider for MockProvider {
             id: "mock_user_id".to_string(),
             username: username.to_string(),
             name: "Mock User".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -143,6 +144,7 @@ impl SocialReadProvider for MockProvider {
             id: "me_123".to_string(),
             username: "testuser".to_string(),
             name: "Test User".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -158,6 +160,7 @@ impl SocialReadProvider for MockProvider {
                 id: "f1".to_string(),
                 username: "follower1".to_string(),
                 name: "Follower One".to_string(),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: types::UsersMeta {
@@ -178,6 +181,7 @@ impl SocialReadProvider for MockProvider {
                 id: "fw1".to_string(),
                 username: "following1".to_string(),
                 name: "Following One".to_string(),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: types::UsersMeta {
@@ -192,6 +196,7 @@ impl SocialReadProvider for MockProvider {
             id: user_id.to_string(),
             username: "iduser".to_string(),
             name: "ID User".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -256,6 +261,7 @@ impl SocialReadProvider for MockProvider {
                 id: id.to_string(),
                 username: format!("user_{id}"),
                 name: format!("User {id}"),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             })
             .collect::<Vec<_>>();
@@ -280,6 +286,7 @@ impl SocialReadProvider for MockProvider {
                 id: "lu1".to_string(),
                 username: "liker1".to_string(),
                 name: "Liker One".to_string(),
+                profile_image_url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: types::UsersMeta {

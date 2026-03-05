@@ -772,6 +772,8 @@ export interface Account {
 	label: string;
 	x_username: string | null;
 	x_user_id: string | null;
+	x_display_name: string | null;
+	x_avatar_url: string | null;
 	config_overrides: string | null;
 	status: string;
 	created_at: string;
@@ -833,7 +835,9 @@ export const api = {
 				body: JSON.stringify(data)
 			}),
 		delete: (id: string) =>
-			request<{ status: string }>(`/api/accounts/${id}`, { method: 'DELETE' })
+			request<{ status: string }>(`/api/accounts/${id}`, { method: 'DELETE' }),
+		syncProfile: (id: string) =>
+			request<Account>(`/api/accounts/${id}/sync-profile`, { method: 'POST' })
 	},
 
 	analytics: {

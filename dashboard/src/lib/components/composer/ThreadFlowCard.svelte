@@ -9,6 +9,7 @@
 		block,
 		index,
 		total,
+		avatarUrl = null,
 		focused = false,
 		assisting = false,
 		dragging = false,
@@ -31,6 +32,7 @@
 		block: ThreadBlock;
 		index: number;
 		total: number;
+		avatarUrl?: string | null;
 		focused?: boolean;
 		assisting?: boolean;
 		dragging?: boolean;
@@ -103,7 +105,11 @@
 	ondrop={(e) => ondrop(e)}
 >
 	<div class="card-writing-area" class:focused class:over-limit={overLimit}>
-		<div class="spine-dot" class:focused class:over-limit={overLimit} aria-hidden="true"></div>
+		{#if avatarUrl}
+			<img src={avatarUrl} alt="" class="spine-avatar" class:focused class:over-limit={overLimit} />
+		{:else}
+			<div class="spine-dot" class:focused class:over-limit={overLimit} aria-hidden="true"></div>
+		{/if}
 		<textarea
 			bind:this={textareaEl}
 			class="flow-textarea"
@@ -187,24 +193,35 @@
 
 	.card-writing-area {
 		position: relative;
-		transition: border-color 0.15s ease;
+		background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		border-radius: 10px;
+		padding: 12px 16px;
+		transition: border-color 0.15s ease, background 0.15s ease;
 	}
 
-	/* Drop target visual */
+	.card-writing-area.focused {
+		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+		background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+	}
+
+	.card-writing-area.over-limit {
+		border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+	}
+
 	.flow-card.drop-target .card-writing-area {
-		background: color-mix(in srgb, var(--color-accent) 3%, transparent);
-		border-radius: 4px;
+		background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+		border-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
 	}
 
-	/* Spine dot marker — aligned to the lane spine */
 	.spine-dot {
 		position: absolute;
-		left: -21px;
-		top: 14px;
-		width: 8px;
-		height: 8px;
+		left: -27px;
+		top: 20px;
+		width: 12px;
+		height: 12px;
 		border-radius: 50%;
-		border: 1.5px solid var(--color-border-subtle);
+		border: 2px solid var(--color-border-subtle);
 		background: var(--color-surface);
 		transition: border-color 0.15s ease, background 0.15s ease;
 		z-index: 1;
@@ -220,19 +237,40 @@
 		background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
 	}
 
+	.spine-avatar {
+		position: absolute;
+		left: -33px;
+		top: 14px;
+		width: 24px;
+		height: 24px;
+		border-radius: 50%;
+		object-fit: cover;
+		border: 2px solid var(--color-border-subtle);
+		z-index: 1;
+		transition: border-color 0.15s ease;
+	}
+
+	.spine-avatar.focused {
+		border-color: var(--color-accent);
+	}
+
+	.spine-avatar.over-limit {
+		border-color: var(--color-danger);
+	}
+
 	.flow-textarea {
 		width: 100%;
-		padding: 10px 0;
+		padding: 4px 0;
 		border: none;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 15px;
+		font-size: 16px;
 		font-family: var(--font-sans);
-		line-height: 1.4;
+		line-height: 1.55;
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
-		min-height: 60px;
+		min-height: 72px;
 		overflow: hidden;
 	}
 
@@ -327,10 +365,9 @@
 		color: var(--color-danger);
 	}
 
-	/* Between-block "+" affordance */
 	.between-zone {
 		position: relative;
-		height: 12px;
+		height: 16px;
 		display: flex;
 		align-items: center;
 		justify-content: flex-start;
@@ -389,6 +426,7 @@
 		.flow-card,
 		.card-writing-area,
 		.spine-dot,
+		.spine-avatar,
 		.sep-tools,
 		.between-plus,
 		.sep-handle,
@@ -398,30 +436,8 @@
 	}
 
 	@media (max-width: 640px) {
-		.flow-textarea {
-			font-size: 16px;
-		}
-
-		/* Hide spine dot on mobile, show thin accent bar instead */
-		.spine-dot {
-			display: none;
-		}
-
-		.card-writing-area {
-			border-left: 1px solid transparent;
-			padding-left: 12px;
-		}
-
-		.card-writing-area.focused {
-			border-left-color: var(--color-accent);
-		}
-
-		.card-writing-area.over-limit {
-			border-left-color: var(--color-danger);
-		}
-
-		.between-plus {
-			margin-left: 0;
-		}
+		.spine-dot, .spine-avatar { display: none; }
+		.card-writing-area { padding: 10px 12px; }
+		.between-plus { margin-left: 0; }
 	}
 </style>

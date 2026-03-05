@@ -49,3 +49,16 @@ export function initAccounts(): void {
 	const id = getPersistedAccountId();
 	setAccountId(id);
 }
+
+/** Sync X profile data (avatar, display name) for the current account. */
+export async function syncCurrentProfile(): Promise<void> {
+	const id = getPersistedAccountId();
+	try {
+		const updated = await api.accounts.syncProfile(id);
+		accounts.update((list) =>
+			list.map((a) => (a.id === updated.id ? updated : a))
+		);
+	} catch {
+		// Non-critical — profile data is optional.
+	}
+}

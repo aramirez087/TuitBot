@@ -28,6 +28,7 @@ impl SocialReadProvider for BenchMockProvider {
             id: "u1".to_string(),
             username: u.to_string(),
             name: "Mock".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -68,6 +69,7 @@ impl SocialReadProvider for BenchMockProvider {
             id: uid.to_string(),
             username: "bench".to_string(),
             name: "Bench".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -76,6 +78,7 @@ impl SocialReadProvider for BenchMockProvider {
             id: "me".to_string(),
             username: "bench".to_string(),
             name: "Bench".to_string(),
+            profile_image_url: None,
             public_metrics: UserMetrics::default(),
         })
     }
