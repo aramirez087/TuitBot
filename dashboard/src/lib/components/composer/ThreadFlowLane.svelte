@@ -7,13 +7,19 @@
 	let {
 		blocks: externalBlocks = [],
 		avatarUrl = null,
+		displayName = null,
+		handle = null,
 		onchange,
-		onvalidchange
+		onvalidchange,
+		onfocusindexchange
 	}: {
 		blocks?: ThreadBlock[];
 		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
+		onfocusindexchange?: (index: number) => void;
 	} = $props();
 
 	// Stable fallback for when parent has no blocks yet
@@ -42,6 +48,13 @@
 	);
 
 	$effect(() => { onvalidchange(canSubmit); });
+
+	// Report focused block index to parent for toolbar display
+	$effect(() => {
+		if (!focusedBlockId || !onfocusindexchange) return;
+		const idx = sortedBlocks.findIndex((b) => b.id === focusedBlockId);
+		if (idx >= 0) onfocusindexchange(idx);
+	});
 
 	function focusBlock(blockId: string, cursorPos?: number) {
 		requestAnimationFrame(() => {
@@ -331,6 +344,8 @@
 			index={i}
 			total={sortedBlocks.length}
 			{avatarUrl}
+			{displayName}
+			{handle}
 			focused={focusedBlockId === block.id}
 			assisting={assistingBlockId === block.id}
 			dragging={draggingBlockId === block.id}
@@ -375,8 +390,8 @@
 		left: 19px;
 		top: 32px;
 		bottom: 32px;
-		width: 2px;
-		background: color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		width: 1px;
+		background: color-mix(in srgb, var(--color-border-subtle) 30%, transparent);
 		border-radius: 1px;
 		pointer-events: none;
 	}

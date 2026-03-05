@@ -222,9 +222,8 @@ export function validateThread(
 	const sorted = sortBlocks(blocks);
 	const nonEmpty = blocks.filter((b) => b.text.trim().length > 0);
 
-	if (nonEmpty.length < 2) {
-		errors.push('Thread needs at least 2 posts with content.');
-	}
+	// "Needs 2 posts" is an incomplete state, not an error — the disabled
+	// submit button already communicates this. Only surface actionable errors.
 
 	for (const block of blocks) {
 		if (tweetWeightedLen(block.text) > MAX_TWEET_CHARS) {
@@ -237,5 +236,5 @@ export function validateThread(
 		}
 	}
 
-	return { valid: errors.length === 0, errors };
+	return { valid: nonEmpty.length >= 2 && errors.length === 0, errors };
 }

@@ -1,17 +1,22 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { Image, X, Film } from 'lucide-svelte';
+	import MediaAltBadge from './composer/MediaAltBadge.svelte';
 
 	let {
 		mediaPaths = [],
 		onmediachange,
 		maxMedia = 4,
-		disabled = false
+		disabled = false,
+		altTexts = {},
+		onaltchange
 	}: {
 		mediaPaths: string[];
 		onmediachange: (paths: string[]) => void;
 		maxMedia?: number;
 		disabled?: boolean;
+		altTexts?: Record<string, string>;
+		onaltchange?: (path: string, altText: string) => void;
 	} = $props();
 
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
@@ -155,6 +160,12 @@
 					>
 						<X size={12} />
 					</button>
+					{#if onaltchange && !isVideo(path)}
+						<MediaAltBadge
+							altText={altTexts[path] ?? ''}
+							onchange={(alt) => onaltchange(path, alt)}
+						/>
+					{/if}
 				</div>
 			{/each}
 		</div>

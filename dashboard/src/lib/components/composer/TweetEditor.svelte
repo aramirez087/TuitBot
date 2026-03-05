@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
-	import { X, Image, Film } from 'lucide-svelte';
+	import { X, Film } from 'lucide-svelte';
+	import MediaAltBadge from './MediaAltBadge.svelte';
 
 	export interface AttachedMedia {
 		path: string;
 		file?: File;
 		previewUrl: string;
 		mediaType: string;
+		altText?: string;
 	}
 
 	let {
@@ -153,32 +155,28 @@
 				<button class="remove-media-btn" onclick={() => removeMedia(i)} aria-label="Remove media">
 					<X size={14} />
 				</button>
+				{#if media.mediaType !== 'video/mp4'}
+					<MediaAltBadge
+						altText={media.altText ?? ''}
+						onchange={(alt) => {
+							onmediachange(attachedMedia.map((m, j) => j === i ? { ...m, altText: alt } : m));
+						}}
+					/>
+				{/if}
 			</div>
 		{/each}
 	</div>
 {/if}
 
-{#if canAttachMore}
-	<div class="media-attach-section">
-		<button
-			class="attach-icon-btn"
-			onclick={() => fileInput?.click()}
-			disabled={uploading}
-			title="Attach media (JPEG, PNG, WebP, GIF, MP4)"
-			aria-label={uploading ? 'Uploading media' : 'Attach media'}
-		>
-			<Image size={16} />
-		</button>
-		<input
-			bind:this={fileInput}
-			type="file"
-			accept={ACCEPTED_TYPES}
-			multiple
-			class="hidden-file-input"
-			onchange={handleFileSelect}
-		/>
-	</div>
-{/if}
+<!-- File input kept for triggerFileSelect() called from toolbar -->
+<input
+	bind:this={fileInput}
+	type="file"
+	accept={ACCEPTED_TYPES}
+	multiple
+	class="hidden-file-input"
+	onchange={handleFileSelect}
+/>
 
 <style>
 	.tweet-compose {
@@ -311,38 +309,6 @@
 		background: rgba(0, 0, 0, 0.85);
 	}
 
-	.media-attach-section {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-top: 8px;
-	}
-
-	.attach-icon-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 36px;
-		height: 36px;
-		border: 1px dashed transparent;
-		border-radius: 8px;
-		background: transparent;
-		color: var(--color-text-muted);
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.attach-icon-btn:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
-		border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
-		color: var(--color-accent);
-	}
-
-	.attach-icon-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
 	.hidden-file-input {
 		display: none;
 	}
@@ -352,16 +318,10 @@
 			width: 32px;
 			height: 32px;
 		}
-
-		.attach-icon-btn {
-			min-width: 44px;
-			min-height: 44px;
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.remove-media-btn,
-		.attach-icon-btn {
+		.remove-media-btn {
 			transition: none;
 		}
 	}

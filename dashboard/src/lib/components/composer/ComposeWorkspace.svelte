@@ -23,9 +23,14 @@
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
-	import ComposerShortcutBar from '../home/ComposerShortcutBar.svelte';
+	import ComposerToolbar from './ComposerToolbar.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
 	import { persistGet, persistSet } from '$lib/stores/persistence';
+	import {
+		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
+		readAutoSave, restoreMedia, wasNavigationExit,
+		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS
+	} from '$lib/utils/composerAutosave';
 	import type { AttachedMedia } from './TweetEditor.svelte';
 
 	let {
@@ -79,18 +84,17 @@
 	let undoMessage = $state('Content replaced.');
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// Auto-save
-	const AUTOSAVE_KEY = 'tuitbot:compose:draft';
-	const AUTOSAVE_ACTIVE_KEY = 'tuitbot:compose:active';
-	const AUTOSAVE_DEBOUNCE_MS = 500;
-	const AUTOSAVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+	// Auto-save (logic extracted to composerAutosave.ts)
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 	let initialized = $state(false);
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
 		mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number;
-		tweetMedia?: Array<{ path: string; mediaType: string }>;
+		tweetMedia?: Array<{ path: string; mediaType: string; altText?: string }>;
 	} | null>(null);
+
+	// Toolbar state
+	let focusedThreadIndex = $state(0);
 
 	// ── Derived ────────────────────────────────────────────
 	const targetDate = $derived(prefillDate ?? new Date());
@@ -173,14 +177,12 @@
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		autoSaveTimer = null;
 		if (!initialized) return;
-		const tweetMedia = attachedMedia.map((m) => ({ path: m.path, mediaType: m.mediaType }));
-		const payload = { mode, tweetText, blocks: threadBlocks, tweetMedia, timestamp: Date.now() };
-		try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
+		saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
 	}
 
 	function handleBeforeUnload() {
 		flushAutoSave();
-		try { sessionStorage.setItem(AUTOSAVE_ACTIVE_KEY, '1'); } catch { /* unavailable */ }
+		markSessionActive();
 	}
 
 	onMount(async () => {
@@ -218,7 +220,7 @@
 		if (undoTimer) clearTimeout(undoTimer);
 		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
 		// Signal that this was a normal teardown (navigation), not a crash
-		try { sessionStorage.setItem(AUTOSAVE_ACTIVE_KEY, '1'); } catch { /* unavailable */ }
+		markSessionActive();
 	});
 
 	function handleComposeEvent() {
@@ -245,14 +247,12 @@
 	function autoSave() {
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 		autoSaveTimer = setTimeout(() => {
-			const tweetMedia = attachedMedia.map((m) => ({ path: m.path, mediaType: m.mediaType }));
-			const payload = { mode, tweetText, blocks: threadBlocks, tweetMedia, timestamp: Date.now() };
-			try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
+			saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
 		}, AUTOSAVE_DEBOUNCE_MS);
 	}
 
 	function clearAutoSave() {
-		localStorage.removeItem(AUTOSAVE_KEY);
+		clearAutoSaveStorage();
 		if (autoSaveTimer) clearTimeout(autoSaveTimer);
 	}
 
@@ -260,44 +260,20 @@
 		mode = (data.mode as 'tweet' | 'thread') ?? 'tweet';
 		tweetText = data.tweetText || '';
 		threadBlocks = data.blocks || [];
-		if (data.tweetMedia?.length) {
-			attachedMedia = data.tweetMedia.map((m) => ({
-				path: m.path,
-				previewUrl: api.media.fileUrl(m.path),
-				mediaType: m.mediaType
-			}));
-		}
+		attachedMedia = restoreMedia(data.tweetMedia);
 	}
 
 	function checkRecovery() {
-		try {
-			const raw = localStorage.getItem(AUTOSAVE_KEY);
-			if (!raw) return;
-			const data = JSON.parse(raw);
-			if (Date.now() - data.timestamp > AUTOSAVE_TTL_MS) {
-				localStorage.removeItem(AUTOSAVE_KEY);
-				return;
-			}
-			const hasContent = data.tweetText?.trim() || data.blocks?.some((b: ThreadBlock) => b.text.trim()) || data.tweetMedia?.length > 0;
-			if (!hasContent) return;
+		const data = readAutoSave();
+		if (!data) return;
 
-			// Distinguish navigation (sessionStorage flag) from crash recovery
-			let wasNavigation = false;
-			try {
-				wasNavigation = sessionStorage.getItem(AUTOSAVE_ACTIVE_KEY) === '1';
-				sessionStorage.removeItem(AUTOSAVE_ACTIVE_KEY);
-			} catch { /* sessionStorage unavailable — treat as crash */ }
-
-			if (wasNavigation) {
-				// Silent restore — user just navigated away and back
-				restoreDraft(data);
-				initialized = true;
-			} else {
-				// Genuine crash recovery — show banner
-				recoveryData = data;
-				showRecovery = true;
-			}
-		} catch { localStorage.removeItem(AUTOSAVE_KEY); }
+		if (wasNavigationExit()) {
+			restoreDraft(data);
+			initialized = true;
+		} else {
+			recoveryData = data;
+			showRecovery = true;
+		}
 	}
 
 	function recoverDraft() {
@@ -322,7 +298,7 @@
 				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
 			});
 			clearAutoSave();
-			try { sessionStorage.removeItem(AUTOSAVE_ACTIVE_KEY); } catch { /* unavailable */ }
+			clearSessionFlag();
 			onsubmit(data);
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount
@@ -699,10 +675,18 @@
 				ondismiss={dismissTips}
 			/>
 		{:else}
-			<ComposerShortcutBar
+			<ComposerToolbar
 				{mode}
-				onopenpalette={() => { paletteOpen = true; }}
+				charCount={tweetChars}
+				charMax={TWEET_MAX}
+				blockIndex={focusedThreadIndex}
+				blockCount={threadBlockCount}
+				canAttachMedia={mode === 'tweet'}
+				uploading={false}
+				onattachmedia={() => { tweetEditorRef?.triggerFileSelect(); }}
+				onaiassist={handleInlineAssist}
 				onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
+				onopenpalette={() => { paletteOpen = true; }}
 			/>
 		{/if}
 		{@render composeBody()}

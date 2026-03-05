@@ -4,12 +4,15 @@
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
 	import { GripVertical, Merge, Trash2, Plus } from 'lucide-svelte';
 	import MediaSlot from '../MediaSlot.svelte';
+	import ThreadCardHeader from './ThreadCardHeader.svelte';
 
 	let {
 		block,
 		index,
 		total,
 		avatarUrl = null,
+		displayName = null,
+		handle = null,
 		focused = false,
 		assisting = false,
 		dragging = false,
@@ -33,6 +36,8 @@
 		index: number;
 		total: number;
 		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 		focused?: boolean;
 		assisting?: boolean;
 		dragging?: boolean;
@@ -105,11 +110,15 @@
 	ondrop={(e) => ondrop(e)}
 >
 	<div class="card-writing-area" class:focused class:over-limit={overLimit}>
-		{#if avatarUrl}
-			<img src={avatarUrl} alt="" class="spine-avatar" class:focused class:over-limit={overLimit} />
-		{:else}
-			<div class="spine-dot" class:focused class:over-limit={overLimit} aria-hidden="true"></div>
-		{/if}
+		<ThreadCardHeader
+			{avatarUrl}
+			{displayName}
+			{handle}
+			{index}
+			{total}
+			{focused}
+			overLimit={overLimit}
+		/>
 		<textarea
 			bind:this={textareaEl}
 			class="flow-textarea"
@@ -125,6 +134,7 @@
 	</div>
 
 	<div class="card-separator" class:last={isLast}>
+		<span class="sep-post-number">#{index + 1}</span>
 		{#if charCount > 240 || overLimit}
 			<span class="sep-char-count" class:over-limit={overLimit} class:warning>
 				{charCount}/{MAX_TWEET_CHARS}
@@ -214,50 +224,6 @@
 		border-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
 	}
 
-	.spine-dot {
-		position: absolute;
-		left: -27px;
-		top: 20px;
-		width: 12px;
-		height: 12px;
-		border-radius: 50%;
-		border: 2px solid var(--color-border-subtle);
-		background: var(--color-surface);
-		transition: border-color 0.15s ease, background 0.15s ease;
-		z-index: 1;
-	}
-
-	.spine-dot.focused {
-		border-color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 15%, var(--color-surface));
-	}
-
-	.spine-dot.over-limit {
-		border-color: var(--color-danger);
-		background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
-	}
-
-	.spine-avatar {
-		position: absolute;
-		left: -33px;
-		top: 14px;
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		object-fit: cover;
-		border: 2px solid var(--color-border-subtle);
-		z-index: 1;
-		transition: border-color 0.15s ease;
-	}
-
-	.spine-avatar.focused {
-		border-color: var(--color-accent);
-	}
-
-	.spine-avatar.over-limit {
-		border-color: var(--color-danger);
-	}
-
 	.flow-textarea {
 		width: 100%;
 		padding: 4px 0;
@@ -286,6 +252,13 @@
 		padding: 0;
 		margin: 0;
 		gap: 8px;
+	}
+
+	.sep-post-number {
+		font-size: 11px;
+		font-family: var(--font-mono);
+		color: var(--color-text-subtle);
+		opacity: 0.6;
 	}
 
 	.sep-char-count {
@@ -425,8 +398,6 @@
 	@media (prefers-reduced-motion: reduce) {
 		.flow-card,
 		.card-writing-area,
-		.spine-dot,
-		.spine-avatar,
 		.sep-tools,
 		.between-plus,
 		.sep-handle,
@@ -436,7 +407,6 @@
 	}
 
 	@media (max-width: 640px) {
-		.spine-dot, .spine-avatar { display: none; }
 		.card-writing-area { padding: 10px 12px; }
 		.between-plus { margin-left: 0; }
 	}

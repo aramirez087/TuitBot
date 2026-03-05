@@ -11,6 +11,7 @@
 		embedded = false,
 		onsubmit,
 		children,
+		toolbar,
 		inspector
 	}: {
 		canSubmit: boolean;
@@ -21,6 +22,7 @@
 		embedded?: boolean;
 		onsubmit: () => void;
 		children: Snippet;
+		toolbar?: Snippet;
 		inspector?: Snippet;
 	} = $props();
 </script>
@@ -31,6 +33,10 @@
 
 		{#if submitError}
 			<div class="error-msg" role="alert">{submitError}</div>
+		{/if}
+
+		{#if toolbar}
+			{@render toolbar()}
 		{/if}
 
 		{#if !embedded}
