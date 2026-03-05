@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Send } from 'lucide-svelte';
-	import type { Snippet } from 'svelte';
+	import { Send } from "lucide-svelte";
+	import type { Snippet } from "svelte";
 
 	let {
 		canSubmit,
@@ -12,7 +12,7 @@
 		onsubmit,
 		children,
 		toolbar,
-		inspector
+		inspector,
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
@@ -47,7 +47,11 @@
 					disabled={!canSubmit || submitting}
 				>
 					<Send size={14} />
-					{submitting ? 'Submitting...' : selectedTime ? 'Schedule' : 'Post now'}
+					{submitting
+						? "Submitting..."
+						: selectedTime
+							? "Schedule"
+							: "Post now"}
 				</button>
 			</div>
 		{/if}
@@ -79,6 +83,10 @@
 		min-height: 0;
 		min-width: 0;
 		overflow-y: auto;
+		max-width: 620px;
+		margin-left: auto;
+		margin-right: auto;
+		width: 100%;
 	}
 
 	.canvas-main > :global(:first-child) {
@@ -95,7 +103,11 @@
 		border-left: 1px solid var(--color-border-subtle);
 		overflow-y: auto;
 		padding: 12px 16px;
-		background: color-mix(in srgb, var(--color-base) 50%, var(--color-surface));
+		background: color-mix(
+			in srgb,
+			var(--color-base) 50%,
+			var(--color-surface)
+		);
 	}
 
 	.error-msg {

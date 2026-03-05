@@ -1,9 +1,15 @@
 <script lang="ts">
-	import { Image, Sparkles, MessageSquare, List, Search } from 'lucide-svelte';
-	import { formatCombo } from '$lib/utils/shortcuts';
+	import {
+		Image,
+		Sparkles,
+		MessageSquare,
+		List,
+		Search,
+	} from "lucide-svelte";
+	import { formatCombo } from "$lib/utils/shortcuts";
 
 	let {
-		mode = 'tweet',
+		mode = "tweet",
 		charCount = 0,
 		charMax = 280,
 		blockIndex = 0,
@@ -13,9 +19,9 @@
 		onattachmedia,
 		onaiassist,
 		onswitchmode,
-		onopenpalette
+		onopenpalette,
 	}: {
-		mode: 'tweet' | 'thread';
+		mode: "tweet" | "thread";
 		charCount: number;
 		charMax: number;
 		blockIndex: number;
@@ -28,91 +34,116 @@
 		onopenpalette: () => void;
 	} = $props();
 
-	const ModeIcon = $derived(mode === 'tweet' ? MessageSquare : List);
-	const modeLabel = $derived(mode === 'tweet' ? 'Tweet' : 'Thread');
-	const switchLabel = $derived(mode === 'tweet' ? 'Switch to thread' : 'Switch to tweet');
-	const showCharCount = $derived(mode === 'tweet' || charCount > 200);
+	const ModeIcon = $derived(mode === "tweet" ? MessageSquare : List);
+	const modeLabel = $derived(mode === "tweet" ? "Tweet" : "Thread");
+	const switchLabel = $derived(
+		mode === "tweet" ? "Switch to thread" : "Switch to tweet",
+	);
+	const showCharCount = $derived(mode === "tweet" || charCount > 200);
 	const charWarning = $derived(charCount > 260 && charCount <= charMax);
 	const charOver = $derived(charCount > charMax);
 </script>
 
-<div class="composer-toolbar" role="toolbar" aria-label="Composer actions">
-	<div class="toolbar-left">
-		<button
-			class="toolbar-btn"
-			onclick={onattachmedia}
-			disabled={!canAttachMedia || uploading}
-			title="Attach media"
-			aria-label={uploading ? 'Uploading media' : 'Attach media'}
-		>
-			<Image size={15} />
-		</button>
-
-		<button
-			class="toolbar-btn ai-btn"
-			onclick={onaiassist}
-			title="AI improve ({formatCombo('cmd+shift+j')})"
-			aria-label="AI improve selection or post"
-		>
-			<Sparkles size={15} />
-		</button>
-
-		<span class="toolbar-divider" aria-hidden="true"></span>
-
-		<button
-			class="mode-badge"
-			onclick={onswitchmode}
-			title={switchLabel}
-			aria-label={switchLabel}
-		>
-			<ModeIcon size={13} />
-			<span class="mode-label">{modeLabel}</span>
-		</button>
-	</div>
-
-	<div class="toolbar-right">
-		{#if showCharCount}
-			<span
-				class="char-badge"
-				class:warning={charWarning}
-				class:over={charOver}
-				aria-label="Character count: {charCount} of {charMax}"
+<div class="toolbar-anchor">
+	<div class="floating-toolbar" role="toolbar" aria-label="Composer actions">
+		<div class="toolbar-left">
+			<button
+				class="toolbar-btn"
+				onclick={onattachmedia}
+				disabled={!canAttachMedia || uploading}
+				title="Attach media"
+				aria-label={uploading ? "Uploading media" : "Attach media"}
 			>
-				{charCount}/{charMax}
-			</span>
-		{/if}
+				<Image size={15} />
+			</button>
 
-		{#if mode === 'thread'}
-			<span class="thread-position" aria-label="Post {blockIndex + 1} of {blockCount}">
-				#{blockIndex + 1}<span class="thread-total">/{blockCount}</span>
-			</span>
-		{/if}
+			<button
+				class="toolbar-btn ai-btn"
+				onclick={onaiassist}
+				title="AI improve ({formatCombo('cmd+shift+j')})"
+				aria-label="AI improve selection or post"
+			>
+				<Sparkles size={15} />
+			</button>
 
-		<button
-			class="palette-trigger"
-			onclick={onopenpalette}
-			aria-label="Command palette"
-		>
-			<Search size={12} />
-			<kbd>{formatCombo('cmd+k')}</kbd>
-			<span class="palette-label">All shortcuts</span>
-		</button>
+			<span class="toolbar-divider" aria-hidden="true"></span>
+
+			<button
+				class="mode-badge"
+				onclick={onswitchmode}
+				title={switchLabel}
+				aria-label={switchLabel}
+			>
+				<ModeIcon size={13} />
+				<span class="mode-label">{modeLabel}</span>
+			</button>
+		</div>
+
+		<div class="toolbar-right">
+			{#if showCharCount}
+				<span
+					class="char-badge"
+					class:warning={charWarning}
+					class:over={charOver}
+					aria-label="Character count: {charCount} of {charMax}"
+				>
+					{charCount}/{charMax}
+				</span>
+			{/if}
+
+			{#if mode === "thread"}
+				<span
+					class="thread-position"
+					aria-label="Post {blockIndex + 1} of {blockCount}"
+				>
+					#{blockIndex + 1}<span class="thread-total"
+						>/{blockCount}</span
+					>
+				</span>
+			{/if}
+
+			<button
+				class="palette-trigger"
+				onclick={onopenpalette}
+				aria-label="Command palette"
+			>
+				<Search size={12} />
+				<kbd>{formatCombo("cmd+k")}</kbd>
+				<span class="palette-label">All shortcuts</span>
+			</button>
+		</div>
 	</div>
 </div>
 
 <style>
-	.composer-toolbar {
+	.toolbar-anchor {
+		position: sticky;
+		bottom: 0;
+		display: flex;
+		justify-content: center;
+		padding: 8px 16px 12px;
+		pointer-events: none;
+		z-index: 5;
+	}
+
+	.floating-toolbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
-		padding: 6px 16px;
-		border-top: 1px solid color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
-		background: color-mix(in srgb, var(--color-accent) 2%, var(--color-surface));
-		flex-shrink: 0;
-		position: sticky;
-		bottom: 0;
-		z-index: 2;
+		padding: 6px 14px;
+		border-radius: 22px;
+		background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+		backdrop-filter: blur(16px) saturate(180%);
+		-webkit-backdrop-filter: blur(16px) saturate(180%);
+		border: 1px solid
+			color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		box-shadow:
+			0 4px 24px rgba(0, 0, 0, 0.15),
+			0 1px 4px rgba(0, 0, 0, 0.08);
+		pointer-events: auto;
+		width: 100%;
+		max-width: 520px;
 	}
 
 	.toolbar-left {
@@ -134,7 +165,7 @@
 		width: 32px;
 		height: 32px;
 		border: none;
-		border-radius: 6px;
+		border-radius: 50%;
 		background: transparent;
 		color: var(--color-text-muted);
 		cursor: pointer;
@@ -143,7 +174,7 @@
 	}
 
 	.toolbar-btn:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 		color: var(--color-accent);
 	}
 
@@ -154,13 +185,21 @@
 
 	.toolbar-btn.ai-btn:hover:not(:disabled) {
 		color: var(--color-warning, #d29922);
-		background: color-mix(in srgb, var(--color-warning, #d29922) 8%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--color-warning, #d29922) 10%,
+			transparent
+		);
 	}
 
 	.toolbar-divider {
 		width: 1px;
 		height: 16px;
-		background: color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--color-border-subtle) 50%,
+			transparent
+		);
 		margin: 0 4px;
 	}
 
@@ -169,7 +208,8 @@
 		align-items: center;
 		gap: 5px;
 		padding: 4px 10px;
-		border: 1px solid color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
+		border: 1px solid
+			color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
 		border-radius: 12px;
 		background: transparent;
 		color: var(--color-text-muted);
@@ -182,7 +222,7 @@
 	.mode-badge:hover {
 		border-color: var(--color-accent);
 		color: var(--color-accent);
-		background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
 	}
 
 	.mode-label {
@@ -245,7 +285,8 @@
 		font-size: 10px;
 		font-family: var(--font-mono);
 		font-weight: 500;
-		border: 1px solid color-mix(in srgb, var(--color-accent) 12%, transparent);
+		border: 1px solid
+			color-mix(in srgb, var(--color-accent) 12%, transparent);
 		line-height: 1.5;
 	}
 
@@ -264,6 +305,11 @@
 
 		.toolbar-right {
 			gap: 6px;
+		}
+
+		.floating-toolbar {
+			border-radius: 16px;
+			padding: 4px 10px;
 		}
 	}
 

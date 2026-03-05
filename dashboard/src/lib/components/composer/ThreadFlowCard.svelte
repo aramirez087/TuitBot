@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import type { ThreadBlock } from '$lib/api';
-	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
-	import { GripVertical, Merge, Trash2, Plus } from 'lucide-svelte';
-	import MediaSlot from '../MediaSlot.svelte';
-	import ThreadCardHeader from './ThreadCardHeader.svelte';
+	import { onMount } from "svelte";
+	import type { ThreadBlock } from "$lib/api";
+	import { tweetWeightedLen, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
+	import { GripVertical, Merge, Trash2, Plus } from "lucide-svelte";
+	import MediaSlot from "../MediaSlot.svelte";
 
 	let {
 		block,
@@ -30,7 +29,7 @@
 		ondragover,
 		ondragenter,
 		ondragleave,
-		ondrop
+		ondrop,
 	}: {
 		block: ThreadBlock;
 		index: number;
@@ -62,6 +61,7 @@
 	const overLimit = $derived(charCount > MAX_TWEET_CHARS);
 	const warning = $derived(charCount > 260 && !overLimit);
 	const isLast = $derived(index >= total - 1);
+	const isFirst = $derived(index === 0);
 
 	function handleKeydownGuarded(e: KeyboardEvent) {
 		if (e.isComposing) return;
@@ -69,8 +69,8 @@
 	}
 
 	function autoResize(el: HTMLTextAreaElement) {
-		el.style.height = 'auto';
-		el.style.height = el.scrollHeight + 'px';
+		el.style.height = "auto";
+		el.style.height = el.scrollHeight + "px";
 	}
 
 	function handleInput(e: Event) {
@@ -102,6 +102,7 @@
 	class:dragging
 	class:drop-target={dropTarget}
 	class:assisting
+	class:focused
 	data-block-id={block.id}
 	role="listitem"
 	ondragover={(e) => ondragover(e)}
@@ -109,86 +110,119 @@
 	ondragleave={(e) => ondragleave(e)}
 	ondrop={(e) => ondrop(e)}
 >
-	<div class="card-writing-area" class:focused class:over-limit={overLimit}>
-		<ThreadCardHeader
-			{avatarUrl}
-			{displayName}
-			{handle}
-			{index}
-			{total}
-			{focused}
-			overLimit={overLimit}
-		/>
-		<textarea
-			bind:this={textareaEl}
-			class="flow-textarea"
-			placeholder={index === 0 ? 'Start writing...' : 'Continue...'}
-			value={block.text}
-			oninput={handleInput}
-			onfocus={() => onfocus()}
-			onblur={() => onblur()}
-			onkeydown={handleKeydownGuarded}
-			aria-label={`Post ${index + 1} of ${total}`}
-		></textarea>
-		<MediaSlot mediaPaths={block.media_paths} onmediachange={(paths) => onmedia(paths)} />
-	</div>
-
-	<div class="card-separator" class:last={isLast}>
-		<span class="sep-post-number">#{index + 1}</span>
-		{#if charCount > 240 || overLimit}
-			<span class="sep-char-count" class:over-limit={overLimit} class:warning>
-				{charCount}/{MAX_TWEET_CHARS}
-			</span>
-		{/if}
-		<div class="sep-tools">
+	<!-- Gutter: avatar + spine -->
+	<div class="card-gutter">
+		{#if avatarUrl}
+			<img
+				src={avatarUrl}
+				alt=""
+				class="gutter-avatar"
+				class:over-limit={overLimit}
+			/>
+		{:else}
 			<div
-				class="sep-handle"
-				draggable="true"
-				role="button"
-				tabindex="-1"
-				title="Drag to reorder"
-				aria-label={`Reorder post ${index + 1}. Use Alt+Up or Alt+Down to move.`}
-				ondragstart={(e) => ondragstart(e)}
-				ondragend={() => ondragend()}
-			>
-				<GripVertical size={12} />
-			</div>
-			{#if total > 2}
-				<button
-					class="sep-action-btn"
-					onclick={() => onmerge()}
-					title="Merge with next ({'\u2318'}{'\u21e7'}M)"
-					aria-label={`Merge post ${index + 1} with post ${index + 2}`}
-				>
-					<Merge size={12} />
-				</button>
-				<button
-					class="sep-action-btn sep-remove"
-					onclick={() => onremove()}
-					title="Remove post"
-					aria-label={`Remove post ${index + 1}`}
-				>
-					<Trash2 size={12} />
-				</button>
-			{/if}
-		</div>
+				class="gutter-avatar-placeholder"
+				class:over-limit={overLimit}
+			></div>
+		{/if}
+		{#if !isLast}
+			<div class="gutter-spine"></div>
+		{/if}
 	</div>
 
-	<button
-		class="between-zone"
-		tabindex="-1"
-		aria-label={`Add post after post ${index + 1}`}
-		onclick={() => onaddafter()}
-	>
-		<span class="between-plus">
-			<Plus size={10} />
-		</span>
-	</button>
+	<!-- Main content area -->
+	<div class="card-body">
+		<div class="card-writing-area" class:over-limit={overLimit}>
+			<div class="card-meta">
+				{#if displayName}
+					<span class="meta-name">{displayName}</span>
+				{/if}
+				{#if handle}
+					<span class="meta-handle">@{handle}</span>
+				{/if}
+			</div>
+			<textarea
+				bind:this={textareaEl}
+				class="flow-textarea"
+				placeholder={isFirst ? "Start writing..." : "Continue..."}
+				value={block.text}
+				oninput={handleInput}
+				onfocus={() => onfocus()}
+				onblur={() => onblur()}
+				onkeydown={handleKeydownGuarded}
+				aria-label={`Post ${index + 1} of ${total}`}
+			></textarea>
+			<MediaSlot
+				mediaPaths={block.media_paths}
+				onmediachange={(paths) => onmedia(paths)}
+			/>
+		</div>
+
+		<!-- Separator row: character count + tools -->
+		<div class="card-separator" class:last={isLast}>
+			<span class="sep-post-number">#{index + 1}</span>
+			{#if charCount > 240 || overLimit}
+				<span
+					class="sep-char-count"
+					class:over-limit={overLimit}
+					class:warning
+				>
+					{charCount}/{MAX_TWEET_CHARS}
+				</span>
+			{/if}
+			<div class="sep-tools">
+				<div
+					class="sep-handle"
+					draggable="true"
+					role="button"
+					tabindex="-1"
+					title="Drag to reorder"
+					aria-label={`Reorder post ${index + 1}. Use Alt+Up or Alt+Down to move.`}
+					ondragstart={(e) => ondragstart(e)}
+					ondragend={() => ondragend()}
+				>
+					<GripVertical size={12} />
+				</div>
+				{#if total > 2}
+					<button
+						class="sep-action-btn"
+						onclick={() => onmerge()}
+						title="Merge with next ({'\u2318'}{'\u21e7'}M)"
+						aria-label={`Merge post ${index + 1} with post ${index + 2}`}
+					>
+						<Merge size={12} />
+					</button>
+					<button
+						class="sep-action-btn sep-remove"
+						onclick={() => onremove()}
+						title="Remove post"
+						aria-label={`Remove post ${index + 1}`}
+					>
+						<Trash2 size={12} />
+					</button>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Add post below zone -->
+		<button
+			class="add-post-zone"
+			tabindex="-1"
+			aria-label={`Add post after post ${index + 1}`}
+			onclick={() => onaddafter()}
+		>
+			<span class="add-post-icon"><Plus size={11} /></span>
+			<span class="add-post-label">Add post below</span>
+			<kbd class="add-post-kbd">⌘↩</kbd>
+		</button>
+	</div>
 </div>
 
 <style>
 	.flow-card {
 		position: relative;
+		display: flex;
+		gap: 12px;
 		transition: opacity 0.15s ease;
 	}
 
@@ -201,27 +235,122 @@
 		pointer-events: none;
 	}
 
-	.card-writing-area {
-		position: relative;
-		background: color-mix(in srgb, var(--color-surface) 60%, transparent);
-		border: 1px solid color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
-		border-radius: 10px;
-		padding: 12px 16px;
-		transition: border-color 0.15s ease, background 0.15s ease;
+	/* ── Gutter (avatar + spine) ────────────── */
+	.card-gutter {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		width: 36px;
+		flex-shrink: 0;
+		padding-top: 4px;
 	}
 
-	.card-writing-area.focused {
-		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-		background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+	.gutter-avatar {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
+		border: 2px solid transparent;
+		transition: border-color 0.15s ease;
+	}
+
+	.flow-card.focused .gutter-avatar {
+		border-color: var(--color-accent);
+	}
+
+	.gutter-avatar.over-limit {
+		border-color: var(--color-danger);
+	}
+
+	.gutter-avatar-placeholder {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		background: var(--color-surface-active);
+		border: 2px solid transparent;
+		flex-shrink: 0;
+		transition: border-color 0.15s ease;
+	}
+
+	.flow-card.focused .gutter-avatar-placeholder {
+		border-color: var(--color-accent);
+	}
+
+	.gutter-avatar-placeholder.over-limit {
+		border-color: var(--color-danger);
+	}
+
+	.gutter-spine {
+		flex: 1;
+		width: 2px;
+		margin-top: 4px;
+		background: color-mix(
+			in srgb,
+			var(--color-border-subtle) 35%,
+			transparent
+		);
+		border-radius: 1px;
+		min-height: 16px;
+		transition: background 0.15s ease;
+	}
+
+	.flow-card.focused .gutter-spine {
+		background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+	}
+
+	/* ── Card body ──────────────────────────── */
+	.card-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.card-writing-area {
+		position: relative;
+		padding: 4px 0;
+		transition: border-color 0.15s ease;
 	}
 
 	.card-writing-area.over-limit {
-		border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+		border-left: 2px solid var(--color-danger);
+		padding-left: 12px;
 	}
 
 	.flow-card.drop-target .card-writing-area {
-		background: color-mix(in srgb, var(--color-accent) 5%, transparent);
-		border-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+		background: color-mix(in srgb, var(--color-accent) 4%, transparent);
+		border-radius: 8px;
+		padding-left: 12px;
+		padding-right: 12px;
+	}
+
+	.card-meta {
+		display: flex;
+		align-items: baseline;
+		gap: 5px;
+		min-width: 0;
+		margin-bottom: 2px;
+	}
+
+	.meta-name {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 160px;
+		line-height: 1;
+	}
+
+	.meta-handle {
+		font-size: 12px;
+		font-family: var(--font-mono);
+		color: var(--color-text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 120px;
+		line-height: 1;
 	}
 
 	.flow-textarea {
@@ -236,15 +365,16 @@
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
-		min-height: 72px;
+		min-height: 56px;
 		overflow: hidden;
 	}
 
 	.flow-textarea::placeholder {
 		color: var(--color-text-subtle);
-		opacity: 0.6;
+		opacity: 0.5;
 	}
 
+	/* ── Separator ──────────────────────────── */
 	.card-separator {
 		display: flex;
 		align-items: center;
@@ -301,7 +431,9 @@
 		background: none;
 		padding: 0;
 		border-radius: 3px;
-		transition: color 0.15s ease, background 0.15s ease;
+		transition:
+			color 0.15s ease,
+			background 0.15s ease;
 	}
 
 	.sep-handle:hover {
@@ -338,47 +470,81 @@
 		color: var(--color-danger);
 	}
 
-	.between-zone {
-		position: relative;
-		height: 16px;
+	/* ── Add Post Zone ──────────────────────── */
+	.add-post-zone {
 		display: flex;
 		align-items: center;
-		justify-content: flex-start;
+		gap: 6px;
+		width: 100%;
+		padding: 6px 0;
+		border: none;
+		background: none;
 		cursor: pointer;
+		opacity: 0;
+		transition: opacity 0.15s ease;
 	}
 
-	.between-plus {
-		opacity: 0;
-		width: 14px;
-		height: 14px;
+	.flow-card:hover .add-post-zone,
+	.flow-card.focused .add-post-zone {
+		opacity: 1;
+	}
+
+	.add-post-icon {
+		width: 18px;
+		height: 18px;
 		border-radius: 50%;
-		border: 1px solid var(--color-border-subtle);
+		border: 1.5px solid
+			color-mix(in srgb, var(--color-border-subtle) 60%, transparent);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: var(--color-text-subtle);
-		background: var(--color-surface);
-		transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-		margin-left: -25px;
-		z-index: 2;
+		transition: all 0.15s ease;
+		flex-shrink: 0;
 	}
 
-	.between-zone:hover .between-plus,
-	.between-zone:focus-within .between-plus {
-		opacity: 1;
-	}
-
-	.between-zone:hover .between-plus {
+	.add-post-zone:hover .add-post-icon {
 		border-color: var(--color-accent);
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+	}
+
+	.add-post-label {
+		font-size: 12px;
+		color: var(--color-text-subtle);
+		transition: color 0.15s ease;
+	}
+
+	.add-post-zone:hover .add-post-label {
 		color: var(--color-accent);
 	}
 
-	/* Touch: always show separator tools */
+	.add-post-kbd {
+		font-size: 10px;
+		font-family: var(--font-mono);
+		padding: 1px 5px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		color: var(--color-accent);
+		border: 1px solid
+			color-mix(in srgb, var(--color-accent) 12%, transparent);
+		opacity: 0;
+		transition: opacity 0.15s ease;
+	}
+
+	.add-post-zone:hover .add-post-kbd {
+		opacity: 1;
+	}
+
+	/* Touch: always show tools */
 	@media (hover: none) {
 		.sep-tools {
 			opacity: 1;
 		}
-		.between-plus {
+		.add-post-zone {
+			opacity: 1;
+		}
+		.add-post-kbd {
 			opacity: 1;
 		}
 	}
@@ -390,7 +556,7 @@
 			min-height: 44px;
 		}
 
-		.between-zone {
+		.add-post-zone {
 			min-height: 44px;
 		}
 	}
@@ -399,7 +565,13 @@
 		.flow-card,
 		.card-writing-area,
 		.sep-tools,
-		.between-plus,
+		.add-post-zone,
+		.add-post-icon,
+		.add-post-label,
+		.add-post-kbd,
+		.gutter-avatar,
+		.gutter-avatar-placeholder,
+		.gutter-spine,
 		.sep-handle,
 		.sep-action-btn {
 			transition: none;
@@ -407,7 +579,22 @@
 	}
 
 	@media (max-width: 640px) {
-		.card-writing-area { padding: 10px 12px; }
-		.between-plus { margin-left: 0; }
+		.card-gutter {
+			width: 28px;
+		}
+
+		.gutter-avatar,
+		.gutter-avatar-placeholder {
+			width: 28px;
+			height: 28px;
+		}
+
+		.flow-card {
+			gap: 8px;
+		}
+
+		.card-meta {
+			display: none;
+		}
 	}
 </style>
