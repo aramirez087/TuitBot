@@ -169,6 +169,20 @@
 		statusAnnouncement = mode === 'tweet' ? 'Switched to tweet mode' : 'Switched to thread mode';
 	});
 
+	function flushAutoSave() {
+		if (autoSaveTimer) clearTimeout(autoSaveTimer);
+		autoSaveTimer = null;
+		if (!initialized) return;
+		const tweetMedia = attachedMedia.map((m) => ({ path: m.path, mediaType: m.mediaType }));
+		const payload = { mode, tweetText, blocks: threadBlocks, tweetMedia, timestamp: Date.now() };
+		try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload)); } catch { /* quota */ }
+	}
+
+	function handleBeforeUnload() {
+		flushAutoSave();
+		try { sessionStorage.setItem(AUTOSAVE_ACTIVE_KEY, '1'); } catch { /* unavailable */ }
+	}
+
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
 		checkRecovery();
@@ -189,6 +203,8 @@
 		previewMode = false;
 		inspectorOpen = loadInspectorState();
 
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
 		if (embedded) {
 			const tipsDismissed = await persistGet('home_tips_dismissed', false);
 			tipsVisible = !tipsDismissed;
@@ -197,11 +213,8 @@
 	});
 
 	onDestroy(() => {
-		for (const m of attachedMedia) URL.revokeObjectURL(m.previewUrl);
-		if (undoSnapshot?.media) {
-			for (const m of undoSnapshot.media) URL.revokeObjectURL(m.previewUrl);
-		}
-		if (autoSaveTimer) clearTimeout(autoSaveTimer);
+		window.removeEventListener('beforeunload', handleBeforeUnload);
+		flushAutoSave();
 		if (undoTimer) clearTimeout(undoTimer);
 		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
 		// Signal that this was a normal teardown (navigation), not a crash

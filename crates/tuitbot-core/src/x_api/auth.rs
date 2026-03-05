@@ -43,6 +43,7 @@ pub struct Tokens {
     /// When the access token expires (UTC).
     pub expires_at: DateTime<Utc>,
     /// Granted OAuth scopes.
+    #[serde(default)]
     pub scopes: Vec<String>,
 }
 

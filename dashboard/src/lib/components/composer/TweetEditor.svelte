@@ -83,7 +83,7 @@
 					{
 						path: result.path,
 						file,
-						previewUrl: URL.createObjectURL(file),
+						previewUrl: api.media.fileUrl(result.path),
 						mediaType: result.media_type
 					}
 				]);
@@ -98,8 +98,6 @@
 	}
 
 	function removeMedia(index: number) {
-		const removed = attachedMedia[index];
-		if (removed) URL.revokeObjectURL(removed.previewUrl);
 		onmediachange(attachedMedia.filter((_, i) => i !== index));
 	}
 

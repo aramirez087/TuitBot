@@ -50,6 +50,10 @@ const AUTH_EXEMPT_PATHS: &[&str] = &[
     "/api/auth/status",
     "/connectors/google-drive/callback",
     "/api/connectors/google-drive/callback",
+    // Media file serving uses path-traversal protection (`is_safe_media_path`)
+    // and must be exempt so <img>/<video> src attributes work without auth headers.
+    "/media/file",
+    "/api/media/file",
 ];
 
 /// Axum middleware that enforces multi-strategy authentication.
