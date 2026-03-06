@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { Users, User, RefreshCw, Pencil, Trash2, Plus, Check, X, Loader2, ShieldCheck, AlertCircle } from 'lucide-svelte';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
+	import CredentialCard from './CredentialCard.svelte';
 	import { api } from '$lib/api';
 	import type { AccountAuthStatus } from '$lib/api';
 	import {
@@ -375,24 +376,17 @@
 		{/if}
 	</div>
 
-	<!-- Credential status detail -->
+	<!-- Credential management -->
 	{#if !statusesLoading && activeAccounts.length > 0}
 		<div class="cred-detail">
-			<h3 class="cred-title">Credential Status</h3>
+			<h3 class="cred-title">Credential Management</h3>
 			<div class="cred-grid">
 				{#each activeAccounts as account (account.id)}
-					{@const status = authStatuses.get(account.id)}
-					<div class="cred-row">
-						<span class="cred-account">{account.x_username ? `@${account.x_username}` : account.label}</span>
-						<div class="cred-badges">
-							<span class="cred-badge" class:linked={status?.oauth_linked && !status?.oauth_expired} class:expired={status?.oauth_expired} class:none={!status?.oauth_linked}>
-								OAuth: {status?.oauth_linked ? (status?.oauth_expired ? 'expired' : 'linked') : 'none'}
-							</span>
-							<span class="cred-badge" class:linked={status?.scraper_linked} class:none={!status?.scraper_linked}>
-								Scraper: {status?.scraper_linked ? 'linked' : 'none'}
-							</span>
-						</div>
-					</div>
+					<CredentialCard
+						{account}
+						status={authStatuses.get(account.id)}
+						onStatusChange={loadAuthStatuses}
+					/>
 				{/each}
 			</div>
 		</div>
@@ -754,7 +748,7 @@
 		margin: 6px 0 0;
 	}
 
-	/* Credential detail */
+	/* Credential management */
 	.cred-detail {
 		margin-top: 20px;
 		padding-top: 16px;
@@ -774,44 +768,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-	}
-
-	.cred-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 6px 10px;
-		background: var(--color-base);
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 5px;
-		font-size: 12px;
-	}
-
-	.cred-account {
-		color: var(--color-text);
-		font-weight: 500;
-	}
-
-	.cred-badges {
-		display: flex;
-		gap: 8px;
-	}
-
-	.cred-badge {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-	}
-
-	.cred-badge.linked {
-		color: var(--color-success);
-	}
-
-	.cred-badge.expired {
-		color: var(--color-warning);
-	}
-
-	.cred-badge.none {
-		color: var(--color-text-subtle);
 	}
 
 	/* Spinner animation */

@@ -112,7 +112,48 @@ export const api = {
 		syncProfile: (id: string) =>
 			request<Account>(`/api/accounts/${id}/sync-profile`, { method: 'POST' }),
 		authStatus: (id: string) =>
-			request<AccountAuthStatus>(`/api/accounts/${id}/x-auth/status`)
+			request<AccountAuthStatus>(`/api/accounts/${id}/x-auth/status`),
+		startAuth: (id: string) =>
+			request<{ authorization_url: string; state: string }>(
+				`/api/accounts/${id}/x-auth/start`,
+				{ method: 'POST' }
+			),
+		completeAuth: (id: string, code: string, state: string) =>
+			request<{ status: string; token_path: string }>(
+				`/api/accounts/${id}/x-auth/callback`,
+				{
+					method: 'POST',
+					body: JSON.stringify({ code, state })
+				}
+			),
+		unlinkOAuth: (id: string) =>
+			request<{ deleted: boolean }>(`/api/accounts/${id}/x-auth/tokens`, {
+				method: 'DELETE'
+			}),
+		scraperSession: {
+			get: (id: string) =>
+				request<{ exists: boolean; username?: string; created_at?: string }>(
+					'/api/settings/scraper-session',
+					{ headers: { 'X-Account-Id': id } }
+				),
+			import: (
+				id: string,
+				data: { auth_token: string; ct0: string; username?: string }
+			) =>
+				request<{ status: string; username?: string; created_at?: string }>(
+					'/api/settings/scraper-session',
+					{
+						method: 'POST',
+						body: JSON.stringify(data),
+						headers: { 'X-Account-Id': id }
+					}
+				),
+			delete: (id: string) =>
+				request<{ deleted: boolean }>('/api/settings/scraper-session', {
+					method: 'DELETE',
+					headers: { 'X-Account-Id': id }
+				})
+		}
 	},
 
 	analytics: {

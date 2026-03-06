@@ -3,9 +3,10 @@
 //! Provides endpoints for initiating, completing, and checking the status
 //! of X API OAuth credential linking for individual accounts.
 //!
-//! - `POST /api/accounts/{id}/x-auth/start`    — start OAuth PKCE flow
-//! - `POST /api/accounts/{id}/x-auth/callback`  — exchange code for tokens
-//! - `GET  /api/accounts/{id}/x-auth/status`    — check credential status
+//! - `POST   /api/accounts/{id}/x-auth/start`    — start OAuth PKCE flow
+//! - `POST   /api/accounts/{id}/x-auth/callback`  — exchange code for tokens
+//! - `GET    /api/accounts/{id}/x-auth/status`    — check credential status
+//! - `DELETE /api/accounts/{id}/x-auth/tokens`    — unlink OAuth tokens
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -165,6 +166,45 @@ pub async fn complete_link(
     Ok(Json(json!({
         "status": "linked",
         "token_path": token_path.display().to_string(),
+    })))
+}
+
+/// `DELETE /api/accounts/{id}/x-auth/tokens` — unlink OAuth tokens.
+///
+/// Deletes the token file for the specified account and evicts any cached
+/// `TokenManager`, effectively disconnecting the OAuth credential.
+pub async fn unlink(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutate(&ctx)?;
+
+    // Validate account exists.
+    accounts::get_account(&state.db, &id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("account not found: {id}")))?;
+
+    let token_path = account_token_path(&state.data_dir, &id);
+
+    let deleted = if token_path.exists() {
+        std::fs::remove_file(&token_path)
+            .map_err(|e| ApiError::Internal(format!("failed to delete tokens: {e}")))?;
+        true
+    } else {
+        false
+    };
+
+    // Evict cached TokenManager regardless.
+    {
+        let mut managers = state.token_managers.lock().await;
+        managers.remove(&id);
+    }
+
+    tracing::info!(account_id = %id, deleted, "OAuth tokens unlinked");
+
+    Ok(Json(json!({
+        "deleted": deleted,
     })))
 }
 

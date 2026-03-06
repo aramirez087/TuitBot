@@ -267,6 +267,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(routes::x_auth::link_status),
         )
         .route(
+            "/accounts/{id}/x-auth/tokens",
+            delete(routes::x_auth::unlink),
+        )
+        .route(
             "/accounts/{id}",
             get(routes::accounts::get_account)
                 .patch(routes::accounts::update_account)
