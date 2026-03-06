@@ -25,7 +25,8 @@
 
 	function addAccount() {
 		open = false;
-		goto('/settings');
+		goto('/settings#accounts');
+		setTimeout(() => document.getElementById('accounts')?.scrollIntoView({ behavior: 'smooth' }), 100);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {

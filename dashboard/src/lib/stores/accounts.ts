@@ -103,3 +103,38 @@ export async function syncCurrentProfile(): Promise<void> {
 		// Non-critical — profile data is optional.
 	}
 }
+
+/** Create a new account, add it to the store, and switch to it. */
+export async function createAccount(label: string): Promise<Account> {
+	const account = await api.accounts.create(label);
+	await fetchAccounts();
+	switchAccount(account.id);
+	return account;
+}
+
+/** Rename an account and update the store in-place. */
+export async function renameAccount(id: string, label: string): Promise<Account> {
+	const updated = await api.accounts.update(id, { label });
+	accounts.update((list) =>
+		list.map((a) => (a.id === updated.id ? updated : a))
+	);
+	return updated;
+}
+
+/** Archive (delete) an account and refresh the store. Falls back to default if needed. */
+export async function archiveAccount(id: string): Promise<void> {
+	await api.accounts.delete(id);
+	await fetchAccounts();
+	if (getPersistedAccountId() === id) {
+		switchAccount(DEFAULT_ACCOUNT_ID);
+	}
+}
+
+/** Sync X profile for a specific account by ID. */
+export async function syncAccountProfile(id: string): Promise<Account> {
+	const updated = await api.accounts.syncProfile(id);
+	accounts.update((list) =>
+		list.map((a) => (a.id === updated.id ? updated : a))
+	);
+	return updated;
+}

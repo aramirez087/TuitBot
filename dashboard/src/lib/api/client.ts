@@ -43,7 +43,8 @@ import type {
 	McpTelemetryEntry,
 	LinkResponse,
 	ConnectorStatusResponse,
-	DisconnectResponse
+	DisconnectResponse,
+	AccountAuthStatus
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -109,7 +110,9 @@ export const api = {
 		delete: (id: string) =>
 			request<{ status: string }>(`/api/accounts/${id}`, { method: 'DELETE' }),
 		syncProfile: (id: string) =>
-			request<Account>(`/api/accounts/${id}/sync-profile`, { method: 'POST' })
+			request<Account>(`/api/accounts/${id}/sync-profile`, { method: 'POST' }),
+		authStatus: (id: string) =>
+			request<AccountAuthStatus>(`/api/accounts/${id}/x-auth/status`)
 	},
 
 	analytics: {

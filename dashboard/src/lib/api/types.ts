@@ -679,3 +679,11 @@ export interface Account {
 	created_at: string;
 	updated_at: string;
 }
+
+export interface AccountAuthStatus {
+	oauth_linked: boolean;
+	oauth_expired: boolean;
+	oauth_expires_at: string | null;
+	scraper_linked: boolean;
+	has_credentials: boolean;
+}

@@ -12,7 +12,8 @@
 		Database,
 		FolderOpen,
 		Wifi,
-		AlertTriangle
+		AlertTriangle,
+		Users
 	} from 'lucide-svelte';
 	import {
 		loading,
@@ -27,6 +28,7 @@
 	} from '$lib/stores/settings';
 	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
+	import AccountsSection from './AccountsSection.svelte';
 	import WorkspaceSection from './WorkspaceSection.svelte';
 	import BusinessProfileSection from './BusinessProfileSection.svelte';
 	import ContentPersonaSection from './ContentPersonaSection.svelte';
@@ -45,6 +47,7 @@
 	// --- Section nav ---
 
 	const sections = [
+		{ id: 'accounts', label: 'Accounts', icon: Users },
 		{ id: 'workspace', label: 'Workspace', icon: LayoutDashboard },
 		{ id: 'business', label: 'Business', icon: Briefcase },
 		{ id: 'persona', label: 'Persona', icon: MessageCircle },
@@ -184,6 +187,7 @@
 			</div>
 
 			<div class="sections">
+				<AccountsSection />
 				<WorkspaceSection />
 				<BusinessProfileSection />
 				<ContentPersonaSection />
