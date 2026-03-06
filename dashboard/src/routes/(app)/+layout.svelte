@@ -4,7 +4,7 @@
 	import { loadStats as loadApprovalStats } from "$lib/stores/approval";
 	import { connected } from "$lib/stores/websocket";
 	import { checkForUpdate } from "$lib/stores/update";
-	import { initAccounts, syncCurrentProfile, bootstrapState } from "$lib/stores/accounts";
+	import { initAccounts, syncCurrentProfile, bootstrapState, ACCOUNT_SWITCHED_EVENT } from "$lib/stores/accounts";
 	import { onMount, onDestroy } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -50,17 +50,23 @@
 		}
 	}
 
+	function onAccountSwitched() {
+		loadApprovalStats();
+	}
+
 	onMount(async () => {
 		await initAccounts();
 		syncCurrentProfile();
 		loadApprovalStats();
 		checkForUpdate();
 		window.addEventListener('keydown', handleKeydown);
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, onAccountSwitched);
 	});
 
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('keydown', handleKeydown);
+			window.removeEventListener(ACCOUNT_SWITCHED_EVENT, onAccountSwitched);
 		}
 	});
 </script>
