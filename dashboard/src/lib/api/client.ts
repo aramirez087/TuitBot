@@ -1,4 +1,4 @@
-import { request, uploadFile, BASE_URL } from './http';
+import { request, uploadFile, BASE_URL, getAuthMode } from './http';
 import type {
 	HealthResponse,
 	RuntimeStatus,
@@ -243,7 +243,9 @@ export const api = {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(data),
-				credentials: 'include'
+				// Only include credentials for same-origin or cookie auth.
+				// Cross-origin + credentials + wildcard CORS origin is blocked by browsers.
+				...((!BASE_URL || getAuthMode() === 'cookie') ? { credentials: 'include' as RequestCredentials } : {})
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({ error: res.statusText }));

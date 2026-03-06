@@ -2,7 +2,8 @@
 	import { AlertTriangle, Loader2 } from 'lucide-svelte';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 	import { api } from '$lib/api';
-	import { clearSession } from '$lib/stores/auth';
+	import { clearSession, authMode as authModeStore } from '$lib/stores/auth';
+	import { get } from 'svelte/store';
 	import { resetStores } from '$lib/stores/settings';
 	import { disconnectWs } from '$lib/stores/websocket';
 	import { goto } from '$app/navigation';
@@ -19,8 +20,16 @@
 		resetting = true;
 		errorMsg = '';
 		try {
+			const wasTauri = get(authModeStore) === 'tauri';
 			await api.settings.factoryReset(confirmationText);
 			clearSession();
+			// Bearer auth (Tauri/dev) survives factory reset — the api_token
+			// file is preserved. Restoring the mode prevents the onboarding
+			// from showing the passphrase claim step that only applies to
+			// cookie-based web sessions.
+			if (wasTauri) {
+				authModeStore.set('tauri');
+			}
 			resetStores();
 			disconnectWs();
 			try {
