@@ -10,6 +10,7 @@ use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tuitbot_core::config::{effective_config, validate_override_keys, Config};
 use tuitbot_core::storage::accounts::{self, UpdateAccountParams};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
@@ -46,6 +47,9 @@ pub struct CreateAccountRequest {
 }
 
 /// `POST /api/accounts` — create a new account (admin only).
+///
+/// Sets `token_path` to `accounts/{id}/tokens.json` so each account
+/// has an isolated credential file.
 pub async fn create_account(
     State(state): State<Arc<AppState>>,
     ctx: AccountContext,
@@ -54,6 +58,18 @@ pub async fn create_account(
     require_mutate(&ctx)?;
     let id = uuid::Uuid::new_v4().to_string();
     accounts::create_account(&state.db, &id, &body.label).await?;
+
+    // Set token_path for credential isolation.
+    let token_path = format!("accounts/{}/tokens.json", id);
+    accounts::update_account(
+        &state.db,
+        &id,
+        UpdateAccountParams {
+            token_path: Some(&token_path),
+            ..Default::default()
+        },
+    )
+    .await?;
 
     let account = accounts::get_account(&state.db, &id)
         .await?
@@ -69,6 +85,10 @@ pub struct UpdateAccountRequest {
 }
 
 /// `PATCH /api/accounts/{id}` — update account config/label (admin only).
+///
+/// When `config_overrides` is provided, validates that:
+/// 1. The JSON only contains account-scoped keys.
+/// 2. Merging with the base config produces a valid effective config.
 pub async fn update_account(
     State(state): State<Arc<AppState>>,
     ctx: AccountContext,
@@ -81,6 +101,22 @@ pub async fn update_account(
     accounts::get_account(&state.db, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("account not found: {id}")))?;
+
+    // Validate config_overrides if provided.
+    if let Some(ref overrides_str) = body.config_overrides {
+        let trimmed = overrides_str.trim();
+        if !trimmed.is_empty() && trimmed != "{}" {
+            let overrides: serde_json::Value = serde_json::from_str(trimmed)
+                .map_err(|e| ApiError::BadRequest(format!("invalid config_overrides JSON: {e}")))?;
+
+            validate_override_keys(&overrides).map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+            // Validate the effective config by merging with base.
+            let base_config = load_base_config(&state.config_path)?;
+            effective_config(&base_config, trimmed)
+                .map_err(|e| ApiError::BadRequest(format!("invalid effective config: {e}")))?;
+        }
+    }
 
     accounts::update_account(
         &state.db,
@@ -98,6 +134,19 @@ pub async fn update_account(
         .ok_or_else(|| ApiError::Internal("account disappeared".to_string()))?;
 
     Ok(Json(json!(updated)))
+}
+
+/// Load and parse the base config from the TOML file.
+fn load_base_config(config_path: &std::path::Path) -> Result<Config, ApiError> {
+    let contents = std::fs::read_to_string(config_path).map_err(|e| {
+        ApiError::BadRequest(format!(
+            "could not read config file {}: {e}",
+            config_path.display()
+        ))
+    })?;
+
+    toml::from_str(&contents)
+        .map_err(|e| ApiError::BadRequest(format!("failed to parse config: {e}")))
 }
 
 /// `DELETE /api/accounts/{id}` — archive an account (admin only).

@@ -6,8 +6,10 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
+use tuitbot_core::storage::accounts::account_scraper_session_path;
 use tuitbot_core::x_api::ScraperSession;
 
+use crate::account::AccountContext;
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -26,8 +28,9 @@ pub struct ImportSessionRequest {
 /// `GET /api/settings/scraper-session` — check if a browser session exists.
 pub async fn get_scraper_session(
     State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
 ) -> Result<Json<Value>, ApiError> {
-    let session_path = state.data_dir.join("scraper_session.json");
+    let session_path = account_scraper_session_path(&state.data_dir, &ctx.account_id);
     let session = ScraperSession::load(&session_path)
         .map_err(|e| ApiError::Internal(format!("failed to read session: {e}")))?;
 
@@ -46,6 +49,7 @@ pub async fn get_scraper_session(
 /// `POST /api/settings/scraper-session` — import browser cookies.
 pub async fn import_scraper_session(
     State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
     Json(body): Json<ImportSessionRequest>,
 ) -> Result<Json<Value>, ApiError> {
     if body.auth_token.trim().is_empty() || body.ct0.trim().is_empty() {
@@ -61,12 +65,19 @@ pub async fn import_scraper_session(
         created_at: Some(chrono::Utc::now().to_rfc3339()),
     };
 
-    let session_path = state.data_dir.join("scraper_session.json");
+    let session_path = account_scraper_session_path(&state.data_dir, &ctx.account_id);
+
+    // Ensure the parent directory exists for non-default accounts.
+    if let Some(parent) = session_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| ApiError::Internal(format!("failed to create session directory: {e}")))?;
+    }
+
     session
         .save(&session_path)
         .map_err(|e| ApiError::Internal(format!("failed to save session: {e}")))?;
 
-    tracing::info!("Browser session imported successfully");
+    tracing::info!(account_id = %ctx.account_id, "Browser session imported successfully");
 
     Ok(Json(serde_json::json!({
         "status": "imported",
@@ -78,8 +89,9 @@ pub async fn import_scraper_session(
 /// `DELETE /api/settings/scraper-session` — remove the browser session.
 pub async fn delete_scraper_session(
     State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
 ) -> Result<Json<Value>, ApiError> {
-    let session_path = state.data_dir.join("scraper_session.json");
+    let session_path = account_scraper_session_path(&state.data_dir, &ctx.account_id);
     let deleted = ScraperSession::delete(&session_path)
         .map_err(|e| ApiError::Internal(format!("failed to delete session: {e}")))?;
 

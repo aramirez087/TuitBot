@@ -408,6 +408,13 @@ export interface TuitbotConfig {
 	};
 }
 
+/** Response from GET /api/settings when a non-default account is active. */
+export interface EffectiveSettingsResponse {
+	config: TuitbotConfig;
+	/** Top-level keys that are overridden by this account (empty for default). */
+	_overrides: string[];
+}
+
 export interface ConfigStatus {
 	configured: boolean;
 	claimed: boolean;

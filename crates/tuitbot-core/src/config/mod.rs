@@ -10,6 +10,7 @@
 mod defaults;
 mod enrichment;
 mod env_overrides;
+pub mod merge;
 mod types;
 mod types_policy;
 mod validation;
@@ -20,6 +21,10 @@ mod tests;
 mod tests_backend;
 
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
+pub use merge::{
+    effective_config, merge_overrides, split_patch_by_scope, validate_override_keys,
+    EffectiveConfigResult, ACCOUNT_SCOPED_KEYS,
+};
 pub use types::{
     AuthConfig, BusinessProfile, ConnectorConfig, ContentSourceEntry, ContentSourcesConfig,
     DeploymentCapabilities, DeploymentMode, GoogleDriveConnectorConfig, IntervalsConfig,
