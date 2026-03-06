@@ -22,7 +22,7 @@ use tuitbot_core::automation::WatchtowerLoop;
 use tuitbot_core::net::local_ip;
 use tuitbot_server::auth;
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 /// Tuitbot API server — serves the dashboard REST API.
 #[derive(Parser)]
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
     let passphrase_hash_mtime = passphrase::passphrase_hash_mtime(db_dir);
 
     // Create the broadcast channel for WebSocket events.
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let data_dir = db_dir.to_path_buf();
 

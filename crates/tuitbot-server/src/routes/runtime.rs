@@ -10,7 +10,7 @@ use tuitbot_core::automation::Runtime;
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::ws::WsEvent;
+use crate::ws::{AccountWsEvent, WsEvent};
 
 /// `GET /api/runtime/status` — check if the automation runtime is running.
 ///
@@ -63,9 +63,12 @@ pub async fn start(
     runtimes.insert(ctx.account_id.clone(), Runtime::new());
 
     // Publish runtime status event.
-    let _ = state.event_tx.send(WsEvent::RuntimeStatus {
-        running: true,
-        active_loops: vec![],
+    let _ = state.event_tx.send(AccountWsEvent {
+        account_id: ctx.account_id.clone(),
+        event: WsEvent::RuntimeStatus {
+            running: true,
+            active_loops: vec![],
+        },
     });
 
     Ok(Json(json!({"status": "started"})))
@@ -84,9 +87,12 @@ pub async fn stop(
             rt.shutdown().await;
 
             // Publish runtime status event.
-            let _ = state.event_tx.send(WsEvent::RuntimeStatus {
-                running: false,
-                active_loops: vec![],
+            let _ = state.event_tx.send(AccountWsEvent {
+                account_id: ctx.account_id.clone(),
+                event: WsEvent::RuntimeStatus {
+                    running: false,
+                    active_loops: vec![],
+                },
             });
 
             Ok(Json(json!({"status": "stopped"})))

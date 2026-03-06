@@ -1,11 +1,17 @@
 <script lang="ts">
 	import { accounts, currentAccountId, switchAccount, type Account } from "$lib/stores/accounts";
-	import { ChevronDown, User } from "lucide-svelte";
+	import { goto } from "$app/navigation";
+	import { ChevronDown, User, Plus } from "lucide-svelte";
 
+	let { collapsed = false }: { collapsed?: boolean } = $props();
 	let open = $state(false);
 
 	const current = $derived(
 		$accounts.find((a: Account) => a.id === $currentAccountId)
+	);
+
+	const displayLabel = $derived(
+		current?.x_username ? `@${current.x_username}` : current?.label ?? 'Default'
 	);
 
 	function toggle() {
@@ -17,6 +23,11 @@
 		open = false;
 	}
 
+	function addAccount() {
+		open = false;
+		goto('/settings');
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === "Escape") {
 			open = false;
@@ -26,43 +37,70 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if $accounts.length > 1}
-	<div class="account-switcher">
-		<button class="account-trigger" onclick={toggle}>
-			<User size={14} />
-			<span class="account-label">
-				{current?.x_username ? `@${current.x_username}` : current?.label ?? 'Default'}
-			</span>
-			<ChevronDown size={12} />
-		</button>
-
-		{#if open}
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="account-backdrop" onclick={() => (open = false)}></div>
-			<div class="account-dropdown">
-				{#each $accounts as account (account.id)}
-					<button
-						class="account-option"
-						class:active={account.id === $currentAccountId}
-						onclick={() => select(account.id)}
-					>
-						<User size={14} />
-						<span>
-							{account.x_username ? `@${account.x_username}` : account.label}
-						</span>
-					</button>
-				{/each}
-			</div>
+<div class="account-switcher" class:collapsed>
+	<button
+		class="account-trigger"
+		onclick={toggle}
+		title={collapsed ? displayLabel : undefined}
+	>
+		{#if current?.x_avatar_url}
+			<img
+				class="account-avatar"
+				src={current.x_avatar_url}
+				alt={displayLabel}
+			/>
+		{:else}
+			<User size={collapsed ? 16 : 14} />
 		{/if}
-	</div>
-{/if}
+		{#if !collapsed}
+			<span class="account-label">{displayLabel}</span>
+			<ChevronDown size={12} />
+		{/if}
+	</button>
+
+	{#if open}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="account-backdrop" onclick={() => (open = false)}></div>
+		<div class="account-dropdown">
+			{#each $accounts as account (account.id)}
+				<button
+					class="account-option"
+					class:active={account.id === $currentAccountId}
+					onclick={() => select(account.id)}
+				>
+					{#if account.x_avatar_url}
+						<img
+							class="account-avatar"
+							src={account.x_avatar_url}
+							alt={account.x_username ?? account.label}
+						/>
+					{:else}
+						<User size={14} />
+					{/if}
+					<span>
+						{account.x_username ? `@${account.x_username}` : account.label}
+					</span>
+				</button>
+			{/each}
+			<div class="dropdown-divider"></div>
+			<button class="account-option add-account" onclick={addAccount}>
+				<Plus size={14} />
+				<span>Add Account</span>
+			</button>
+		</div>
+	{/if}
+</div>
 
 <style>
 	.account-switcher {
 		position: relative;
 		padding: 0 8px;
 		margin-bottom: 4px;
+	}
+
+	.account-switcher.collapsed {
+		padding: 0 4px;
 	}
 
 	.account-trigger {
@@ -81,9 +119,22 @@
 		transition: background-color 0.15s ease, border-color 0.15s ease;
 	}
 
+	.collapsed .account-trigger {
+		justify-content: center;
+		padding: 6px;
+	}
+
 	.account-trigger:hover {
 		background-color: var(--color-surface-hover);
 		border-color: var(--color-border);
+	}
+
+	.account-avatar {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		object-fit: cover;
+		flex-shrink: 0;
 	}
 
 	.account-label {
@@ -103,8 +154,8 @@
 	.account-dropdown {
 		position: absolute;
 		top: 100%;
-		left: 8px;
-		right: 8px;
+		left: 0;
+		right: 0;
 		margin-top: 4px;
 		padding: 4px;
 		background: var(--color-surface);
@@ -112,6 +163,7 @@
 		border-radius: 6px;
 		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 		z-index: 100;
+		min-width: 180px;
 	}
 
 	.account-option {
@@ -138,5 +190,15 @@
 	.account-option.active {
 		background-color: var(--color-surface-active);
 		color: var(--color-text);
+	}
+
+	.account-option.add-account {
+		color: var(--color-accent);
+	}
+
+	.dropdown-divider {
+		height: 1px;
+		margin: 4px 6px;
+		background: var(--color-border-subtle);
 	}
 </style>

@@ -4,6 +4,7 @@
 	import { api } from '$lib/api';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	interface DiscoveredTweet {
 		id: string;
@@ -97,6 +98,9 @@
 	onMount(() => {
 		loadFeed();
 		loadKeywords();
+		const handler = () => { loadFeed(); loadKeywords(); };
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 </script>
 

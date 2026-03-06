@@ -25,6 +25,7 @@
 		loadStrategy,
 		refreshReport
 	} from '$lib/stores/strategy';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let refreshing = $state(false);
 
@@ -36,6 +37,9 @@
 
 	onMount(() => {
 		loadStrategy();
+		const handler = () => loadStrategy();
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	const totalOutput = $derived(

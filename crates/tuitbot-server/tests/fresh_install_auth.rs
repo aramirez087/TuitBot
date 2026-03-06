@@ -15,7 +15,7 @@ use tuitbot_core::auth::passphrase;
 use tuitbot_core::storage;
 
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 const TEST_TOKEN: &str = "test-token-abc123";
 
@@ -35,7 +35,7 @@ fn valid_config_body() -> serde_json::Value {
 /// Create a test router with an isolated temp directory for data_dir and config_path.
 async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,
@@ -260,7 +260,7 @@ async fn init_with_claim_produces_valid_session() {
 
     // Use a shared DB pool so session persists across requests.
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,
@@ -345,7 +345,7 @@ async fn login_detects_out_of_band_passphrase_reset() {
     let initial_mtime = passphrase::passphrase_hash_mtime(dir.path());
 
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,
@@ -411,7 +411,7 @@ async fn login_detects_new_passphrase_file() {
 
     // Start with no passphrase (unclaimed).
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,

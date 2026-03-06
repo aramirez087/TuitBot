@@ -17,6 +17,7 @@
 		error,
 		loadAll
 	} from '$lib/stores/observability';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	function formatCost(val: number): string {
 		return '$' + val.toFixed(2);
@@ -33,7 +34,12 @@
 		return `${days}d ago`;
 	}
 
-	onMount(loadAll);
+	onMount(() => {
+		loadAll();
+		const handler = () => loadAll();
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+	});
 </script>
 
 <svelte:head>

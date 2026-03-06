@@ -5,6 +5,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let drafts = $state<ScheduledContentItem[]>([]);
 	let loading = $state(true);
@@ -112,7 +113,12 @@
 		editContent = d.content;
 	}
 
-	onMount(loadDrafts);
+	onMount(() => {
+		loadDrafts();
+		const handler = () => loadDrafts();
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+	});
 </script>
 
 <svelte:head>

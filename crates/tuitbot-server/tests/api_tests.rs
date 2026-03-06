@@ -10,7 +10,7 @@ use tower::ServiceExt;
 use tuitbot_core::storage;
 
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 /// The test API token used across all tests.
 const TEST_TOKEN: &str = "test-token-abc123";
@@ -18,7 +18,7 @@ const TEST_TOKEN: &str = "test-token-abc123";
 /// Create the test router backed by an in-memory SQLite database.
 async fn test_router() -> axum::Router {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,
@@ -239,7 +239,7 @@ async fn approval_reject_not_found() {
 #[tokio::test]
 async fn approval_stats_returns_counts() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -290,7 +290,7 @@ async fn approval_stats_returns_counts() {
 #[tokio::test]
 async fn approval_list_with_status_filter() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -351,7 +351,7 @@ async fn approval_list_with_status_filter() {
 #[tokio::test]
 async fn approval_edit_content() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -410,7 +410,7 @@ async fn approval_edit_not_found() {
 #[tokio::test]
 async fn approval_edit_empty_content() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -555,7 +555,7 @@ async fn targets_returns_array() {
 #[tokio::test]
 async fn add_and_list_target() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -602,7 +602,7 @@ async fn add_and_list_target() {
 #[tokio::test]
 async fn add_duplicate_target_fails() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -650,7 +650,7 @@ async fn add_duplicate_target_fails() {
 #[tokio::test]
 async fn remove_target_works() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -718,7 +718,7 @@ async fn runtime_status_initially_stopped() {
 #[tokio::test]
 async fn runtime_start_and_stop() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -777,7 +777,7 @@ async fn runtime_start_and_stop() {
 #[tokio::test]
 async fn settings_get_returns_json() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a minimal config file.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -817,7 +817,7 @@ async fn settings_get_returns_json() {
 #[tokio::test]
 async fn settings_patch_round_trips() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let dir = tempfile::tempdir().expect("create temp dir");
     let config_path = dir.path().join("config.toml");
@@ -918,7 +918,7 @@ async fn post_ingest_requires_auth() {
 #[tokio::test]
 async fn post_ingest_idempotent() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -1027,7 +1027,7 @@ async fn config_status_capabilities_match_cloud_mode() {
     use tuitbot_core::config::DeploymentMode;
 
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -1078,7 +1078,7 @@ async fn config_status_capabilities_match_cloud_mode() {
 #[tokio::test]
 async fn settings_get_redacts_service_account_key() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config file with a service_account_key.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1141,7 +1141,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_patch_preserves_legacy_sa_key() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config with a legacy service_account_key.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1229,7 +1229,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_patch_response_redacts_sa_key() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config with a legacy service_account_key.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1313,7 +1313,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_get_redacts_sa_key_alongside_connection_id() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config with both service_account_key AND connection_id.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1377,7 +1377,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_init_with_connection_id() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let dir = tempfile::tempdir().expect("create temp dir");
     let config_path = dir.path().join("config.toml");
@@ -1565,7 +1565,7 @@ async fn connector_status_requires_auth() {
 #[tokio::test]
 async fn connector_status_with_connection() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Seed a connection row.
     tuitbot_core::storage::watchtower::insert_connection(
@@ -1642,7 +1642,7 @@ async fn connector_disconnect_requires_auth() {
 /// Writes a minimal config.toml so `read_effective_config` works.
 async fn test_router_with_dir(dir: &std::path::Path) -> (axum::Router, storage::DbPool) {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a minimal valid config.toml
     let config_path = dir.join("config.toml");
@@ -2113,7 +2113,7 @@ api_key = "test-key-not-real"
     .expect("write config");
 
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool.clone(),
@@ -2198,7 +2198,7 @@ product_keywords = ["base"]
     .expect("write config");
 
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = AppState {
         db: pool.clone(),

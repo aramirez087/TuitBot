@@ -311,14 +311,14 @@ mod tests {
 
     use tokio::sync::{broadcast, Mutex, RwLock};
 
-    use crate::ws::WsEvent;
+    use crate::ws::AccountWsEvent;
 
     /// Build a minimal `AppState` for testing the RAG resolver.
     async fn test_state(config_path: PathBuf) -> AppState {
         let db = tuitbot_core::storage::init_test_db()
             .await
             .expect("init test db");
-        let (event_tx, _) = broadcast::channel::<WsEvent>(16);
+        let (event_tx, _) = broadcast::channel::<AccountWsEvent>(16);
         AppState {
             db,
             config_path: config_path.clone(),

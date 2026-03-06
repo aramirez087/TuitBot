@@ -11,13 +11,13 @@ use tower::ServiceExt;
 use tuitbot_core::storage;
 
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 const TEST_TOKEN: &str = "test-token-abc123";
 
 async fn test_router() -> axum::Router {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,

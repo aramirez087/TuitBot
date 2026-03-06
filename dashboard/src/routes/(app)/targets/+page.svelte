@@ -19,6 +19,7 @@
 		stopAutoRefresh
 	} from '$lib/stores/targets';
 	import { config, loadSettings } from '$lib/stores/settings';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let showAddModal = $state(false);
 	let addSubmitting = $state(false);
@@ -55,6 +56,9 @@
 		loadTargets();
 		loadSettings();
 		startAutoRefresh();
+		const handler = () => { loadTargets(); loadSettings(); };
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	onDestroy(() => {

@@ -25,6 +25,7 @@
 		saveSettings,
 		hasDangerousChanges
 	} from '$lib/stores/settings';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	import WorkspaceSection from './WorkspaceSection.svelte';
 	import BusinessProfileSection from './BusinessProfileSection.svelte';
@@ -92,9 +93,11 @@
 
 	onMount(() => {
 		loadSettings().then(() => {
-			// Small delay so DOM is ready
 			setTimeout(setupObservers, 100);
 		});
+		const handler = () => loadSettings().then(() => setTimeout(setupObservers, 100));
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	onDestroy(() => {

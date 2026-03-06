@@ -33,6 +33,7 @@
 		startAutoRefresh,
 		stopAutoRefresh
 	} from '$lib/stores/approval';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let editingId = $state<number | null>(null);
 	let exportOpen = $state(false);
@@ -106,11 +107,16 @@
 		loadStats();
 		startAutoRefresh();
 		window.addEventListener('keydown', handleKeydown);
+		const handler = () => { loadItems(true); loadStats(); };
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => {
+			window.removeEventListener('keydown', handleKeydown);
+			window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		};
 	});
 
 	onDestroy(() => {
 		stopAutoRefresh();
-		window.removeEventListener('keydown', handleKeydown);
 	});
 </script>
 

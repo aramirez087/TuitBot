@@ -1,8 +1,10 @@
 import { writable } from 'svelte/store';
+import { getAccountId } from '$lib/api/http';
 
 /** Events pushed by the tuitbot-server WebSocket. */
 export interface WsEvent {
     type: 'ActionPerformed' | 'ApprovalQueued' | 'ApprovalUpdated' | 'FollowerUpdate' | 'RuntimeStatus' | 'ContentScheduled' | 'Error';
+    account_id?: string;
     [key: string]: unknown;
 }
 
@@ -20,6 +22,12 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectDelay = 1000;
 const MAX_RECONNECT_DELAY = 30000;
 let consecutiveErrors = 0;
+
+/** Flush the events buffer (called on account switch to prevent stale data). */
+export function clearEvents(): void {
+    events.set([]);
+    runtimeRunning.set(false);
+}
 
 /** Send a native notification if available and the app is in the background. */
 async function sendNativeNotification(title: string, body: string) {
@@ -95,6 +103,13 @@ export function connectWs(token?: string) {
     ws.onmessage = (e) => {
         try {
             const event: WsEvent = JSON.parse(e.data);
+
+            // Filter out events from other accounts.
+            const activeAccountId = getAccountId();
+            if (event.account_id && event.account_id !== activeAccountId) {
+                return;
+            }
+
             events.update((list) => [event, ...list].slice(0, 200));
 
             // Track runtime status

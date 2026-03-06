@@ -16,7 +16,7 @@ use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::ws::WsEvent;
+use crate::ws::{AccountWsEvent, WsEvent};
 
 use super::read_approval_mode;
 
@@ -86,11 +86,14 @@ pub async fn compose_tweet(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: "tweet".to_string(),
-            content: text.to_string(),
-            media_paths: vec![],
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: "tweet".to_string(),
+                content: text.to_string(),
+                media_paths: vec![],
+            },
         });
 
         Ok(Json(json!({
@@ -148,11 +151,14 @@ pub async fn compose_thread(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: "thread".to_string(),
-            content: combined,
-            media_paths: vec![],
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: "thread".to_string(),
+                content: combined,
+                media_paths: vec![],
+            },
         });
 
         Ok(Json(json!({
@@ -306,11 +312,14 @@ async fn compose_thread_blocks_flow(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: "thread".to_string(),
-            content: content.clone(),
-            media_paths: all_media,
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: "thread".to_string(),
+                content: content.clone(),
+                media_paths: all_media,
+            },
         });
 
         Ok(Json(json!({
@@ -333,10 +342,13 @@ async fn compose_thread_blocks_flow(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ContentScheduled {
-            id,
-            content_type: "thread".to_string(),
-            scheduled_for: scheduled_for.clone(),
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ContentScheduled {
+                id,
+                content_type: "thread".to_string(),
+                scheduled_for: scheduled_for.clone(),
+            },
         });
 
         Ok(Json(json!({
@@ -373,11 +385,14 @@ async fn persist_content(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: body.content_type.clone(),
-            content: content.to_string(),
-            media_paths: media_paths.to_vec(),
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: body.content_type.clone(),
+                content: content.to_string(),
+                media_paths: media_paths.to_vec(),
+            },
         });
 
         Ok(Json(json!({
@@ -395,10 +410,13 @@ async fn persist_content(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ContentScheduled {
-            id,
-            content_type: body.content_type.clone(),
-            scheduled_for: body.scheduled_for.clone(),
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ContentScheduled {
+                id,
+                content_type: body.content_type.clone(),
+                scheduled_for: body.scheduled_for.clone(),
+            },
         });
 
         Ok(Json(json!({
@@ -420,10 +438,13 @@ async fn persist_content(
             )
             .await?;
 
-            let _ = state.event_tx.send(WsEvent::ContentScheduled {
-                id,
-                content_type: body.content_type.clone(),
-                scheduled_for: Some(scheduled_for),
+            let _ = state.event_tx.send(AccountWsEvent {
+                account_id: ctx.account_id.clone(),
+                event: WsEvent::ContentScheduled {
+                    id,
+                    content_type: body.content_type.clone(),
+                    scheduled_for: Some(scheduled_for),
+                },
             });
 
             return Ok(Json(json!({

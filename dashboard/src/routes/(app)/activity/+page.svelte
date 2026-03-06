@@ -21,6 +21,7 @@
 		startAutoRefresh,
 		stopAutoRefresh
 	} from '$lib/stores/activity';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let loadingMore = $state(false);
 	let exportOpen = $state(false);
@@ -44,6 +45,9 @@
 	onMount(() => {
 		loadActivity(true);
 		startAutoRefresh();
+		const handler = () => loadActivity(true);
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	onDestroy(() => {

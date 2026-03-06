@@ -22,7 +22,7 @@ use tuitbot_core::x_api::auth::TokenManager;
 use tuitbot_core::error::XApiError;
 use tuitbot_core::x_api::auth;
 
-use crate::ws::WsEvent;
+use crate::ws::AccountWsEvent;
 
 /// Pending OAuth PKCE state for connector link flows.
 pub struct PendingOAuth {
@@ -43,7 +43,7 @@ pub struct AppState {
     /// Data directory for media storage (parent of config file).
     pub data_dir: PathBuf,
     /// Broadcast channel sender for real-time WebSocket events.
-    pub event_tx: broadcast::Sender<WsEvent>,
+    pub event_tx: broadcast::Sender<AccountWsEvent>,
     /// Local bearer token for API authentication.
     pub api_token: String,
     /// Bcrypt hash of the web login passphrase (None if not configured).
