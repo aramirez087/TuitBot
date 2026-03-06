@@ -1,6 +1,5 @@
 //! Compose endpoints for tweets, threads, and unified compose.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::State;
@@ -11,7 +10,7 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
-use tuitbot_core::storage::{accounts, action_log, approval_queue, scheduled_content};
+use tuitbot_core::storage::{action_log, approval_queue, scheduled_content};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext};
@@ -19,7 +18,7 @@ use crate::error::ApiError;
 use crate::state::AppState;
 use crate::ws::WsEvent;
 
-use super::{read_approval_mode, read_config};
+use super::read_approval_mode;
 
 /// A single thread block in an API request payload.
 #[derive(Debug, Deserialize)]
@@ -70,7 +69,7 @@ pub async fn compose_tweet(
     }
 
     // Check if approval mode is enabled.
-    let approval_mode = read_approval_mode(&state)?;
+    let approval_mode = read_approval_mode(&state, &ctx.account_id).await?;
 
     if approval_mode {
         let id = approval_queue::enqueue_for(
@@ -131,7 +130,7 @@ pub async fn compose_thread(
         ));
     }
 
-    let approval_mode = read_approval_mode(&state)?;
+    let approval_mode = read_approval_mode(&state, &ctx.account_id).await?;
     let combined = body.tweets.join("\n---\n");
 
     if approval_mode {
@@ -289,7 +288,7 @@ async fn compose_thread_blocks_flow(
         sorted.iter().flat_map(|b| b.media_paths.clone()).collect()
     };
 
-    let approval_mode = read_approval_mode(state)?;
+    let approval_mode = read_approval_mode(state, &ctx.account_id).await?;
 
     if approval_mode {
         let media_json = serde_json::to_string(&all_media).unwrap_or_else(|_| "[]".to_string());
@@ -355,7 +354,7 @@ async fn persist_content(
     body: &ComposeRequest,
     content: &str,
 ) -> Result<Json<Value>, ApiError> {
-    let approval_mode = read_approval_mode(state)?;
+    let approval_mode = read_approval_mode(state, &ctx.account_id).await?;
 
     if approval_mode {
         let media_paths = body.media_paths.as_deref().unwrap_or(&[]);
@@ -409,12 +408,7 @@ async fn persist_content(
     } else {
         // Immediate publish — try posting via X API directly.
         // If not configured for direct posting, save to calendar instead.
-        let config = read_config(state)?;
-        let can_post = match config.x_api.provider_backend.as_str() {
-            "x_api" => true,
-            "scraper" => state.data_dir.join("scraper_session.json").exists(),
-            _ => false,
-        };
+        let can_post = super::can_post_for(state, &ctx.account_id).await;
         if !can_post {
             let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
             let id = scheduled_content::insert_for(
@@ -449,14 +443,16 @@ async fn try_post_now(
     content_type: &str,
     content: &str,
 ) -> Result<Json<Value>, ApiError> {
-    let config = read_config(state)?;
+    let config = super::read_effective_config(state, &ctx.account_id).await?;
 
     let posted = match config.x_api.provider_backend.as_str() {
         "scraper" => {
-            // Use cookie-auth transport via LocalModeXClient.
+            // Use cookie-auth transport via LocalModeXClient with account-scoped data dir.
+            let account_data =
+                tuitbot_core::storage::accounts::account_data_dir(&state.data_dir, &ctx.account_id);
             let client = tuitbot_core::x_api::LocalModeXClient::with_session(
                 config.x_api.scraper_allow_mutations,
-                &state.data_dir,
+                &account_data,
             );
             client
                 .post_tweet(content)
@@ -465,15 +461,10 @@ async fn try_post_now(
         }
         "x_api" => {
             // Use official X API with OAuth tokens.
-            let account = accounts::get_account(&state.db, &ctx.account_id)
-                .await
-                .map_err(ApiError::Storage)?;
-
-            let token_path = account
-                .as_ref()
-                .and_then(|a| a.token_path.as_deref())
-                .map(PathBuf::from)
-                .unwrap_or_else(|| state.data_dir.join("tokens.json"));
+            let token_path = tuitbot_core::storage::accounts::account_token_path(
+                &state.data_dir,
+                &ctx.account_id,
+            );
 
             let access_token = state
                 .get_x_access_token(&token_path, &ctx.account_id)

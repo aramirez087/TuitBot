@@ -20,3 +20,4 @@ pub mod scraper_session;
 pub mod settings;
 pub mod strategy;
 pub mod targets;
+pub mod x_auth;

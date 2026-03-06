@@ -13,8 +13,7 @@ use serde_json::Value;
 use tuitbot_core::auth::error::AuthError;
 use tuitbot_core::auth::{passphrase, session};
 use tuitbot_core::config::{
-    effective_config, merge_overrides, split_patch_by_scope, Config,
-    LlmConfig,
+    effective_config, merge_overrides, split_patch_by_scope, Config, LlmConfig,
 };
 use tuitbot_core::error::ConfigError;
 use tuitbot_core::llm::factory::create_provider;

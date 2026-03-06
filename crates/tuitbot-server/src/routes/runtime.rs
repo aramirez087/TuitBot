@@ -26,14 +26,8 @@ pub async fn status(
     let task_count = runtime.map_or(0, |r| r.task_count());
     let capabilities = state.deployment_mode.capabilities();
 
-    // Determine if direct posting is possible:
-    // - "x_api" backend with OAuth tokens, or
-    // - "scraper" backend with a valid cookie session file.
-    let can_post = match state.provider_backend.as_str() {
-        "x_api" => true,
-        "scraper" => state.data_dir.join("scraper_session.json").exists(),
-        _ => false,
-    };
+    // Determine if direct posting is possible for this account.
+    let can_post = crate::routes::content::can_post_for(&state, &ctx.account_id).await;
 
     Ok(Json(json!({
         "running": running,

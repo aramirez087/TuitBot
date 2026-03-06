@@ -253,6 +253,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/accounts/{id}/sync-profile",
             post(routes::accounts::sync_profile),
         )
+        // X credential linking (before catch-all /accounts/{id})
+        .route(
+            "/accounts/{id}/x-auth/start",
+            post(routes::x_auth::start_link),
+        )
+        .route(
+            "/accounts/{id}/x-auth/callback",
+            post(routes::x_auth::complete_link),
+        )
+        .route(
+            "/accounts/{id}/x-auth/status",
+            get(routes::x_auth::link_status),
+        )
         .route(
             "/accounts/{id}",
             get(routes::accounts::get_account)

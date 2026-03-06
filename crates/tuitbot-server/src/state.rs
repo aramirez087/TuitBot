@@ -26,6 +26,8 @@ pub struct PendingOAuth {
     pub code_verifier: String,
     /// When this entry was created (for 10-minute expiry).
     pub created_at: Instant,
+    /// The account ID that initiated this OAuth flow (empty for connectors).
+    pub account_id: String,
 }
 
 /// Shared application state accessible by all route handlers.
