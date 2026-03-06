@@ -3,7 +3,6 @@
 //! CRUD for the account registry, role management, and per-account
 //! configuration overrides.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
@@ -11,7 +10,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tuitbot_core::config::{effective_config, validate_override_keys, Config};
-use tuitbot_core::storage::accounts::{self, UpdateAccountParams};
+use tuitbot_core::storage::accounts::{self, account_token_path, UpdateAccountParams};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext, Role};
@@ -230,16 +229,11 @@ pub async fn sync_profile(
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
 
-    let account = accounts::get_account(&state.db, &id)
+    let _account = accounts::get_account(&state.db, &id)
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("account not found: {id}")))?;
 
-    // Resolve token path: account-specific or default.
-    let token_path = account
-        .token_path
-        .as_deref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| state.data_dir.join("tokens.json"));
+    let token_path = account_token_path(&state.data_dir, &id);
 
     let access_token = state
         .get_x_access_token(&token_path, &id)

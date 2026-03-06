@@ -55,14 +55,38 @@ pub async fn get_account(pool: &DbPool, id: &str) -> Result<Option<Account>, Sto
         .map_err(|e| StorageError::Query { source: e })
 }
 
+/// Default config overrides for new accounts.
+///
+/// Blanks out identity fields so a new account doesn't inherit the default
+/// account's persona, business profile, or targets from `config.toml`.
+const NEW_ACCOUNT_OVERRIDES: &str = r#"{
+    "business": {
+        "product_name": "",
+        "product_keywords": [],
+        "product_description": "",
+        "product_url": null,
+        "target_audience": "",
+        "competitor_keywords": [],
+        "industry_topics": [],
+        "brand_voice": null,
+        "reply_style": null,
+        "content_style": null,
+        "persona_opinions": [],
+        "persona_experiences": [],
+        "content_pillars": []
+    },
+    "targets": []
+}"#;
+
 /// Create a new account. Returns the account ID.
 pub async fn create_account(pool: &DbPool, id: &str, label: &str) -> Result<String, StorageError> {
     sqlx::query(
-        "INSERT INTO accounts (id, label, updated_at) \
-         VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
+        "INSERT INTO accounts (id, label, config_overrides, updated_at) \
+         VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
     )
     .bind(id)
     .bind(label)
+    .bind(NEW_ACCOUNT_OVERRIDES)
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;

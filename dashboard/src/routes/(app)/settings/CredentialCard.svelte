@@ -88,11 +88,37 @@
 		try {
 			const result = await api.accounts.startAuth(account.id);
 			oauthStateParam = result.state;
-			window.open(result.authorization_url, '_blank', 'noopener');
+			await openAuthWindow(result.authorization_url);
 			oauthStep = 'waiting';
 		} catch (e) {
 			oauthError = e instanceof Error ? e.message : 'Failed to start OAuth flow';
 			oauthStep = 'idle';
+		}
+	}
+
+	/** Open auth URL in an isolated Tauri webview (no shared browser cookies)
+	 *  so X doesn't pre-fill a previously logged-in account. The Rust side
+	 *  intercepts the callback redirect, extracts the code, and emits an
+	 *  `oauth-callback` event. Falls back to window.open outside Tauri. */
+	async function openAuthWindow(url: string) {
+		try {
+			const { invoke } = await import('@tauri-apps/api/core');
+			const { listen } = await import('@tauri-apps/api/event');
+
+			// Listen for the callback event from the Rust-side navigation handler.
+			const unlisten = await listen<{ code: string; state: string }>('oauth-callback', async (event) => {
+				unlisten();
+				const { code, state } = event.payload;
+				if (code && state === oauthStateParam) {
+					callbackCode = code;
+					await completeOAuthLink();
+				}
+			});
+
+			await invoke('open_oauth_window', { url });
+		} catch {
+			// Not running in Tauri — fall back to default browser.
+			window.open(url, '_blank', 'noopener');
 		}
 	}
 
@@ -258,7 +284,7 @@
 					<div class="oauth-callback">
 						<p class="oauth-hint">
 							<ExternalLink size={12} />
-							Authorize in the browser tab, then paste the code below.
+							Authorize in the popup window, then paste the code below.
 						</p>
 						<div class="oauth-code-row">
 							<input

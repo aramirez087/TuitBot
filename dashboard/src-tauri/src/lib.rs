@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::sync::Mutex;
 use tuitbot_core::auth::passphrase;
 use tuitbot_core::config::{ContentSourcesConfig, DeploymentMode};
@@ -9,7 +9,7 @@ use tuitbot_core::startup::data_dir;
 use tuitbot_core::storage;
 use tuitbot_server::auth;
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 /// Shared reference to the embedded server's application state.
 struct EmbeddedState(Arc<AppState>);
@@ -26,6 +26,70 @@ fn read_api_token() -> Result<String, String> {
 #[tauri::command]
 fn get_api_token() -> Result<String, String> {
     read_api_token()
+}
+
+/// Tauri command: open an isolated OAuth webview that intercepts the callback.
+///
+/// When X redirects to the callback URL, the webview extracts the `code`
+/// and `state` query params, emits them via a `oauth-callback` event to
+/// the main window, and closes itself.
+#[tauri::command]
+fn open_oauth_window(app_handle: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri::webview::WebviewWindowBuilder;
+
+    let label = format!("oauth-{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis());
+
+    let handle = app_handle.clone();
+    WebviewWindowBuilder::new(&app_handle, &label, tauri::WebviewUrl::External(
+        url.parse().map_err(|e| format!("invalid URL: {e}"))?,
+    ))
+    .title("Authorize X Account")
+    .inner_size(520.0, 720.0)
+    .center()
+    .on_navigation(move |nav_url| {
+        let url_str = nav_url.as_str();
+        // Intercept the callback redirect (e.g. http://localhost:3001/callback?code=...&state=...)
+        if url_str.contains("/callback") && url_str.contains("code=") {
+            if let Ok(parsed) = url::Url::parse(url_str) {
+                let code = parsed.query_pairs()
+                    .find(|(k, _)| k == "code")
+                    .map(|(_, v)| v.to_string())
+                    .unwrap_or_default();
+                let state = parsed.query_pairs()
+                    .find(|(k, _)| k == "state")
+                    .map(|(_, v)| v.to_string())
+                    .unwrap_or_default();
+
+                let _ = handle.emit("oauth-callback", serde_json::json!({
+                    "code": code,
+                    "state": state,
+                }));
+
+                // Can't close inside on_navigation — schedule it.
+                let h2 = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    // Find and close the oauth window.
+                    for (_, wv) in h2.webview_windows() {
+                        if wv.label().starts_with("oauth-") {
+                            let _ = wv.close();
+                        }
+                    }
+                });
+
+                // Block the navigation — don't load the callback URL.
+                return false;
+            }
+        }
+        true
+    })
+    .build()
+    .map_err(|e| format!("failed to open OAuth window: {e}"))?;
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -72,7 +136,15 @@ pub fn run() {
                     .ok()
                     .flatten();
 
-                let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+                let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
+
+                // Load config for x_client_id.
+                let config_contents = std::fs::read_to_string(&config_path).unwrap_or_default();
+                let loaded_config: Result<tuitbot_core::config::Config, _> = toml::from_str(&config_contents);
+                let x_client_id = loaded_config
+                    .as_ref()
+                    .map(|c| c.x_api.client_id.clone())
+                    .unwrap_or_default();
 
                 let passphrase_mtime = passphrase::passphrase_hash_mtime(&dir);
 
@@ -95,6 +167,8 @@ pub fn run() {
                     connector_config: Default::default(),
                     deployment_mode: DeploymentMode::Desktop,
                     pending_oauth: Mutex::new(HashMap::new()),
+                    token_managers: Mutex::new(HashMap::new()),
+                    x_client_id,
                 })
             });
 
@@ -117,7 +191,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_api_token])
+        .invoke_handler(tauri::generate_handler![get_api_token, open_oauth_window])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
