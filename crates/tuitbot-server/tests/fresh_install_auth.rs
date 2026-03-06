@@ -55,7 +55,7 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -280,7 +280,7 @@ async fn init_with_claim_produces_valid_session() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -365,7 +365,7 @@ async fn login_detects_out_of_band_passphrase_reset() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -431,7 +431,7 @@ async fn login_detects_new_passphrase_file() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),

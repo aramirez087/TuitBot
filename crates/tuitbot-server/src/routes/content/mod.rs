@@ -6,10 +6,8 @@ mod drafts;
 mod list;
 mod scheduled;
 
-use tuitbot_core::config::{effective_config, Config};
-use tuitbot_core::storage::accounts::{
-    self, account_scraper_session_path, account_token_path, DEFAULT_ACCOUNT_ID,
-};
+use tuitbot_core::config::Config;
+use tuitbot_core::storage::accounts::{account_scraper_session_path, account_token_path};
 
 use crate::error::ApiError;
 use crate::state::AppState;
@@ -90,25 +88,13 @@ pub(crate) async fn can_post_for(state: &AppState, account_id: &str) -> bool {
 
 /// Load the effective config for the given account.
 ///
-/// Default account: reads config.toml directly (backward compat).
-/// Non-default: merges config.toml base with account's config_overrides from DB.
+/// Delegates to `AppState::load_effective_config` and maps errors to `ApiError`.
 pub(crate) async fn read_effective_config(
     state: &AppState,
     account_id: &str,
 ) -> Result<Config, ApiError> {
-    let contents = std::fs::read_to_string(&state.config_path).unwrap_or_default();
-    let base_config: Config = toml::from_str(&contents).unwrap_or_default();
-
-    if account_id == DEFAULT_ACCOUNT_ID {
-        return Ok(base_config);
-    }
-
-    let account = accounts::get_account(&state.db, account_id)
-        .await?
-        .ok_or_else(|| ApiError::NotFound(format!("account not found: {account_id}")))?;
-
-    let result = effective_config(&base_config, &account.config_overrides)
-        .map_err(|e| ApiError::Internal(format!("failed to compute effective config: {e}")))?;
-
-    Ok(result.config)
+    state
+        .load_effective_config(account_id)
+        .await
+        .map_err(|e| ApiError::Internal(format!("failed to load effective config: {e}")))
 }

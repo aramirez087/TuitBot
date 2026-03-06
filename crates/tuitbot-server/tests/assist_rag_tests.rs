@@ -240,7 +240,7 @@ async fn build_test_router_with_generator(
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),
@@ -281,7 +281,7 @@ async fn build_test_router_no_generator() -> (axum::Router, tempfile::TempDir) {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),

@@ -38,7 +38,7 @@ async fn test_router() -> axum::Router {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -258,7 +258,7 @@ async fn approval_stats_returns_counts() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -309,7 +309,7 @@ async fn approval_list_with_status_filter() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -370,7 +370,7 @@ async fn approval_edit_content() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -429,7 +429,7 @@ async fn approval_edit_empty_content() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -574,7 +574,7 @@ async fn add_and_list_target() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -621,7 +621,7 @@ async fn add_duplicate_target_fails() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -669,7 +669,7 @@ async fn remove_target_works() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -737,7 +737,7 @@ async fn runtime_start_and_stop() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -802,7 +802,7 @@ async fn settings_get_returns_json() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -841,7 +841,7 @@ async fn settings_patch_round_trips() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -937,7 +937,7 @@ async fn post_ingest_idempotent() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1046,7 +1046,7 @@ async fn config_status_capabilities_match_cloud_mode() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: DeploymentMode::Cloud,
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1118,7 +1118,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1181,7 +1181,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1269,7 +1269,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1354,7 +1354,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1402,7 +1402,7 @@ async fn settings_init_with_connection_id() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1595,7 +1595,7 @@ async fn connector_status_with_connection() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1678,7 +1678,7 @@ product_keywords = ["test"]
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: "scraper".to_string(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: "test-client-id".to_string(),
@@ -1960,4 +1960,305 @@ async fn x_auth_status_reflects_scraper_session() {
     assert_eq!(body["scraper_linked"], true);
     assert_eq!(body["has_credentials"], true);
     assert_eq!(body["oauth_linked"], false);
+}
+
+// ============================================================
+// Runtime isolation (Session 4)
+// ============================================================
+
+/// Test: runtime status returns per-account provider_backend from effective config.
+#[tokio::test]
+async fn runtime_status_per_account_provider_backend() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Default account gets provider_backend from config.toml ("scraper")
+    let (status, body) = get_json_for(
+        router.clone(),
+        "/api/runtime/status",
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["provider_backend"], "scraper");
+
+    // Create non-default account with x_api override
+    let acct_b = create_test_account(&pool, "X API Account").await;
+    tuitbot_core::storage::accounts::update_account(
+        &pool,
+        &acct_b,
+        tuitbot_core::storage::accounts::UpdateAccountParams {
+            label: None,
+            x_user_id: None,
+            x_username: None,
+            x_display_name: None,
+            x_avatar_url: None,
+            config_overrides: Some(r#"{"x_api": {"provider_backend": "x_api"}}"#),
+            token_path: None,
+            status: None,
+        },
+    )
+    .await
+    .expect("update account");
+
+    // Account B should see provider_backend = "x_api"
+    let (status, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["provider_backend"], "x_api",
+        "non-default account should see overridden provider_backend"
+    );
+
+    // Default account should still see "scraper"
+    let (status, body) = get_json_for(
+        router.clone(),
+        "/api/runtime/status",
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["provider_backend"], "scraper",
+        "default account should be unaffected by non-default override"
+    );
+}
+
+/// Test: runtime start/stop is isolated per account.
+#[tokio::test]
+async fn runtime_isolation_start_stop() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_a = create_test_account(&pool, "Runtime A").await;
+    let acct_b = create_test_account(&pool, "Runtime B").await;
+
+    // Both start as not running
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], false);
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], false);
+
+    // Start runtime for A
+    let (status, body) = post_json_for(
+        router.clone(),
+        "/api/runtime/start",
+        &acct_a,
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "start A: {body}");
+
+    // A is running, B is not
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], true, "A should be running");
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], false, "B should not be running");
+
+    // Start runtime for B
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/runtime/start",
+        &acct_b,
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Both running
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], true, "A should still be running");
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], true, "B should be running now");
+
+    // Stop A — B should remain running
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/runtime/stop",
+        &acct_a,
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], false, "A should be stopped");
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], true, "B should survive A's stop");
+}
+
+/// Test: content generator cache is per-account (lazy init).
+#[tokio::test]
+async fn content_generator_lazy_init_per_account() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    // Write config with LLM configured (will fail to actually create provider
+    // without a valid API key, but we can verify the caching mechanism)
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[x_api]
+provider_backend = "scraper"
+client_id = "test-client-id"
+
+[business]
+product_name = "TestProduct"
+product_keywords = ["test"]
+
+[llm]
+provider = "openai"
+api_key = "test-key-not-real"
+"#,
+    )
+    .expect("write config");
+
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path,
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
+    });
+
+    // Cache starts empty
+    assert_eq!(state.content_generators.lock().await.len(), 0);
+
+    // Lazy init for default account
+    let result = state
+        .get_or_create_content_generator(tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID)
+        .await;
+    assert!(
+        result.is_ok(),
+        "should create generator for default account"
+    );
+    assert_eq!(state.content_generators.lock().await.len(), 1);
+
+    // Create a non-default account
+    let acct_b = uuid::Uuid::new_v4().to_string();
+    tuitbot_core::storage::accounts::create_account(&pool, &acct_b, "Account B")
+        .await
+        .expect("create account");
+
+    // Lazy init for non-default account (inherits base config LLM settings)
+    let result = state.get_or_create_content_generator(&acct_b).await;
+    assert!(
+        result.is_ok(),
+        "should create generator for non-default account"
+    );
+    assert_eq!(state.content_generators.lock().await.len(), 2);
+
+    // Second call should return cached instance (no additional entry)
+    let gen1 = state
+        .get_or_create_content_generator(&acct_b)
+        .await
+        .unwrap();
+    let gen2 = state
+        .get_or_create_content_generator(&acct_b)
+        .await
+        .unwrap();
+    assert!(Arc::ptr_eq(&gen1, &gen2), "should return cached generator");
+    assert_eq!(state.content_generators.lock().await.len(), 2);
+}
+
+/// Test: load_effective_config returns per-account config.
+#[tokio::test]
+async fn load_effective_config_per_account() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[x_api]
+provider_backend = "scraper"
+client_id = "test-client-id"
+
+[business]
+product_name = "BaseProduct"
+product_keywords = ["base"]
+"#,
+    )
+    .expect("write config");
+
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+
+    let state = AppState {
+        db: pool.clone(),
+        config_path,
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
+    };
+
+    // Default account: base config
+    let config = state
+        .load_effective_config(tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID)
+        .await
+        .unwrap();
+    assert_eq!(config.x_api.provider_backend, "scraper");
+    assert_eq!(config.business.product_name, "BaseProduct");
+
+    // Create non-default account with overrides
+    let acct_id = uuid::Uuid::new_v4().to_string();
+    tuitbot_core::storage::accounts::create_account(&pool, &acct_id, "Override Test")
+        .await
+        .expect("create account");
+    tuitbot_core::storage::accounts::update_account(
+        &pool,
+        &acct_id,
+        tuitbot_core::storage::accounts::UpdateAccountParams {
+            label: None,
+            x_user_id: None,
+            x_username: None,
+            x_display_name: None,
+            x_avatar_url: None,
+            config_overrides: Some(
+                r#"{"x_api": {"provider_backend": "x_api"}, "business": {"product_name": "OverriddenProduct"}}"#,
+            ),
+            token_path: None,
+            status: None,
+        },
+    )
+    .await
+    .expect("update account");
+
+    // Non-default account: merged config
+    let config = state.load_effective_config(&acct_id).await.unwrap();
+    assert_eq!(config.x_api.provider_backend, "x_api");
+    assert_eq!(config.business.product_name, "OverriddenProduct");
+    // Base keywords should still be inherited
+    assert_eq!(config.x_api.client_id, "test-client-id");
 }

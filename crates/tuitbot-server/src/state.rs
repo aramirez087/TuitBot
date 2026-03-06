@@ -10,8 +10,12 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
 use tuitbot_core::automation::Runtime;
-use tuitbot_core::config::{ConnectorConfig, ContentSourcesConfig, DeploymentMode};
+use tuitbot_core::config::{
+    effective_config, Config, ConnectorConfig, ContentSourcesConfig, DeploymentMode,
+};
 use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::llm::factory::create_provider;
+use tuitbot_core::storage::accounts::{self, DEFAULT_ACCOUNT_ID};
 use tuitbot_core::storage::DbPool;
 use tuitbot_core::x_api::auth::TokenManager;
 
@@ -66,8 +70,6 @@ pub struct AppState {
     pub connector_config: ConnectorConfig,
     /// Deployment mode (desktop, self_host, or cloud).
     pub deployment_mode: DeploymentMode,
-    /// Provider backend ("", "x_api", or "scraper").
-    pub provider_backend: String,
     /// Pending OAuth PKCE challenges keyed by state parameter.
     pub pending_oauth: Mutex<HashMap<String, PendingOAuth>>,
     /// Per-account X API token managers for automatic token refresh.
@@ -111,5 +113,57 @@ impl AppState {
             .insert(account_id.to_string(), tm);
 
         Ok(access_token)
+    }
+
+    /// Load the effective config for a given account.
+    ///
+    /// Default account: reads config.toml directly (backward compat).
+    /// Non-default: merges config.toml base with account's `config_overrides` from DB.
+    pub async fn load_effective_config(&self, account_id: &str) -> Result<Config, String> {
+        let contents = std::fs::read_to_string(&self.config_path).unwrap_or_default();
+        let base: Config = toml::from_str(&contents).unwrap_or_default();
+
+        if account_id == DEFAULT_ACCOUNT_ID {
+            return Ok(base);
+        }
+
+        let account = accounts::get_account(&self.db, account_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("account not found: {account_id}"))?;
+
+        effective_config(&base, &account.config_overrides)
+            .map(|r| r.config)
+            .map_err(|e| e.to_string())
+    }
+
+    /// Lazily create or return a cached `ContentGenerator` for the given account.
+    ///
+    /// Loads effective config, creates the LLM provider, and caches the generator.
+    pub async fn get_or_create_content_generator(
+        &self,
+        account_id: &str,
+    ) -> Result<Arc<ContentGenerator>, String> {
+        // Fast path: already cached.
+        {
+            let generators = self.content_generators.lock().await;
+            if let Some(gen) = generators.get(account_id) {
+                return Ok(gen.clone());
+            }
+        }
+
+        let config = self.load_effective_config(account_id).await?;
+
+        let provider =
+            create_provider(&config.llm).map_err(|e| format!("LLM not configured: {e}"))?;
+
+        let gen = Arc::new(ContentGenerator::new(provider, config.business));
+
+        self.content_generators
+            .lock()
+            .await
+            .insert(account_id.to_string(), gen.clone());
+
+        Ok(gen)
     }
 }

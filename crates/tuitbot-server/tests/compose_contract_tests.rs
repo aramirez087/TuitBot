@@ -37,7 +37,7 @@ async fn test_router() -> axum::Router {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),

@@ -180,12 +180,6 @@ async fn main() -> Result<()> {
         .map(|c| c.deployment_mode.clone())
         .unwrap_or_default();
 
-    // Extract provider backend from config.
-    let provider_backend = loaded_config
-        .as_ref()
-        .map(|c| c.x_api.provider_backend.clone())
-        .unwrap_or_default();
-
     // Conditionally start the Watchtower filesystem watcher.
     let watchtower_cancel = {
         let watch_sources: Vec<_> = content_sources
@@ -241,7 +235,6 @@ async fn main() -> Result<()> {
         content_sources,
         connector_config,
         deployment_mode,
-        provider_backend,
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: loaded_config

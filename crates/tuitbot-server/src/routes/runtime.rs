@@ -29,12 +29,18 @@ pub async fn status(
     // Determine if direct posting is possible for this account.
     let can_post = crate::routes::content::can_post_for(&state, &ctx.account_id).await;
 
+    // Load provider_backend from effective config (per-account, not global).
+    let provider_backend = match state.load_effective_config(&ctx.account_id).await {
+        Ok(config) => config.x_api.provider_backend,
+        Err(_) => String::new(),
+    };
+
     Ok(Json(json!({
         "running": running,
         "task_count": task_count,
         "deployment_mode": state.deployment_mode,
         "capabilities": capabilities,
-        "provider_backend": state.provider_backend,
+        "provider_backend": provider_backend,
         "can_post": can_post,
     })))
 }

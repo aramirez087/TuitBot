@@ -21,13 +21,10 @@ async fn get_generator(
     state: &AppState,
     account_id: &str,
 ) -> Result<Arc<ContentGenerator>, ApiError> {
-    let generators = state.content_generators.lock().await;
-    generators
-        .get(account_id)
-        .cloned()
-        .ok_or(ApiError::BadRequest(
-            "LLM not configured — set llm.provider and llm.api_key in config.toml".to_string(),
-        ))
+    state
+        .get_or_create_content_generator(account_id)
+        .await
+        .map_err(ApiError::BadRequest)
 }
 
 // ---------------------------------------------------------------------------
