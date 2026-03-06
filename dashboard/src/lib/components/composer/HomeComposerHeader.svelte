@@ -5,7 +5,8 @@
 		Eye,
 		EyeOff,
 		PanelRight,
-		Sparkles,
+		MessageSquare,
+		List,
 		Search,
 		Loader2
 	} from 'lucide-svelte';
@@ -27,7 +28,7 @@
 		ontoggleinspector,
 		ontogglepreview,
 		onopenpalette,
-		onaiassist
+		onswitchmode,
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
@@ -45,8 +46,12 @@
 		ontoggleinspector: () => void;
 		ontogglepreview: () => void;
 		onopenpalette: () => void;
-		onaiassist?: () => void;
+		onswitchmode?: () => void;
 	} = $props();
+
+	const ModeIcon = $derived(mode === 'tweet' ? MessageSquare : List);
+	const modeLabel = $derived(mode === 'tweet' ? 'Tweet' : 'Thread');
+	const switchLabel = $derived(mode === 'tweet' ? 'Switch to thread' : 'Switch to tweet');
 </script>
 
 <header class="home-header">
@@ -59,6 +64,18 @@
 		{/if}
 		{#if handle}
 			<span class="header-handle">@{handle}</span>
+		{/if}
+		{#if onswitchmode}
+			<span class="header-divider" aria-hidden="true"></span>
+			<button
+				class="mode-tab"
+				onclick={onswitchmode}
+				title={switchLabel}
+				aria-label={switchLabel}
+			>
+				<ModeIcon size={13} />
+				<span class="mode-label">{modeLabel}</span>
+			</button>
 		{/if}
 	</div>
 
@@ -121,17 +138,6 @@
 				{/if}
 			</button>
 
-			{#if onaiassist}
-				<button
-					class="icon-btn"
-					onclick={onaiassist}
-					aria-label="AI improve selection or post"
-					title="AI improve selection or post (\u2318\u21e7J)"
-				>
-					<Sparkles size={15} />
-				</button>
-			{/if}
-
 			<button
 				class="icon-btn"
 				class:active={inspectorOpen}
@@ -187,7 +193,7 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 120px;
+		max-width: 200px;
 	}
 
 	.header-handle {
@@ -198,6 +204,35 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		max-width: 140px;
+	}
+
+	.header-divider {
+		width: 1px;
+		height: 16px;
+		background: color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
+		margin: 0 4px;
+		flex-shrink: 0;
+	}
+
+	.mode-tab {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 4px 10px;
+		border: none;
+		border-radius: 6px;
+		background: transparent;
+		color: var(--color-text-muted);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.12s ease;
+		flex-shrink: 0;
+	}
+
+	.mode-tab:hover {
+		color: var(--color-text);
+		background: var(--color-surface-hover);
 	}
 
 	.header-right {
@@ -319,7 +354,8 @@
 			animation: none;
 		}
 
-		.icon-tools {
+		.icon-tools,
+		.mode-tab {
 			transition: none;
 		}
 	}
@@ -341,7 +377,9 @@
 
 		.header-avatar,
 		.header-name,
-		.header-handle {
+		.header-handle,
+		.header-divider,
+		.mode-tab {
 			display: none;
 		}
 

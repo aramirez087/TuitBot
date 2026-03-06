@@ -220,9 +220,9 @@
 		border-radius: 0;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 18px;
+		font-size: 15px;
 		font-family: var(--font-sans);
-		line-height: 1.65;
+		line-height: 1.5;
 		letter-spacing: -0.01em;
 		caret-color: var(--color-accent);
 		text-rendering: optimizeLegibility;

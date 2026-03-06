@@ -11,8 +11,6 @@
 		index,
 		total,
 		avatarUrl = null,
-		displayName = null,
-		handle = null,
 		focused = false,
 		assisting = false,
 		dragging = false,
@@ -36,8 +34,6 @@
 		index: number;
 		total: number;
 		avatarUrl?: string | null;
-		displayName?: string | null;
-		handle?: string | null;
 		focused?: boolean;
 		assisting?: boolean;
 		dragging?: boolean;
@@ -62,6 +58,7 @@
 	const overLimit = $derived(charCount > MAX_TWEET_CHARS);
 	const warning = $derived(charCount > 260 && !overLimit);
 	const isFirst = $derived(index === 0);
+	const isLast = $derived(index === total - 1);
 	const words = $derived(wordCount(block.text));
 
 	function handleKeydownGuarded(e: KeyboardEvent) {
@@ -105,6 +102,7 @@
 	class:drop-target={dropTarget}
 	class:assisting
 	class:focused
+	class:is-last={isLast}
 	data-block-id={block.id}
 	role="listitem"
 	ondragover={(e) => ondragover(e)}
@@ -132,14 +130,6 @@
 	<!-- Main content area -->
 	<div class="card-body">
 		<div class="card-writing-area" class:over-limit={overLimit}>
-			<div class="card-meta">
-				{#if displayName}
-					<span class="meta-name">{displayName}</span>
-				{/if}
-				{#if handle}
-					<span class="meta-handle">@{handle}</span>
-				{/if}
-			</div>
 			<textarea
 				bind:this={textareaEl}
 				class="flow-textarea"
@@ -165,44 +155,46 @@
 			</div>
 			<div class="footer-actions">
 				<CharRing current={charCount} />
-				<button
-					class="footer-action-btn"
-					onclick={() => mediaSlotRef?.triggerAttach()}
-					title="Attach media"
-					aria-label={`Attach media to post ${index + 1}`}
-				>
-					<Image size={13} />
-				</button>
-				<div
-					class="footer-handle"
-					draggable="true"
-					role="button"
-					tabindex="-1"
-					title="Drag to reorder"
-					aria-label={`Reorder post ${index + 1}. Use Alt+Up or Alt+Down to move.`}
-					ondragstart={(e) => ondragstart(e)}
-					ondragend={() => ondragend()}
-				>
-					<GripVertical size={13} />
-				</div>
-				{#if total > 2}
+				<div class="footer-action-group">
 					<button
 						class="footer-action-btn"
-						onclick={() => onmerge()}
-						title="Merge with next ({'\u2318'}{'\u21e7'}M)"
-						aria-label={`Merge post ${index + 1} with post ${index + 2}`}
+						onclick={() => mediaSlotRef?.triggerAttach()}
+						title="Attach media"
+						aria-label={`Attach media to post ${index + 1}`}
 					>
-						<Merge size={13} />
+						<Image size={13} />
 					</button>
-					<button
-						class="footer-action-btn footer-remove"
-						onclick={() => onremove()}
-						title="Remove post"
-						aria-label={`Remove post ${index + 1}`}
+					<div
+						class="footer-handle"
+						draggable="true"
+						role="button"
+						tabindex="-1"
+						title="Drag to reorder"
+						aria-label={`Reorder post ${index + 1}. Use Alt+Up or Alt+Down to move.`}
+						ondragstart={(e) => ondragstart(e)}
+						ondragend={() => ondragend()}
 					>
-						<Trash2 size={13} />
-					</button>
-				{/if}
+						<GripVertical size={13} />
+					</div>
+					{#if total > 2}
+						<button
+							class="footer-action-btn"
+							onclick={() => onmerge()}
+							title="Merge with next ({'\u2318'}{'\u21e7'}M)"
+							aria-label={`Merge post ${index + 1} with post ${index + 2}`}
+						>
+							<Merge size={13} />
+						</button>
+						<button
+							class="footer-action-btn footer-remove"
+							onclick={() => onremove()}
+							title="Remove post"
+							aria-label={`Remove post ${index + 1}`}
+						>
+							<Trash2 size={13} />
+						</button>
+					{/if}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -213,7 +205,12 @@
 		position: relative;
 		display: flex;
 		gap: 14px;
-		transition: opacity 0.15s ease;
+		border-left: 2px solid transparent;
+		transition: opacity 0.15s ease, border-color 0.15s ease;
+	}
+
+	.flow-card.focused {
+		border-left-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
 	}
 
 	.flow-card.dragging {
@@ -225,14 +222,27 @@
 		pointer-events: none;
 	}
 
-	/* ── Gutter (avatar) ───────────────────── */
+	/* ── Gutter (avatar + spine) ──────────── */
 	.card-gutter {
+		position: relative;
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
 		width: 36px;
 		flex-shrink: 0;
 		padding-top: 4px;
+	}
+
+	.flow-card:not(.is-last) .card-gutter::after {
+		content: "";
+		position: absolute;
+		top: 44px; /* 4px padding-top + 36px avatar + 4px below */
+		bottom: -16px; /* extend through the inter-card gap */
+		left: 50%;
+		transform: translateX(-50%);
+		width: 2px;
+		background: color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		border-radius: 1px;
 	}
 
 	.gutter-avatar {
@@ -271,14 +281,14 @@
 
 	.card-writing-area {
 		position: relative;
-		padding: 4px 0;
+		padding: 2px 0;
 		border-radius: 6px;
 		transition: opacity 0.2s ease;
 	}
 
-	/* Subtle de-emphasis on unfocused cards */
+	/* De-emphasis on unfocused cards */
 	.flow-card:not(.focused) .card-writing-area {
-		opacity: 0.85;
+		opacity: 0.7;
 	}
 
 	.flow-card:not(.focused):hover .card-writing-area {
@@ -292,45 +302,15 @@
 		padding-right: 12px;
 	}
 
-	.card-meta {
-		display: flex;
-		align-items: baseline;
-		gap: 5px;
-		min-width: 0;
-		margin-bottom: 2px;
-	}
-
-	.meta-name {
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--color-text);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 160px;
-		line-height: 1;
-	}
-
-	.meta-handle {
-		font-size: 12px;
-		font-family: var(--font-mono);
-		color: var(--color-text-muted);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 120px;
-		line-height: 1;
-	}
-
 	.flow-textarea {
 		width: 100%;
-		padding: 4px 0;
+		padding: 2px 0;
 		border: none;
 		background: transparent;
 		color: var(--color-text);
-		font-size: 18px;
+		font-size: 15px;
 		font-family: var(--font-sans);
-		line-height: 1.65;
+		line-height: 1.5;
 		letter-spacing: -0.01em;
 		caret-color: var(--color-accent);
 		text-rendering: optimizeLegibility;
@@ -338,7 +318,7 @@
 		resize: none;
 		outline: none;
 		box-sizing: border-box;
-		min-height: 72px;
+		min-height: 48px;
 		overflow: hidden;
 	}
 
@@ -378,14 +358,24 @@
 	.footer-actions {
 		display: flex;
 		align-items: center;
-		gap: 2px;
-		opacity: 0.5;
+		gap: 4px;
+	}
+
+	.card-footer {
+		opacity: 0;
 		transition: opacity 0.15s ease;
 	}
 
-	.card-footer:hover .footer-actions,
-	.flow-card.focused .footer-actions {
-		opacity: 0.9;
+	.flow-card:hover .card-footer,
+	.flow-card.focused .card-footer,
+	.flow-card:focus-within .card-footer {
+		opacity: 1;
+	}
+
+	.footer-action-group {
+		display: flex;
+		align-items: center;
+		gap: 2px;
 	}
 
 	.footer-action-btn {
@@ -443,8 +433,8 @@
 
 	/* Touch: always show tools */
 	@media (hover: none) {
-		.footer-actions {
-			opacity: 1;
+		.card-footer {
+			opacity: 0.7;
 		}
 	}
 
@@ -460,7 +450,7 @@
 		.flow-card,
 		.card-writing-area,
 		.card-writing-area::before,
-		.footer-actions,
+		.card-footer,
 		.footer-action-btn,
 		.footer-handle,
 		.gutter-avatar,
@@ -480,12 +470,12 @@
 			height: 28px;
 		}
 
-		.flow-card {
-			gap: 8px;
+		.flow-card:not(.is-last) .card-gutter::after {
+			top: 36px; /* 4px padding-top + 28px avatar + 4px below */
 		}
 
-		.card-meta {
-			display: none;
+		.flow-card {
+			gap: 8px;
 		}
 	}
 </style>

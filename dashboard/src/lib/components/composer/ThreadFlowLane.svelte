@@ -9,16 +9,12 @@
 	let {
 		blocks: externalBlocks = [],
 		avatarUrl = null,
-		displayName = null,
-		handle = null,
 		onchange,
 		onvalidchange,
 		onfocusindexchange,
 	}: {
 		blocks?: ThreadBlock[];
 		avatarUrl?: string | null;
-		displayName?: string | null;
-		handle?: string | null;
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
 		onfocusindexchange?: (index: number) => void;
@@ -427,8 +423,6 @@
 				index={i}
 				total={sortedBlocks.length}
 				{avatarUrl}
-				{displayName}
-				{handle}
 				focused={focusedBlockId === block.id}
 				assisting={assistingBlockId === block.id}
 				dragging={draggingBlockId === block.id}
@@ -472,26 +466,15 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 0;
 	}
 
 	.card-wrapper {
 		position: relative;
 		z-index: 1;
-		padding-bottom: 8px;
+		padding-bottom: 16px;
 	}
 
-	/* Clean horizontal separator between cards */
-	.flow-lane.has-multiple .card-wrapper:not(:last-child)::after {
-		content: "";
-		position: absolute;
-		bottom: 0;
-		/* Inset to align with content area (past the avatar gutter) */
-		left: 50px;
-		right: 0;
-		height: 1px;
-		background: color-mix(in srgb, var(--color-border-subtle) 25%, transparent);
-	}
 
 	.sr-only {
 		position: absolute;
@@ -533,8 +516,5 @@
 			padding-left: 0;
 		}
 
-		.flow-lane.has-multiple .card-wrapper:not(:last-child)::after {
-			left: 36px;
-		}
 	}
 </style>

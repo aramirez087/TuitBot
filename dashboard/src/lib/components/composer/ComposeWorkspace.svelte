@@ -603,8 +603,6 @@
 					bind:this={threadFlowRef}
 					blocks={threadBlocks}
 					avatarUrl={$currentAccount?.x_avatar_url ?? null}
-					displayName={$currentAccount?.x_display_name ?? null}
-					handle={$currentAccount?.x_username ?? null}
 					onchange={(b) => { threadBlocks = b; }}
 					onvalidchange={(v) => { threadValid = v; }}
 				/>
@@ -706,20 +704,13 @@
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
 			onopenpalette={() => { paletteOpen = true; }}
-			onaiassist={handleInlineAssist}
+			onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
 		/>
 		{#if tipsVisible}
 			<ComposerTipsTray
 				visible={tipsVisible}
 				{mode}
 				ondismiss={dismissTips}
-			/>
-		{:else}
-			<ComposerToolbar
-				{mode}
-				onaiassist={handleInlineAssist}
-				onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
-				onopenpalette={() => { paletteOpen = true; }}
 			/>
 		{/if}
 		{@render composeBody()}
