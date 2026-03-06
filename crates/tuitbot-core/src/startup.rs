@@ -333,7 +333,7 @@ pub fn build_auth_url(
 ) -> String {
     let oauth_scopes = REQUIRED_SCOPES.join(" ");
     format!(
-        "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256",
+        "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256&prompt=consent",
         X_AUTH_URL,
         url_encode(client_id),
         url_encode(redirect_uri),

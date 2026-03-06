@@ -16,6 +16,7 @@ pub mod mcp;
 pub mod media;
 pub mod replies;
 pub mod runtime;
+pub mod scraper_session;
 pub mod settings;
 pub mod strategy;
 pub mod targets;

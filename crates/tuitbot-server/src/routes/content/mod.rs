@@ -42,13 +42,21 @@ fn read_approval_mode(state: &AppState) -> Result<bool, ApiError> {
     Ok(config.approval_mode)
 }
 
-/// Return an error if the provider backend cannot post (scraper / unconfigured).
+/// Return an error if the provider backend cannot post.
+///
+/// Posting is possible with the official X API, or with the scraper
+/// backend when a cookie session file is present.
 fn require_post_capable(state: &AppState) -> Result<(), ApiError> {
     let config = read_config(state)?;
-    if config.x_api.provider_backend != "x_api" {
+    let can_post = match config.x_api.provider_backend.as_str() {
+        "x_api" => true,
+        "scraper" => state.data_dir.join("scraper_session.json").exists(),
+        _ => false,
+    };
+    if !can_post {
         return Err(ApiError::BadRequest(
-            "Direct posting requires X API credentials. \
-             Configure the Official X API in Settings."
+            "Direct posting requires X API credentials or an imported browser session. \
+             Configure in Settings → X API."
                 .to_string(),
         ));
     }

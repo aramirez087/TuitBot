@@ -410,7 +410,12 @@ async fn persist_content(
         // Immediate publish — try posting via X API directly.
         // If not configured for direct posting, save to calendar instead.
         let config = read_config(state)?;
-        if config.x_api.provider_backend != "x_api" {
+        let can_post = match config.x_api.provider_backend.as_str() {
+            "x_api" => true,
+            "scraper" => state.data_dir.join("scraper_session.json").exists(),
+            _ => false,
+        };
+        if !can_post {
             let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
             let id = scheduled_content::insert_for(
                 &state.db,
@@ -437,8 +442,7 @@ async fn persist_content(
     }
 }
 
-/// Attempt to post a tweet directly via X API. Falls back to scheduled
-/// content if no credentials are available.
+/// Attempt to post a tweet directly via X API or cookie-auth transport.
 async fn try_post_now(
     state: &AppState,
     ctx: &AccountContext,
@@ -447,42 +451,53 @@ async fn try_post_now(
 ) -> Result<Json<Value>, ApiError> {
     let config = read_config(state)?;
 
-    // Only attempt direct posting with the official X API backend.
-    if config.x_api.provider_backend == "scraper" || config.x_api.provider_backend.is_empty() {
-        return Err(ApiError::BadRequest(
-            "Direct posting requires X API credentials. \
-             Configure the Official X API in Settings → X API, \
-             or schedule the post for later."
-                .to_string(),
-        ));
-    }
+    let posted = match config.x_api.provider_backend.as_str() {
+        "scraper" => {
+            // Use cookie-auth transport via LocalModeXClient.
+            let client = tuitbot_core::x_api::LocalModeXClient::with_session(
+                config.x_api.scraper_allow_mutations,
+                &state.data_dir,
+            );
+            client
+                .post_tweet(content)
+                .await
+                .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?
+        }
+        "x_api" => {
+            // Use official X API with OAuth tokens.
+            let account = accounts::get_account(&state.db, &ctx.account_id)
+                .await
+                .map_err(ApiError::Storage)?;
 
-    // Resolve token path for this account.
-    let account = accounts::get_account(&state.db, &ctx.account_id)
-        .await
-        .map_err(ApiError::Storage)?;
+            let token_path = account
+                .as_ref()
+                .and_then(|a| a.token_path.as_deref())
+                .map(PathBuf::from)
+                .unwrap_or_else(|| state.data_dir.join("tokens.json"));
 
-    let token_path = account
-        .as_ref()
-        .and_then(|a| a.token_path.as_deref())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| state.data_dir.join("tokens.json"));
+            let access_token = state
+                .get_x_access_token(&token_path, &ctx.account_id)
+                .await
+                .map_err(|e| {
+                    ApiError::BadRequest(format!(
+                        "X API authentication failed — re-link your account in Settings. ({e})"
+                    ))
+                })?;
 
-    let access_token = state
-        .get_x_access_token(&token_path, &ctx.account_id)
-        .await
-        .map_err(|e| {
-            ApiError::BadRequest(format!(
-                "X API authentication failed — re-link your account in Settings. ({e})"
-            ))
-        })?;
-
-    let client = XApiHttpClient::new(access_token);
-
-    let posted = client
-        .post_tweet(content)
-        .await
-        .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?;
+            let client = XApiHttpClient::new(access_token);
+            client
+                .post_tweet(content)
+                .await
+                .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?
+        }
+        _ => {
+            return Err(ApiError::BadRequest(
+                "Direct posting requires X API credentials or a browser session. \
+                 Configure in Settings → X API."
+                    .to_string(),
+            ));
+        }
+    };
 
     // Log the successful post.
     let metadata = json!({

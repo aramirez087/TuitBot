@@ -16,7 +16,7 @@
 				api.runtime.status(),
 			]);
 			schedule = cfg;
-			canPublish = rt.provider_backend === 'x_api';
+			canPublish = rt.can_post;
 		} catch {
 			// Non-critical; workspace works without these
 		}

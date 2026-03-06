@@ -13,9 +13,11 @@ pub mod tier;
 pub mod types;
 
 pub use client::XApiHttpClient;
+pub use local_mode::session::ScraperSession;
 pub use local_mode::LocalModeXClient;
 pub use types::*;
 
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::config::XApiConfig;
@@ -25,11 +27,24 @@ use crate::error::XApiError;
 ///
 /// Returns `Some(Arc<dyn XApiClient>)` for scraper backend, `None` for
 /// official backend (caller must construct `XApiHttpClient` with OAuth tokens).
+///
+/// When `data_dir` is provided, attempts to load a cookie-auth session from
+/// `scraper_session.json` in that directory to enable posting.
 pub fn create_local_client(config: &XApiConfig) -> Option<Arc<dyn XApiClient>> {
+    create_local_client_with_data_dir(config, None)
+}
+
+/// Create a local-mode client with an optional data directory for cookie-auth.
+pub fn create_local_client_with_data_dir(
+    config: &XApiConfig,
+    data_dir: Option<&Path>,
+) -> Option<Arc<dyn XApiClient>> {
     if config.provider_backend == "scraper" {
-        Some(Arc::new(LocalModeXClient::new(
-            config.scraper_allow_mutations,
-        )))
+        let client = match data_dir {
+            Some(dir) => LocalModeXClient::with_session(config.scraper_allow_mutations, dir),
+            None => LocalModeXClient::new(config.scraper_allow_mutations),
+        };
+        Some(Arc::new(client))
     } else {
         None
     }

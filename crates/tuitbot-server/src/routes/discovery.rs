@@ -171,15 +171,20 @@ pub async fn queue_reply(
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
 
-    // Block posting in scraper / unconfigured mode.
+    // Block posting unless the backend can actually post.
     let config: Config = std::fs::read_to_string(&state.config_path)
         .ok()
         .and_then(|s| toml::from_str(&s).ok())
         .unwrap_or_default();
-    if config.x_api.provider_backend != "x_api" {
+    let can_post = match config.x_api.provider_backend.as_str() {
+        "x_api" => true,
+        "scraper" => state.data_dir.join("scraper_session.json").exists(),
+        _ => false,
+    };
+    if !can_post {
         return Err(ApiError::BadRequest(
-            "Direct posting requires X API credentials. \
-             Configure the Official X API in Settings."
+            "Direct posting requires X API credentials or an imported browser session. \
+             Configure in Settings → X API."
                 .to_string(),
         ));
     }

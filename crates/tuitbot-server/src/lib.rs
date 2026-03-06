@@ -188,6 +188,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(routes::settings::factory_reset),
         )
         .route(
+            "/settings/scraper-session",
+            get(routes::scraper_session::get_scraper_session)
+                .post(routes::scraper_session::import_scraper_session)
+                .delete(routes::scraper_session::delete_scraper_session),
+        )
+        .route(
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),
         )

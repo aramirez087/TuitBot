@@ -236,7 +236,25 @@ export const api = {
 					method: 'POST',
 					body: JSON.stringify({ confirmation })
 				}
-			)
+			),
+		scraperSession: {
+			get: () =>
+				request<{ exists: boolean; username?: string; created_at?: string }>(
+					'/api/settings/scraper-session'
+				),
+			import: (data: { auth_token: string; ct0: string; username?: string }) =>
+				request<{ status: string; username?: string; created_at?: string }>(
+					'/api/settings/scraper-session',
+					{
+						method: 'POST',
+						body: JSON.stringify(data)
+					}
+				),
+			delete: () =>
+				request<{ deleted: boolean }>('/api/settings/scraper-session', {
+					method: 'DELETE'
+				})
+		}
 	},
 
 	targets: {

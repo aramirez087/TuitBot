@@ -17,6 +17,7 @@ export interface RuntimeStatus {
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
 	provider_backend: string;
+	can_post: boolean;
 }
 
 // --- Health & Analytics types ---
