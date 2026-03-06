@@ -78,6 +78,8 @@
 	title="Schedule"
 	description="Active hours, posting times, and timezone"
 	icon={Clock}
+	scope="account"
+	scopeKey="schedule"
 >
 	<div class="field-grid">
 		<div class="field full-width">

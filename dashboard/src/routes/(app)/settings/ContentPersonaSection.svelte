@@ -11,6 +11,8 @@
 	title="Content Persona"
 	description="Shape the personality and voice of your generated content"
 	icon={MessageCircle}
+	scope="account"
+	scopeKey="business"
 >
 	<div class="field-grid">
 		<div class="field full-width">

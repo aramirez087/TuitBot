@@ -111,6 +111,7 @@
 	title="LAN Access"
 	description="Access the dashboard from any device on your network"
 	icon={Wifi}
+	scope="instance"
 >
 	{#if loading}
 		<div class="loading-text">Loading...</div>

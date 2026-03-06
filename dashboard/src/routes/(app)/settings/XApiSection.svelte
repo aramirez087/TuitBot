@@ -27,6 +27,8 @@
 	id="xapi"
 	title="X Access"
 	description="How Tuitbot connects to X (Twitter)"
+	scope="account"
+	scopeKey="x_api"
 	icon={Key}
 >
 	<div class="section-body">

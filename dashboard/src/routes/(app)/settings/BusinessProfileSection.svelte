@@ -11,6 +11,8 @@
 	title="Business Profile"
 	description="Your product details and keywords for discovery"
 	icon={Briefcase}
+	scope="account"
+	scopeKey="business"
 >
 	<div class="field-grid">
 		<div class="field">

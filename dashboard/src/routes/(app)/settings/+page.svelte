@@ -15,6 +15,7 @@
 		AlertTriangle,
 		Users
 	} from 'lucide-svelte';
+	import { get } from 'svelte/store';
 	import {
 		loading,
 		error,
@@ -65,7 +66,9 @@
 	let activeSection = $state('business');
 	let showSaved = $state(false);
 	let showConfirm = $state(false);
+	let showDiscarded = $state(false);
 	let savedTimeout: ReturnType<typeof setTimeout> | null = null;
+	let discardedTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// --- IntersectionObserver for section highlighting ---
 
@@ -98,7 +101,18 @@
 		loadSettings().then(() => {
 			setTimeout(setupObservers, 100);
 		});
-		const handler = () => loadSettings().then(() => setTimeout(setupObservers, 100));
+		const handler = () => {
+			const wasDirty = get(isDirty);
+			if (wasDirty) {
+				resetDraft();
+				showDiscarded = true;
+				if (discardedTimeout) clearTimeout(discardedTimeout);
+				discardedTimeout = setTimeout(() => {
+					showDiscarded = false;
+				}, 3000);
+			}
+			loadSettings().then(() => setTimeout(setupObservers, 100));
+		};
 		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
@@ -106,6 +120,7 @@
 	onDestroy(() => {
 		observers.forEach((o) => o.disconnect());
 		if (savedTimeout) clearTimeout(savedTimeout);
+		if (discardedTimeout) clearTimeout(discardedTimeout);
 	});
 
 	function scrollToSection(id: string) {
@@ -204,7 +219,7 @@
 		</div>
 	</div>
 
-	<SaveBar {showSaved} onSave={handleSave} onDiscard={resetDraft} />
+	<SaveBar {showSaved} {showDiscarded} onSave={handleSave} onDiscard={resetDraft} />
 
 	{#if showConfirm}
 		<ConfirmModal onConfirm={doSave} onCancel={() => (showConfirm = false)} />

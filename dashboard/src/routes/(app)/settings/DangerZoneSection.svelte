@@ -41,6 +41,7 @@
 		title="Danger Zone"
 		description="Irreversible actions that erase all Tuitbot data"
 		icon={AlertTriangle}
+		scope="instance"
 	>
 		<div class="warning-block">
 			<p class="warning-text">

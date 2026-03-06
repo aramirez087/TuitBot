@@ -24,6 +24,7 @@
 	id="llm"
 	title="LLM Provider"
 	description="AI model configuration for content generation"
+	scope="instance"
 	icon={Brain}
 >
 	<div class="field-grid">

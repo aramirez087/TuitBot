@@ -54,6 +54,8 @@
 	title="Scoring Engine"
 	description="Tune the 6-signal scoring system that decides which tweets to reply to"
 	icon={Target}
+	scope="account"
+	scopeKey="scoring"
 >
 	<div class="field-grid">
 		<div class="field full-width">
