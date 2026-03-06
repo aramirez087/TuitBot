@@ -7,6 +7,7 @@
 		prefillTime = null,
 		prefillDate = null,
 		schedule,
+		canPublish = true,
 		onclose,
 		onsubmit
 	}: {
@@ -14,8 +15,9 @@
 		prefillTime?: string | null;
 		prefillDate?: Date | null;
 		schedule: ScheduleConfig | null;
+		canPublish?: boolean;
 		onclose: () => void;
-		onsubmit: (data: ComposeRequest) => void;
+		onsubmit: (data: ComposeRequest) => void | Promise<void>;
 	} = $props();
 
 	let triggerElement: Element | null = null;
@@ -35,6 +37,7 @@
 {#if open}
 	<ComposeWorkspace
 		{schedule}
+		{canPublish}
 		{onsubmit}
 		onclose={handleClose}
 		{prefillTime}

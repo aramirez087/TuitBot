@@ -6,14 +6,19 @@
 	import { homeSurface, homeSurfaceReady, loadHomeSurface } from '$lib/stores/homeSurface';
 
 	let schedule = $state<ScheduleConfig | null>(null);
+	let canPublish = $state(true);
 
 	onMount(async () => {
 		await loadHomeSurface();
 		try {
-			const cfg = await api.content.schedule();
+			const [cfg, rt] = await Promise.all([
+				api.content.schedule(),
+				api.runtime.status(),
+			]);
 			schedule = cfg;
+			canPublish = rt.provider_backend === 'x_api';
 		} catch {
-			// Schedule loading is non-critical; workspace works without it
+			// Non-critical; workspace works without these
 		}
 	});
 
@@ -32,6 +37,7 @@
 	<div class="home-composer">
 		<ComposeWorkspace
 			{schedule}
+			{canPublish}
 			onsubmit={handleSubmit}
 			embedded={true}
 		/>

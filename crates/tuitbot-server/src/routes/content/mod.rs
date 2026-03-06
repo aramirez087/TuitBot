@@ -31,10 +31,28 @@ pub use scheduled::EditScheduledRequest;
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/// Read `approval_mode` from the config file.
+/// Read the explicit `approval_mode` setting from the config file.
+///
+/// This uses the raw `approval_mode` field (not `effective_approval_mode`)
+/// because compose endpoints handle user-initiated manual posts — the
+/// Composer-mode override that forces approval for autonomous loops
+/// should not apply here.
 fn read_approval_mode(state: &AppState) -> Result<bool, ApiError> {
     let config = read_config(state)?;
-    Ok(config.effective_approval_mode())
+    Ok(config.approval_mode)
+}
+
+/// Return an error if the provider backend cannot post (scraper / unconfigured).
+fn require_post_capable(state: &AppState) -> Result<(), ApiError> {
+    let config = read_config(state)?;
+    if config.x_api.provider_backend != "x_api" {
+        return Err(ApiError::BadRequest(
+            "Direct posting requires X API credentials. \
+             Configure the Official X API in Settings."
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Read the full config from the config file.

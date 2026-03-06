@@ -1,5 +1,6 @@
 //! Compose endpoints for tweets, threads, and unified compose.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::State;
@@ -10,14 +11,15 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
-use tuitbot_core::storage::{approval_queue, scheduled_content};
+use tuitbot_core::storage::{accounts, action_log, approval_queue, scheduled_content};
+use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
 use crate::ws::WsEvent;
 
-use super::read_approval_mode;
+use super::{read_approval_mode, read_config};
 
 /// A single thread block in an API request payload.
 #[derive(Debug, Deserialize)]
@@ -318,19 +320,24 @@ async fn compose_thread_blocks_flow(
             "block_ids": block_ids,
         })))
     } else {
+        let scheduled_for = body
+            .scheduled_for
+            .clone()
+            .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string()));
+
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
             "thread",
             &content,
-            body.scheduled_for.as_deref(),
+            scheduled_for.as_deref(),
         )
         .await?;
 
         let _ = state.event_tx.send(WsEvent::ContentScheduled {
             id,
             content_type: "thread".to_string(),
-            scheduled_for: body.scheduled_for.clone(),
+            scheduled_for: scheduled_for.clone(),
         });
 
         Ok(Json(json!({
@@ -341,7 +348,7 @@ async fn compose_thread_blocks_flow(
     }
 }
 
-/// Persist content via approval queue or scheduled content table.
+/// Persist content via approval queue, scheduled content, or post directly.
 async fn persist_content(
     state: &AppState,
     ctx: &AccountContext,
@@ -378,7 +385,8 @@ async fn persist_content(
             "status": "queued_for_approval",
             "id": id,
         })))
-    } else {
+    } else if body.scheduled_for.is_some() {
+        // User explicitly chose a future time — save to calendar.
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
@@ -398,5 +406,102 @@ async fn persist_content(
             "status": "scheduled",
             "id": id,
         })))
+    } else {
+        // Immediate publish — try posting via X API directly.
+        // If not configured for direct posting, save to calendar instead.
+        let config = read_config(state)?;
+        if config.x_api.provider_backend != "x_api" {
+            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let id = scheduled_content::insert_for(
+                &state.db,
+                &ctx.account_id,
+                &body.content_type,
+                content,
+                Some(&scheduled_for),
+            )
+            .await?;
+
+            let _ = state.event_tx.send(WsEvent::ContentScheduled {
+                id,
+                content_type: body.content_type.clone(),
+                scheduled_for: Some(scheduled_for),
+            });
+
+            return Ok(Json(json!({
+                "status": "scheduled",
+                "id": id,
+            })));
+        }
+
+        try_post_now(state, ctx, &body.content_type, content).await
     }
+}
+
+/// Attempt to post a tweet directly via X API. Falls back to scheduled
+/// content if no credentials are available.
+async fn try_post_now(
+    state: &AppState,
+    ctx: &AccountContext,
+    content_type: &str,
+    content: &str,
+) -> Result<Json<Value>, ApiError> {
+    let config = read_config(state)?;
+
+    // Only attempt direct posting with the official X API backend.
+    if config.x_api.provider_backend == "scraper" || config.x_api.provider_backend.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Direct posting requires X API credentials. \
+             Configure the Official X API in Settings → X API, \
+             or schedule the post for later."
+                .to_string(),
+        ));
+    }
+
+    // Resolve token path for this account.
+    let account = accounts::get_account(&state.db, &ctx.account_id)
+        .await
+        .map_err(ApiError::Storage)?;
+
+    let token_path = account
+        .as_ref()
+        .and_then(|a| a.token_path.as_deref())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| state.data_dir.join("tokens.json"));
+
+    let access_token = state
+        .get_x_access_token(&token_path, &ctx.account_id)
+        .await
+        .map_err(|e| {
+            ApiError::BadRequest(format!(
+                "X API authentication failed — re-link your account in Settings. ({e})"
+            ))
+        })?;
+
+    let client = XApiHttpClient::new(access_token);
+
+    let posted = client
+        .post_tweet(content)
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?;
+
+    // Log the successful post.
+    let metadata = json!({
+        "tweet_id": posted.id,
+        "content_type": content_type,
+        "source": "compose",
+    });
+    let _ = action_log::log_action_for(
+        &state.db,
+        &ctx.account_id,
+        "tweet_posted",
+        "success",
+        Some(&format!("Posted tweet {}", posted.id)),
+        Some(&metadata.to_string()),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "status": "posted",
+        "tweet_id": posted.id,
+    })))
 }

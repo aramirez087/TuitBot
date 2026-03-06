@@ -16,6 +16,7 @@ export interface RuntimeStatus {
 	task_count: number;
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
+	provider_backend: string;
 }
 
 // --- Health & Analytics types ---

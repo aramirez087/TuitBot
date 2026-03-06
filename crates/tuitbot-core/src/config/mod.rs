@@ -193,8 +193,11 @@ impl Config {
 
     /// Returns `true` if approval mode is effectively enabled.
     ///
-    /// In composer mode, approval mode is always implicitly enabled so
-    /// the user controls all posting.
+    /// In composer mode, approval mode is implicitly enabled for
+    /// **autonomous** loops so the user controls all automated posting.
+    /// Manual compose actions from the dashboard respect the explicit
+    /// `approval_mode` setting — use [`Config::approval_mode`] directly
+    /// for user-initiated flows.
     pub fn effective_approval_mode(&self) -> bool {
         self.approval_mode || self.mode == OperatingMode::Composer
     }

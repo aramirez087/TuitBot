@@ -17,6 +17,7 @@
 		selectedTime,
 		inspectorOpen,
 		previewVisible,
+		canPublish = true,
 		handle = null,
 		avatarUrl = null,
 		displayName = null,
@@ -35,6 +36,7 @@
 		selectedTime: string | null;
 		inspectorOpen: boolean;
 		previewVisible: boolean;
+		canPublish?: boolean;
 		handle?: string | null;
 		avatarUrl?: string | null;
 		displayName?: string | null;
@@ -96,17 +98,19 @@
 					{/if}
 					<span>{submitting ? 'Scheduling\u2026' : 'Schedule'}</span>
 				</button>
-				<button
-					class="cta-pill publish-now-btn"
-					onclick={onpublishnow ?? onsubmit}
-					disabled={!canSubmit || submitting}
-					title="Publish immediately"
-					aria-label="Publish now"
-				>
-					<Send size={14} />
-				</button>
+				{#if canPublish}
+					<button
+						class="cta-pill publish-now-btn"
+						onclick={onpublishnow ?? onsubmit}
+						disabled={!canSubmit || submitting}
+						title="Publish immediately"
+						aria-label="Publish now"
+					>
+						<Send size={14} />
+					</button>
+				{/if}
 			</div>
-		{:else}
+		{:else if canPublish}
 			<button
 				class="cta-pill publish-pill"
 				onclick={onsubmit}
@@ -120,6 +124,21 @@
 					<Send size={14} />
 				{/if}
 				<span>{submitting ? 'Posting\u2026' : 'Publish'}</span>
+			</button>
+		{:else}
+			<button
+				class="cta-pill schedule-pill"
+				onclick={onsubmit}
+				disabled={!canSubmit || submitting}
+				title="Connect X API credentials to publish directly"
+				aria-label={submitting ? 'Saving' : 'Save to calendar'}
+			>
+				{#if submitting}
+					<Loader2 size={14} class="spin-icon" />
+				{:else}
+					<Clock size={14} />
+				{/if}
+				<span>{submitting ? 'Saving\u2026' : 'Save to Calendar'}</span>
 			</button>
 		{/if}
 

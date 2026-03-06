@@ -6,6 +6,7 @@ use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tuitbot_core::config::Config;
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::storage::{self, approval_queue};
 
@@ -169,6 +170,19 @@ pub async fn queue_reply(
     Json(body): Json<QueueReplyRequest>,
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
+
+    // Block posting in scraper / unconfigured mode.
+    let config: Config = std::fs::read_to_string(&state.config_path)
+        .ok()
+        .and_then(|s| toml::from_str(&s).ok())
+        .unwrap_or_default();
+    if config.x_api.provider_backend != "x_api" {
+        return Err(ApiError::BadRequest(
+            "Direct posting requires X API credentials. \
+             Configure the Official X API in Settings."
+                .to_string(),
+        ));
+    }
 
     if body.content.trim().is_empty() {
         return Err(ApiError::BadRequest(

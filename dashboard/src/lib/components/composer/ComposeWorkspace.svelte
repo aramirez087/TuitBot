@@ -40,14 +40,16 @@
 		onclose,
 		prefillTime = null,
 		prefillDate = null,
-		embedded = false
+		embedded = false,
+		canPublish = true
 	}: {
 		schedule: ScheduleConfig | null;
-		onsubmit: (data: ComposeRequest) => void;
+		onsubmit: (data: ComposeRequest) => void | Promise<void>;
 		onclose?: () => void;
 		prefillTime?: string | null;
 		prefillDate?: Date | null;
 		embedded?: boolean;
+		canPublish?: boolean;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
@@ -299,7 +301,7 @@
 			});
 			clearAutoSave();
 			clearSessionFlag();
-			onsubmit(data);
+			await onsubmit(data);
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount
 			if (embedded) {
@@ -308,7 +310,7 @@
 					mode, text: tweetText, blocks: [...threadBlocks],
 					media: [...attachedMedia], selectedTime
 				};
-				undoMessage = 'Published.';
+				undoMessage = canPublish && !selectedTime ? 'Published.' : 'Saved to calendar.';
 
 				tweetText = '';
 				threadBlocks = [];
@@ -582,7 +584,7 @@
 	{/if}
 
 	<ComposerCanvas
-		{canSubmit} {submitting} {selectedTime} {submitError}
+		{canSubmit} {submitting} {selectedTime} {submitError} {canPublish}
 		inspectorOpen={desktopInspectorOpen}
 		{embedded}
 		onsubmit={handleSubmit}
@@ -694,6 +696,7 @@
 			{submitting}
 			{selectedTime}
 			{inspectorOpen}
+			{canPublish}
 			previewVisible={previewMode}
 			handle={$currentAccount?.x_username ?? null}
 			avatarUrl={$currentAccount?.x_avatar_url ?? null}
