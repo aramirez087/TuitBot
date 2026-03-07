@@ -327,18 +327,14 @@ async fn compose_thread_blocks_flow(
             "id": id,
             "block_ids": block_ids,
         })))
-    } else {
-        let scheduled_for = body
-            .scheduled_for
-            .clone()
-            .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string()));
-
+    } else if body.scheduled_for.is_some() {
+        // User explicitly chose a future time — save to calendar.
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
             "thread",
             &content,
-            scheduled_for.as_deref(),
+            body.scheduled_for.as_deref(),
         )
         .await?;
 
@@ -347,7 +343,7 @@ async fn compose_thread_blocks_flow(
             event: WsEvent::ContentScheduled {
                 id,
                 content_type: "thread".to_string(),
-                scheduled_for: scheduled_for.clone(),
+                scheduled_for: body.scheduled_for.clone(),
             },
         });
 
@@ -356,6 +352,37 @@ async fn compose_thread_blocks_flow(
             "id": id,
             "block_ids": block_ids,
         })))
+    } else {
+        // Immediate publish — try posting as a reply chain.
+        let can_post = super::can_post_for(state, &ctx.account_id).await;
+        if !can_post {
+            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let id = scheduled_content::insert_for(
+                &state.db,
+                &ctx.account_id,
+                "thread",
+                &content,
+                Some(&scheduled_for),
+            )
+            .await?;
+
+            let _ = state.event_tx.send(AccountWsEvent {
+                account_id: ctx.account_id.clone(),
+                event: WsEvent::ContentScheduled {
+                    id,
+                    content_type: "thread".to_string(),
+                    scheduled_for: Some(scheduled_for),
+                },
+            });
+
+            return Ok(Json(json!({
+                "status": "scheduled",
+                "id": id,
+                "block_ids": block_ids,
+            })));
+        }
+
+        try_post_thread_now(state, ctx, &core_blocks).await
     }
 }
 
@@ -457,18 +484,18 @@ async fn persist_content(
     }
 }
 
-/// Attempt to post a tweet directly via X API or cookie-auth transport.
-async fn try_post_now(
+/// Build an X API client for the given account based on the configured backend.
+///
+/// Returns `Box<dyn XApiClient>` so callers can use either scraper or OAuth
+/// without duplicating the construction logic.
+async fn build_x_client(
     state: &AppState,
     ctx: &AccountContext,
-    content_type: &str,
-    content: &str,
-) -> Result<Json<Value>, ApiError> {
+) -> Result<Box<dyn XApiClient>, ApiError> {
     let config = super::read_effective_config(state, &ctx.account_id).await?;
 
-    let posted = match config.x_api.provider_backend.as_str() {
+    match config.x_api.provider_backend.as_str() {
         "scraper" => {
-            // Use cookie-auth transport via LocalModeXClient with account-scoped data dir.
             let account_data =
                 tuitbot_core::storage::accounts::account_data_dir(&state.data_dir, &ctx.account_id);
             let client = tuitbot_core::x_api::LocalModeXClient::with_session(
@@ -476,18 +503,13 @@ async fn try_post_now(
                 &account_data,
             )
             .await;
-            client
-                .post_tweet(content)
-                .await
-                .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?
+            Ok(Box::new(client))
         }
         "x_api" => {
-            // Use official X API with OAuth tokens.
             let token_path = tuitbot_core::storage::accounts::account_token_path(
                 &state.data_dir,
                 &ctx.account_id,
             );
-
             let access_token = state
                 .get_x_access_token(&token_path, &ctx.account_id)
                 .await
@@ -496,23 +518,30 @@ async fn try_post_now(
                         "X API authentication failed — re-link your account in Settings. ({e})"
                     ))
                 })?;
-
-            let client = XApiHttpClient::new(access_token);
-            client
-                .post_tweet(content)
-                .await
-                .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?
+            Ok(Box::new(XApiHttpClient::new(access_token)))
         }
-        _ => {
-            return Err(ApiError::BadRequest(
-                "Direct posting requires X API credentials or a browser session. \
-                 Configure in Settings → X API."
-                    .to_string(),
-            ));
-        }
-    };
+        _ => Err(ApiError::BadRequest(
+            "Direct posting requires X API credentials or a browser session. \
+             Configure in Settings → X API."
+                .to_string(),
+        )),
+    }
+}
 
-    // Log the successful post.
+/// Attempt to post a tweet directly via X API or cookie-auth transport.
+async fn try_post_now(
+    state: &AppState,
+    ctx: &AccountContext,
+    content_type: &str,
+    content: &str,
+) -> Result<Json<Value>, ApiError> {
+    let client = build_x_client(state, ctx).await?;
+
+    let posted = client
+        .post_tweet(content)
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?;
+
     let metadata = json!({
         "tweet_id": posted.id,
         "content_type": content_type,
@@ -531,5 +560,82 @@ async fn try_post_now(
     Ok(Json(json!({
         "status": "posted",
         "tweet_id": posted.id,
+    })))
+}
+
+/// Post a thread as a reply chain: first tweet standalone, each subsequent
+/// tweet replying to the previous one. Returns all posted tweet IDs.
+async fn try_post_thread_now(
+    state: &AppState,
+    ctx: &AccountContext,
+    blocks: &[ThreadBlock],
+) -> Result<Json<Value>, ApiError> {
+    let client = build_x_client(state, ctx).await?;
+
+    let mut sorted: Vec<&ThreadBlock> = blocks.iter().collect();
+    sorted.sort_by_key(|b| b.order);
+
+    let mut tweet_ids: Vec<String> = Vec::with_capacity(sorted.len());
+
+    for (i, block) in sorted.iter().enumerate() {
+        let posted = if i == 0 {
+            client.post_tweet(&block.text).await
+        } else {
+            client.reply_to_tweet(&block.text, &tweet_ids[i - 1]).await
+        };
+
+        match posted {
+            Ok(p) => tweet_ids.push(p.id),
+            Err(e) => {
+                // Log partial failure with the IDs we did post.
+                let metadata = json!({
+                    "posted_tweet_ids": tweet_ids,
+                    "failed_at_index": i,
+                    "error": e.to_string(),
+                    "source": "compose",
+                });
+                let _ = action_log::log_action_for(
+                    &state.db,
+                    &ctx.account_id,
+                    "thread_posted",
+                    "partial_failure",
+                    Some(&format!(
+                        "Thread failed at tweet {}/{}: {e}",
+                        i + 1,
+                        sorted.len()
+                    )),
+                    Some(&metadata.to_string()),
+                )
+                .await;
+
+                return Err(ApiError::Internal(format!(
+                    "Thread failed at tweet {}/{}: {e}. \
+                     {} tweet(s) were posted and cannot be undone.",
+                    i + 1,
+                    sorted.len(),
+                    tweet_ids.len()
+                )));
+            }
+        }
+    }
+
+    let metadata = json!({
+        "tweet_ids": tweet_ids,
+        "content_type": "thread",
+        "source": "compose",
+    });
+    let _ = action_log::log_action_for(
+        &state.db,
+        &ctx.account_id,
+        "thread_posted",
+        "success",
+        Some(&format!("Posted thread ({} tweets)", tweet_ids.len())),
+        Some(&metadata.to_string()),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "status": "posted",
+        "tweet_ids": tweet_ids,
     })))
 }

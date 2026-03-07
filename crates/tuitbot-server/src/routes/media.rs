@@ -59,6 +59,15 @@ pub async fn upload(
         .await
         .map_err(|e| ApiError::Internal(format!("failed to store media: {e}")))?;
 
+    // Trigger cleanup in background if media folder exceeds threshold.
+    let data_dir = state.data_dir.clone();
+    let db = state.db.clone();
+    tokio::spawn(async move {
+        if let Err(e) = media::cleanup_if_over_threshold(&data_dir, &db).await {
+            tracing::warn!(error = %e, "Media cleanup failed");
+        }
+    });
+
     Ok(Json(json!({
         "path": local.path,
         "media_type": media_type.mime_type(),
