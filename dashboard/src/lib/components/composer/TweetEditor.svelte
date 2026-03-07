@@ -54,12 +54,13 @@
 		return MAX_IMAGE_SIZE;
 	}
 
-	async function handleFileSelect(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const files = input.files;
-		if (!files || files.length === 0) return;
-
+	async function processFiles(files: FileList | File[]) {
 		for (const file of files) {
+			const accepted = ACCEPTED_TYPES.split(',');
+			if (!accepted.includes(file.type)) {
+				onerror(`Unsupported file type: ${file.type || 'unknown'}`);
+				break;
+			}
 			if (!canAttachMore && !hasGifOrVideo) {
 				onerror(`Maximum ${MAX_IMAGES} images allowed per tweet.`);
 				break;
@@ -97,7 +98,41 @@
 				uploading = false;
 			}
 		}
+	}
+
+	async function handleFileSelect(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const files = input.files;
+		if (!files || files.length === 0) return;
+		await processFiles(files);
 		input.value = '';
+	}
+
+	function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		const files = e.dataTransfer?.files;
+		if (files && files.length > 0) processFiles(files);
+	}
+
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+	}
+
+	async function handlePaste(e: ClipboardEvent) {
+		// Standard browser path: clipboardData has files
+		const files = e.clipboardData?.files;
+		if (files && files.length > 0) {
+			e.preventDefault();
+			processFiles(files);
+			return;
+		}
+
+		// If text was pasted, let native handling work
+		if (e.clipboardData?.getData('text/plain')) return;
+
+		// WKWebView fallback: clipboardData is empty for images.
+		// In Tauri, image paste is handled by ComposeWorkspace's Cmd+V handler
+		// via the clipboard plugin, so no fallback needed here.
 	}
 
 	function removeMedia(index: number) {
@@ -107,6 +142,7 @@
 	export function triggerFileSelect() {
 		fileInput?.click();
 	}
+
 </script>
 
 <div class="tweet-compose" class:has-avatar={!!avatarUrl}>
@@ -119,6 +155,9 @@
 		placeholder="What's on your mind?"
 		value={text}
 		oninput={(e) => onchange(e.currentTarget.value)}
+		ondrop={handleDrop}
+		ondragover={handleDragOver}
+		onpaste={handlePaste}
 		rows={4}
 		aria-label="Tweet content"
 	></textarea>

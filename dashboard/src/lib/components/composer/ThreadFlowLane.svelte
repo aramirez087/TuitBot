@@ -321,6 +321,14 @@
 		}
 	}
 
+	export function addMediaToFocusedBlock(path: string) {
+		const targetId = focusedBlockId ?? sortedBlocks[0]?.id;
+		if (!targetId) return;
+		const block = blocks.find((b) => b.id === targetId);
+		if (!block || block.media_paths.length >= 4) return;
+		updateBlockMedia(targetId, [...block.media_paths, path]);
+	}
+
 	export function getBlocks(): ThreadBlock[] {
 		return [...blocks];
 	}

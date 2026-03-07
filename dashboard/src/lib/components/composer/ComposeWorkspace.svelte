@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, flushSync } from 'svelte';
 	import {
 		api,
 		type ScheduleConfig,
@@ -385,7 +385,58 @@
 		focusMode = !focusMode;
 	}
 
+
+	async function handleImagePaste() {
+		try {
+			const { readImage } = await import('@tauri-apps/plugin-clipboard-manager');
+			const img = await readImage();
+			const { width: w, height: h } = await img.size();
+			const rgba = await img.rgba();
+
+			const canvas = document.createElement('canvas');
+			canvas.width = w;
+			canvas.height = h;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
+			ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), w, h), 0, 0);
+			const blob: Blob | null = await new Promise((resolve) =>
+				canvas.toBlob(resolve, 'image/png')
+			);
+			if (!blob) return;
+
+			const file = new File([blob], 'pasted-image.png', { type: 'image/png' });
+			const result = await api.media.upload(file);
+
+			if (mode === 'thread') {
+				threadFlowRef?.addMediaToFocusedBlock(result.path);
+			} else {
+				flushSync(() => {
+					attachedMedia = [...attachedMedia, {
+						path: result.path,
+						file,
+						previewUrl: api.media.fileUrl(result.path),
+						mediaType: result.media_type
+					}];
+				});
+			}
+			return;
+		} catch {
+			// Not an image in clipboard — fall through to text paste
+		}
+
+		try {
+			const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+			const text = await readText();
+			if (text) {
+				document.execCommand('insertText', false, text);
+			}
+		} catch {
+			// No text in clipboard either
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
+
 		if (paletteOpen) return;
 
 		// When preview overlay is open, only allow Escape and toggle
@@ -408,6 +459,11 @@
 				if (tweetText.trim()) switchToThread();
 			}
 			// In thread mode: let event propagate to ThreadFlowLane's card handler for split
+			return;
+		}
+		if (matchEvent(e, 'cmd+v')) {
+			e.preventDefault();
+			handleImagePaste();
 			return;
 		}
 		if (matchEvent(e, 'cmd+shift+j')) { e.preventDefault(); handleInlineAssist(); return; }

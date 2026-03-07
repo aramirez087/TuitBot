@@ -37,6 +37,8 @@ dashboard/node_modules/
 dashboard/.svelte-kit/
 dashboard/build/
 dashboard/src-tauri/target/
+dashboard/.playwright-cli/
+dashboard/src-tauri/.playwright-cli/
 
 # Embedded dashboard build artifact
 crates/tuitbot-server/dashboard-dist/

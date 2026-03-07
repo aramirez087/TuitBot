@@ -112,6 +112,7 @@
 		>
 			<Lightbulb size={15} />
 		</button>
+
 	</div>
 </div>
 
