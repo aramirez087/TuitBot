@@ -246,6 +246,7 @@ impl RuntimeDeps {
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
         let dyn_client = create_local_client_with_data_dir(&config.x_api, Some(data_dir))
+            .await
             .expect("scraper backend should produce a local client");
         tracing::info!(
             allow_mutations = config.x_api.scraper_allow_mutations,

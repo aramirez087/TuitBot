@@ -4,13 +4,17 @@
 //! web API endpoints. This is the transport layer that enables posting
 //! tweets without official API credentials.
 
-use reqwest::header::{HeaderMap, HeaderValue};
+use rand::RngCore;
+use rquest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 
 use crate::error::XApiError;
 use crate::x_api::types::PostedTweet;
 
 use super::session::ScraperSession;
+
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 
 /// Static bearer token used by X's web client.
 ///
@@ -21,29 +25,84 @@ const WEB_BEARER_TOKEN: &str = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6
 /// Base URL for X's internal API.
 const X_API_BASE: &str = "https://x.com/i/api";
 
-/// GraphQL query ID for CreateTweet mutation.
+/// Fallback GraphQL query ID for CreateTweet mutation.
 ///
-/// This ID changes with X web deploys. If requests start returning 404,
-/// the ID needs updating. Override via `TUITBOT_CREATE_TWEET_QUERY_ID` env var.
-const DEFAULT_CREATE_TWEET_QUERY_ID: &str = "znCbxBEHRELYLRSELA_J1g";
+/// X rotates this ID with web deploys. On startup we attempt to resolve
+/// the current ID from X's JS bundles (`resolve_create_tweet_query_id`).
+/// This constant is only used when auto-detection fails.
+const FALLBACK_CREATE_TWEET_QUERY_ID: &str = "uY34Pldm6W89yqswRmPMSQ";
+
+/// Build an `rquest::Client` that impersonates Chrome's TLS fingerprint.
+///
+/// X uses TLS fingerprinting (JA3/JA4) to detect non-browser clients.
+/// `rquest` reproduces Chrome's exact TLS handshake, HTTP/2 settings,
+/// and header order so the connection is indistinguishable from a real browser.
+fn build_browser_client() -> rquest::Client {
+    rquest::Client::builder()
+        .emulation(rquest_util::Emulation::Chrome134)
+        .build()
+        .unwrap_or_else(|_| rquest::Client::new())
+}
+
+/// Generate a random UUID v4 string for `x-client-uuid`.
+fn generate_client_uuid() -> String {
+    let mut buf = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut buf);
+    buf[6] = (buf[6] & 0x0f) | 0x40;
+    buf[8] = (buf[8] & 0x3f) | 0x80;
+    format!(
+        "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
+        u32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]),
+        u16::from_be_bytes([buf[4], buf[5]]),
+        u16::from_be_bytes([buf[6], buf[7]]),
+        u16::from_be_bytes([buf[8], buf[9]]),
+        u64::from_be_bytes([0, 0, buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]]),
+    )
+}
+
+/// Generate a random `x-client-transaction-id` header value.
+fn generate_transaction_id() -> String {
+    let mut buf = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut buf);
+    BASE64.encode(buf)
+}
 
 /// HTTP transport using cookie-based authentication.
+///
+/// Uses `rquest` (not `reqwest`) to impersonate Chrome's TLS fingerprint
+/// so that X's anti-automation checks (JA3/JA4 fingerprinting) pass.
 pub struct CookieTransport {
-    client: reqwest::Client,
+    client: rquest::Client,
     session: ScraperSession,
     create_tweet_query_id: String,
+    /// Persistent client UUID (mimics X web client's localStorage UUID).
+    client_uuid: String,
 }
 
 impl CookieTransport {
     /// Create a new cookie transport from a loaded session.
+    ///
+    /// Prefer `with_query_id` + `resolve_create_tweet_query_id` which
+    /// auto-detects the current CreateTweet query ID from X's web client.
     pub fn new(session: ScraperSession) -> Self {
         let query_id = std::env::var("TUITBOT_CREATE_TWEET_QUERY_ID")
-            .unwrap_or_else(|_| DEFAULT_CREATE_TWEET_QUERY_ID.to_string());
+            .unwrap_or_else(|_| FALLBACK_CREATE_TWEET_QUERY_ID.to_string());
 
         Self {
-            client: reqwest::Client::new(),
+            client: build_browser_client(),
             session,
             create_tweet_query_id: query_id,
+            client_uuid: generate_client_uuid(),
+        }
+    }
+
+    /// Create a transport with a pre-resolved query ID.
+    pub fn with_query_id(session: ScraperSession, query_id: String) -> Self {
+        Self {
+            client: build_browser_client(),
+            session,
+            create_tweet_query_id: query_id,
+            client_uuid: generate_client_uuid(),
         }
     }
 
@@ -85,7 +144,29 @@ impl CookieTransport {
             HeaderValue::from_static("OAuth2Session"),
         );
         headers.insert("x-twitter-active-user", HeaderValue::from_static("yes"));
+        headers.insert("x-twitter-client-language", HeaderValue::from_static("en"));
         headers.insert("content-type", HeaderValue::from_static("application/json"));
+        headers.insert("origin", HeaderValue::from_static("https://x.com"));
+        headers.insert("referer", HeaderValue::from_static("https://x.com/"));
+
+        // Anti-automation headers: X's web client sends these with every request.
+        // `x-client-uuid` is a persistent UUID stored in the browser's localStorage.
+        // `x-client-transaction-id` is a unique per-request identifier.
+        headers.insert(
+            "x-client-uuid",
+            HeaderValue::from_str(&self.client_uuid).map_err(|e| {
+                XApiError::ScraperTransportUnavailable {
+                    message: format!("invalid client-uuid header: {e}"),
+                }
+            })?,
+        );
+        let txn_id = generate_transaction_id();
+        headers.insert(
+            "x-client-transaction-id",
+            HeaderValue::from_str(&txn_id).map_err(|e| XApiError::ScraperTransportUnavailable {
+                message: format!("invalid transaction-id header: {e}"),
+            })?,
+        );
 
         Ok(headers)
     }
@@ -149,7 +230,9 @@ impl CookieTransport {
             .json(&body)
             .send()
             .await
-            .map_err(|e| XApiError::Network { source: e })?;
+            .map_err(|e| XApiError::ScraperTransportUnavailable {
+                message: format!("HTTP request failed: {e}"),
+            })?;
 
         let status = response.status().as_u16();
 
@@ -175,12 +258,160 @@ impl CookieTransport {
             });
         }
 
-        let resp_body: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| XApiError::Network { source: e })?;
+        let resp_body: serde_json::Value =
+            response
+                .json()
+                .await
+                .map_err(|e| XApiError::ScraperTransportUnavailable {
+                    message: format!("failed to parse response JSON: {e}"),
+                })?;
 
         parse_create_tweet_response(&resp_body)
+    }
+}
+
+/// Resolve the current CreateTweet query ID from X's web client JS bundles.
+///
+/// 1. Fetches the X homepage to discover `<script>` bundle URLs.
+/// 2. Fetches each bundle and searches for the `CreateTweet` operation.
+/// 3. Extracts the query ID from the surrounding pattern.
+///
+/// Returns the env-var override if set, falls back to the hardcoded default
+/// if auto-detection fails. Logs the outcome at info/warn level.
+pub async fn resolve_create_tweet_query_id() -> String {
+    // Env-var override always wins.
+    if let Ok(id) = std::env::var("TUITBOT_CREATE_TWEET_QUERY_ID") {
+        tracing::info!(query_id = %id, "Using CreateTweet query ID from env var");
+        return id;
+    }
+
+    match detect_query_id_from_bundles().await {
+        Ok(id) => {
+            tracing::info!(query_id = %id, "Auto-detected CreateTweet query ID from X web client");
+            id
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                fallback = FALLBACK_CREATE_TWEET_QUERY_ID,
+                "Failed to auto-detect CreateTweet query ID, using fallback"
+            );
+            FALLBACK_CREATE_TWEET_QUERY_ID.to_string()
+        }
+    }
+}
+
+/// Fetch X's homepage, find JS bundle URLs, and extract the CreateTweet query ID.
+async fn detect_query_id_from_bundles() -> Result<String, String> {
+    let client = rquest::Client::builder()
+        .emulation(rquest_util::Emulation::Chrome134)
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("failed to build HTTP client: {e}"))?;
+
+    // Step 1: Fetch the X homepage to find JS bundle URLs.
+    let html = client
+        .get("https://x.com")
+        .send()
+        .await
+        .map_err(|e| format!("failed to fetch x.com: {e}"))?
+        .text()
+        .await
+        .map_err(|e| format!("failed to read x.com response: {e}"))?;
+
+    // Extract script src URLs from the HTML.
+    let script_urls: Vec<String> = extract_script_urls(&html);
+
+    if script_urls.is_empty() {
+        return Err("no JS bundle URLs found in x.com HTML".to_string());
+    }
+
+    tracing::debug!(count = script_urls.len(), "Found JS bundle URLs to scan");
+
+    // Step 2: Fetch each bundle and search for the CreateTweet query ID.
+    // X typically has ~10-15 bundles; the query ID is in one of the main API bundles.
+    for url in &script_urls {
+        let js = match client.get(url).send().await {
+            Ok(resp) => match resp.text().await {
+                Ok(text) => text,
+                Err(_) => continue,
+            },
+            Err(_) => continue,
+        };
+
+        if let Some(id) = extract_query_id_for_operation(&js, "CreateTweet") {
+            return Ok(id);
+        }
+    }
+
+    Err("CreateTweet query ID not found in any JS bundle".to_string())
+}
+
+/// Extract `<script src="...">` URLs from HTML that look like X's JS bundles.
+fn extract_script_urls(html: &str) -> Vec<String> {
+    let mut urls = Vec::new();
+    // Match src="..." in script tags. X uses absolute paths like
+    // "https://abs.twimg.com/responsive-web/client-web/main.XXXX.js"
+    for segment in html.split("src=\"") {
+        if let Some(end) = segment.find('"') {
+            let url = &segment[..end];
+            if url.ends_with(".js") && (url.contains("twimg.com") || url.contains("x.com")) {
+                urls.push(url.to_string());
+            }
+        }
+    }
+    urls
+}
+
+/// Search a JS bundle for a GraphQL operation and extract its query ID.
+///
+/// X's bundles contain patterns like:
+/// - `queryId:"abc123",operationName:"CreateTweet"`
+/// - `{queryId:"abc123",...,operationName:"CreateTweet"}`
+fn extract_query_id_for_operation(js: &str, operation: &str) -> Option<String> {
+    // Find the operation name in the JS source.
+    let op_pattern = format!("\"{}\"", operation);
+
+    // Search for queryId near the operation name.
+    // The queryId and operationName are usually within the same object literal,
+    // so we search a window around each occurrence of the operation name.
+    for (idx, _) in js.match_indices(&op_pattern) {
+        // Look backwards from the match (up to 200 chars) for a queryId.
+        let start = idx.saturating_sub(200);
+        let window = &js[start..idx];
+
+        if let Some(id) = extract_query_id_value(window) {
+            return Some(id);
+        }
+
+        // Also look forward (the queryId might come after operationName).
+        let end = (idx + op_pattern.len() + 200).min(js.len());
+        let window = &js[idx..end];
+
+        if let Some(id) = extract_query_id_value(window) {
+            return Some(id);
+        }
+    }
+    None
+}
+
+/// Extract a queryId value from a JS snippet like `queryId:"abc123"`.
+fn extract_query_id_value(snippet: &str) -> Option<String> {
+    let marker = "queryId:\"";
+    let pos = snippet.rfind(marker)?;
+    let after = &snippet[pos + marker.len()..];
+    let end = after.find('"')?;
+    let id = &after[..end];
+    // Sanity: query IDs are short alphanumeric+underscore+hyphen strings.
+    if !id.is_empty()
+        && id.len() < 64
+        && id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
+        Some(id.to_string())
+    } else {
+        None
     }
 }
 
@@ -382,5 +613,59 @@ mod tests {
             json["tweet_awards_web_tipping_enabled"],
             serde_json::Value::Bool(false)
         );
+    }
+
+    // --- Query ID extraction tests ---
+
+    #[test]
+    fn extract_query_id_before_operation_name() {
+        let js = r#"e.exports={queryId:"uY34Pldm6W89yqswRmPMSQ",operationName:"CreateTweet",operationType:"mutation"}"#;
+        assert_eq!(
+            extract_query_id_for_operation(js, "CreateTweet"),
+            Some("uY34Pldm6W89yqswRmPMSQ".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_query_id_after_operation_name() {
+        let js = r#"{operationName:"CreateTweet",queryId:"abc123XYZ"}"#;
+        assert_eq!(
+            extract_query_id_for_operation(js, "CreateTweet"),
+            Some("abc123XYZ".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_query_id_returns_none_for_missing_operation() {
+        let js = r#"{queryId:"abc123",operationName:"DeleteTweet"}"#;
+        assert_eq!(extract_query_id_for_operation(js, "CreateTweet"), None);
+    }
+
+    #[test]
+    fn extract_script_urls_finds_twimg_bundles() {
+        let html = r#"<script src="https://abs.twimg.com/responsive-web/client-web/main.abc123.js"></script>"#;
+        let urls = extract_script_urls(html);
+        assert_eq!(urls.len(), 1);
+        assert!(urls[0].contains("twimg.com"));
+    }
+
+    #[test]
+    fn extract_script_urls_ignores_non_js() {
+        let html = r#"<script src="https://abs.twimg.com/data.json"></script>"#;
+        let urls = extract_script_urls(html);
+        assert!(urls.is_empty());
+    }
+
+    #[test]
+    fn extract_query_id_value_basic() {
+        assert_eq!(
+            extract_query_id_value(r#"queryId:"hello123""#),
+            Some("hello123".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_query_id_value_rejects_empty() {
+        assert_eq!(extract_query_id_value(r#"queryId:"""#), None);
     }
 }

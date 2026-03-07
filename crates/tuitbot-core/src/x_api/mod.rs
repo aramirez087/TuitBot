@@ -30,18 +30,18 @@ use crate::error::XApiError;
 ///
 /// When `data_dir` is provided, attempts to load a cookie-auth session from
 /// `scraper_session.json` in that directory to enable posting.
-pub fn create_local_client(config: &XApiConfig) -> Option<Arc<dyn XApiClient>> {
-    create_local_client_with_data_dir(config, None)
+pub async fn create_local_client(config: &XApiConfig) -> Option<Arc<dyn XApiClient>> {
+    create_local_client_with_data_dir(config, None).await
 }
 
 /// Create a local-mode client with an optional data directory for cookie-auth.
-pub fn create_local_client_with_data_dir(
+pub async fn create_local_client_with_data_dir(
     config: &XApiConfig,
     data_dir: Option<&Path>,
 ) -> Option<Arc<dyn XApiClient>> {
     if config.provider_backend == "scraper" {
         let client = match data_dir {
-            Some(dir) => LocalModeXClient::with_session(config.scraper_allow_mutations, dir),
+            Some(dir) => LocalModeXClient::with_session(config.scraper_allow_mutations, dir).await,
             None => LocalModeXClient::new(config.scraper_allow_mutations),
         };
         Some(Arc::new(client))

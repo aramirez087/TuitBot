@@ -474,7 +474,8 @@ async fn try_post_now(
             let client = tuitbot_core::x_api::LocalModeXClient::with_session(
                 config.x_api.scraper_allow_mutations,
                 &account_data,
-            );
+            )
+            .await;
             client
                 .post_tweet(content)
                 .await

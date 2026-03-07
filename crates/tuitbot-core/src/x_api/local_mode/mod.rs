@@ -47,16 +47,20 @@ impl LocalModeXClient {
     ///
     /// If the session file exists and is valid, write operations will use
     /// the cookie transport. Otherwise, falls back to stub behavior.
-    pub fn with_session(allow_mutations: bool, data_dir: &Path) -> Self {
+    ///
+    /// Auto-detects the current CreateTweet GraphQL query ID from X's
+    /// web client JS bundles at startup.
+    pub async fn with_session(allow_mutations: bool, data_dir: &Path) -> Self {
         let session_path = data_dir.join("scraper_session.json");
-        let cookie_transport = ScraperSession::load(&session_path)
-            .ok()
-            .flatten()
-            .map(CookieTransport::new);
+        let session = ScraperSession::load(&session_path).ok().flatten();
 
-        if cookie_transport.is_some() {
+        let cookie_transport = if let Some(session) = session {
+            let query_id = cookie_transport::resolve_create_tweet_query_id().await;
             tracing::info!("Cookie-auth transport loaded from scraper_session.json");
-        }
+            Some(CookieTransport::with_query_id(session, query_id))
+        } else {
+            None
+        };
 
         Self {
             allow_mutations,
