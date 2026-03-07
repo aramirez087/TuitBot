@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Globe, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-svelte';
 	import { api } from '$lib/api';
+	import { syncAccountProfile } from '$lib/stores/accounts';
+	import { getAccountId } from '$lib/api/http';
 	import { onMount } from 'svelte';
 
 	let sessionExists = $state(false);
@@ -50,6 +52,12 @@
 			authToken = '';
 			ct0 = '';
 			username = '';
+			// Sync profile to pull avatar/username/display name from X.
+			try {
+				await syncAccountProfile(getAccountId());
+			} catch {
+				// Non-critical — profile data will sync on next page load.
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Import failed';
 		} finally {

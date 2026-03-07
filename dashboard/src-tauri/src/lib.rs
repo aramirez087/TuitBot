@@ -195,7 +195,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|_app_handle, _event| {});
+    app.run(|_app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { .. } = event {
+            // Ensure the process fully terminates so the embedded server
+            // doesn't keep port 3001 bound after the window closes.
+            std::process::exit(0);
+        }
+    });
 }
 
 /// Build the system tray icon and context menu.
