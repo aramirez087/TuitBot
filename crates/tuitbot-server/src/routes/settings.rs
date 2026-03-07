@@ -591,6 +591,7 @@ struct FactoryResetCleared {
     config_deleted: bool,
     passphrase_deleted: bool,
     media_deleted: bool,
+    credentials_deleted: bool,
     runtimes_stopped: u32,
 }
 
@@ -662,11 +663,16 @@ pub async fn factory_reset(
         }
     };
 
-    // 8. Clear in-memory state.
+    // 8. Delete credential files and per-account data directories.
+    let credentials_deleted = delete_all_credentials(&state.data_dir);
+
+    // 9. Clear in-memory state.
     *state.passphrase_hash.write().await = None;
     *state.passphrase_hash_mtime.write().await = None;
     state.content_generators.lock().await.clear();
     state.login_attempts.lock().await.clear();
+    state.pending_oauth.lock().await.clear();
+    state.token_managers.lock().await.clear();
 
     tracing::info!(
         tables = reset_stats.tables_cleared,
@@ -674,6 +680,7 @@ pub async fn factory_reset(
         config = config_deleted,
         passphrase = passphrase_deleted,
         media = media_deleted,
+        credentials = credentials_deleted,
         runtimes = runtimes_stopped,
         "Factory reset completed"
     );
@@ -687,6 +694,7 @@ pub async fn factory_reset(
             config_deleted,
             passphrase_deleted,
             media_deleted,
+            credentials_deleted,
             runtimes_stopped,
         },
     };
@@ -697,6 +705,37 @@ pub async fn factory_reset(
         [(axum::http::header::SET_COOKIE, cookie)],
         Json(serde_json::to_value(response).unwrap()),
     ))
+}
+
+/// Delete all credential files produced during normal operation.
+///
+/// Removes root-level `scraper_session.json` / `tokens.json` (default
+/// account) plus the entire `accounts/` subdirectory tree (per-account
+/// credentials). Returns `true` if anything was actually removed.
+fn delete_all_credentials(data_dir: &std::path::Path) -> bool {
+    let mut deleted = false;
+
+    // Root-level credential files (default account).
+    for name in &["scraper_session.json", "tokens.json"] {
+        let path = data_dir.join(name);
+        match std::fs::remove_file(&path) {
+            Ok(()) => deleted = true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                tracing::warn!(path = %path.display(), error = %e, "failed to delete credential file")
+            }
+        }
+    }
+
+    // Per-account data directories (accounts/{uuid}/).
+    let accounts_dir = data_dir.join("accounts");
+    match std::fs::remove_dir_all(&accounts_dir) {
+        Ok(()) => deleted = true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => tracing::warn!(error = %e, "failed to delete accounts directory"),
+    }
+
+    deleted
 }
 
 // ---------------------------------------------------------------------------

@@ -66,18 +66,24 @@ export async function initAccounts(): Promise<void> {
 	bootstrapState.set('loading');
 	try {
 		const persistedId = getPersistedAccountId();
-		setAccountId(persistedId);
+
+		// Use the default account ID for the initial fetch so we don't send
+		// a stale UUID that the server rejects before the route runs.
+		setAccountId(DEFAULT_ACCOUNT_ID);
 
 		const list = await fetchAccounts();
 
 		if (list.length === 0) {
-			// No accounts returned — keep persisted ID (backward compat).
+			// No accounts returned — keep default ID (backward compat).
 			bootstrapState.set('ready');
 			return;
 		}
 
 		const valid = list.some((a) => a.id === persistedId);
-		if (!valid) {
+		if (valid) {
+			// Persisted ID is still valid — restore it.
+			setAccountId(persistedId);
+		} else {
 			// Persisted ID is stale — fall back to default or first account.
 			const fallback =
 				list.find((a) => a.id === DEFAULT_ACCOUNT_ID) ?? list[0];

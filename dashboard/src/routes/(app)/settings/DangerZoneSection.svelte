@@ -5,6 +5,7 @@
 	import { clearSession, authMode as authModeStore } from '$lib/stores/auth';
 	import { get } from 'svelte/store';
 	import { resetStores } from '$lib/stores/settings';
+	import { switchAccount } from '$lib/stores/accounts';
 	import { disconnectWs } from '$lib/stores/websocket';
 	import { goto } from '$app/navigation';
 
@@ -31,6 +32,7 @@
 				authModeStore.set('tauri');
 			}
 			resetStores();
+			switchAccount('00000000-0000-0000-0000-000000000000');
 			disconnectWs();
 			try {
 				await goto('/onboarding');
@@ -50,7 +52,6 @@
 		title="Danger Zone"
 		description="Irreversible actions that erase all Tuitbot data"
 		icon={AlertTriangle}
-		scope="instance"
 	>
 		<div class="warning-block">
 			<p class="warning-text">

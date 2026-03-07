@@ -10,7 +10,9 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tuitbot_core::config::{effective_config, validate_override_keys, Config};
-use tuitbot_core::storage::accounts::{self, account_token_path, UpdateAccountParams};
+use tuitbot_core::storage::accounts::{
+    self, account_scraper_session_path, account_token_path, UpdateAccountParams, DEFAULT_ACCOUNT_ID,
+};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext, Role};
@@ -69,6 +71,12 @@ pub async fn create_account(
         },
     )
     .await?;
+
+    // Migrate credentials from the default account when this is the first
+    // non-default account.  This handles the common onboarding path where the
+    // user configures a browser session on the default account and then creates
+    // a named account — without this, the session would be orphaned.
+    migrate_default_credentials(&state, &id).await;
 
     let account = accounts::get_account(&state.db, &id)
         .await?
@@ -133,6 +141,64 @@ pub async fn update_account(
         .ok_or_else(|| ApiError::Internal("account disappeared".to_string()))?;
 
     Ok(Json(json!(updated)))
+}
+
+/// Migrate credential files from the default account to a newly created account.
+///
+/// Only runs when the default account has credential files (scraper session
+/// and/or OAuth tokens) and there are no other non-default active accounts —
+/// i.e. this is the user's first named account.  Files are *moved* so the
+/// default account no longer shows stale "Linked" status.
+async fn migrate_default_credentials(state: &AppState, new_account_id: &str) {
+    // Only migrate when this is the first non-default account.
+    let active = match accounts::list_accounts(&state.db).await {
+        Ok(list) => list,
+        Err(_) => return,
+    };
+    let non_default_count = active.iter().filter(|a| a.id != DEFAULT_ACCOUNT_ID).count();
+    if non_default_count != 1 {
+        return;
+    }
+
+    let default_session = account_scraper_session_path(&state.data_dir, DEFAULT_ACCOUNT_ID);
+    let default_tokens = account_token_path(&state.data_dir, DEFAULT_ACCOUNT_ID);
+
+    let has_session = default_session.exists();
+    let has_tokens = default_tokens.exists();
+
+    if !has_session && !has_tokens {
+        return;
+    }
+
+    let new_dir = state.data_dir.join("accounts").join(new_account_id);
+    if let Err(e) = std::fs::create_dir_all(&new_dir) {
+        tracing::warn!("failed to create account dir for migration: {e}");
+        return;
+    }
+
+    if has_session {
+        let dest = account_scraper_session_path(&state.data_dir, new_account_id);
+        if let Err(e) = std::fs::rename(&default_session, &dest) {
+            tracing::warn!("failed to migrate scraper session: {e}");
+        } else {
+            tracing::info!(
+                account_id = %new_account_id,
+                "migrated scraper session from default account"
+            );
+        }
+    }
+
+    if has_tokens {
+        let dest = account_token_path(&state.data_dir, new_account_id);
+        if let Err(e) = std::fs::rename(&default_tokens, &dest) {
+            tracing::warn!("failed to migrate OAuth tokens: {e}");
+        } else {
+            tracing::info!(
+                account_id = %new_account_id,
+                "migrated OAuth tokens from default account"
+            );
+        }
+    }
 }
 
 /// Load and parse the base config from the TOML file.
