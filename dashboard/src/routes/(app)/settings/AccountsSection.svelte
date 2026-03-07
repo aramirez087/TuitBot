@@ -46,10 +46,6 @@
 		$accounts.filter((a: Account) => a.status === 'active')
 	);
 
-	const hasOnlyDefault = $derived(
-		activeAccounts.length <= 1 && activeAccounts.every((a: Account) => a.id === DEFAULT_ACCOUNT_ID)
-	);
-
 	onMount(() => {
 		loadAuthStatuses();
 	});
@@ -191,19 +187,6 @@
 	description="Manage your X accounts and credentials"
 	icon={Users}
 >
-	{#if hasOnlyDefault && !statusesLoading}
-		<!-- Empty state -->
-		<div class="empty-state">
-			<div class="empty-icon">
-				<Users size={28} />
-			</div>
-			<p class="empty-title">Add your first X account</p>
-			<p class="empty-desc">
-				Create an account entry, then link your X credentials to start automating.
-			</p>
-		</div>
-	{/if}
-
 	<!-- Account roster -->
 	<div class="account-list">
 		{#each activeAccounts as account (account.id)}
@@ -394,40 +377,6 @@
 </SettingsSection>
 
 <style>
-	/* Empty state */
-	.empty-state {
-		text-align: center;
-		padding: 20px 0 24px;
-	}
-
-	.empty-icon {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 48px;
-		height: 48px;
-		border-radius: 12px;
-		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-		color: var(--color-accent);
-		margin-bottom: 12px;
-	}
-
-	.empty-title {
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--color-text);
-		margin: 0 0 4px;
-	}
-
-	.empty-desc {
-		font-size: 13px;
-		color: var(--color-text-muted);
-		margin: 0;
-		max-width: 320px;
-		margin-inline: auto;
-		line-height: 1.5;
-	}
-
 	/* Account list */
 	.account-list {
 		display: flex;

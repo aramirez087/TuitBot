@@ -1,13 +1,13 @@
 # Session 09 — Handoff
 
-**Generated:** 2026-03-07 01:58 UTC
+**Generated:** 2026-03-07 02:50 UTC
 
 ## Scenarios
 
 | Scenario | Description | Steps | Total (ms) | Success | Schema |
 |----------|-------------|-------|------------|---------|--------|
 | D | Direct kernel read flow: get_tweet, search, followers, me | 4 | 0 | PASS | PASS |
-| E | Mutation with idempotency enforcement | 3 | 4 | PASS | PASS |
+| E | Mutation with idempotency enforcement | 3 | 5 | PASS | PASS |
 | F | Rate-limited and auth error behavior validation | 2 | 0 | PASS | PASS |
 | G | Provider switching: MockProvider vs ScraperReadProvider | 3 | 0 | PASS | PASS |
 

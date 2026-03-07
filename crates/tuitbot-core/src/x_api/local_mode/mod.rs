@@ -115,6 +115,9 @@ impl XApiClient for LocalModeXClient {
     // --- Auth-gated methods ---
 
     async fn get_me(&self) -> Result<User, XApiError> {
+        if let Some(ref transport) = self.cookie_transport {
+            return transport.fetch_viewer().await;
+        }
         Err(Self::auth_required("get_me"))
     }
 

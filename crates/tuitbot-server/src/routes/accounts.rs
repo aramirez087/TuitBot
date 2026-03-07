@@ -286,8 +286,9 @@ pub async fn remove_role(
 
 /// `POST /api/accounts/{id}/sync-profile` — fetch X profile and update account.
 ///
-/// Loads the OAuth token for the account, calls `/users/me` on the X API,
-/// and stores the display name and avatar URL on the account record.
+/// Tries OAuth tokens first (`/users/me`). If unavailable, falls back to
+/// the cookie transport (scraper session) so local no-key mode users can
+/// still sync their profile picture, username, and display name.
 pub async fn sync_profile(
     State(state): State<Arc<AppState>>,
     ctx: AccountContext,
@@ -299,18 +300,27 @@ pub async fn sync_profile(
         .await?
         .ok_or_else(|| ApiError::NotFound(format!("account not found: {id}")))?;
 
+    // Try OAuth first, fall back to cookie transport.
     let token_path = account_token_path(&state.data_dir, &id);
-
-    let access_token = state
-        .get_x_access_token(&token_path, &id)
-        .await
-        .map_err(|e| ApiError::Internal(format!("X API error: {e}")))?;
-
-    let client = XApiHttpClient::new(access_token);
-    let user = client
-        .get_me()
-        .await
-        .map_err(|e| ApiError::Internal(format!("X API error: {e}")))?;
+    let user = match state.get_x_access_token(&token_path, &id).await {
+        Ok(access_token) => {
+            let client = XApiHttpClient::new(access_token);
+            client
+                .get_me()
+                .await
+                .map_err(|e| ApiError::Internal(format!("X API error: {e}")))?
+        }
+        Err(_) => {
+            // No OAuth tokens — try the cookie transport.
+            let account_dir = accounts::account_data_dir(&state.data_dir, &id);
+            let client =
+                tuitbot_core::x_api::LocalModeXClient::with_session(false, &account_dir).await;
+            client
+                .get_me()
+                .await
+                .map_err(|e| ApiError::Internal(format!("profile sync failed: {e}")))?
+        }
+    };
 
     accounts::update_account(
         &state.db,

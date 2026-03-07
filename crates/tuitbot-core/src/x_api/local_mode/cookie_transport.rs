@@ -289,6 +289,86 @@ impl CookieTransport {
 
         parse_create_tweet_response(&resp_body)
     }
+
+    /// Fetch the authenticated viewer's profile via the legacy verify_credentials endpoint.
+    ///
+    /// Returns a `User` with id, username, display name, and avatar URL.
+    pub async fn fetch_viewer(&self) -> Result<crate::x_api::types::User, XApiError> {
+        let api_path = "/i/api/1.1/account/verify_credentials.json";
+        let headers = self.build_headers("GET", api_path)?;
+
+        let url = format!("https://x.com{api_path}?include_email=false&skip_status=true");
+
+        let response = self
+            .client
+            .get(&url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|e| XApiError::ScraperTransportUnavailable {
+                message: format!("fetch_viewer HTTP request failed: {e}"),
+            })?;
+
+        let status = response.status().as_u16();
+        if status == 401 || status == 403 {
+            return Err(XApiError::ScraperTransportUnavailable {
+                message: "Cookie session expired or invalid. Re-import your browser session."
+                    .to_string(),
+            });
+        }
+        if !response.status().is_success() {
+            let body_text = response.text().await.unwrap_or_default();
+            return Err(XApiError::ApiError {
+                status,
+                message: format!("verify_credentials failed: {body_text}"),
+            });
+        }
+
+        let body: serde_json::Value =
+            response
+                .json()
+                .await
+                .map_err(|e| XApiError::ScraperTransportUnavailable {
+                    message: format!("failed to parse verify_credentials JSON: {e}"),
+                })?;
+
+        let id = body
+            .get("id_str")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let username = body
+            .get("screen_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let name = body
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let profile_image_url = body
+            .get("profile_image_url_https")
+            .and_then(|v| v.as_str())
+            // X returns "_normal" size by default; replace for higher quality.
+            .map(|u| u.replace("_normal.", "_400x400."))
+            .filter(|u| !u.is_empty());
+
+        if id.is_empty() {
+            return Err(XApiError::ApiError {
+                status: 0,
+                message: "verify_credentials returned no user ID".to_string(),
+            });
+        }
+
+        Ok(crate::x_api::types::User {
+            id,
+            username,
+            name,
+            profile_image_url,
+            public_metrics: Default::default(),
+        })
+    }
 }
 
 /// Result of startup resolution: query ID + transaction generator.
