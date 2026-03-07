@@ -7,23 +7,18 @@
 use rand::RngCore;
 use rquest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
+use x_client_transaction::ClientTransaction;
 
 use crate::error::XApiError;
 use crate::x_api::types::PostedTweet;
 
 use super::session::ScraperSession;
 
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
-
 /// Static bearer token used by X's web client.
 ///
 /// This token is public and embedded in X's JavaScript bundles. It
 /// identifies the "web app" client — cookie auth provides the user identity.
 const WEB_BEARER_TOKEN: &str = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
-
-/// Base URL for X's internal API.
-const X_API_BASE: &str = "https://x.com/i/api";
 
 /// Fallback GraphQL query ID for CreateTweet mutation.
 ///
@@ -60,23 +55,21 @@ fn generate_client_uuid() -> String {
     )
 }
 
-/// Generate a random `x-client-transaction-id` header value.
-fn generate_transaction_id() -> String {
-    let mut buf = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut buf);
-    BASE64.encode(buf)
-}
-
 /// HTTP transport using cookie-based authentication.
 ///
 /// Uses `rquest` (not `reqwest`) to impersonate Chrome's TLS fingerprint
 /// so that X's anti-automation checks (JA3/JA4 fingerprinting) pass.
+/// Generates valid `x-client-transaction-id` headers using the algorithm
+/// extracted from X's web client (animation key + SHA256 + XOR).
 pub struct CookieTransport {
     client: rquest::Client,
     session: ScraperSession,
     create_tweet_query_id: String,
     /// Persistent client UUID (mimics X web client's localStorage UUID).
     client_uuid: String,
+    /// Transaction ID generator (extracted from X's homepage on init).
+    /// `None` if the homepage couldn't be parsed — falls back to random IDs.
+    transaction: Option<ClientTransaction>,
 }
 
 impl CookieTransport {
@@ -93,21 +86,29 @@ impl CookieTransport {
             session,
             create_tweet_query_id: query_id,
             client_uuid: generate_client_uuid(),
+            transaction: None,
         }
     }
 
-    /// Create a transport with a pre-resolved query ID.
-    pub fn with_query_id(session: ScraperSession, query_id: String) -> Self {
+    /// Create a transport with a pre-resolved query ID and transaction generator.
+    pub fn with_query_id(
+        session: ScraperSession,
+        query_id: String,
+        transaction: Option<ClientTransaction>,
+    ) -> Self {
         Self {
             client: build_browser_client(),
             session,
             create_tweet_query_id: query_id,
             client_uuid: generate_client_uuid(),
+            transaction,
         }
     }
 
     /// Build the common headers for X internal API requests.
-    fn build_headers(&self) -> Result<HeaderMap, XApiError> {
+    ///
+    /// `method` and `path` are used to generate a valid `x-client-transaction-id`.
+    fn build_headers(&self, method: &str, path: &str) -> Result<HeaderMap, XApiError> {
         let mut headers = HeaderMap::new();
 
         headers.insert(
@@ -149,9 +150,16 @@ impl CookieTransport {
         headers.insert("origin", HeaderValue::from_static("https://x.com"));
         headers.insert("referer", HeaderValue::from_static("https://x.com/"));
 
+        // Override the emulation's navigation-style defaults with XHR/fetch values.
+        // The emulation sets sec-fetch-dest=document, sec-fetch-mode=navigate, etc.
+        // which are wrong for an API POST — real browsers use these values for fetch().
+        headers.insert("accept", HeaderValue::from_static("*/*"));
+        headers.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
+        headers.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
+        headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+
         // Anti-automation headers: X's web client sends these with every request.
         // `x-client-uuid` is a persistent UUID stored in the browser's localStorage.
-        // `x-client-transaction-id` is a unique per-request identifier.
         headers.insert(
             "x-client-uuid",
             HeaderValue::from_str(&self.client_uuid).map_err(|e| {
@@ -160,13 +168,28 @@ impl CookieTransport {
                 }
             })?,
         );
-        let txn_id = generate_transaction_id();
-        headers.insert(
-            "x-client-transaction-id",
-            HeaderValue::from_str(&txn_id).map_err(|e| XApiError::ScraperTransportUnavailable {
-                message: format!("invalid transaction-id header: {e}"),
-            })?,
-        );
+
+        // `x-client-transaction-id` is a cryptographic hash derived from X's
+        // homepage animation data, the HTTP method/path, and current time.
+        // If we have a valid ClientTransaction, generate the real value;
+        // otherwise fall back to a random one (which X may reject).
+        if let Some(ref txn) = self.transaction {
+            match txn.generate_transaction_id(method, path) {
+                Ok(txn_id) => {
+                    headers.insert(
+                        "x-client-transaction-id",
+                        HeaderValue::from_str(&txn_id).map_err(|e| {
+                            XApiError::ScraperTransportUnavailable {
+                                message: format!("invalid transaction-id header: {e}"),
+                            }
+                        })?,
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to generate transaction ID, skipping header");
+                }
+            }
+        }
 
         Ok(headers)
     }
@@ -191,7 +214,8 @@ impl CookieTransport {
         text: &str,
         in_reply_to_id: Option<&str>,
     ) -> Result<PostedTweet, XApiError> {
-        let headers = self.build_headers()?;
+        let api_path = format!("/i/api/graphql/{}/CreateTweet", self.create_tweet_query_id);
+        let headers = self.build_headers("POST", &api_path)?;
 
         let mut variables = serde_json::json!({
             "tweet_text": text,
@@ -216,10 +240,7 @@ impl CookieTransport {
             query_id: self.create_tweet_query_id.clone(),
         };
 
-        let url = format!(
-            "{X_API_BASE}/graphql/{}/CreateTweet",
-            self.create_tweet_query_id
-        );
+        let url = format!("https://x.com{api_path}");
 
         tracing::debug!(url = %url, "Sending CreateTweet via cookie transport");
 
@@ -270,15 +291,37 @@ impl CookieTransport {
     }
 }
 
-/// Resolve the current CreateTweet query ID from X's web client JS bundles.
+/// Result of startup resolution: query ID + transaction generator.
+pub struct ResolvedTransport {
+    /// The CreateTweet GraphQL query ID.
+    pub query_id: String,
+    /// Transaction ID generator (extracted from X's homepage).
+    /// `None` if initialization failed — requests will omit the header.
+    pub transaction: Option<ClientTransaction>,
+}
+
+/// Resolve the current CreateTweet query ID and initialize the transaction
+/// ID generator from X's web client JS bundles and homepage.
 ///
 /// 1. Fetches the X homepage to discover `<script>` bundle URLs.
 /// 2. Fetches each bundle and searches for the `CreateTweet` operation.
 /// 3. Extracts the query ID from the surrounding pattern.
+/// 4. Initializes the `ClientTransaction` for valid `x-client-transaction-id`.
 ///
 /// Returns the env-var override if set, falls back to the hardcoded default
 /// if auto-detection fails. Logs the outcome at info/warn level.
-pub async fn resolve_create_tweet_query_id() -> String {
+pub async fn resolve_transport() -> ResolvedTransport {
+    let query_id = resolve_query_id().await;
+    let transaction = resolve_client_transaction().await;
+
+    ResolvedTransport {
+        query_id,
+        transaction,
+    }
+}
+
+/// Resolve the CreateTweet query ID from X's JS bundles.
+async fn resolve_query_id() -> String {
     // Env-var override always wins.
     if let Ok(id) = std::env::var("TUITBOT_CREATE_TWEET_QUERY_ID") {
         tracing::info!(query_id = %id, "Using CreateTweet query ID from env var");
@@ -297,6 +340,45 @@ pub async fn resolve_create_tweet_query_id() -> String {
                 "Failed to auto-detect CreateTweet query ID, using fallback"
             );
             FALLBACK_CREATE_TWEET_QUERY_ID.to_string()
+        }
+    }
+}
+
+/// Initialize the `ClientTransaction` for generating valid transaction IDs.
+///
+/// Uses `reqwest::blocking` internally (via the `x-client-transaction` crate),
+/// so this runs on a blocking thread via `spawn_blocking`.
+async fn resolve_client_transaction() -> Option<ClientTransaction> {
+    match tokio::task::spawn_blocking(|| {
+        let client = reqwest::blocking::Client::builder()
+            .user_agent(
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
+                 AppleWebKit/537.36 (KHTML, like Gecko) \
+                 Chrome/134.0.0.0 Safari/537.36",
+            )
+            .build()
+            .ok()?;
+        ClientTransaction::new(&client).ok()
+    })
+    .await
+    {
+        Ok(Some(ct)) => {
+            tracing::info!("Initialized x-client-transaction-id generator");
+            Some(ct)
+        }
+        Ok(None) => {
+            tracing::warn!(
+                "Failed to initialize x-client-transaction-id generator; \
+                 requests will omit the header"
+            );
+            None
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "spawn_blocking for ClientTransaction panicked"
+            );
+            None
         }
     }
 }

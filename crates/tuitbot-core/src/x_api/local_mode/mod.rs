@@ -55,9 +55,13 @@ impl LocalModeXClient {
         let session = ScraperSession::load(&session_path).ok().flatten();
 
         let cookie_transport = if let Some(session) = session {
-            let query_id = cookie_transport::resolve_create_tweet_query_id().await;
+            let resolved = cookie_transport::resolve_transport().await;
             tracing::info!("Cookie-auth transport loaded from scraper_session.json");
-            Some(CookieTransport::with_query_id(session, query_id))
+            Some(CookieTransport::with_query_id(
+                session,
+                resolved.query_id,
+                resolved.transaction,
+            ))
         } else {
             None
         };
