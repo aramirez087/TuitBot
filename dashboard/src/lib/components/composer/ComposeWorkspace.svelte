@@ -19,6 +19,7 @@
 	import InspectorContent from './InspectorContent.svelte';
 	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
+	import AddTweetDivider from './AddTweetDivider.svelte';
 	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
@@ -168,6 +169,20 @@
 
 	$effect(() => { void mode; void tweetText; void threadBlocks; void attachedMedia; if (initialized) autoSave(); });
 
+	// Auto-collapse: thread → tweet when only 1 block remains
+	$effect(() => {
+		if (mode === 'thread' && threadBlocks.length <= 1 && initialized) {
+			const surviving = threadBlocks[0];
+			tweetText = surviving?.text ?? '';
+			threadBlocks = [];
+			mode = 'tweet';
+			requestAnimationFrame(() => {
+				const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
+				textarea?.focus();
+			});
+		}
+	});
+
 	// Announce mode switches to screen readers (skip initial render)
 	let modeInitialized = false;
 	$effect(() => {
@@ -243,6 +258,25 @@
 			}
 		}
 		mode = newMode;
+	}
+
+	function switchToThread() {
+		if (mode !== 'tweet') return;
+		const mediaPaths = attachedMedia.map((m) => m.path);
+		threadBlocks = [
+			{ id: crypto.randomUUID(), text: tweetText, media_paths: mediaPaths, order: 0 },
+			{ id: crypto.randomUUID(), text: '', media_paths: [], order: 1 }
+		];
+		const focusId = threadBlocks[1].id;
+		tweetText = '';
+		attachedMedia = [];
+		mode = 'thread';
+		requestAnimationFrame(() => {
+			const textarea = document.querySelector(
+				`[data-block-id="${focusId}"] textarea`
+			) as HTMLTextAreaElement | null;
+			textarea?.focus();
+		});
 	}
 
 	// ── Autosave / Recovery ────────────────────────────────
@@ -369,7 +403,10 @@
 		}
 		if (matchEvent(e, 'cmd+shift+enter')) { e.preventDefault(); handleSubmit(); return; }
 		if (matchEvent(e, 'cmd+enter')) {
-			if (mode === 'tweet') { e.preventDefault(); handleSubmit(); }
+			if (mode === 'tweet') {
+				e.preventDefault();
+				if (tweetText.trim()) switchToThread();
+			}
 			// In thread mode: let event propagate to ThreadFlowLane's card handler for split
 			return;
 		}
@@ -600,6 +637,7 @@
 					onerror={(msg) => { submitError = msg; }}
 					avatarUrl={$currentAccount?.x_avatar_url ?? null}
 				/>
+				<AddTweetDivider onclick={switchToThread} disabled={!tweetText.trim()} />
 			{:else}
 				<ThreadFlowLane
 					bind:this={threadFlowRef}
@@ -707,7 +745,6 @@
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
 			onopenpalette={() => { paletteOpen = true; }}
-			onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
 		/>
 		{#if tipsVisible}
 			<ComposerTipsTray

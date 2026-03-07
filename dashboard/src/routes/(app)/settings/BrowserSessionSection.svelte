@@ -55,8 +55,11 @@
 			// Sync profile to pull avatar/username/display name from X.
 			try {
 				await syncAccountProfile(getAccountId());
-			} catch {
-				// Non-critical — profile data will sync on next page load.
+			} catch (syncErr) {
+				console.error('Profile sync failed:', syncErr);
+				error = syncErr instanceof Error
+					? `Session imported, but profile sync failed: ${syncErr.message}`
+					: 'Session imported, but profile sync failed';
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Import failed';

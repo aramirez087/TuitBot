@@ -78,6 +78,9 @@ async fn main() -> Result<()> {
 
     let pool = storage::init_db(&db_path.to_string_lossy()).await?;
 
+    // Ensure default account exists (may be missing after factory reset).
+    storage::accounts::ensure_default_account(&pool).await?;
+
     // Ensure the API token file exists and read it.
     let api_token = auth::ensure_api_token(db_dir)?;
     tracing::info!(token_path = %db_dir.join("api_token").display(), "API token ready");

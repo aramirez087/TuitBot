@@ -150,7 +150,7 @@
 		if (!result) {
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
-			if (idx >= sorted.length - 1 || sorted.length <= 2) return;
+			if (idx >= sorted.length - 1 || sorted.length <= 1) return;
 			showMergeMediaError(
 				sorted[idx].media_paths,
 				sorted[idx + 1].media_paths,
@@ -167,7 +167,7 @@
 		if (!result) {
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
-			if (idx <= 0 || sorted.length <= 2) return;
+			if (idx <= 0 || sorted.length <= 1) return;
 			showMergeMediaError(
 				sorted[idx - 1].media_paths,
 				sorted[idx].media_paths,
@@ -253,7 +253,7 @@
 			if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
 				const sorted = threadOps.sortBlocks(blocks);
 				const idx = sorted.findIndex((b) => b.id === blockId);
-				if (idx > 0 && sorted.length > 2) {
+				if (idx > 0 && sorted.length > 1) {
 					e.preventDefault();
 					mergeWithPrevious(blockId);
 					return;

@@ -631,6 +631,9 @@ pub async fn factory_reset(
     // 4. Clear all DB table contents (single transaction).
     let reset_stats = tuitbot_core::storage::reset::factory_reset(&state.db).await?;
 
+    // 4b. Re-seed the default account (reset deletes it).
+    tuitbot_core::storage::accounts::ensure_default_account(&state.db).await?;
+
     // 5. Delete config.toml (tolerate NotFound for idempotency).
     let config_deleted = match std::fs::remove_file(&state.config_path) {
         Ok(()) => true,

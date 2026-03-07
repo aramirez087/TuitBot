@@ -1,24 +1,16 @@
 <script lang="ts">
-	import { Sparkles, MessageSquare, List, Search } from "lucide-svelte";
+	import { Sparkles, Search } from "lucide-svelte";
 	import { formatCombo } from "$lib/utils/shortcuts";
 
 	let {
 		mode = "tweet",
 		onaiassist,
-		onswitchmode,
 		onopenpalette,
 	}: {
 		mode: "tweet" | "thread";
 		onaiassist: () => void;
-		onswitchmode: () => void;
 		onopenpalette: () => void;
 	} = $props();
-
-	const ModeIcon = $derived(mode === "tweet" ? MessageSquare : List);
-	const modeLabel = $derived(mode === "tweet" ? "Tweet" : "Thread");
-	const switchLabel = $derived(
-		mode === "tweet" ? "Switch to thread" : "Switch to tweet",
-	);
 </script>
 
 <div class="subheader-bar" role="toolbar" aria-label="Composer actions">
@@ -32,17 +24,6 @@
 			<Sparkles size={14} />
 		</button>
 
-		<span class="bar-divider" aria-hidden="true"></span>
-
-		<button
-			class="mode-tab"
-			onclick={onswitchmode}
-			title={switchLabel}
-			aria-label={switchLabel}
-		>
-			<ModeIcon size={13} />
-			<span class="mode-label">{modeLabel}</span>
-		</button>
 	</div>
 
 	<div class="bar-right">
@@ -110,41 +91,6 @@
 		);
 	}
 
-	.bar-divider {
-		width: 1px;
-		height: 16px;
-		background: color-mix(
-			in srgb,
-			var(--color-border-subtle) 50%,
-			transparent
-		);
-		margin: 0 6px;
-	}
-
-	.mode-tab {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		padding: 4px 10px;
-		border: none;
-		border-radius: 6px;
-		background: transparent;
-		color: var(--color-text-muted);
-		font-size: 12px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.12s ease;
-	}
-
-	.mode-tab:hover {
-		color: var(--color-text);
-		background: var(--color-surface-hover);
-	}
-
-	.mode-label {
-		letter-spacing: 0.01em;
-	}
-
 	.shortcut-trigger {
 		display: inline-flex;
 		align-items: center;
@@ -185,10 +131,6 @@
 			display: none;
 		}
 
-		.mode-label {
-			display: none;
-		}
-
 		.subheader-bar {
 			padding: 4px 12px;
 		}
@@ -199,16 +141,10 @@
 			min-width: 44px;
 			min-height: 44px;
 		}
-
-		.mode-tab {
-			min-height: 36px;
-			padding: 4px 12px;
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
 		.bar-btn,
-		.mode-tab,
 		.shortcut-trigger {
 			transition: none;
 		}

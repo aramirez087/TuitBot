@@ -36,6 +36,42 @@ pub struct AccountRole {
     pub created_at: String,
 }
 
+/// Ensure the default account and its roles exist.
+///
+/// This is idempotent — safe to call on every startup. It re-creates the
+/// default account row and admin roles if they were deleted (e.g. by
+/// factory reset).
+pub async fn ensure_default_account(pool: &DbPool) -> Result<(), StorageError> {
+    sqlx::query(
+        "INSERT OR IGNORE INTO accounts (id, label, status) \
+         VALUES (?, 'Default', 'active')",
+    )
+    .bind(DEFAULT_ACCOUNT_ID)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    sqlx::query(
+        "INSERT OR IGNORE INTO account_roles (account_id, actor, role) \
+         VALUES (?, 'dashboard', 'admin')",
+    )
+    .bind(DEFAULT_ACCOUNT_ID)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    sqlx::query(
+        "INSERT OR IGNORE INTO account_roles (account_id, actor, role) \
+         VALUES (?, 'mcp', 'admin')",
+    )
+    .bind(DEFAULT_ACCOUNT_ID)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
 /// List all active accounts, ordered by creation date.
 pub async fn list_accounts(pool: &DbPool) -> Result<Vec<Account>, StorageError> {
     sqlx::query_as::<_, Account>(

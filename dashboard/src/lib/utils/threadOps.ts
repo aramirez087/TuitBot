@@ -41,7 +41,7 @@ export function addBlockAfter(
 }
 
 export function removeBlock(blocks: ThreadBlock[], id: string): ThreadBlock[] | null {
-	if (blocks.length <= 2) return null;
+	if (blocks.length <= 1) return null;
 	const sorted = blocks.filter((b) => b.id !== id).sort((a, b) => a.order - b.order);
 	return normalizeOrder(sorted);
 }
@@ -162,7 +162,7 @@ export function mergeWithNext(
 ): { blocks: ThreadBlock[]; cursorPos: number } | null {
 	const sorted = sortBlocks(blocks);
 	const idx = sorted.findIndex((b) => b.id === id);
-	if (idx === -1 || idx >= sorted.length - 1 || sorted.length <= 2) return null;
+	if (idx === -1 || idx >= sorted.length - 1 || sorted.length <= 1) return null;
 
 	const current = sorted[idx];
 	const next = sorted[idx + 1];
@@ -190,7 +190,7 @@ export function mergeWithPrevious(
 ): { blocks: ThreadBlock[]; targetId: string; cursorPos: number } | null {
 	const sorted = sortBlocks(blocks);
 	const idx = sorted.findIndex((b) => b.id === id);
-	if (idx <= 0 || sorted.length <= 2) return null;
+	if (idx <= 0 || sorted.length <= 1) return null;
 
 	const current = sorted[idx];
 	const prev = sorted[idx - 1];
