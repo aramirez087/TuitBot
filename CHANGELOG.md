@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.22](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.21...tuitbot-cli-v0.1.22) - 2026-03-07
+
+### Added
+
+- Introduce `x-client-transaction` crate for handling X migration, token generation, and client transaction logic.
+- Dynamically resolve X API CreateTweet GraphQL query ID and migrate local mode cookie transport to `rquest`, updating evaluation reports.
+- Implement browser session management for local X API mode, including API endpoints and dashboard UI.
+- Refactor analytics storage, introduce CLI upgrade command, and update dashboard API client and evaluation artifacts.
+- Enhance local mode cookie transport by integrating `x-client-transaction` and updating generated reports.
+- Session 2 — effective config and settings
+- Refine content composition and publishing flow with explicit capability checks and updated approval mode logic.
+
+### Fixed
+
+- OAuth flow opens isolated webview and new accounts start with blank persona
+
+### Other
+
+- Remove empty state UI from accounts section and enable cookie transport for `get_me` in local mode.
+
 ## [0.1.21](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.20...tuitbot-cli-v0.1.21) - 2026-03-05
 
 ### Added
