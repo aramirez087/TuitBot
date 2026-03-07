@@ -21,13 +21,10 @@ async fn get_generator(
     state: &AppState,
     account_id: &str,
 ) -> Result<Arc<ContentGenerator>, ApiError> {
-    let generators = state.content_generators.lock().await;
-    generators
-        .get(account_id)
-        .cloned()
-        .ok_or(ApiError::BadRequest(
-            "LLM not configured — set llm.provider and llm.api_key in config.toml".to_string(),
-        ))
+    state
+        .get_or_create_content_generator(account_id)
+        .await
+        .map_err(ApiError::BadRequest)
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +166,9 @@ pub async fn queue_reply(
     Json(body): Json<QueueReplyRequest>,
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
+
+    // Block posting unless the backend can actually post for this account.
+    crate::routes::content::require_post_capable(&state, &ctx.account_id).await?;
 
     if body.content.trim().is_empty() {
         return Err(ApiError::BadRequest(

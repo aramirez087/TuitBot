@@ -10,7 +10,7 @@ use tuitbot_core::automation::Runtime;
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::ws::WsEvent;
+use crate::ws::{AccountWsEvent, WsEvent};
 
 /// `GET /api/runtime/status` — check if the automation runtime is running.
 ///
@@ -26,12 +26,22 @@ pub async fn status(
     let task_count = runtime.map_or(0, |r| r.task_count());
     let capabilities = state.deployment_mode.capabilities();
 
+    // Determine if direct posting is possible for this account.
+    let can_post = crate::routes::content::can_post_for(&state, &ctx.account_id).await;
+
+    // Load provider_backend from effective config (per-account, not global).
+    let provider_backend = match state.load_effective_config(&ctx.account_id).await {
+        Ok(config) => config.x_api.provider_backend,
+        Err(_) => String::new(),
+    };
+
     Ok(Json(json!({
         "running": running,
         "task_count": task_count,
         "deployment_mode": state.deployment_mode,
         "capabilities": capabilities,
-        "provider_backend": state.provider_backend,
+        "provider_backend": provider_backend,
+        "can_post": can_post,
     })))
 }
 
@@ -53,9 +63,12 @@ pub async fn start(
     runtimes.insert(ctx.account_id.clone(), Runtime::new());
 
     // Publish runtime status event.
-    let _ = state.event_tx.send(WsEvent::RuntimeStatus {
-        running: true,
-        active_loops: vec![],
+    let _ = state.event_tx.send(AccountWsEvent {
+        account_id: ctx.account_id.clone(),
+        event: WsEvent::RuntimeStatus {
+            running: true,
+            active_loops: vec![],
+        },
     });
 
     Ok(Json(json!({"status": "started"})))
@@ -74,9 +87,12 @@ pub async fn stop(
             rt.shutdown().await;
 
             // Publish runtime status event.
-            let _ = state.event_tx.send(WsEvent::RuntimeStatus {
-                running: false,
-                active_loops: vec![],
+            let _ = state.event_tx.send(AccountWsEvent {
+                account_id: ctx.account_id.clone(),
+                event: WsEvent::RuntimeStatus {
+                    running: false,
+                    active_loops: vec![],
+                },
             });
 
             Ok(Json(json!({"status": "stopped"})))

@@ -28,7 +28,7 @@ use tuitbot_core::startup::{
 use tuitbot_core::storage;
 use tuitbot_core::x_api::auth::{TokenManager, Tokens};
 use tuitbot_core::x_api::tier::{self, detect_tier};
-use tuitbot_core::x_api::{create_local_client, XApiClient, XApiHttpClient};
+use tuitbot_core::x_api::{create_local_client_with_data_dir, XApiClient, XApiHttpClient};
 
 /// All shared dependencies needed by the automation loops.
 pub struct RuntimeDeps {
@@ -241,8 +241,12 @@ impl RuntimeDeps {
         let db_path = expand_tilde(&config.storage.db_path);
         tracing::info!(path = %db_path.display(), "Database path configured");
 
-        // 2. Create LocalModeXClient (no tokens needed).
-        let dyn_client = create_local_client(&config.x_api)
+        // 2. Create LocalModeXClient (with cookie-auth if session exists).
+        let data_dir = db_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        let dyn_client = create_local_client_with_data_dir(&config.x_api, Some(data_dir))
+            .await
             .expect("scraper backend should produce a local client");
         tracing::info!(
             allow_mutations = config.x_api.scraper_allow_mutations,

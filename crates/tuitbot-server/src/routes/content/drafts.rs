@@ -185,6 +185,7 @@ pub async fn publish_draft(
     Path(id): Path<i64>,
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
+    super::require_post_capable(&state, &ctx.account_id).await?;
 
     // Get the draft.
     let item = scheduled_content::get_by_id_for(&state.db, &ctx.account_id, id)

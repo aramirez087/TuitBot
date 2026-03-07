@@ -14,7 +14,7 @@ use tuitbot_core::auth::passphrase;
 use tuitbot_core::storage;
 
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 const TEST_TOKEN: &str = "test-token-abc123";
 
@@ -34,7 +34,7 @@ fn valid_config_body() -> serde_json::Value {
 /// Build an AppState backed by an in-memory DB and a real temp directory.
 async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     Arc::new(AppState {
         db: pool,
@@ -54,7 +54,7 @@ async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),

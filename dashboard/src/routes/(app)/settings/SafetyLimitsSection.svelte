@@ -12,6 +12,8 @@
 	title="Safety & Limits"
 	description="Rate limits, delays, and content safety rules"
 	icon={Shield}
+	scope="account"
+	scopeKey="limits"
 >
 	<div class="field-grid">
 		<div class="field">

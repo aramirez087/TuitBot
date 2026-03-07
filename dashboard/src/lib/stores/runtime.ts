@@ -27,6 +27,12 @@ export const capabilitiesLoaded = derived(capabilitiesData, ($d) => $d !== null)
 let fetching = false;
 let fetched = false;
 
+export async function reloadCapabilities(): Promise<void> {
+	fetched = false;
+	fetching = false;
+	await loadCapabilities();
+}
+
 export async function loadCapabilities(): Promise<void> {
 	if (fetched || fetching) return;
 	fetching = true;

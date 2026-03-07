@@ -23,7 +23,7 @@ use tuitbot_core::storage::watchtower;
 use tuitbot_core::storage::DbPool;
 
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 const TEST_TOKEN: &str = "test-token-rag-abc";
 const DEFAULT_ACCOUNT_ID: &str = "00000000-0000-0000-0000-000000000000";
@@ -218,7 +218,7 @@ async fn build_test_router_with_generator(
     let provider = PromptCapturingProvider::new(responses, Arc::clone(&captured));
     let generator = Arc::new(ContentGenerator::new(Box::new(provider), test_business()));
 
-    let (event_tx, _) = broadcast::channel::<WsEvent>(16);
+    let (event_tx, _) = broadcast::channel::<AccountWsEvent>(16);
     let mut generators = HashMap::new();
     generators.insert(DEFAULT_ACCOUNT_ID.to_string(), generator);
 
@@ -240,7 +240,7 @@ async fn build_test_router_with_generator(
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),
@@ -261,7 +261,7 @@ async fn build_test_router_no_generator() -> (axum::Router, tempfile::TempDir) {
     .expect("write config");
 
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = broadcast::channel::<WsEvent>(16);
+    let (event_tx, _) = broadcast::channel::<AccountWsEvent>(16);
 
     let state = Arc::new(AppState {
         db: pool,
@@ -281,7 +281,7 @@ async fn build_test_router_no_generator() -> (axum::Router, tempfile::TempDir) {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),

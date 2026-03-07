@@ -188,6 +188,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(routes::settings::factory_reset),
         )
         .route(
+            "/settings/scraper-session",
+            get(routes::scraper_session::get_scraper_session)
+                .post(routes::scraper_session::import_scraper_session)
+                .delete(routes::scraper_session::delete_scraper_session),
+        )
+        .route(
             "/settings",
             get(routes::settings::get_settings).patch(routes::settings::patch_settings),
         )
@@ -246,6 +252,23 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/accounts/{id}/sync-profile",
             post(routes::accounts::sync_profile),
+        )
+        // X credential linking (before catch-all /accounts/{id})
+        .route(
+            "/accounts/{id}/x-auth/start",
+            post(routes::x_auth::start_link),
+        )
+        .route(
+            "/accounts/{id}/x-auth/callback",
+            post(routes::x_auth::complete_link),
+        )
+        .route(
+            "/accounts/{id}/x-auth/status",
+            get(routes::x_auth::link_status),
+        )
+        .route(
+            "/accounts/{id}/x-auth/tokens",
+            delete(routes::x_auth::unlink),
         )
         .route(
             "/accounts/{id}",

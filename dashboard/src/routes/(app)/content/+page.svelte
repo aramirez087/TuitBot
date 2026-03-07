@@ -28,6 +28,7 @@
 		startAutoRefresh,
 		stopAutoRefresh
 	} from '$lib/stores/calendar';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let composeOpen = $state(false);
 	let composePrefillTime = $state<string | null>(null);
@@ -80,6 +81,10 @@
 		if ($page.url.searchParams.get('compose') === 'true') {
 			openCompose(new Date());
 		}
+
+		const handler = () => { loadSchedule(); loadCalendar(); };
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	onDestroy(() => {

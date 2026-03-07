@@ -8,6 +8,7 @@
 		startAutoRefresh,
 		stopAutoRefresh
 	} from '$lib/stores/mcp';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	import OverviewSection from './OverviewSection.svelte';
 	import PolicySection from './PolicySection.svelte';
@@ -21,6 +22,9 @@
 	onMount(() => {
 		loadMcpData(hours);
 		startAutoRefresh(30_000, hours);
+		const handler = () => loadMcpData(hours);
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	onDestroy(() => {

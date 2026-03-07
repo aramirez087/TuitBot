@@ -2,7 +2,6 @@
 	import { page } from "$app/stores";
 	import { connected, runtimeRunning } from "$lib/stores/websocket";
 	import { pendingCount } from "$lib/stores/approval";
-	import { accounts } from "$lib/stores/accounts";
 	import AccountSwitcher from "$lib/components/AccountSwitcher.svelte";
 	import { theme } from "$lib/stores/theme";
 	import { updateAvailable, installUpdate } from "$lib/stores/update";
@@ -89,9 +88,7 @@
 		{/if}
 	</div>
 
-	{#if !collapsed && $accounts.length > 1}
-		<AccountSwitcher />
-	{/if}
+	<AccountSwitcher {collapsed} />
 
 	<nav class="sidebar-nav">
 		{#each navItems as item}

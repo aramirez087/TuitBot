@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Key, Eye, EyeOff, AlertTriangle } from 'lucide-svelte';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
+	import BrowserSessionSection from './BrowserSessionSection.svelte';
 	import { draft, updateDraft } from '$lib/stores/settings';
 	import { deploymentMode } from '$lib/stores/runtime';
 
@@ -26,6 +27,8 @@
 	id="xapi"
 	title="X Access"
 	description="How Tuitbot connects to X (Twitter)"
+	scope="account"
+	scopeKey="x_api"
 	icon={Key}
 >
 	<div class="section-body">
@@ -130,10 +133,12 @@
 			<div class="info-banner scraper-banner">
 				<p>
 					Run discovery and drafting without API credentials.
-					Read-only by default. Some features like posting, mentions, and analytics are unavailable.
+					Import your browser session below to enable direct posting.
 					Switch to Official X API anytime for full capabilities.
 				</p>
 			</div>
+
+			<BrowserSessionSection />
 
 			<div class="advanced-section">
 				<button

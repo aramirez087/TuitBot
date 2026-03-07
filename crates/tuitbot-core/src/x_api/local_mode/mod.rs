@@ -1,10 +1,15 @@
 //! Local-mode X API client for scraper backend.
 //!
 //! Implements `XApiClient` without requiring OAuth credentials.
-//! Read methods return transport-unavailable stubs (pending actual scraper
-//! transport in a future session). Write methods are gated by
-//! `scraper_allow_mutations`. Auth-gated methods (get_me, mentions, etc.)
-//! return `FeatureRequiresAuth`.
+//! When a browser session file (`scraper_session.json`) is present,
+//! write methods use cookie-based authentication to post via X's
+//! internal GraphQL API. Without a session, write methods return
+//! `ScraperTransportUnavailable`.
+
+pub mod cookie_transport;
+pub mod session;
+
+use std::path::{Path, PathBuf};
 
 use crate::error::XApiError;
 use crate::x_api::types::{
@@ -13,15 +18,17 @@ use crate::x_api::types::{
 };
 use crate::x_api::XApiClient;
 
+use cookie_transport::CookieTransport;
+use session::ScraperSession;
+
 /// X API client for local/scraper mode — no OAuth credentials required.
 ///
-/// All methods return appropriate error variants:
-/// - Auth-gated methods → `FeatureRequiresAuth`
-/// - Write methods → `ScraperMutationBlocked` (if disabled) or `ScraperTransportUnavailable`
-/// - Read methods → `ScraperTransportUnavailable` (pending actual transport)
-/// - Media methods → `MediaUploadError`
+/// When a valid `scraper_session.json` exists in the data directory,
+/// write operations are dispatched to the cookie-based transport.
+/// Otherwise, they return `ScraperTransportUnavailable`.
 pub struct LocalModeXClient {
     allow_mutations: bool,
+    cookie_transport: Option<CookieTransport>,
 }
 
 impl LocalModeXClient {
@@ -30,19 +37,62 @@ impl LocalModeXClient {
     /// `allow_mutations` controls whether write operations are attempted
     /// (when `true`) or immediately rejected (when `false`).
     pub fn new(allow_mutations: bool) -> Self {
-        Self { allow_mutations }
+        Self {
+            allow_mutations,
+            cookie_transport: None,
+        }
     }
 
-    /// Check mutation gate and return appropriate error.
+    /// Create a local-mode client with cookie-auth from a session file.
+    ///
+    /// If the session file exists and is valid, write operations will use
+    /// the cookie transport. Otherwise, falls back to stub behavior.
+    ///
+    /// Auto-detects the current CreateTweet GraphQL query ID from X's
+    /// web client JS bundles at startup.
+    pub async fn with_session(allow_mutations: bool, data_dir: &Path) -> Self {
+        let session_path = data_dir.join("scraper_session.json");
+        let session = ScraperSession::load(&session_path).ok().flatten();
+
+        let cookie_transport = if let Some(session) = session {
+            let resolved = cookie_transport::resolve_transport().await;
+            tracing::info!("Cookie-auth transport loaded from scraper_session.json");
+            Some(CookieTransport::with_query_id(
+                session,
+                resolved.query_id,
+                resolved.transaction,
+            ))
+        } else {
+            None
+        };
+
+        Self {
+            allow_mutations,
+            cookie_transport,
+        }
+    }
+
+    /// Path to the session file in a given data directory.
+    pub fn session_path(data_dir: &Path) -> PathBuf {
+        data_dir.join("scraper_session.json")
+    }
+
+    /// Check mutation gate and delegate to cookie transport if available.
     fn check_mutation(&self, method: &str) -> Result<(), XApiError> {
         if !self.allow_mutations {
             return Err(XApiError::ScraperMutationBlocked {
                 message: method.to_string(),
             });
         }
-        Err(XApiError::ScraperTransportUnavailable {
-            message: format!("{method}: scraper write transport not yet implemented"),
-        })
+        if self.cookie_transport.is_none() {
+            return Err(XApiError::ScraperTransportUnavailable {
+                message: format!(
+                    "{method}: no browser session imported. \
+                     Import cookies via Settings → X API → Import Browser Session."
+                ),
+            });
+        }
+        Ok(())
     }
 
     /// Return a transport-unavailable error for read methods.
@@ -65,6 +115,9 @@ impl XApiClient for LocalModeXClient {
     // --- Auth-gated methods ---
 
     async fn get_me(&self) -> Result<User, XApiError> {
+        if let Some(ref transport) = self.cookie_transport {
+            return transport.fetch_viewer().await;
+        }
         Err(Self::auth_required("get_me"))
     }
 
@@ -189,37 +242,55 @@ impl XApiClient for LocalModeXClient {
 
     // --- Write methods (mutation-gated) ---
 
-    async fn post_tweet(&self, _text: &str) -> Result<PostedTweet, XApiError> {
+    async fn post_tweet(&self, text: &str) -> Result<PostedTweet, XApiError> {
         self.check_mutation("post_tweet")?;
-        unreachable!()
+        self.cookie_transport
+            .as_ref()
+            .unwrap()
+            .post_tweet(text)
+            .await
     }
 
     async fn reply_to_tweet(
         &self,
-        _text: &str,
-        _in_reply_to_id: &str,
+        text: &str,
+        in_reply_to_id: &str,
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("reply_to_tweet")?;
-        unreachable!()
+        self.cookie_transport
+            .as_ref()
+            .unwrap()
+            .reply_to_tweet(text, in_reply_to_id)
+            .await
     }
 
     async fn post_tweet_with_media(
         &self,
-        _text: &str,
+        text: &str,
         _media_ids: &[String],
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("post_tweet_with_media")?;
-        unreachable!()
+        // Media upload not yet supported via cookie transport — post text only.
+        self.cookie_transport
+            .as_ref()
+            .unwrap()
+            .post_tweet(text)
+            .await
     }
 
     async fn reply_to_tweet_with_media(
         &self,
-        _text: &str,
-        _in_reply_to_id: &str,
+        text: &str,
+        in_reply_to_id: &str,
         _media_ids: &[String],
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("reply_to_tweet_with_media")?;
-        unreachable!()
+        // Media upload not yet supported via cookie transport — post text only.
+        self.cookie_transport
+            .as_ref()
+            .unwrap()
+            .reply_to_tweet(text, in_reply_to_id)
+            .await
     }
 
     async fn quote_tweet(
@@ -228,22 +299,30 @@ impl XApiClient for LocalModeXClient {
         _quoted_tweet_id: &str,
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("quote_tweet")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "quote_tweet not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn like_tweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("like_tweet")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "like_tweet not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn unlike_tweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("unlike_tweet")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "unlike_tweet not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn follow_user(&self, _user_id: &str, _target_user_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("follow_user")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "follow_user not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn unfollow_user(
@@ -252,22 +331,30 @@ impl XApiClient for LocalModeXClient {
         _target_user_id: &str,
     ) -> Result<bool, XApiError> {
         self.check_mutation("unfollow_user")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "unfollow_user not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn retweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("retweet")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "retweet not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn unretweet(&self, _user_id: &str, _tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("unretweet")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "unretweet not yet supported via cookie transport".to_string(),
+        })
     }
 
     async fn delete_tweet(&self, _tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("delete_tweet")?;
-        unreachable!()
+        Err(XApiError::ScraperTransportUnavailable {
+            message: "delete_tweet not yet supported via cookie transport".to_string(),
+        })
     }
 
     // --- Media (always unavailable in scraper mode) ---

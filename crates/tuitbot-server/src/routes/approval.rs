@@ -12,7 +12,7 @@ use tuitbot_core::storage::{action_log, approval_queue};
 use crate::account::{require_approve, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::ws::WsEvent;
+use crate::ws::{AccountWsEvent, WsEvent};
 
 /// Query parameters for listing approval items.
 #[derive(Deserialize)]
@@ -193,11 +193,14 @@ pub async fn approve_item(
     )
     .await;
 
-    let _ = state.event_tx.send(WsEvent::ApprovalUpdated {
-        id,
-        status: "approved".to_string(),
-        action_type: item.action_type,
-        actor: review.actor,
+    let _ = state.event_tx.send(AccountWsEvent {
+        account_id: ctx.account_id.clone(),
+        event: WsEvent::ApprovalUpdated {
+            id,
+            status: "approved".to_string(),
+            action_type: item.action_type,
+            actor: review.actor,
+        },
     });
 
     Ok(Json(json!({"status": "approved", "id": id})))
@@ -242,11 +245,14 @@ pub async fn reject_item(
     )
     .await;
 
-    let _ = state.event_tx.send(WsEvent::ApprovalUpdated {
-        id,
-        status: "rejected".to_string(),
-        action_type: item.action_type,
-        actor: review.actor,
+    let _ = state.event_tx.send(AccountWsEvent {
+        account_id: ctx.account_id.clone(),
+        event: WsEvent::ApprovalUpdated {
+            id,
+            status: "rejected".to_string(),
+            action_type: item.action_type,
+            actor: review.actor,
+        },
     });
 
     Ok(Json(json!({"status": "rejected", "id": id})))
@@ -334,11 +340,14 @@ pub async fn approve_all(
     )
     .await;
 
-    let _ = state.event_tx.send(WsEvent::ApprovalUpdated {
-        id: 0,
-        status: "approved_all".to_string(),
-        action_type: String::new(),
-        actor: review.actor,
+    let _ = state.event_tx.send(AccountWsEvent {
+        account_id: ctx.account_id.clone(),
+        event: WsEvent::ApprovalUpdated {
+            id: 0,
+            status: "approved_all".to_string(),
+            action_type: String::new(),
+            actor: review.actor,
+        },
     });
 
     Ok(Json(

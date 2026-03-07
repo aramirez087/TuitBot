@@ -9,42 +9,42 @@ use crate::x_api::{create_local_client, XApiClient};
 
 // --- Factory function tests ---
 
-#[test]
-fn factory_returns_some_for_scraper_backend() {
+#[tokio::test]
+async fn factory_returns_some_for_scraper_backend() {
     let config = XApiConfig {
         provider_backend: "scraper".to_string(),
         scraper_allow_mutations: false,
         ..Default::default()
     };
-    assert!(create_local_client(&config).is_some());
+    assert!(create_local_client(&config).await.is_some());
 }
 
-#[test]
-fn factory_returns_none_for_empty_backend() {
+#[tokio::test]
+async fn factory_returns_none_for_empty_backend() {
     let config = XApiConfig {
         provider_backend: String::new(),
         ..Default::default()
     };
-    assert!(create_local_client(&config).is_none());
+    assert!(create_local_client(&config).await.is_none());
 }
 
-#[test]
-fn factory_returns_none_for_x_api_backend() {
+#[tokio::test]
+async fn factory_returns_none_for_x_api_backend() {
     let config = XApiConfig {
         provider_backend: "x_api".to_string(),
         ..Default::default()
     };
-    assert!(create_local_client(&config).is_none());
+    assert!(create_local_client(&config).await.is_none());
 }
 
-#[test]
-fn factory_passes_allow_mutations_true() {
+#[tokio::test]
+async fn factory_passes_allow_mutations_true() {
     let config = XApiConfig {
         provider_backend: "scraper".to_string(),
         scraper_allow_mutations: true,
         ..Default::default()
     };
-    let client = create_local_client(&config).unwrap();
+    let client = create_local_client(&config).await.unwrap();
     // Verify it's a valid Arc<dyn XApiClient>
     let _: &dyn XApiClient = &*client;
 }

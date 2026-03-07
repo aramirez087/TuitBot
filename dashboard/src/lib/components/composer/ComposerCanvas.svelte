@@ -7,6 +7,7 @@
 		submitting,
 		selectedTime,
 		submitError,
+		canPublish = true,
 		inspectorOpen = false,
 		embedded = false,
 		onsubmit,
@@ -18,6 +19,7 @@
 		submitting: boolean;
 		selectedTime: string | null;
 		submitError: string | null;
+		canPublish?: boolean;
 		inspectorOpen?: boolean;
 		embedded?: boolean;
 		onsubmit: () => void;
@@ -45,13 +47,16 @@
 					class="submit-pill"
 					onclick={onsubmit}
 					disabled={!canSubmit || submitting}
+					title={!canPublish && !selectedTime ? 'Connect X API to publish directly' : ''}
 				>
 					<Send size={14} />
 					{submitting
 						? "Submitting..."
 						: selectedTime
 							? "Schedule"
-							: "Post now"}
+							: canPublish
+								? "Post now"
+								: "Save to Calendar"}
 				</button>
 			</div>
 		{/if}

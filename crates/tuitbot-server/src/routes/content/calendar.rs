@@ -12,7 +12,7 @@ use crate::account::AccountContext;
 use crate::error::ApiError;
 use crate::state::AppState;
 
-use super::read_config;
+use super::read_effective_config;
 
 /// A unified calendar item merging content from all sources.
 #[derive(Debug, Serialize)]
@@ -155,9 +155,9 @@ pub async fn calendar(
 /// `GET /api/content/schedule` — the configured posting schedule.
 pub async fn schedule(
     State(state): State<Arc<AppState>>,
-    _ctx: AccountContext,
+    ctx: AccountContext,
 ) -> Result<Json<Value>, ApiError> {
-    let config = read_config(&state)?;
+    let config = read_effective_config(&state, &ctx.account_id).await?;
 
     Ok(Json(json!({
         "timezone": config.schedule.timezone,

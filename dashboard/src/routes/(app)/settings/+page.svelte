@@ -12,8 +12,10 @@
 		Database,
 		FolderOpen,
 		Wifi,
-		AlertTriangle
+		AlertTriangle,
+		Users
 	} from 'lucide-svelte';
+	import { get } from 'svelte/store';
 	import {
 		loading,
 		error,
@@ -25,7 +27,9 @@
 		saveSettings,
 		hasDangerousChanges
 	} from '$lib/stores/settings';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
+	import AccountsSection from './AccountsSection.svelte';
 	import WorkspaceSection from './WorkspaceSection.svelte';
 	import BusinessProfileSection from './BusinessProfileSection.svelte';
 	import ContentPersonaSection from './ContentPersonaSection.svelte';
@@ -44,6 +48,7 @@
 	// --- Section nav ---
 
 	const sections = [
+		{ id: 'accounts', label: 'Accounts', icon: Users },
 		{ id: 'workspace', label: 'Workspace', icon: LayoutDashboard },
 		{ id: 'business', label: 'Business', icon: Briefcase },
 		{ id: 'persona', label: 'Persona', icon: MessageCircle },
@@ -61,7 +66,9 @@
 	let activeSection = $state('business');
 	let showSaved = $state(false);
 	let showConfirm = $state(false);
+	let showDiscarded = $state(false);
 	let savedTimeout: ReturnType<typeof setTimeout> | null = null;
+	let discardedTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// --- IntersectionObserver for section highlighting ---
 
@@ -92,14 +99,28 @@
 
 	onMount(() => {
 		loadSettings().then(() => {
-			// Small delay so DOM is ready
 			setTimeout(setupObservers, 100);
 		});
+		const handler = () => {
+			const wasDirty = get(isDirty);
+			if (wasDirty) {
+				resetDraft();
+				showDiscarded = true;
+				if (discardedTimeout) clearTimeout(discardedTimeout);
+				discardedTimeout = setTimeout(() => {
+					showDiscarded = false;
+				}, 3000);
+			}
+			loadSettings().then(() => setTimeout(setupObservers, 100));
+		};
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	onDestroy(() => {
 		observers.forEach((o) => o.disconnect());
 		if (savedTimeout) clearTimeout(savedTimeout);
+		if (discardedTimeout) clearTimeout(discardedTimeout);
 	});
 
 	function scrollToSection(id: string) {
@@ -181,6 +202,7 @@
 			</div>
 
 			<div class="sections">
+				<AccountsSection />
 				<WorkspaceSection />
 				<BusinessProfileSection />
 				<ContentPersonaSection />
@@ -197,7 +219,7 @@
 		</div>
 	</div>
 
-	<SaveBar {showSaved} onSave={handleSave} onDiscard={resetDraft} />
+	<SaveBar {showSaved} {showDiscarded} onSave={handleSave} onDiscard={resetDraft} />
 
 	{#if showConfirm}
 		<ConfirmModal onConfirm={doSave} onCancel={() => (showConfirm = false)} />

@@ -1,20 +1,26 @@
 <script lang="ts">
-	import { Save, RotateCcw, Check, AlertTriangle } from 'lucide-svelte';
+	import { Save, RotateCcw, Check, AlertTriangle, Info } from 'lucide-svelte';
 	import { isDirty, saving, saveError } from '$lib/stores/settings';
 
 	interface Props {
 		showSaved: boolean;
+		showDiscarded?: boolean;
 		onSave: () => void;
 		onDiscard: () => void;
 	}
 
-	let { showSaved, onSave, onDiscard }: Props = $props();
+	let { showSaved, showDiscarded = false, onSave, onDiscard }: Props = $props();
 </script>
 
-{#if $isDirty || showSaved || $saveError}
+{#if $isDirty || showSaved || showDiscarded || $saveError}
 	<div class="save-bar" class:has-error={!!$saveError}>
 		<div class="save-bar-content">
-			{#if showSaved}
+			{#if showDiscarded}
+				<div class="save-status discarded">
+					<Info size={16} />
+					Unsaved changes were discarded
+				</div>
+			{:else if showSaved}
 				<div class="save-status success">
 					<Check size={16} />
 					Settings saved
@@ -29,7 +35,7 @@
 			{/if}
 
 			<div class="save-actions">
-				{#if !showSaved}
+				{#if !showSaved && !showDiscarded}
 					<button type="button" class="discard-btn" onclick={onDiscard} disabled={$saving}>
 						<RotateCcw size={14} />
 						Discard
@@ -103,6 +109,10 @@
 
 	.save-status.error {
 		color: var(--color-danger);
+	}
+
+	.save-status.discarded {
+		color: var(--color-warning);
 	}
 
 	.save-actions {

@@ -4,7 +4,7 @@
 	import { loadStats as loadApprovalStats } from "$lib/stores/approval";
 	import { connected } from "$lib/stores/websocket";
 	import { checkForUpdate } from "$lib/stores/update";
-	import { initAccounts, fetchAccounts, syncCurrentProfile } from "$lib/stores/accounts";
+	import { initAccounts, syncCurrentProfile, bootstrapState, ACCOUNT_SWITCHED_EVENT } from "$lib/stores/accounts";
 	import { onMount, onDestroy } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
@@ -50,17 +50,23 @@
 		}
 	}
 
-	onMount(() => {
-		initAccounts();
+	function onAccountSwitched() {
+		loadApprovalStats();
+	}
+
+	onMount(async () => {
+		await initAccounts();
+		syncCurrentProfile();
 		loadApprovalStats();
 		checkForUpdate();
-		fetchAccounts().then(() => syncCurrentProfile());
 		window.addEventListener('keydown', handleKeydown);
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, onAccountSwitched);
 	});
 
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('keydown', handleKeydown);
+			window.removeEventListener(ACCOUNT_SWITCHED_EVENT, onAccountSwitched);
 		}
 	});
 </script>
@@ -68,14 +74,20 @@
 <div class="app-shell">
 	<Sidebar />
 	<main class="main-content">
-		{#if !$connected}
-			<ConnectionBanner />
-		{/if}
-		{#key $page.url.pathname}
-			<div in:fade={{ duration: 150 }}>
-				{@render children()}
+		{#if $bootstrapState === 'loading'}
+			<div class="bootstrap-loading" in:fade={{ duration: 100 }}>
+				<div class="bootstrap-spinner"></div>
 			</div>
-		{/key}
+		{:else}
+			{#if !$connected}
+				<ConnectionBanner />
+			{/if}
+			{#key $page.url.pathname}
+				<div in:fade={{ duration: 150 }}>
+					{@render children()}
+				</div>
+			{/key}
+		{/if}
 	</main>
 </div>
 
@@ -90,5 +102,25 @@
 		flex: 1;
 		padding: 24px 32px;
 		overflow-y: auto;
+	}
+
+	.bootstrap-loading {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 200px;
+	}
+
+	.bootstrap-spinner {
+		width: 24px;
+		height: 24px;
+		border: 2px solid var(--color-border-subtle);
+		border-top-color: var(--color-accent);
+		border-radius: 50%;
+		animation: spin 0.6s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 </style>

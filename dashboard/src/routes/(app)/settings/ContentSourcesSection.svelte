@@ -91,7 +91,7 @@
 </script>
 
 {#if $draft}
-<SettingsSection id="sources" title="Content Sources" description="Connect a content source for the Watchtower to index" icon={SectionIcon}>
+<SettingsSection id="sources" title="Content Sources" description="Connect a content source for the Watchtower to index" icon={SectionIcon} scope="account" scopeKey="content_sources">
 	<div class="field-grid">
 		{#if !isCloud}
 			<div class="field full-width">

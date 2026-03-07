@@ -46,6 +46,7 @@
 	title="Storage"
 	description="Database location and data retention"
 	icon={Database}
+	scope="instance"
 >
 	<div class="field-grid">
 		<div class="field full-width">

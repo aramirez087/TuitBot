@@ -13,19 +13,21 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-rc.13" }
+tauri-build = { version = "2.0.0-rc.13", features = [] }
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
-tauri = { version = "2.0.0-rc.17" }
+tauri = { version = "2.0.0-rc.17", features = ["tray-icon"] }
 tauri-plugin-log = "2.0.0-rc"
 
 # Embed the server as a library (replaces child-process spawning)
 tuitbot-server = { path = "../../crates/tuitbot-server" }
 tuitbot-core = { path = "../../crates/tuitbot-core" }
 tokio = { version = "1", features = ["full"] }
+toml = "0.8"
+url = "2"
 axum = "0.8"
 
 # Tauri plugins

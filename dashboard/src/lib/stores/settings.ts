@@ -3,8 +3,10 @@ import {
 	api,
 	type TuitbotConfig,
 	type SettingsValidationResult,
-	type SettingsTestResult
+	type SettingsTestResult,
+	type EffectiveSettingsResponse
 } from '$lib/api';
+import { getAccountId } from '$lib/api/http';
 
 // --- Writable stores ---
 
@@ -17,6 +19,9 @@ export const error = writable<string | null>(null);
 export const saveError = writable<string | null>(null);
 export const validationErrors = writable<SettingsValidationResult['errors']>([]);
 export const lastSaved = writable<Date | null>(null);
+
+/** Top-level config keys overridden by the active account (empty for default). */
+export const overriddenKeys = writable<string[]>([]);
 
 // --- Derived stores ---
 
@@ -83,15 +88,29 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
 
 // --- Actions ---
 
+const DEFAULT_ACCOUNT_ID = '00000000-0000-0000-0000-000000000000';
+
 export async function loadSettings() {
 	loading.set(true);
 	error.set(null);
 
 	try {
-		const [configData, defaultsData] = await Promise.all([
-			api.settings.get(),
+		const [rawResponse, defaultsData] = await Promise.all([
+			api.settings.get() as Promise<TuitbotConfig | EffectiveSettingsResponse>,
 			api.settings.defaults()
 		]);
+
+		// Non-default accounts return an envelope with `config` + `_overrides`.
+		let configData: TuitbotConfig;
+		const activeAccount = getAccountId();
+		if (activeAccount !== DEFAULT_ACCOUNT_ID && '_overrides' in rawResponse) {
+			const envelope = rawResponse as EffectiveSettingsResponse;
+			configData = envelope.config;
+			overriddenKeys.set(envelope._overrides);
+		} else {
+			configData = rawResponse as TuitbotConfig;
+			overriddenKeys.set([]);
+		}
 
 		config.set(configData);
 		defaults.set(defaultsData);
@@ -154,9 +173,20 @@ export async function saveSettings(): Promise<boolean> {
 		}
 
 		// Save
-		const updated = await api.settings.patch($draft);
-		config.set(updated);
-		draft.set(deepClone(updated));
+		const rawUpdated = await api.settings.patch($draft) as TuitbotConfig | EffectiveSettingsResponse;
+
+		let updatedConfig: TuitbotConfig;
+		const activeAccount = getAccountId();
+		if (activeAccount !== DEFAULT_ACCOUNT_ID && '_overrides' in rawUpdated) {
+			const envelope = rawUpdated as EffectiveSettingsResponse;
+			updatedConfig = envelope.config;
+			overriddenKeys.set(envelope._overrides);
+		} else {
+			updatedConfig = rawUpdated as TuitbotConfig;
+		}
+
+		config.set(updatedConfig);
+		draft.set(deepClone(updatedConfig));
 		lastSaved.set(new Date());
 		return true;
 	} catch (e) {
@@ -191,6 +221,43 @@ export function resetStores(): void {
 	saveError.set(null);
 	validationErrors.set([]);
 	lastSaved.set(null);
+	overriddenKeys.set([]);
+}
+
+/**
+ * Reset a section's override back to the base config by PATCHing `null` for
+ * the given top-level key. The backend's `merge_overrides` treats null as a
+ * remove, so the account falls back to the base config for that section.
+ */
+export async function resetSectionToBase(key: string): Promise<boolean> {
+	saving.set(true);
+	saveError.set(null);
+
+	try {
+		const rawUpdated = (await api.settings.patch({ [key]: null })) as
+			| TuitbotConfig
+			| EffectiveSettingsResponse;
+
+		let updatedConfig: TuitbotConfig;
+		const activeAccount = getAccountId();
+		if (activeAccount !== DEFAULT_ACCOUNT_ID && '_overrides' in rawUpdated) {
+			const envelope = rawUpdated as EffectiveSettingsResponse;
+			updatedConfig = envelope.config;
+			overriddenKeys.set(envelope._overrides);
+		} else {
+			updatedConfig = rawUpdated as TuitbotConfig;
+		}
+
+		config.set(updatedConfig);
+		draft.set(deepClone(updatedConfig));
+		lastSaved.set(new Date());
+		return true;
+	} catch (e) {
+		saveError.set(e instanceof Error ? e.message : 'Failed to reset section');
+		return false;
+	} finally {
+		saving.set(false);
+	}
 }
 
 export function hasDangerousChanges(): boolean {

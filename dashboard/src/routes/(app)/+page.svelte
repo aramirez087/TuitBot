@@ -4,17 +4,29 @@
 	import ComposeWorkspace from '$lib/components/composer/ComposeWorkspace.svelte';
 	import AnalyticsHome from '$lib/components/home/AnalyticsHome.svelte';
 	import { homeSurface, homeSurfaceReady, loadHomeSurface } from '$lib/stores/homeSurface';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let schedule = $state<ScheduleConfig | null>(null);
+	let canPublish = $state(true);
 
-	onMount(async () => {
-		await loadHomeSurface();
-		try {
-			const cfg = await api.content.schedule();
-			schedule = cfg;
-		} catch {
-			// Schedule loading is non-critical; workspace works without it
+	onMount(() => {
+		async function loadPageData() {
+			await loadHomeSurface();
+			try {
+				const [cfg, rt] = await Promise.all([
+					api.content.schedule(),
+					api.runtime.status(),
+				]);
+				schedule = cfg;
+				canPublish = rt.can_post;
+			} catch {
+				// Non-critical; workspace works without these
+			}
 		}
+		loadPageData();
+		const handler = () => { schedule = null; loadPageData(); };
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	async function handleSubmit(data: ComposeRequest) {
@@ -32,6 +44,7 @@
 	<div class="home-composer">
 		<ComposeWorkspace
 			{schedule}
+			{canPublish}
 			onsubmit={handleSubmit}
 			embedded={true}
 		/>

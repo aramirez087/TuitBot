@@ -3,6 +3,8 @@
 //! Provides multi-account registry, per-account configuration overrides,
 //! and role-based access control (admin/approver/viewer).
 
+use std::path::{Path, PathBuf};
+
 use super::DbPool;
 use crate::error::StorageError;
 
@@ -53,14 +55,38 @@ pub async fn get_account(pool: &DbPool, id: &str) -> Result<Option<Account>, Sto
         .map_err(|e| StorageError::Query { source: e })
 }
 
+/// Default config overrides for new accounts.
+///
+/// Blanks out identity fields so a new account doesn't inherit the default
+/// account's persona, business profile, or targets from `config.toml`.
+const NEW_ACCOUNT_OVERRIDES: &str = r#"{
+    "business": {
+        "product_name": "",
+        "product_keywords": [],
+        "product_description": "",
+        "product_url": null,
+        "target_audience": "",
+        "competitor_keywords": [],
+        "industry_topics": [],
+        "brand_voice": null,
+        "reply_style": null,
+        "content_style": null,
+        "persona_opinions": [],
+        "persona_experiences": [],
+        "content_pillars": []
+    },
+    "targets": []
+}"#;
+
 /// Create a new account. Returns the account ID.
 pub async fn create_account(pool: &DbPool, id: &str, label: &str) -> Result<String, StorageError> {
     sqlx::query(
-        "INSERT INTO accounts (id, label, updated_at) \
-         VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
+        "INSERT INTO accounts (id, label, config_overrides, updated_at) \
+         VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
     )
     .bind(id)
     .bind(label)
+    .bind(NEW_ACCOUNT_OVERRIDES)
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;
@@ -249,6 +275,30 @@ pub async fn list_roles(pool: &DbPool, account_id: &str) -> Result<Vec<AccountRo
     .map_err(|e| StorageError::Query { source: e })
 }
 
+// ---- Path resolution helpers ----
+
+/// Resolve the data directory for an account.
+///
+/// - Default account: returns `data_dir` itself (root-level, backward compat).
+/// - Other accounts: returns `data_dir/accounts/{account_id}/`.
+pub fn account_data_dir(data_dir: &Path, account_id: &str) -> PathBuf {
+    if account_id == DEFAULT_ACCOUNT_ID {
+        data_dir.to_path_buf()
+    } else {
+        data_dir.join("accounts").join(account_id)
+    }
+}
+
+/// Resolve the scraper session file path for an account.
+pub fn account_scraper_session_path(data_dir: &Path, account_id: &str) -> PathBuf {
+    account_data_dir(data_dir, account_id).join("scraper_session.json")
+}
+
+/// Resolve the token file path for an account.
+pub fn account_token_path(data_dir: &Path, account_id: &str) -> PathBuf {
+    account_data_dir(data_dir, account_id).join("tokens.json")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -384,5 +434,60 @@ mod tests {
             .await
             .expect("check"));
         assert!(!account_exists(&pool, "nonexistent").await.expect("check"));
+    }
+
+    #[test]
+    fn account_data_dir_default() {
+        let data_dir = Path::new("/home/user/.tuitbot");
+        let result = account_data_dir(data_dir, DEFAULT_ACCOUNT_ID);
+        assert_eq!(result, PathBuf::from("/home/user/.tuitbot"));
+    }
+
+    #[test]
+    fn account_data_dir_other() {
+        let data_dir = Path::new("/home/user/.tuitbot");
+        let id = "abc-123";
+        let result = account_data_dir(data_dir, id);
+        assert_eq!(
+            result,
+            PathBuf::from("/home/user/.tuitbot/accounts/abc-123")
+        );
+    }
+
+    #[test]
+    fn scraper_session_path_default() {
+        let data_dir = Path::new("/home/user/.tuitbot");
+        let result = account_scraper_session_path(data_dir, DEFAULT_ACCOUNT_ID);
+        assert_eq!(
+            result,
+            PathBuf::from("/home/user/.tuitbot/scraper_session.json")
+        );
+    }
+
+    #[test]
+    fn scraper_session_path_other() {
+        let data_dir = Path::new("/home/user/.tuitbot");
+        let result = account_scraper_session_path(data_dir, "abc-123");
+        assert_eq!(
+            result,
+            PathBuf::from("/home/user/.tuitbot/accounts/abc-123/scraper_session.json")
+        );
+    }
+
+    #[test]
+    fn token_path_default() {
+        let data_dir = Path::new("/home/user/.tuitbot");
+        let result = account_token_path(data_dir, DEFAULT_ACCOUNT_ID);
+        assert_eq!(result, PathBuf::from("/home/user/.tuitbot/tokens.json"));
+    }
+
+    #[test]
+    fn token_path_other() {
+        let data_dir = Path::new("/home/user/.tuitbot");
+        let result = account_token_path(data_dir, "abc-123");
+        assert_eq!(
+            result,
+            PathBuf::from("/home/user/.tuitbot/accounts/abc-123/tokens.json")
+        );
     }
 }

@@ -10,7 +10,7 @@ use tower::ServiceExt;
 use tuitbot_core::storage;
 
 use tuitbot_server::state::AppState;
-use tuitbot_server::ws::WsEvent;
+use tuitbot_server::ws::AccountWsEvent;
 
 /// The test API token used across all tests.
 const TEST_TOKEN: &str = "test-token-abc123";
@@ -18,7 +18,7 @@ const TEST_TOKEN: &str = "test-token-abc123";
 /// Create the test router backed by an in-memory SQLite database.
 async fn test_router() -> axum::Router {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let state = Arc::new(AppState {
         db: pool,
@@ -38,7 +38,7 @@ async fn test_router() -> axum::Router {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -239,7 +239,7 @@ async fn approval_reject_not_found() {
 #[tokio::test]
 async fn approval_stats_returns_counts() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -258,7 +258,7 @@ async fn approval_stats_returns_counts() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -290,7 +290,7 @@ async fn approval_stats_returns_counts() {
 #[tokio::test]
 async fn approval_list_with_status_filter() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -309,7 +309,7 @@ async fn approval_list_with_status_filter() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -351,7 +351,7 @@ async fn approval_list_with_status_filter() {
 #[tokio::test]
 async fn approval_edit_content() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -370,7 +370,7 @@ async fn approval_edit_content() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -410,7 +410,7 @@ async fn approval_edit_not_found() {
 #[tokio::test]
 async fn approval_edit_empty_content() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool.clone(),
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -429,7 +429,7 @@ async fn approval_edit_empty_content() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -555,7 +555,7 @@ async fn targets_returns_array() {
 #[tokio::test]
 async fn add_and_list_target() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -574,7 +574,7 @@ async fn add_and_list_target() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -602,7 +602,7 @@ async fn add_and_list_target() {
 #[tokio::test]
 async fn add_duplicate_target_fails() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -621,7 +621,7 @@ async fn add_duplicate_target_fails() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -650,7 +650,7 @@ async fn add_duplicate_target_fails() {
 #[tokio::test]
 async fn remove_target_works() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -669,7 +669,7 @@ async fn remove_target_works() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -718,7 +718,7 @@ async fn runtime_status_initially_stopped() {
 #[tokio::test]
 async fn runtime_start_and_stop() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -737,7 +737,7 @@ async fn runtime_start_and_stop() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -777,7 +777,7 @@ async fn runtime_start_and_stop() {
 #[tokio::test]
 async fn settings_get_returns_json() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a minimal config file.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -802,7 +802,7 @@ async fn settings_get_returns_json() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -817,7 +817,7 @@ async fn settings_get_returns_json() {
 #[tokio::test]
 async fn settings_patch_round_trips() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let dir = tempfile::tempdir().expect("create temp dir");
     let config_path = dir.path().join("config.toml");
@@ -841,7 +841,7 @@ async fn settings_patch_round_trips() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -918,7 +918,7 @@ async fn post_ingest_requires_auth() {
 #[tokio::test]
 async fn post_ingest_idempotent() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -937,7 +937,7 @@ async fn post_ingest_idempotent() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1027,7 +1027,7 @@ async fn config_status_capabilities_match_cloud_mode() {
     use tuitbot_core::config::DeploymentMode;
 
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
     let state = Arc::new(AppState {
         db: pool,
         config_path: std::path::PathBuf::from("/tmp/test-config.toml"),
@@ -1046,7 +1046,7 @@ async fn config_status_capabilities_match_cloud_mode() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: DeploymentMode::Cloud,
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1078,7 +1078,7 @@ async fn config_status_capabilities_match_cloud_mode() {
 #[tokio::test]
 async fn settings_get_redacts_service_account_key() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config file with a service_account_key.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1118,7 +1118,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1141,7 +1141,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_patch_preserves_legacy_sa_key() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config with a legacy service_account_key.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1181,7 +1181,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1229,7 +1229,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_patch_response_redacts_sa_key() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config with a legacy service_account_key.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1269,7 +1269,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1313,7 +1313,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_get_redacts_sa_key_alongside_connection_id() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Write a config with both service_account_key AND connection_id.
     let dir = tempfile::tempdir().expect("create temp dir");
@@ -1354,7 +1354,7 @@ loop_back_enabled = false
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1377,7 +1377,7 @@ loop_back_enabled = false
 #[tokio::test]
 async fn settings_init_with_connection_id() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     let dir = tempfile::tempdir().expect("create temp dir");
     let config_path = dir.path().join("config.toml");
@@ -1402,7 +1402,7 @@ async fn settings_init_with_connection_id() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1565,7 +1565,7 @@ async fn connector_status_requires_auth() {
 #[tokio::test]
 async fn connector_status_with_connection() {
     let pool = storage::init_test_db().await.expect("init test db");
-    let (event_tx, _) = tokio::sync::broadcast::channel::<WsEvent>(256);
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
 
     // Seed a connection row.
     tuitbot_core::storage::watchtower::insert_connection(
@@ -1595,7 +1595,7 @@ async fn connector_status_with_connection() {
         content_sources: Default::default(),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
-        provider_backend: String::new(),
+
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
@@ -1632,4 +1632,767 @@ async fn connector_disconnect_requires_auth() {
 
     let response = router.oneshot(req).await.expect("send request");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+// ============================================================
+// Credential isolation (Session 3)
+// ============================================================
+
+/// Create a test router with a dedicated temp directory for data files.
+/// Writes a minimal config.toml so `read_effective_config` works.
+async fn test_router_with_dir(dir: &std::path::Path) -> (axum::Router, storage::DbPool) {
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
+
+    // Write a minimal valid config.toml
+    let config_path = dir.join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[x_api]
+provider_backend = "scraper"
+client_id = "test-client-id"
+
+[business]
+product_name = "TestProduct"
+product_keywords = ["test"]
+"#,
+    )
+    .expect("write config");
+
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path,
+        data_dir: dir.to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: "test-client-id".to_string(),
+    });
+
+    (tuitbot_server::build_router(state), pool)
+}
+
+/// Helper: send a GET request with auth + X-Account-Id header.
+async fn get_json_for(
+    router: axum::Router,
+    path: &str,
+    account_id: &str,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .uri(path)
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("X-Account-Id", account_id)
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    let status = response.status();
+    let body = response.into_body().collect().await.expect("read body");
+    let json: serde_json::Value = serde_json::from_slice(&body.to_bytes()).expect("parse JSON");
+    (status, json)
+}
+
+/// Helper: send a POST request with auth + X-Account-Id header.
+async fn post_json_for(
+    router: axum::Router,
+    path: &str,
+    account_id: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(path)
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .header("X-Account-Id", account_id)
+        .body(Body::from(serde_json::to_vec(&body).unwrap()))
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    let status = response.status();
+    let bytes = response.into_body().collect().await.expect("read body");
+    let json: serde_json::Value = serde_json::from_slice(&bytes.to_bytes()).expect("parse JSON");
+    (status, json)
+}
+
+/// Helper: send a DELETE request with auth + X-Account-Id header.
+async fn delete_json_for(
+    router: axum::Router,
+    path: &str,
+    account_id: &str,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(path)
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("X-Account-Id", account_id)
+        .body(Body::empty())
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    let status = response.status();
+    let bytes = response.into_body().collect().await.expect("read body");
+    let json: serde_json::Value = serde_json::from_slice(&bytes.to_bytes()).expect("parse JSON");
+    (status, json)
+}
+
+/// Create a non-default account, returning (account_id, router clone info).
+async fn create_test_account(pool: &storage::DbPool, label: &str) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
+    tuitbot_core::storage::accounts::create_account(pool, &id, label)
+        .await
+        .expect("create account");
+    id
+}
+
+/// Test: Two accounts can have isolated scraper sessions.
+#[tokio::test]
+async fn credential_isolation_two_accounts() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_a = create_test_account(&pool, "Account A").await;
+    let acct_b = create_test_account(&pool, "Account B").await;
+
+    // Import scraper session for account A
+    let (status, body) = post_json_for(
+        router.clone(),
+        "/api/settings/scraper-session",
+        &acct_a,
+        serde_json::json!({
+            "auth_token": "auth_a",
+            "ct0": "ct0_a",
+            "username": "user_a"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "import A: {body}");
+    assert_eq!(body["username"], "user_a");
+
+    // Import scraper session for account B
+    let (status, body) = post_json_for(
+        router.clone(),
+        "/api/settings/scraper-session",
+        &acct_b,
+        serde_json::json!({
+            "auth_token": "auth_b",
+            "ct0": "ct0_b",
+            "username": "user_b"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "import B: {body}");
+    assert_eq!(body["username"], "user_b");
+
+    // Verify each account sees its own session
+    let (status, body) =
+        get_json_for(router.clone(), "/api/settings/scraper-session", &acct_a).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["exists"], true);
+    assert_eq!(body["username"], "user_a");
+
+    let (status, body) =
+        get_json_for(router.clone(), "/api/settings/scraper-session", &acct_b).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["exists"], true);
+    assert_eq!(body["username"], "user_b");
+
+    // Delete account A's session — B should be unaffected
+    let (status, _) =
+        delete_json_for(router.clone(), "/api/settings/scraper-session", &acct_a).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, body) =
+        get_json_for(router.clone(), "/api/settings/scraper-session", &acct_a).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["exists"], false);
+
+    let (status, body) =
+        get_json_for(router.clone(), "/api/settings/scraper-session", &acct_b).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["exists"], true,
+        "B's session should survive A's delete"
+    );
+    assert_eq!(body["username"], "user_b");
+}
+
+/// Test: can_post is isolated per account (one has credentials, one doesn't).
+#[tokio::test]
+async fn can_post_isolated_per_account() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_with = create_test_account(&pool, "Has Creds").await;
+    let acct_without = create_test_account(&pool, "No Creds").await;
+
+    // Import scraper session only for acct_with
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/settings/scraper-session",
+        &acct_with,
+        serde_json::json!({
+            "auth_token": "auth_test",
+            "ct0": "ct0_test",
+            "username": "test_user"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Check runtime status for acct_with — should have can_post = true
+    let (status, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_with).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["can_post"], true,
+        "account with session should can_post"
+    );
+
+    // Check runtime status for acct_without — should have can_post = false
+    let (status, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_without).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["can_post"], false,
+        "account without session should not can_post"
+    );
+}
+
+/// Test: x-auth/status returns not linked for a fresh account.
+#[tokio::test]
+async fn x_auth_status_no_credentials() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Fresh Account").await;
+
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["oauth_linked"], false);
+    assert_eq!(body["scraper_linked"], false);
+    assert_eq!(body["has_credentials"], false);
+}
+
+/// Test: x-auth/start returns an authorization URL and state.
+#[tokio::test]
+async fn x_auth_start_returns_auth_url() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Auth Start Test").await;
+
+    let (status, body) = post_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/start"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "start: {body}");
+    assert!(
+        body["authorization_url"]
+            .as_str()
+            .unwrap()
+            .contains("oauth2/authorize"),
+        "should contain auth URL"
+    );
+    assert!(
+        body["state"].as_str().is_some(),
+        "should return state parameter"
+    );
+}
+
+/// Test: x-auth/status reflects scraper session as well.
+#[tokio::test]
+async fn x_auth_status_reflects_scraper_session() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Scraper Status Test").await;
+
+    // No credentials yet
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["has_credentials"], false);
+
+    // Import scraper session
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/settings/scraper-session",
+        &acct,
+        serde_json::json!({
+            "auth_token": "auth_test",
+            "ct0": "ct0_test",
+            "username": "scraper_user"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Now x-auth/status should show scraper_linked
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["scraper_linked"], true);
+    assert_eq!(body["has_credentials"], true);
+    assert_eq!(body["oauth_linked"], false);
+}
+
+// ============================================================
+// Runtime isolation (Session 4)
+// ============================================================
+
+/// Test: runtime status returns per-account provider_backend from effective config.
+#[tokio::test]
+async fn runtime_status_per_account_provider_backend() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Default account gets provider_backend from config.toml ("scraper")
+    let (status, body) = get_json_for(
+        router.clone(),
+        "/api/runtime/status",
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["provider_backend"], "scraper");
+
+    // Create non-default account with x_api override
+    let acct_b = create_test_account(&pool, "X API Account").await;
+    tuitbot_core::storage::accounts::update_account(
+        &pool,
+        &acct_b,
+        tuitbot_core::storage::accounts::UpdateAccountParams {
+            label: None,
+            x_user_id: None,
+            x_username: None,
+            x_display_name: None,
+            x_avatar_url: None,
+            config_overrides: Some(r#"{"x_api": {"provider_backend": "x_api"}}"#),
+            token_path: None,
+            status: None,
+        },
+    )
+    .await
+    .expect("update account");
+
+    // Account B should see provider_backend = "x_api"
+    let (status, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["provider_backend"], "x_api",
+        "non-default account should see overridden provider_backend"
+    );
+
+    // Default account should still see "scraper"
+    let (status, body) = get_json_for(
+        router.clone(),
+        "/api/runtime/status",
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        body["provider_backend"], "scraper",
+        "default account should be unaffected by non-default override"
+    );
+}
+
+/// Test: runtime start/stop is isolated per account.
+#[tokio::test]
+async fn runtime_isolation_start_stop() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_a = create_test_account(&pool, "Runtime A").await;
+    let acct_b = create_test_account(&pool, "Runtime B").await;
+
+    // Both start as not running
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], false);
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], false);
+
+    // Start runtime for A
+    let (status, body) = post_json_for(
+        router.clone(),
+        "/api/runtime/start",
+        &acct_a,
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "start A: {body}");
+
+    // A is running, B is not
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], true, "A should be running");
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], false, "B should not be running");
+
+    // Start runtime for B
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/runtime/start",
+        &acct_b,
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Both running
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], true, "A should still be running");
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], true, "B should be running now");
+
+    // Stop A — B should remain running
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/runtime/stop",
+        &acct_a,
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_a).await;
+    assert_eq!(body["running"], false, "A should be stopped");
+    let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
+    assert_eq!(body["running"], true, "B should survive A's stop");
+}
+
+/// Test: content generator cache is per-account (lazy init).
+#[tokio::test]
+async fn content_generator_lazy_init_per_account() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    // Write config with LLM configured (will fail to actually create provider
+    // without a valid API key, but we can verify the caching mechanism)
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[x_api]
+provider_backend = "scraper"
+client_id = "test-client-id"
+
+[business]
+product_name = "TestProduct"
+product_keywords = ["test"]
+
+[llm]
+provider = "openai"
+api_key = "test-key-not-real"
+"#,
+    )
+    .expect("write config");
+
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
+
+    let state = Arc::new(AppState {
+        db: pool.clone(),
+        config_path,
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
+    });
+
+    // Cache starts empty
+    assert_eq!(state.content_generators.lock().await.len(), 0);
+
+    // Lazy init for default account
+    let result = state
+        .get_or_create_content_generator(tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID)
+        .await;
+    assert!(
+        result.is_ok(),
+        "should create generator for default account"
+    );
+    assert_eq!(state.content_generators.lock().await.len(), 1);
+
+    // Create a non-default account
+    let acct_b = uuid::Uuid::new_v4().to_string();
+    tuitbot_core::storage::accounts::create_account(&pool, &acct_b, "Account B")
+        .await
+        .expect("create account");
+
+    // Lazy init for non-default account (inherits base config LLM settings)
+    let result = state.get_or_create_content_generator(&acct_b).await;
+    assert!(
+        result.is_ok(),
+        "should create generator for non-default account"
+    );
+    assert_eq!(state.content_generators.lock().await.len(), 2);
+
+    // Second call should return cached instance (no additional entry)
+    let gen1 = state
+        .get_or_create_content_generator(&acct_b)
+        .await
+        .unwrap();
+    let gen2 = state
+        .get_or_create_content_generator(&acct_b)
+        .await
+        .unwrap();
+    assert!(Arc::ptr_eq(&gen1, &gen2), "should return cached generator");
+    assert_eq!(state.content_generators.lock().await.len(), 2);
+}
+
+/// Test: load_effective_config returns per-account config.
+#[tokio::test]
+async fn load_effective_config_per_account() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(
+        &config_path,
+        r#"
+[x_api]
+provider_backend = "scraper"
+client_id = "test-client-id"
+
+[business]
+product_name = "BaseProduct"
+product_keywords = ["base"]
+"#,
+    )
+    .expect("write config");
+
+    let pool = storage::init_test_db().await.expect("init test db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
+
+    let state = AppState {
+        db: pool.clone(),
+        config_path,
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: None,
+        content_sources: Default::default(),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(),
+    };
+
+    // Default account: base config
+    let config = state
+        .load_effective_config(tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID)
+        .await
+        .unwrap();
+    assert_eq!(config.x_api.provider_backend, "scraper");
+    assert_eq!(config.business.product_name, "BaseProduct");
+
+    // Create non-default account with overrides
+    let acct_id = uuid::Uuid::new_v4().to_string();
+    tuitbot_core::storage::accounts::create_account(&pool, &acct_id, "Override Test")
+        .await
+        .expect("create account");
+    tuitbot_core::storage::accounts::update_account(
+        &pool,
+        &acct_id,
+        tuitbot_core::storage::accounts::UpdateAccountParams {
+            label: None,
+            x_user_id: None,
+            x_username: None,
+            x_display_name: None,
+            x_avatar_url: None,
+            config_overrides: Some(
+                r#"{"x_api": {"provider_backend": "x_api"}, "business": {"product_name": "OverriddenProduct"}}"#,
+            ),
+            token_path: None,
+            status: None,
+        },
+    )
+    .await
+    .expect("update account");
+
+    // Non-default account: merged config
+    let config = state.load_effective_config(&acct_id).await.unwrap();
+    assert_eq!(config.x_api.provider_backend, "x_api");
+    assert_eq!(config.business.product_name, "OverriddenProduct");
+    // Base keywords should still be inherited
+    assert_eq!(config.x_api.client_id, "test-client-id");
+}
+
+// ============================================================
+// OAuth unlink (Session 8)
+// ============================================================
+
+/// Test: unlinking OAuth tokens deletes the token file and updates status.
+#[tokio::test]
+async fn x_auth_unlink_removes_tokens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Unlink Test").await;
+
+    // Write a mock token file.
+    let token_path = tuitbot_core::storage::accounts::account_token_path(dir.path(), &acct);
+    let tokens = tuitbot_core::x_api::auth::Tokens {
+        access_token: "test_access".to_string(),
+        refresh_token: "test_refresh".to_string(),
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
+        scopes: vec!["tweet.read".to_string()],
+    };
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("save tokens");
+    assert!(token_path.exists(), "token file should exist before unlink");
+
+    // Verify status shows linked.
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["oauth_linked"], true);
+
+    // Unlink.
+    let (status, body) = delete_json_for(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/tokens"),
+        &acct,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "unlink: {body}");
+    assert_eq!(body["deleted"], true);
+    assert!(!token_path.exists(), "token file should be deleted");
+
+    // Verify status shows unlinked.
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["oauth_linked"], false);
+    assert_eq!(body["has_credentials"], false);
+}
+
+/// Test: unlinking when no tokens exist returns deleted: false (no error).
+#[tokio::test]
+async fn x_auth_unlink_no_tokens_returns_false() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Unlink Empty").await;
+
+    let (status, body) = delete_json_for(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/tokens"),
+        &acct,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], false);
+}
+
+/// Test: unlinking account A's OAuth does not affect account B's scraper session.
+#[tokio::test]
+async fn x_auth_unlink_cross_account_isolation() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_a = create_test_account(&pool, "Account A").await;
+    let acct_b = create_test_account(&pool, "Account B").await;
+
+    // Give A OAuth tokens.
+    let token_path = tuitbot_core::storage::accounts::account_token_path(dir.path(), &acct_a);
+    let tokens = tuitbot_core::x_api::auth::Tokens {
+        access_token: "a_access".to_string(),
+        refresh_token: "a_refresh".to_string(),
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
+        scopes: vec![],
+    };
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("save A tokens");
+
+    // Give B a scraper session.
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/settings/scraper-session",
+        &acct_b,
+        serde_json::json!({
+            "auth_token": "b_auth",
+            "ct0": "b_ct0",
+            "username": "user_b"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Unlink A's OAuth.
+    let (status, body) = delete_json_for(
+        router.clone(),
+        &format!("/api/accounts/{acct_a}/x-auth/tokens"),
+        &acct_a,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], true);
+
+    // A should have no credentials.
+    let (_, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct_a}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(body["oauth_linked"], false);
+    assert_eq!(body["has_credentials"], false);
+
+    // B should still have scraper session.
+    let (_, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct_b}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(body["scraper_linked"], true);
+    assert_eq!(body["has_credentials"], true);
 }

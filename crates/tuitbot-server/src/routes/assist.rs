@@ -26,13 +26,10 @@ async fn get_generator(
     state: &AppState,
     account_id: &str,
 ) -> Result<Arc<ContentGenerator>, ApiError> {
-    let generators = state.content_generators.lock().await;
-    generators
-        .get(account_id)
-        .cloned()
-        .ok_or(ApiError::BadRequest(
-            "LLM not configured — set llm.provider and llm.api_key in config.toml".to_string(),
-        ))
+    state
+        .get_or_create_content_generator(account_id)
+        .await
+        .map_err(ApiError::BadRequest)
 }
 
 /// Resolve optional RAG context from the vault for composer assist handlers.
@@ -41,15 +38,14 @@ async fn get_generator(
 /// content seeds via `build_draft_context()`, and returns the formatted
 /// prompt block. Returns `None` (fail-open) on any error or when no
 /// relevant context exists.
-async fn resolve_composer_rag_context(state: &AppState, _account_id: &str) -> Option<String> {
-    let config =
-        match tuitbot_core::config::Config::load(Some(&state.config_path.to_string_lossy())) {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::warn!("composer RAG: failed to load config: {e}");
-                return None;
-            }
-        };
+async fn resolve_composer_rag_context(state: &AppState, account_id: &str) -> Option<String> {
+    let config = match state.load_effective_config(account_id).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("composer RAG: failed to load config: {e}");
+            return None;
+        }
+    };
 
     let keywords = config.business.draft_context_keywords();
     if keywords.is_empty() {
@@ -293,11 +289,9 @@ pub struct ModeResponse {
 
 pub async fn get_mode(
     State(state): State<Arc<AppState>>,
-    _ctx: AccountContext,
+    ctx: AccountContext,
 ) -> Result<(StatusCode, Json<ModeResponse>), ApiError> {
-    // Read mode from config file.
-    let config = tuitbot_core::config::Config::load(Some(&state.config_path.to_string_lossy()))
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let config = crate::routes::content::read_effective_config(&state, &ctx.account_id).await?;
 
     Ok((
         StatusCode::OK,
@@ -317,14 +311,14 @@ mod tests {
 
     use tokio::sync::{broadcast, Mutex, RwLock};
 
-    use crate::ws::WsEvent;
+    use crate::ws::AccountWsEvent;
 
     /// Build a minimal `AppState` for testing the RAG resolver.
     async fn test_state(config_path: PathBuf) -> AppState {
         let db = tuitbot_core::storage::init_test_db()
             .await
             .expect("init test db");
-        let (event_tx, _) = broadcast::channel::<WsEvent>(16);
+        let (event_tx, _) = broadcast::channel::<AccountWsEvent>(16);
         AppState {
             db,
             config_path: config_path.clone(),
@@ -343,7 +337,7 @@ mod tests {
             content_sources: Default::default(),
             connector_config: Default::default(),
             deployment_mode: Default::default(),
-            provider_backend: String::new(),
+
             pending_oauth: Mutex::new(HashMap::new()),
             token_managers: Mutex::new(HashMap::new()),
             x_client_id: String::new(),

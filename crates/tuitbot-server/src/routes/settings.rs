@@ -12,10 +12,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tuitbot_core::auth::error::AuthError;
 use tuitbot_core::auth::{passphrase, session};
-use tuitbot_core::config::{Config, LlmConfig};
+use tuitbot_core::config::{
+    effective_config, merge_overrides, split_patch_by_scope, Config, LlmConfig,
+};
 use tuitbot_core::error::ConfigError;
 use tuitbot_core::llm::factory::create_provider;
+use tuitbot_core::storage::accounts::{self, DEFAULT_ACCOUNT_ID};
 
+use crate::account::AccountContext;
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -93,6 +97,19 @@ fn merge_patch_and_parse(config_path: &Path, patch: &Value) -> Result<(String, C
         .map_err(|e| ApiError::BadRequest(format!("merged config is invalid: {e}")))?;
 
     Ok((merged_str, config))
+}
+
+/// Load and parse the base config from the TOML file.
+fn load_base_config(config_path: &Path) -> Result<Config, ApiError> {
+    let contents = std::fs::read_to_string(config_path).map_err(|e| {
+        ApiError::BadRequest(format!(
+            "could not read config file {}: {e}",
+            config_path.display()
+        ))
+    })?;
+
+    toml::from_str(&contents)
+        .map_err(|e| ApiError::BadRequest(format!("failed to parse config: {e}")))
 }
 
 fn config_errors_to_response(errors: Vec<ConfigError>) -> Vec<ValidationErrorItem> {
@@ -283,24 +300,42 @@ pub async fn init_settings(
 // ---------------------------------------------------------------------------
 
 /// `GET /api/settings` — return the current config as JSON.
-pub async fn get_settings(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ApiError> {
-    let contents = std::fs::read_to_string(&state.config_path).map_err(|e| {
-        ApiError::BadRequest(format!(
-            "could not read config file {}: {e}",
-            state.config_path.display()
-        ))
-    })?;
+///
+/// For the default account, returns the raw `config.toml` (existing behavior).
+/// For non-default accounts, merges the account's `config_overrides` into
+/// the base config and returns the effective result with `_overrides` metadata.
+pub async fn get_settings(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+) -> Result<Json<Value>, ApiError> {
+    let base_config = load_base_config(&state.config_path)?;
 
-    let config: Config = toml::from_str(&contents)
-        .map_err(|e| ApiError::BadRequest(format!("failed to parse config: {e}")))?;
+    if ctx.account_id == DEFAULT_ACCOUNT_ID {
+        let mut json = serde_json::to_value(base_config)
+            .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
+        redact_service_account_keys(&mut json);
+        return Ok(Json(json));
+    }
 
-    let mut json = serde_json::to_value(config)
+    // Non-default account: merge overrides.
+    let account = accounts::get_account(&state.db, &ctx.account_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("account not found: {}", ctx.account_id)))?;
+
+    let result = effective_config(&base_config, &account.config_overrides)
+        .map_err(|e| ApiError::BadRequest(format!("config merge failed: {e}")))?;
+
+    let mut json = serde_json::to_value(&result.config)
         .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
-
-    // Redact service_account_key from response (charter D5, rule 2).
     redact_service_account_keys(&mut json);
 
-    Ok(Json(json))
+    // Wrap in envelope with override metadata.
+    let response = serde_json::json!({
+        "config": json,
+        "_overrides": result.overridden_keys,
+    });
+
+    Ok(Json(response))
 }
 
 /// Replace any non-null `service_account_key` values in `content_sources.sources`
@@ -322,8 +357,14 @@ fn redact_service_account_keys(json: &mut Value) {
 }
 
 /// `PATCH /api/settings` — merge partial JSON into the config and write back.
+///
+/// For the default account, writes to `config.toml` (existing behavior).
+/// For non-default accounts, enforces scope contract: only account-scoped
+/// keys are allowed, and changes persist to `accounts.config_overrides`
+/// instead of `config.toml`.
 pub async fn patch_settings(
     State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
     Json(patch): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     if !patch.is_object() {
@@ -332,27 +373,76 @@ pub async fn patch_settings(
         ));
     }
 
-    let (merged_str, config) = merge_patch_and_parse(&state.config_path, &patch)?;
+    if ctx.account_id == DEFAULT_ACCOUNT_ID {
+        // Default account: write to config.toml (existing behavior).
+        let (merged_str, config) = merge_patch_and_parse(&state.config_path, &patch)?;
 
-    std::fs::write(&state.config_path, &merged_str).map_err(|e| {
-        ApiError::BadRequest(format!(
-            "could not write config file {}: {e}",
-            state.config_path.display()
-        ))
-    })?;
+        std::fs::write(&state.config_path, &merged_str).map_err(|e| {
+            ApiError::BadRequest(format!(
+                "could not write config file {}: {e}",
+                state.config_path.display()
+            ))
+        })?;
 
-    let mut json = serde_json::to_value(config)
+        let mut json = serde_json::to_value(config)
+            .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
+        redact_service_account_keys(&mut json);
+        return Ok(Json(json));
+    }
+
+    // Non-default account: enforce scope contract.
+    let (_account_patch, rejected) = split_patch_by_scope(&patch);
+    if !rejected.is_empty() {
+        return Err(ApiError::Forbidden(format!(
+            "instance-scoped keys cannot be changed per-account: {}",
+            rejected.join(", ")
+        )));
+    }
+
+    // Load account and current overrides.
+    let account = accounts::get_account(&state.db, &ctx.account_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("account not found: {}", ctx.account_id)))?;
+
+    // Merge incoming patch into existing overrides.
+    let new_overrides = merge_overrides(&account.config_overrides, &patch)
+        .map_err(|e| ApiError::BadRequest(format!("override merge failed: {e}")))?;
+
+    // Validate the effective config (base + new overrides).
+    let base_config = load_base_config(&state.config_path)?;
+    let result = effective_config(&base_config, &new_overrides)
+        .map_err(|e| ApiError::BadRequest(format!("effective config invalid: {e}")))?;
+
+    // Persist updated overrides to database.
+    accounts::update_account(
+        &state.db,
+        &ctx.account_id,
+        accounts::UpdateAccountParams {
+            config_overrides: Some(&new_overrides),
+            ..Default::default()
+        },
+    )
+    .await?;
+
+    let mut json = serde_json::to_value(&result.config)
         .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
-
-    // Redact service_account_key from response (charter D5, rule 2).
     redact_service_account_keys(&mut json);
 
-    Ok(Json(json))
+    let response = serde_json::json!({
+        "config": json,
+        "_overrides": result.overridden_keys,
+    });
+
+    Ok(Json(response))
 }
 
 /// `POST /api/settings/validate` — validate a config change without saving.
+///
+/// For non-default accounts, merges the patch into the account's current
+/// overrides and validates the effective config against the base.
 pub async fn validate_settings(
     State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
     Json(patch): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     if !patch.is_object() {
@@ -361,9 +451,54 @@ pub async fn validate_settings(
         ));
     }
 
-    let (_merged_str, config) = merge_patch_and_parse(&state.config_path, &patch)?;
+    if ctx.account_id == DEFAULT_ACCOUNT_ID {
+        // Default account: existing behavior.
+        let (_merged_str, config) = merge_patch_and_parse(&state.config_path, &patch)?;
 
-    let response = match config.validate() {
+        let response = match config.validate() {
+            Ok(()) => ValidationResponse {
+                valid: true,
+                errors: Vec::new(),
+            },
+            Err(errors) => ValidationResponse {
+                valid: false,
+                errors: config_errors_to_response(errors),
+            },
+        };
+
+        return Ok(Json(serde_json::to_value(response).unwrap()));
+    }
+
+    // Non-default account: check scope, merge into overrides, validate effective config.
+    let (_account_patch, rejected) = split_patch_by_scope(&patch);
+    if !rejected.is_empty() {
+        return Ok(Json(
+            serde_json::to_value(ValidationResponse {
+                valid: false,
+                errors: vec![ValidationErrorItem {
+                    field: "config_overrides".to_string(),
+                    message: format!(
+                        "instance-scoped keys cannot be changed per-account: {}",
+                        rejected.join(", ")
+                    ),
+                }],
+            })
+            .unwrap(),
+        ));
+    }
+
+    let account = accounts::get_account(&state.db, &ctx.account_id)
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("account not found: {}", ctx.account_id)))?;
+
+    let new_overrides = merge_overrides(&account.config_overrides, &patch)
+        .map_err(|e| ApiError::BadRequest(format!("override merge failed: {e}")))?;
+
+    let base_config = load_base_config(&state.config_path)?;
+    let result = effective_config(&base_config, &new_overrides)
+        .map_err(|e| ApiError::BadRequest(format!("effective config invalid: {e}")))?;
+
+    let response = match result.config.validate() {
         Ok(()) => ValidationResponse {
             valid: true,
             errors: Vec::new(),
@@ -456,6 +591,7 @@ struct FactoryResetCleared {
     config_deleted: bool,
     passphrase_deleted: bool,
     media_deleted: bool,
+    credentials_deleted: bool,
     runtimes_stopped: u32,
 }
 
@@ -527,11 +663,16 @@ pub async fn factory_reset(
         }
     };
 
-    // 8. Clear in-memory state.
+    // 8. Delete credential files and per-account data directories.
+    let credentials_deleted = delete_all_credentials(&state.data_dir);
+
+    // 9. Clear in-memory state.
     *state.passphrase_hash.write().await = None;
     *state.passphrase_hash_mtime.write().await = None;
     state.content_generators.lock().await.clear();
     state.login_attempts.lock().await.clear();
+    state.pending_oauth.lock().await.clear();
+    state.token_managers.lock().await.clear();
 
     tracing::info!(
         tables = reset_stats.tables_cleared,
@@ -539,6 +680,7 @@ pub async fn factory_reset(
         config = config_deleted,
         passphrase = passphrase_deleted,
         media = media_deleted,
+        credentials = credentials_deleted,
         runtimes = runtimes_stopped,
         "Factory reset completed"
     );
@@ -552,6 +694,7 @@ pub async fn factory_reset(
             config_deleted,
             passphrase_deleted,
             media_deleted,
+            credentials_deleted,
             runtimes_stopped,
         },
     };
@@ -562,6 +705,37 @@ pub async fn factory_reset(
         [(axum::http::header::SET_COOKIE, cookie)],
         Json(serde_json::to_value(response).unwrap()),
     ))
+}
+
+/// Delete all credential files produced during normal operation.
+///
+/// Removes root-level `scraper_session.json` / `tokens.json` (default
+/// account) plus the entire `accounts/` subdirectory tree (per-account
+/// credentials). Returns `true` if anything was actually removed.
+fn delete_all_credentials(data_dir: &std::path::Path) -> bool {
+    let mut deleted = false;
+
+    // Root-level credential files (default account).
+    for name in &["scraper_session.json", "tokens.json"] {
+        let path = data_dir.join(name);
+        match std::fs::remove_file(&path) {
+            Ok(()) => deleted = true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                tracing::warn!(path = %path.display(), error = %e, "failed to delete credential file")
+            }
+        }
+    }
+
+    // Per-account data directories (accounts/{uuid}/).
+    let accounts_dir = data_dir.join("accounts");
+    match std::fs::remove_dir_all(&accounts_dir) {
+        Ok(()) => deleted = true,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => tracing::warn!(error = %e, "failed to delete accounts directory"),
+    }
+
+    deleted
 }
 
 // ---------------------------------------------------------------------------

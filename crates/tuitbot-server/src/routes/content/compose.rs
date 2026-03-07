@@ -10,12 +10,13 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
-use tuitbot_core::storage::{approval_queue, scheduled_content};
+use tuitbot_core::storage::{action_log, approval_queue, scheduled_content};
+use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
 use crate::state::AppState;
-use crate::ws::WsEvent;
+use crate::ws::{AccountWsEvent, WsEvent};
 
 use super::read_approval_mode;
 
@@ -68,7 +69,7 @@ pub async fn compose_tweet(
     }
 
     // Check if approval mode is enabled.
-    let approval_mode = read_approval_mode(&state)?;
+    let approval_mode = read_approval_mode(&state, &ctx.account_id).await?;
 
     if approval_mode {
         let id = approval_queue::enqueue_for(
@@ -85,11 +86,14 @@ pub async fn compose_tweet(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: "tweet".to_string(),
-            content: text.to_string(),
-            media_paths: vec![],
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: "tweet".to_string(),
+                content: text.to_string(),
+                media_paths: vec![],
+            },
         });
 
         Ok(Json(json!({
@@ -129,7 +133,7 @@ pub async fn compose_thread(
         ));
     }
 
-    let approval_mode = read_approval_mode(&state)?;
+    let approval_mode = read_approval_mode(&state, &ctx.account_id).await?;
     let combined = body.tweets.join("\n---\n");
 
     if approval_mode {
@@ -147,11 +151,14 @@ pub async fn compose_thread(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: "thread".to_string(),
-            content: combined,
-            media_paths: vec![],
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: "thread".to_string(),
+                content: combined,
+                media_paths: vec![],
+            },
         });
 
         Ok(Json(json!({
@@ -287,7 +294,7 @@ async fn compose_thread_blocks_flow(
         sorted.iter().flat_map(|b| b.media_paths.clone()).collect()
     };
 
-    let approval_mode = read_approval_mode(state)?;
+    let approval_mode = read_approval_mode(state, &ctx.account_id).await?;
 
     if approval_mode {
         let media_json = serde_json::to_string(&all_media).unwrap_or_else(|_| "[]".to_string());
@@ -305,11 +312,14 @@ async fn compose_thread_blocks_flow(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: "thread".to_string(),
-            content: content.clone(),
-            media_paths: all_media,
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: "thread".to_string(),
+                content: content.clone(),
+                media_paths: all_media,
+            },
         });
 
         Ok(Json(json!({
@@ -318,19 +328,27 @@ async fn compose_thread_blocks_flow(
             "block_ids": block_ids,
         })))
     } else {
+        let scheduled_for = body
+            .scheduled_for
+            .clone()
+            .or_else(|| Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string()));
+
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
             "thread",
             &content,
-            body.scheduled_for.as_deref(),
+            scheduled_for.as_deref(),
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ContentScheduled {
-            id,
-            content_type: "thread".to_string(),
-            scheduled_for: body.scheduled_for.clone(),
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ContentScheduled {
+                id,
+                content_type: "thread".to_string(),
+                scheduled_for: scheduled_for.clone(),
+            },
         });
 
         Ok(Json(json!({
@@ -341,14 +359,14 @@ async fn compose_thread_blocks_flow(
     }
 }
 
-/// Persist content via approval queue or scheduled content table.
+/// Persist content via approval queue, scheduled content, or post directly.
 async fn persist_content(
     state: &AppState,
     ctx: &AccountContext,
     body: &ComposeRequest,
     content: &str,
 ) -> Result<Json<Value>, ApiError> {
-    let approval_mode = read_approval_mode(state)?;
+    let approval_mode = read_approval_mode(state, &ctx.account_id).await?;
 
     if approval_mode {
         let media_paths = body.media_paths.as_deref().unwrap_or(&[]);
@@ -367,18 +385,22 @@ async fn persist_content(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ApprovalQueued {
-            id,
-            action_type: body.content_type.clone(),
-            content: content.to_string(),
-            media_paths: media_paths.to_vec(),
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalQueued {
+                id,
+                action_type: body.content_type.clone(),
+                content: content.to_string(),
+                media_paths: media_paths.to_vec(),
+            },
         });
 
         Ok(Json(json!({
             "status": "queued_for_approval",
             "id": id,
         })))
-    } else {
+    } else if body.scheduled_for.is_some() {
+        // User explicitly chose a future time — save to calendar.
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
@@ -388,15 +410,126 @@ async fn persist_content(
         )
         .await?;
 
-        let _ = state.event_tx.send(WsEvent::ContentScheduled {
-            id,
-            content_type: body.content_type.clone(),
-            scheduled_for: body.scheduled_for.clone(),
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ContentScheduled {
+                id,
+                content_type: body.content_type.clone(),
+                scheduled_for: body.scheduled_for.clone(),
+            },
         });
 
         Ok(Json(json!({
             "status": "scheduled",
             "id": id,
         })))
+    } else {
+        // Immediate publish — try posting via X API directly.
+        // If not configured for direct posting, save to calendar instead.
+        let can_post = super::can_post_for(state, &ctx.account_id).await;
+        if !can_post {
+            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let id = scheduled_content::insert_for(
+                &state.db,
+                &ctx.account_id,
+                &body.content_type,
+                content,
+                Some(&scheduled_for),
+            )
+            .await?;
+
+            let _ = state.event_tx.send(AccountWsEvent {
+                account_id: ctx.account_id.clone(),
+                event: WsEvent::ContentScheduled {
+                    id,
+                    content_type: body.content_type.clone(),
+                    scheduled_for: Some(scheduled_for),
+                },
+            });
+
+            return Ok(Json(json!({
+                "status": "scheduled",
+                "id": id,
+            })));
+        }
+
+        try_post_now(state, ctx, &body.content_type, content).await
     }
+}
+
+/// Attempt to post a tweet directly via X API or cookie-auth transport.
+async fn try_post_now(
+    state: &AppState,
+    ctx: &AccountContext,
+    content_type: &str,
+    content: &str,
+) -> Result<Json<Value>, ApiError> {
+    let config = super::read_effective_config(state, &ctx.account_id).await?;
+
+    let posted = match config.x_api.provider_backend.as_str() {
+        "scraper" => {
+            // Use cookie-auth transport via LocalModeXClient with account-scoped data dir.
+            let account_data =
+                tuitbot_core::storage::accounts::account_data_dir(&state.data_dir, &ctx.account_id);
+            let client = tuitbot_core::x_api::LocalModeXClient::with_session(
+                config.x_api.scraper_allow_mutations,
+                &account_data,
+            )
+            .await;
+            client
+                .post_tweet(content)
+                .await
+                .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?
+        }
+        "x_api" => {
+            // Use official X API with OAuth tokens.
+            let token_path = tuitbot_core::storage::accounts::account_token_path(
+                &state.data_dir,
+                &ctx.account_id,
+            );
+
+            let access_token = state
+                .get_x_access_token(&token_path, &ctx.account_id)
+                .await
+                .map_err(|e| {
+                    ApiError::BadRequest(format!(
+                        "X API authentication failed — re-link your account in Settings. ({e})"
+                    ))
+                })?;
+
+            let client = XApiHttpClient::new(access_token);
+            client
+                .post_tweet(content)
+                .await
+                .map_err(|e| ApiError::Internal(format!("Failed to post tweet: {e}")))?
+        }
+        _ => {
+            return Err(ApiError::BadRequest(
+                "Direct posting requires X API credentials or a browser session. \
+                 Configure in Settings → X API."
+                    .to_string(),
+            ));
+        }
+    };
+
+    // Log the successful post.
+    let metadata = json!({
+        "tweet_id": posted.id,
+        "content_type": content_type,
+        "source": "compose",
+    });
+    let _ = action_log::log_action_for(
+        &state.db,
+        &ctx.account_id,
+        "tweet_posted",
+        "success",
+        Some(&format!("Posted tweet {}", posted.id)),
+        Some(&metadata.to_string()),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "status": "posted",
+        "tweet_id": posted.id,
+    })))
 }

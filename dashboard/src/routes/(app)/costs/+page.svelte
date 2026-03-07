@@ -15,12 +15,16 @@
 		error,
 		loadCosts
 	} from '$lib/stores/costs';
+	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	let days = $state(30);
 	let activeTab = $state<'llm' | 'xapi'>('llm');
 
 	onMount(() => {
 		loadCosts(days);
+		const handler = () => loadCosts(days);
+		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
+		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
 	function handleDaysChange(newDays: number) {

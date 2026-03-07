@@ -19,6 +19,17 @@ use tuitbot_core::auth::session;
 
 use crate::state::AppState;
 
+/// Wrapper that tags every [`WsEvent`] with the originating account.
+///
+/// Serializes flat thanks to `#[serde(flatten)]`, so the JSON looks like:
+/// `{ "account_id": "...", "type": "ApprovalQueued", ... }`
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AccountWsEvent {
+    pub account_id: String,
+    #[serde(flatten)]
+    pub event: WsEvent,
+}
+
 /// Events pushed to WebSocket clients.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -154,8 +165,11 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
             }
             Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
                 tracing::warn!(count, "WebSocket client lagged, events dropped");
-                let error_event = WsEvent::Error {
-                    message: format!("{count} events dropped due to slow consumer"),
+                let error_event = AccountWsEvent {
+                    account_id: String::new(),
+                    event: WsEvent::Error {
+                        message: format!("{count} events dropped due to slow consumer"),
+                    },
                 };
                 if let Ok(json) = serde_json::to_string(&error_event) {
                     if socket.send(Message::Text(json.into())).await.is_err() {
