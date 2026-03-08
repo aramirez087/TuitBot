@@ -71,15 +71,15 @@ function filterBySearch(drafts: DraftSummary[], q: string): DraftSummary[] {
 // Derived
 // ---------------------------------------------------------------------------
 
-export const activeDrafts = $derived(
+const activeDrafts = $derived(
 	collection.filter((d) => d.status === 'draft').sort(byUpdatedDesc)
 );
 
-export const scheduledDrafts = $derived(
+const scheduledDrafts = $derived(
 	collection.filter((d) => d.status === 'scheduled').sort(byUpdatedDesc)
 );
 
-export const postedDrafts = $derived(
+const postedDrafts = $derived(
 	collection.filter((d) => d.status === 'posted').sort(byUpdatedDesc)
 );
 
@@ -93,20 +93,44 @@ const rawTabDrafts = $derived(
 				: [...archivedCollection].sort(byUpdatedDesc)
 );
 
-export const currentTabDrafts = $derived(
+const currentTabDrafts = $derived(
 	sortDrafts(filterBySearch(rawTabDrafts, searchQuery), sortBy)
 );
 
-export const selectedDraft = $derived(
+const selectedDraft = $derived(
 	[...collection, ...archivedCollection].find((d) => d.id === selectedId) ?? null
 );
 
-export const tabCounts = $derived({
+const tabCounts = $derived({
 	active: activeDrafts.length,
 	scheduled: scheduledDrafts.length,
 	posted: postedDrafts.length,
 	archive: archivedCollection.length
 });
+
+export function getActiveDrafts(): DraftSummary[] {
+	return activeDrafts;
+}
+
+export function getScheduledDrafts(): DraftSummary[] {
+	return scheduledDrafts;
+}
+
+export function getPostedDrafts(): DraftSummary[] {
+	return postedDrafts;
+}
+
+export function getCurrentTabDrafts(): DraftSummary[] {
+	return currentTabDrafts;
+}
+
+export function getSelectedDraft(): DraftSummary | null {
+	return selectedDraft;
+}
+
+export function getTabCounts(): { active: number; scheduled: number; posted: number; archive: number } {
+	return tabCounts;
+}
 
 // ---------------------------------------------------------------------------
 // Getters (for non-derived reactive reads)

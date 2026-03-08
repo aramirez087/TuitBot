@@ -22,12 +22,9 @@
 	import AddTweetDivider from './AddTweetDivider.svelte';
 	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
-	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
-	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
 	import ComposerToolbar from './ComposerToolbar.svelte';
 	import ComposerInsertBar from './ComposerInsertBar.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
-	import { persistGet, persistSet } from '$lib/stores/persistence';
 	import {
 		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
 		readAutoSave, restoreMedia, wasNavigationExit,
@@ -92,10 +89,6 @@
 	let isMobile = $state(false);
 	let statusAnnouncement = $state('');
 
-	// Home-surface state (only active when embedded)
-	let tipsVisible = $state(false);
-	let promptDismissed = $state(false);
-
 	// Undo state for notes generation
 	let undoSnapshot = $state<{
 		mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[];
@@ -144,10 +137,6 @@
 	);
 
 	const desktopInspectorOpen = $derived(inspectorOpen && !isMobile);
-
-	const showPromptCard = $derived(
-		embedded && !hasExistingContent && !promptDismissed
-	);
 
 	const threadBlockCount = $derived(
 		mode === 'thread' ? threadBlocks.filter((b) => b.text.trim().length > 0).length || threadBlocks.length : 1
@@ -270,11 +259,6 @@
 
 		window.addEventListener('beforeunload', handleBeforeUnload);
 
-		if (embedded && !draftId) {
-			const tipsDismissed = await persistGet('home_tips_dismissed', false);
-			tipsVisible = !tipsDismissed;
-			window.addEventListener('tuitbot:compose', handleComposeEvent);
-		}
 	});
 
 	onDestroy(() => {
@@ -287,13 +271,7 @@
 			markSessionActive();
 		}
 		if (undoTimer) clearTimeout(undoTimer);
-		if (embedded && !draftId) window.removeEventListener('tuitbot:compose', handleComposeEvent);
 	});
-
-	function handleComposeEvent() {
-		const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
-		textarea?.focus();
-	}
 
 	function switchMode(newMode: 'tweet' | 'thread') {
 		if (newMode === mode) return;
@@ -643,25 +621,6 @@
 		if (undoTimer) clearTimeout(undoTimer);
 	}
 
-	async function dismissTips() {
-		tipsVisible = false;
-		await persistSet('home_tips_dismissed', true);
-	}
-
-	function handleUseExample(text: string) {
-		if (mode === 'tweet') {
-			tweetText = text;
-		} else {
-			const sorted = [...threadBlocks].sort((a, b) => a.order - b.order);
-			if (sorted.length > 0 && sorted[0].text.trim() === '') {
-				threadBlocks = threadBlocks.map((b) =>
-					b.id === sorted[0].id ? { ...b, text } : b
-				);
-			}
-		}
-		promptDismissed = true;
-	}
-
 	function openScheduleInInspector() {
 		if (!inspectorOpen) {
 			inspectorOpen = true;
@@ -867,22 +826,7 @@
 			ontogglepreview={togglePreview}
 			onopenpalette={() => { paletteOpen = true; }}
 		/>
-		{#if tipsVisible}
-			<ComposerTipsTray
-				visible={tipsVisible}
-				{mode}
-				ondismiss={dismissTips}
-			/>
-		{/if}
 		{@render composeBody()}
-		{#if showPromptCard}
-			<ComposerPromptCard
-				visible={showPromptCard}
-				{mode}
-				ondismiss={() => { promptDismissed = true; }}
-				onuseexample={handleUseExample}
-			/>
-		{/if}
 	</div>
 {/if}
 

@@ -25,6 +25,7 @@
 	let composerZoneEl: HTMLDivElement | undefined = $state();
 	let detailsPanelOpen = $state(true);
 	let activePanel = $state<'details' | 'history'>('details');
+	let prefillSchedule = $state<string | null>(null);
 
 	interface HydrationPayload {
 		mode: 'tweet' | 'thread';
@@ -59,6 +60,18 @@
 					console.info('[draft-studio]', { event: 'draft_created', id: newId, source: 'cmd-n' });
 				}
 			});
+		}
+
+		// Handle ?prefill_schedule param (from calendar time-slot clicks)
+		const prefillParam = $page.url.searchParams.get('prefill_schedule');
+		if (prefillParam) {
+			const parsed = new Date(prefillParam);
+			if (!isNaN(parsed.getTime())) {
+				prefillSchedule = prefillParam;
+			}
+			const url = new URL(window.location.href);
+			url.searchParams.delete('prefill_schedule');
+			history.replaceState(null, '', url.toString());
 		}
 
 		const handler = () => {
@@ -343,10 +356,10 @@
 	<div class="rail-zone">
 		<DraftRail
 			bind:this={railComponent}
-			drafts={studio.currentTabDrafts}
+			drafts={studio.getCurrentTabDrafts()}
 			selectedId={studio.getSelectedId()}
 			tab={studio.getTab()}
-			tabCounts={studio.tabCounts}
+			tabCounts={studio.getTabCounts()}
 			loading={studio.isLoading()}
 			searchQuery={studio.getSearchQuery()}
 			sortBy={studio.getSortBy()}
@@ -372,7 +385,7 @@
 			</div>
 		{/if}
 
-		{#if studio.isLoading() && !studio.selectedDraft}
+		{#if studio.isLoading() && !studio.getSelectedDraft()}
 			<div class="zone-loading">
 				<div class="zone-spinner"></div>
 			</div>
@@ -409,7 +422,7 @@
 					</button>
 				</div>
 			{/if}
-		{:else if studio.tabCounts.active === 0 && studio.tabCounts.scheduled === 0}
+		{:else if studio.getTabCounts().active === 0 && studio.getTabCounts().scheduled === 0}
 			<DraftEmptyState variant="no-drafts" oncreate={handleCreate} />
 		{:else}
 			<DraftEmptyState variant="no-selection" oncreate={handleCreate} />
@@ -435,9 +448,10 @@
 			{#if activePanel === 'details'}
 				<DraftDetailsPanel
 					draft={studio.getFullDraft()}
-					draftSummary={studio.selectedDraft}
+					draftSummary={studio.getSelectedDraft()}
 					tags={studio.getSelectedDraftTags()}
 					allTags={studio.getAccountTags()}
+					{prefillSchedule}
 					onupdatemeta={handleMetaUpdate}
 					onassigntag={handleAssignTag}
 					onunassigntag={handleUnassignTag}

@@ -9,7 +9,7 @@ Every surface that initiates writing now flows through Draft Studio.
 | **Home page** (`/`) | Embedded `ComposeWorkspace` calling `api.content.compose()` — no server-backed drafts, no revision history | `DraftStudioQuickStart` card with "New Draft" and recent drafts list. Creates server-backed draft, navigates to `/drafts?id={id}` |
 | **`Cmd+N` shortcut** | Navigated to `/` and dispatched `tuitbot:compose` event to focus the home composer | Navigates to `/drafts?new=true`. DraftStudioShell reads the param, creates a draft, cleans the URL |
 | **Calendar "Compose" button** | Opened `ComposeModal` inline — created `scheduled_content` directly via `composeContent()` | Creates a server-backed draft via `api.draftStudio.create()`, navigates to `/drafts?id={id}` |
-| **Calendar time-slot click** | Opened `ComposeModal` with prefilled date/time | Creates a draft, navigates to `/drafts?id={id}&prefill_schedule={iso}` |
+| **Calendar time-slot click** | Opened `ComposeModal` with prefilled date/time | Creates a draft, navigates to `/drafts?id={id}&prefill_schedule={iso}`. Shell parses param, pre-populates schedule pickers |
 | **Calendar day click (month view)** | Opened `ComposeModal` with prefilled date | Creates a draft, navigates to `/drafts?id={id}` |
 | **Calendar `?compose=true` (onboarding)** | Opened `ComposeModal` | Creates a draft, navigates to `/drafts?id={id}` |
 | **Calendar empty state** | Opened `ComposeModal` | Creates a draft, navigates to `/drafts` |
@@ -59,16 +59,22 @@ These events are visible in browser devtools and Tauri's console. No external te
 
 ## Removed Components
 
-| Component | Location | Reason |
-|-----------|----------|--------|
-| `ComposeModal` | Removed from `content/+page.svelte` import and render | Calendar now creates drafts and redirects to Draft Studio |
-| `ComposeWorkspace` (home usage) | Removed from `(app)/+page.svelte` | Replaced by `DraftStudioQuickStart` |
-| `composeContent` import | Removed from calendar store imports | No longer called from calendar page |
+| Component | Action | Reason |
+|-----------|--------|--------|
+| `ComposeModal.svelte` | Deleted (Session 11) | Zero imports after calendar migration. Calendar creates drafts and redirects. |
+| `ComposerPromptCard.svelte` | Deleted (Session 11) | Only used by `ComposeWorkspace` in `embedded && !draftId` path, which is now dead |
+| `ComposerTipsTray.svelte` | Deleted (Session 11) | Same as above |
+| `ComposerShortcutBar.svelte` | Deleted (Session 11) | Zero imports found |
+| `ComposeWorkspace` (home usage) | Import removed from `(app)/+page.svelte` (Session 10) | Replaced by `DraftStudioQuickStart` |
+| `composeContent` import | Removed from calendar store imports (Session 10) | No longer called from calendar page |
 
-## Deferred Cleanup (Session 11)
+## Session 11 Cleanup (Completed)
 
-- Delete `ComposeModal.svelte` if no other pages import it
-- Delete `ComposerPromptCard.svelte`, `ComposerShortcutBar.svelte`, `ComposerTipsTray.svelte` (legacy home composer helpers)
-- Remove `tuitbot:compose` CustomEvent handling if no listeners remain
-- Audit for dead code paths in `ComposeWorkspace` related to non-Draft-Studio usage
-- Handle `prefill_schedule` URL param in DraftStudioShell to auto-populate the schedule picker
+All deferred cleanup items have been resolved:
+
+- Deleted `ComposeModal.svelte` — zero remaining imports
+- Deleted `ComposerPromptCard.svelte`, `ComposerShortcutBar.svelte`, `ComposerTipsTray.svelte`
+- Removed `tuitbot:compose` event listener/handler from `ComposeWorkspace.svelte`
+- Removed dead code paths in `ComposeWorkspace` (`tipsVisible`, `promptDismissed`, `showPromptCard`, `dismissTips`, `handleUseExample`)
+- `prefill_schedule` URL param handled: Shell parses and validates the ISO string, passes to `DraftScheduleSection` which pre-populates date/time pickers
+- Extracted `DraftDetailsPanel` (943 → 156 lines) into 5 sub-components
