@@ -247,6 +247,139 @@ pub async fn fail_media_upload(
     Ok(())
 }
 
+/// Default size threshold (200 MB) before media cleanup kicks in.
+const CLEANUP_THRESHOLD_BYTES: u64 = 200 * 1024 * 1024;
+
+/// Run media cleanup if the media folder exceeds the size threshold.
+///
+/// Collects all media paths referenced by pending scheduled content and
+/// approval queue items, then deletes the oldest unreferenced files until
+/// total size drops below the threshold.
+pub async fn cleanup_if_over_threshold(
+    data_dir: &Path,
+    pool: &DbPool,
+) -> Result<u64, StorageError> {
+    let media_dir = data_dir.join("media");
+    if !media_dir.exists() {
+        return Ok(0);
+    }
+
+    // Scan all files and compute total size.
+    let mut files = scan_media_files(&media_dir).await?;
+    let total_size: u64 = files.iter().map(|f| f.size).sum();
+
+    if total_size <= CLEANUP_THRESHOLD_BYTES {
+        return Ok(0);
+    }
+
+    // Collect referenced paths from approval_queue and scheduled_content.
+    let referenced = collect_referenced_paths(pool).await?;
+
+    // Filter to unreferenced files, sort oldest first.
+    files.retain(|f| !referenced.contains(&f.path));
+    files.sort_by_key(|f| f.modified);
+
+    // Delete oldest unreferenced files until under threshold.
+    let mut current_size = total_size;
+    let mut deleted = 0u64;
+    for file in &files {
+        if current_size <= CLEANUP_THRESHOLD_BYTES {
+            break;
+        }
+        if tokio::fs::remove_file(&file.path).await.is_ok() {
+            current_size = current_size.saturating_sub(file.size);
+            deleted += 1;
+        }
+    }
+
+    if deleted > 0 {
+        tracing::info!(
+            deleted_files = deleted,
+            freed_bytes = total_size.saturating_sub(current_size),
+            remaining_bytes = current_size,
+            "Media cleanup completed"
+        );
+    }
+
+    Ok(deleted)
+}
+
+struct MediaFile {
+    path: String,
+    size: u64,
+    modified: std::time::SystemTime,
+}
+
+async fn scan_media_files(media_dir: &Path) -> Result<Vec<MediaFile>, StorageError> {
+    let mut files = Vec::new();
+    let mut entries = tokio::fs::read_dir(media_dir)
+        .await
+        .map_err(|e| StorageError::Query {
+            source: sqlx::Error::Io(e),
+        })?;
+
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| StorageError::Query {
+            source: sqlx::Error::Io(e),
+        })?
+    {
+        let meta = match entry.metadata().await {
+            Ok(m) if m.is_file() => m,
+            _ => continue,
+        };
+        files.push(MediaFile {
+            path: entry.path().to_string_lossy().to_string(),
+            size: meta.len(),
+            modified: meta.modified().unwrap_or(std::time::UNIX_EPOCH),
+        });
+    }
+    Ok(files)
+}
+
+/// Collect all media file paths referenced by active approval queue items
+/// and pending scheduled content.
+async fn collect_referenced_paths(
+    pool: &DbPool,
+) -> Result<std::collections::HashSet<String>, StorageError> {
+    let mut paths = std::collections::HashSet::new();
+
+    // 1. approval_queue: media_paths is a JSON array of strings.
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT COALESCE(media_paths, '[]') FROM approval_queue WHERE status = 'pending'",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    for (json_str,) in &rows {
+        if let Ok(arr) = serde_json::from_str::<Vec<String>>(json_str) {
+            paths.extend(arr);
+        }
+    }
+
+    // 2. scheduled_content: content may contain blocks with media_paths.
+    let content_rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT content_type, content FROM scheduled_content WHERE status = 'scheduled'",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    for (content_type, content) in &content_rows {
+        if content_type == "thread" {
+            if let Some(blocks) = crate::content::deserialize_blocks_from_content(content) {
+                for block in blocks {
+                    paths.extend(block.media_paths);
+                }
+            }
+        }
+    }
+
+    Ok(paths)
+}
+
 /// Validate that a file path is under the expected media directory (path traversal protection).
 pub fn is_safe_media_path(path: &str, data_dir: &Path) -> bool {
     let media_dir = data_dir.join("media");

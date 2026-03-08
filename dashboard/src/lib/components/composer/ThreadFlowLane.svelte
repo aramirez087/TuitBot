@@ -4,6 +4,7 @@
 	import * as threadOps from "$lib/utils/threadOps";
 	import { fly, fade } from "svelte/transition";
 	import { flip } from "svelte/animate";
+	import { registerTransferHandler } from "$lib/stores/mediaDrag";
 	import ThreadFlowCard from "./ThreadFlowCard.svelte";
 
 	let {
@@ -150,7 +151,7 @@
 		if (!result) {
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
-			if (idx >= sorted.length - 1 || sorted.length <= 2) return;
+			if (idx >= sorted.length - 1 || sorted.length <= 1) return;
 			showMergeMediaError(
 				sorted[idx].media_paths,
 				sorted[idx + 1].media_paths,
@@ -167,7 +168,7 @@
 		if (!result) {
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
-			if (idx <= 0 || sorted.length <= 2) return;
+			if (idx <= 0 || sorted.length <= 1) return;
 			showMergeMediaError(
 				sorted[idx - 1].media_paths,
 				sorted[idx].media_paths,
@@ -178,6 +179,17 @@
 		focusBlock(result.targetId, result.cursorPos);
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
+
+	function handleMediaTransfer(targetBlockId: string, mediaPath: string, sourceBlockId: string) {
+		const result = threadOps.moveMediaBetweenBlocks(blocks, sourceBlockId, targetBlockId, mediaPath);
+		if (result) onchange(result);
+	}
+
+	// Register the media transfer handler so MediaSlot's mouse-based drag can call it
+	$effect(() => {
+		registerTransferHandler(handleMediaTransfer);
+		return () => registerTransferHandler(null);
+	});
 
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
@@ -253,7 +265,7 @@
 			if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
 				const sorted = threadOps.sortBlocks(blocks);
 				const idx = sorted.findIndex((b) => b.id === blockId);
-				if (idx > 0 && sorted.length > 2) {
+				if (idx > 0 && sorted.length > 1) {
 					e.preventDefault();
 					mergeWithPrevious(blockId);
 					return;
@@ -319,6 +331,14 @@
 			mergeWithNext(blockId);
 			return;
 		}
+	}
+
+	export function addMediaToFocusedBlock(path: string) {
+		const targetId = focusedBlockId ?? sortedBlocks[0]?.id;
+		if (!targetId) return;
+		const block = blocks.find((b) => b.id === targetId);
+		if (!block || block.media_paths.length >= 4) return;
+		updateBlockMedia(targetId, [...block.media_paths, path]);
 	}
 
 	export function getBlocks(): ThreadBlock[] {
@@ -439,6 +459,8 @@
 				onmerge={() => mergeWithNext(block.id)}
 				onremove={() => removeBlock(block.id)}
 				onaddafter={() => addBlockAfter(block.id)}
+				onmoveup={i > 0 ? () => moveBlock(block.id, i - 1) : undefined}
+				onmovedown={i < sortedBlocks.length - 1 ? () => moveBlock(block.id, i + 1) : undefined}
 				ondragstart={(e) => handleDragStart(e, block.id)}
 				ondragend={handleDragEnd}
 				ondragover={(e) => handleCardDragOver(e, block.id)}

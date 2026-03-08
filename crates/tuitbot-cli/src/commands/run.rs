@@ -106,7 +106,8 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
                 config.intervals.content_post_window_seconds,
                 false,
             )
-            .with_topic_scorer(deps.topic_scorer.clone());
+            .with_topic_scorer(deps.topic_scorer.clone())
+            .with_thread_poster(deps.thread_poster.clone());
 
             let cancel = runtime.cancel_token();
             let scheduler = scheduler_from_config(

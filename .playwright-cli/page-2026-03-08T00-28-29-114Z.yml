@@ -1,0 +1,186 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e8]: Tuitbot
+    - button "@aramirez087 @aramirez087" [ref=e10] [cursor=pointer]:
+      - img "@aramirez087" [ref=e11]
+      - generic [ref=e12]: "@aramirez087"
+      - img [ref=e13]
+    - navigation [ref=e14]:
+      - link "Home" [ref=e15] [cursor=pointer]:
+        - /url: /
+        - img [ref=e16]
+        - generic [ref=e17]: Home
+      - link "Activity" [ref=e18] [cursor=pointer]:
+        - /url: /activity
+        - img [ref=e19]
+        - generic [ref=e20]: Activity
+      - link "Approval" [ref=e21] [cursor=pointer]:
+        - /url: /approval
+        - img [ref=e22]
+        - generic [ref=e23]: Approval
+      - link "Content" [ref=e24] [cursor=pointer]:
+        - /url: /content
+        - img [ref=e25]
+        - generic [ref=e26]: Content
+      - link "Drafts" [ref=e27] [cursor=pointer]:
+        - /url: /drafts
+        - img [ref=e28]
+        - generic [ref=e29]: Drafts
+      - link "Discovery" [ref=e30] [cursor=pointer]:
+        - /url: /discovery
+        - img [ref=e31]
+        - generic [ref=e32]: Discovery
+      - link "Targets" [ref=e33] [cursor=pointer]:
+        - /url: /targets
+        - img [ref=e34]
+        - generic [ref=e35]: Targets
+      - link "Strategy" [ref=e36] [cursor=pointer]:
+        - /url: /strategy
+        - img [ref=e37]
+        - generic [ref=e38]: Strategy
+      - link "Costs" [ref=e39] [cursor=pointer]:
+        - /url: /costs
+        - img [ref=e40]
+        - generic [ref=e41]: Costs
+      - link "MCP" [ref=e42] [cursor=pointer]:
+        - /url: /mcp
+        - img [ref=e43]
+        - generic [ref=e44]: MCP
+      - link "Observability" [ref=e45] [cursor=pointer]:
+        - /url: /observability
+        - img [ref=e46]
+        - generic [ref=e47]: Observability
+      - link "Settings" [ref=e48] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e49]
+        - generic [ref=e50]: Settings
+    - generic [ref=e51]:
+      - generic "Server connected" [ref=e52]:
+        - generic [ref=e54]: Connected
+      - generic "Tuitbot v0.1.20" [ref=e55]: v0.1.20
+      - generic [ref=e56]:
+        - button "Dark" [ref=e57] [cursor=pointer]:
+          - img [ref=e58]
+          - generic [ref=e59]: Dark
+        - button "Collapse sidebar" [ref=e60] [cursor=pointer]:
+          - img [ref=e61]
+  - main [ref=e62]:
+    - generic [ref=e64]:
+      - status [ref=e65]
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - generic [ref=e69]: Alexander Ramírez
+            - generic [ref=e70]: "@aramirez087"
+          - generic [ref=e71]:
+            - button "Publish now" [disabled] [ref=e72]:
+              - img [ref=e73]
+              - generic [ref=e74]: Publish
+            - generic [ref=e75]:
+              - button "Open preview" [ref=e76] [cursor=pointer]:
+                - img [ref=e77]
+              - button "Close inspector" [ref=e78] [cursor=pointer]:
+                - img [ref=e79]
+              - button "Command palette" [ref=e80] [cursor=pointer]:
+                - img [ref=e81]
+        - region "Quick tips" [ref=e82]:
+          - generic [ref=e83]:
+            - generic [ref=e84]:
+              - img [ref=e173]
+              - generic [ref=e87]: Split / add post
+              - generic [ref=e88]: ⌘Enter
+            - generic [ref=e89]:
+              - img [ref=e91]
+              - generic [ref=e92]: Command palette
+              - generic [ref=e93]: ⌘K
+            - generic [ref=e94]:
+              - img [ref=e96]
+              - generic [ref=e97]: AI improve
+              - generic [ref=e98]: ⌘J
+          - button "Got it" [ref=e99] [cursor=pointer]
+        - generic [ref=e100]:
+          - generic [ref=e101]:
+            - list "Thread editor" [ref=e174]:
+              - status [ref=e175]
+              - listitem [ref=e177]:
+                - generic [ref=e179]:
+                  - generic [ref=e180]:
+                    - textbox "Post 1 of 2" [ref=e181]:
+                      - /placeholder: Start writing...
+                      - text: Testing drag between tweets
+                    - region "Media attachment zone"
+                  - generic [ref=e182]:
+                    - generic [ref=e184]: "#1· 4 words"
+                    - generic [ref=e185]:
+                      - generic "27/280" [ref=e186]:
+                        - img [ref=e187]
+                        - generic: 27/280
+                      - generic [ref=e190]:
+                        - button "Attach media to post 1" [ref=e191] [cursor=pointer]:
+                          - img [ref=e192]
+                        - button "Move post 1 down" [ref=e193] [cursor=pointer]:
+                          - img [ref=e194]
+                        - button "Reorder post 1. Use Alt+Up or Alt+Down to move." [ref=e195]:
+                          - img [ref=e196]
+              - listitem [ref=e198]:
+                - generic [ref=e200]:
+                  - generic [ref=e201]:
+                    - textbox "Post 2 of 2" [active] [ref=e202]:
+                      - /placeholder: Continue...
+                    - region "Media attachment zone"
+                  - generic [ref=e203]:
+                    - generic [ref=e205]: "#2"
+                    - generic [ref=e206]:
+                      - generic "0/280" [ref=e207]:
+                        - img [ref=e208]
+                        - generic: 0/280
+                      - generic [ref=e211]:
+                        - button "Attach media to post 2" [ref=e212] [cursor=pointer]:
+                          - img [ref=e213]
+                        - button "Move post 2 up" [ref=e214] [cursor=pointer]:
+                          - img [ref=e215]
+                        - button "Reorder post 2. Use Alt+Up or Alt+Down to move." [ref=e216]:
+                          - img [ref=e217]
+            - toolbar "Insert formatting" [ref=e116]:
+              - generic [ref=e117]:
+                - button "Insert emoji" [ref=e119] [cursor=pointer]:
+                  - img [ref=e120]
+                - button "Insert hashtag" [ref=e121] [cursor=pointer]:
+                  - img [ref=e122]
+                - button "Insert mention" [ref=e123] [cursor=pointer]:
+                  - img [ref=e124]
+                - button "Insert list item" [ref=e126] [cursor=pointer]:
+                  - img [ref=e127]
+                - button "Insert quote marks" [ref=e128] [cursor=pointer]:
+                  - img [ref=e129]
+                - button "Insert sparkle" [ref=e130] [cursor=pointer]:
+                  - img [ref=e131]
+          - generic [ref=e132]:
+            - generic [ref=e133]:
+              - generic [ref=e134]: Schedule
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - img [ref=e137]
+                  - generic [ref=e138]: Schedule for today
+                - generic [ref=e139]:
+                  - textbox [ref=e140]:
+                    - /placeholder: HH:MM
+                  - button "Set" [disabled] [ref=e141]
+              - paragraph [ref=e142]: Posts immediately unless scheduled
+            - generic [ref=e143]:
+              - generic [ref=e144]: Voice
+              - generic [ref=e145]:
+                - generic [ref=e146]:
+                  - img [ref=e147]
+                  - generic [ref=e148]: Set voice in Settings → Content Persona
+                - textbox "Tone cue (e.g., 'more casual')" [ref=e150]
+            - generic [ref=e151]:
+              - generic [ref=e152]:
+                - generic [ref=e153]: AI
+                - generic [ref=e154]: ⌘⇧J
+              - paragraph [ref=e155]: Improve selected text or generate new content
+              - generic [ref=e156]:
+                - button "Improve with AI" [ref=e172] [cursor=pointer]
+                - button "From notes" [ref=e158] [cursor=pointer]

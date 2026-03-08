@@ -1,8 +1,19 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import type { ThreadBlock } from "$lib/api";
-	import { tweetWeightedLen, wordCount, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
-	import { GripVertical, Merge, Trash2, Image } from "lucide-svelte";
+	import {
+		tweetWeightedLen,
+		wordCount,
+		MAX_TWEET_CHARS,
+	} from "$lib/utils/tweetLength";
+	import {
+		GripVertical,
+		Merge,
+		Trash2,
+		Image,
+		ChevronUp,
+		ChevronDown,
+	} from "lucide-svelte";
 	import MediaSlot from "../MediaSlot.svelte";
 	import CharRing from "./CharRing.svelte";
 
@@ -23,6 +34,8 @@
 		onmerge,
 		onremove,
 		onaddafter,
+		onmoveup,
+		onmovedown,
 		ondragstart,
 		ondragend,
 		ondragover,
@@ -46,6 +59,8 @@
 		onmerge: () => void;
 		onremove: () => void;
 		onaddafter: () => void;
+		onmoveup?: () => void;
+		onmovedown?: () => void;
 		ondragstart: (e: DragEvent) => void;
 		ondragend: () => void;
 		ondragover: (e: DragEvent) => void;
@@ -145,13 +160,18 @@
 				bind:this={mediaSlotRef}
 				mediaPaths={block.media_paths}
 				onmediachange={(paths) => onmedia(paths)}
+				blockId={block.id}
 			/>
 		</div>
 
 		<!-- Card footer: post number + actions -->
 		<div class="card-footer">
 			<div class="footer-left">
-				<span class="footer-badge">#{index + 1}{#if words > 0} &middot; {words} {words === 1 ? "word" : "words"}{/if}</span>
+				<span class="footer-badge"
+					>#{index + 1}{#if words > 0}
+						&middot; {words}
+						{words === 1 ? "word" : "words"}{/if}</span
+				>
 			</div>
 			<div class="footer-actions">
 				<CharRing current={charCount} />
@@ -164,6 +184,26 @@
 					>
 						<Image size={13} />
 					</button>
+					{#if onmoveup && !isFirst}
+						<button
+							class="footer-action-btn"
+							onclick={() => onmoveup()}
+							title="Move up (Alt+\u2191)"
+							aria-label={`Move post ${index + 1} up`}
+						>
+							<ChevronUp size={13} />
+						</button>
+					{/if}
+					{#if onmovedown && !isLast}
+						<button
+							class="footer-action-btn"
+							onclick={() => onmovedown()}
+							title="Move down (Alt+\u2193)"
+							aria-label={`Move post ${index + 1} down`}
+						>
+							<ChevronDown size={13} />
+						</button>
+					{/if}
 					<div
 						class="footer-handle"
 						draggable="true"
@@ -206,11 +246,17 @@
 		display: flex;
 		gap: 14px;
 		border-left: 2px solid transparent;
-		transition: opacity 0.15s ease, border-color 0.15s ease;
+		transition:
+			opacity 0.15s ease,
+			border-color 0.15s ease;
 	}
 
 	.flow-card.focused {
-		border-left-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
+		border-left-color: color-mix(
+			in srgb,
+			var(--color-accent) 35%,
+			transparent
+		);
 	}
 
 	.flow-card.dragging {
@@ -220,6 +266,12 @@
 	.flow-card.assisting {
 		opacity: 0.7;
 		pointer-events: none;
+	}
+
+	.flow-card:global(.media-transfer-target) {
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+		border-left-color: var(--color-accent);
+		border-radius: 6px;
 	}
 
 	/* ── Gutter (avatar + spine) ──────────── */
@@ -241,7 +293,11 @@
 		left: 50%;
 		transform: translateX(-50%);
 		width: 2px;
-		background: color-mix(in srgb, var(--color-border-subtle) 40%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--color-border-subtle) 40%,
+			transparent
+		);
 		border-radius: 1px;
 	}
 
@@ -286,15 +342,10 @@
 		transition: opacity 0.2s ease;
 	}
 
-	/* De-emphasis on unfocused cards */
+	/* Keep full opacity on all cards to maintain clear readability */
 	.flow-card:not(.focused) .card-writing-area {
-		opacity: 0.7;
-	}
-
-	.flow-card:not(.focused):hover .card-writing-area {
 		opacity: 1;
 	}
-
 	.flow-card.drop-target .card-writing-area {
 		background: color-mix(in srgb, var(--color-accent) 4%, transparent);
 		border-radius: 8px;
@@ -351,7 +402,11 @@
 		opacity: 0.6;
 		padding: 1px 6px;
 		border-radius: 8px;
-		background: color-mix(in srgb, var(--color-surface-active) 50%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--color-surface-active) 50%,
+			transparent
+		);
 		letter-spacing: 0.02em;
 	}
 

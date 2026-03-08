@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, flushSync } from 'svelte';
 	import {
 		api,
 		type ScheduleConfig,
@@ -19,6 +19,7 @@
 	import InspectorContent from './InspectorContent.svelte';
 	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
+	import AddTweetDivider from './AddTweetDivider.svelte';
 	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
@@ -168,6 +169,20 @@
 
 	$effect(() => { void mode; void tweetText; void threadBlocks; void attachedMedia; if (initialized) autoSave(); });
 
+	// Auto-collapse: thread → tweet when only 1 block remains
+	$effect(() => {
+		if (mode === 'thread' && threadBlocks.length <= 1 && initialized) {
+			const surviving = threadBlocks[0];
+			tweetText = surviving?.text ?? '';
+			threadBlocks = [];
+			mode = 'tweet';
+			requestAnimationFrame(() => {
+				const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
+				textarea?.focus();
+			});
+		}
+	});
+
 	// Announce mode switches to screen readers (skip initial render)
 	let modeInitialized = false;
 	$effect(() => {
@@ -243,6 +258,25 @@
 			}
 		}
 		mode = newMode;
+	}
+
+	function switchToThread() {
+		if (mode !== 'tweet') return;
+		const mediaPaths = attachedMedia.map((m) => m.path);
+		threadBlocks = [
+			{ id: crypto.randomUUID(), text: tweetText, media_paths: mediaPaths, order: 0 },
+			{ id: crypto.randomUUID(), text: '', media_paths: [], order: 1 }
+		];
+		const focusId = threadBlocks[1].id;
+		tweetText = '';
+		attachedMedia = [];
+		mode = 'thread';
+		requestAnimationFrame(() => {
+			const textarea = document.querySelector(
+				`[data-block-id="${focusId}"] textarea`
+			) as HTMLTextAreaElement | null;
+			textarea?.focus();
+		});
 	}
 
 	// ── Autosave / Recovery ────────────────────────────────
@@ -351,7 +385,58 @@
 		focusMode = !focusMode;
 	}
 
+
+	async function handleImagePaste() {
+		try {
+			const { readImage } = await import('@tauri-apps/plugin-clipboard-manager');
+			const img = await readImage();
+			const { width: w, height: h } = await img.size();
+			const rgba = await img.rgba();
+
+			const canvas = document.createElement('canvas');
+			canvas.width = w;
+			canvas.height = h;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
+			ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), w, h), 0, 0);
+			const blob: Blob | null = await new Promise((resolve) =>
+				canvas.toBlob(resolve, 'image/png')
+			);
+			if (!blob) return;
+
+			const file = new File([blob], 'pasted-image.png', { type: 'image/png' });
+			const result = await api.media.upload(file);
+
+			if (mode === 'thread') {
+				threadFlowRef?.addMediaToFocusedBlock(result.path);
+			} else {
+				flushSync(() => {
+					attachedMedia = [...attachedMedia, {
+						path: result.path,
+						file,
+						previewUrl: api.media.fileUrl(result.path),
+						mediaType: result.media_type
+					}];
+				});
+			}
+			return;
+		} catch {
+			// Not an image in clipboard — fall through to text paste
+		}
+
+		try {
+			const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+			const text = await readText();
+			if (text) {
+				document.execCommand('insertText', false, text);
+			}
+		} catch {
+			// No text in clipboard either
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
+
 		if (paletteOpen) return;
 
 		// When preview overlay is open, only allow Escape and toggle
@@ -369,8 +454,16 @@
 		}
 		if (matchEvent(e, 'cmd+shift+enter')) { e.preventDefault(); handleSubmit(); return; }
 		if (matchEvent(e, 'cmd+enter')) {
-			if (mode === 'tweet') { e.preventDefault(); handleSubmit(); }
+			if (mode === 'tweet') {
+				e.preventDefault();
+				if (tweetText.trim()) switchToThread();
+			}
 			// In thread mode: let event propagate to ThreadFlowLane's card handler for split
+			return;
+		}
+		if (matchEvent(e, 'cmd+v')) {
+			e.preventDefault();
+			handleImagePaste();
 			return;
 		}
 		if (matchEvent(e, 'cmd+shift+j')) { e.preventDefault(); handleInlineAssist(); return; }
@@ -600,6 +693,7 @@
 					onerror={(msg) => { submitError = msg; }}
 					avatarUrl={$currentAccount?.x_avatar_url ?? null}
 				/>
+				<AddTweetDivider onclick={switchToThread} disabled={!tweetText.trim()} />
 			{:else}
 				<ThreadFlowLane
 					bind:this={threadFlowRef}
@@ -707,7 +801,6 @@
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
 			onopenpalette={() => { paletteOpen = true; }}
-			onswitchmode={() => { switchMode(mode === 'tweet' ? 'thread' : 'tweet'); }}
 		/>
 		{#if tipsVisible}
 			<ComposerTipsTray

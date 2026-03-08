@@ -294,6 +294,7 @@ pub async fn sync_profile(
     ctx: AccountContext,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
+    tracing::info!(account_id = %id, "sync_profile called");
     require_mutate(&ctx)?;
 
     let _account = accounts::get_account(&state.db, &id)
@@ -304,6 +305,7 @@ pub async fn sync_profile(
     let token_path = account_token_path(&state.data_dir, &id);
     let user = match state.get_x_access_token(&token_path, &id).await {
         Ok(access_token) => {
+            tracing::info!(account_id = %id, "sync_profile: using OAuth tokens");
             let client = XApiHttpClient::new(access_token);
             client
                 .get_me()
@@ -312,13 +314,17 @@ pub async fn sync_profile(
         }
         Err(_) => {
             // No OAuth tokens — try the cookie transport.
+            tracing::info!(account_id = %id, "sync_profile: no OAuth, falling back to cookie transport");
             let account_dir = accounts::account_data_dir(&state.data_dir, &id);
             let client =
                 tuitbot_core::x_api::LocalModeXClient::with_session(false, &account_dir).await;
             client
                 .get_me()
                 .await
-                .map_err(|e| ApiError::Internal(format!("profile sync failed: {e}")))?
+                .map_err(|e| {
+                    tracing::error!(account_id = %id, error = %e, "sync_profile: cookie transport failed");
+                    ApiError::Internal(format!("profile sync failed: {e}"))
+                })?
         }
     };
 

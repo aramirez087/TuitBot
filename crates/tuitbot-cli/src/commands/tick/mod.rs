@@ -567,7 +567,8 @@ async fn run_content(
         config.intervals.content_post_window_seconds,
         deps.target_loop_config.dry_run,
     )
-    .with_topic_scorer(deps.topic_scorer.clone());
+    .with_topic_scorer(deps.topic_scorer.clone())
+    .with_thread_poster(deps.thread_poster.clone());
 
     match content_loop.run_once(None).await {
         tuitbot_core::automation::ContentResult::Posted { topic, content } => {

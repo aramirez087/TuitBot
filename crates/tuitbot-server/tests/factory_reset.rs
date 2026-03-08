@@ -227,11 +227,11 @@ async fn factory_reset_success() {
     assert!(!dir.path().join("passphrase_hash").exists());
     assert!(!dir.path().join("media").exists());
 
-    // Verify tables are empty by running a second reset (should find 0 rows).
+    // Verify tables only contain re-seeded default account (1 account + 2 roles = 3 rows).
     let body2 = serde_json::json!({ "confirmation": "RESET TUITBOT" });
     let (status2, json2, _) = post_json_auth(router, "/api/settings/factory-reset", body2).await;
     assert_eq!(status2, StatusCode::OK);
-    assert_eq!(json2["cleared"]["rows_deleted"], 0);
+    assert_eq!(json2["cleared"]["rows_deleted"], 3);
 
     // Verify Set-Cookie header clears session.
     let cookie = headers
@@ -269,11 +269,11 @@ async fn factory_reset_idempotent() {
     assert_eq!(json1["status"], "reset_complete");
     assert_eq!(json1["cleared"]["config_deleted"], true);
 
-    // Second reset on already-reset instance.
+    // Second reset on already-reset instance — only re-seeded default rows (3).
     let (status2, json2, _) = post_json_auth(router, "/api/settings/factory-reset", body).await;
     assert_eq!(status2, StatusCode::OK);
     assert_eq!(json2["status"], "reset_complete");
-    assert_eq!(json2["cleared"]["rows_deleted"], 0);
+    assert_eq!(json2["cleared"]["rows_deleted"], 3);
     assert_eq!(json2["cleared"]["config_deleted"], false);
 }
 

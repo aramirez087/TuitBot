@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use tauri::{Emitter, Manager};
+use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tokio::sync::Mutex;
 use tuitbot_core::auth::passphrase;
 use tuitbot_core::config::{ContentSourcesConfig, DeploymentMode};
@@ -103,6 +104,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -186,6 +188,47 @@ pub fn run() {
 
             app.manage(EmbeddedState(state));
 
+            // --- Application menu ---
+            // Custom Paste menu item emits a Tauri event so the webview
+            // can handle both text and image paste via the clipboard plugin.
+            let app_submenu = SubmenuBuilder::new(app, &app.package_info().name)
+                .about(None)
+                .separator()
+                .services()
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .quit()
+                .build()?;
+
+            let edit_submenu = SubmenuBuilder::new(app, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                // No .paste() — Cmd+V must reach JavaScript for image paste support.
+                // Text paste is handled via Tauri clipboard plugin readText().
+                .separator()
+                .select_all()
+                .build()?;
+
+            let window_submenu = SubmenuBuilder::new(app, "Window")
+                .minimize()
+                .close_window()
+                .separator()
+                .fullscreen()
+                .build()?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&app_submenu)
+                .item(&edit_submenu)
+                .item(&window_submenu)
+                .build()?;
+            app.set_menu(menu)?;
+
             // --- System tray ---
             build_system_tray(app)?;
 
@@ -195,7 +238,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    app.run(|_app_handle, _event| {});
+    app.run(|_app_handle, event| {
+        if let tauri::RunEvent::ExitRequested { .. } = event {
+            // Ensure the process fully terminates so the embedded server
+            // doesn't keep port 3001 bound after the window closes.
+            std::process::exit(0);
+        }
+    });
 }
 
 /// Build the system tray icon and context menu.
