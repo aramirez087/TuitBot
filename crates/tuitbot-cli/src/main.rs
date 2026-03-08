@@ -98,6 +98,13 @@ async fn main() {
     // terminate this process cleanly instead of triggering a panic.
     output::reset_sigpipe();
 
+    // Pre-parse output format for the error handler (before full parse).
+    let wants_json = std::env::args().any(|a| a == "--output" || a == "json")
+        && std::env::args()
+            .collect::<Vec<_>>()
+            .windows(2)
+            .any(|w| w[0] == "--output" && w[1] == "json");
+
     let result = run().await;
     match result {
         Ok(()) => {}
@@ -106,7 +113,12 @@ async fn main() {
             std::process::exit(0);
         }
         Err(e) => {
-            eprintln!("Error: {e:#}");
+            if wants_json {
+                let json = serde_json::json!({ "error": format!("{e:#}") });
+                let _ = output::write_stdout(&json.to_string());
+            } else {
+                eprintln!("Error: {e:#}");
+            }
             std::process::exit(1);
         }
     }
@@ -121,11 +133,12 @@ async fn run() -> anyhow::Result<()> {
     // - Default: warn level, compact format with timestamps.
     // - Verbose (-v): debug level, includes module paths.
     // - Quiet (-q): error level, minimal format.
+    let suppress_logs = cli.quiet || commands::OutputFormat::from_str(&cli.output).is_json();
     let filter = if std::env::var("RUST_LOG").is_ok() {
         EnvFilter::from_default_env()
     } else if cli.verbose {
         EnvFilter::new("tuitbot=debug,tuitbot_core=debug,info")
-    } else if cli.quiet {
+    } else if suppress_logs {
         EnvFilter::new("error")
     } else {
         EnvFilter::new("tuitbot=info,tuitbot_core=info,warn")
@@ -138,11 +151,12 @@ async fn run() -> anyhow::Result<()> {
         .init();
 
     let output_format = commands::OutputFormat::from_str(&cli.output);
+    let out = output::CliOutput::new(cli.quiet, output_format);
 
     // Handle `init`, `update`, `upgrade`, and `settings` before general config
     // loading (they manage their own config lifecycle).
     if let Commands::Init(args) = cli.command {
-        return commands::init::execute(args.force, args.non_interactive, args.advanced).await;
+        return commands::init::execute(args.force, args.non_interactive, args.advanced, out).await;
     }
     if let Commands::Update(args) = cli.command {
         return commands::update::execute(
@@ -150,6 +164,7 @@ async fn run() -> anyhow::Result<()> {
             args.check,
             args.config_only,
             &cli.config,
+            out,
         )
         .await;
     }
@@ -160,13 +175,13 @@ async fn run() -> anyhow::Result<()> {
         return commands::settings::execute(args, &cli.config, output_format).await;
     }
     if let Commands::Backup(args) = cli.command {
-        return commands::backup::execute(args).await;
+        return commands::backup::execute(args, out).await;
     }
     if let Commands::Restore(args) = cli.command {
-        return commands::restore::execute(args).await;
+        return commands::restore::execute(args, out).await;
     }
     if let Commands::Uninstall(args) = cli.command {
-        return commands::uninstall::execute(args.force, args.data_only);
+        return commands::uninstall::execute(args.force, args.data_only, out);
     }
     if let Commands::Mcp(ref args) = cli.command {
         return match &args.command {
@@ -176,7 +191,7 @@ async fn run() -> anyhow::Result<()> {
             commands::McpSubcommand::Serve { ref profile } => {
                 commands::mcp::execute_serve(profile).await
             }
-            commands::McpSubcommand::Setup => commands::mcp::execute_setup().await,
+            commands::McpSubcommand::Setup => commands::mcp::execute_setup(out).await,
         };
     }
 
@@ -199,7 +214,7 @@ async fn run() -> anyhow::Result<()> {
                     .unwrap_or(false);
 
                 if run_init {
-                    return commands::init::execute(false, false, false).await;
+                    return commands::init::execute(false, false, false, out).await;
                 }
             }
 
@@ -234,34 +249,34 @@ async fn run() -> anyhow::Result<()> {
             if args.require_approval {
                 config.approval_mode = true;
             }
-            commands::tick::execute(&config, args, output_format).await?;
+            commands::tick::execute(&config, args, out).await?;
         }
         Commands::Auth(args) => {
             commands::auth::execute(&config, args.mode.as_deref()).await?;
         }
         Commands::Test(_args) => {
-            commands::test::execute(&config, &cli.config, output_format).await?;
+            commands::test::execute(&config, &cli.config, out).await?;
         }
         Commands::Discover(_args) => {
-            eprintln!("discover: not yet available (requires WP08 merge)");
+            anyhow::bail!("discover: not yet available (requires WP08 merge)");
         }
         Commands::Mentions(_args) => {
-            eprintln!("mentions: not yet available (requires WP08 merge)");
+            anyhow::bail!("mentions: not yet available (requires WP08 merge)");
         }
         Commands::Post(_args) => {
-            eprintln!("post: not yet available (requires WP09 merge)");
+            anyhow::bail!("post: not yet available (requires WP09 merge)");
         }
         Commands::Thread(_args) => {
-            eprintln!("thread: not yet available (requires WP09 merge)");
+            anyhow::bail!("thread: not yet available (requires WP09 merge)");
         }
         Commands::Score(_args) => {
-            eprintln!("score: not yet available (requires WP06 merge)");
+            anyhow::bail!("score: not yet available (requires WP06 merge)");
         }
         Commands::Stats(_args) => {
-            commands::stats::execute(&config, output_format).await?;
+            commands::stats::execute(&config, out).await?;
         }
         Commands::Approve(args) => {
-            commands::approve::execute(&config, args, output_format).await?;
+            commands::approve::execute(&config, args, out).await?;
         }
     }
 

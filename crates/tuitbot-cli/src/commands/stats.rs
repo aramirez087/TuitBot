@@ -7,8 +7,7 @@ use serde::Serialize;
 use tuitbot_core::config::Config;
 use tuitbot_core::storage;
 
-use super::OutputFormat;
-use crate::output::write_stdout;
+use crate::output::CliOutput;
 
 #[derive(Serialize)]
 struct FollowerSnapshotJson {
@@ -48,34 +47,36 @@ struct StatsOutput {
 }
 
 /// Execute the `tuitbot stats` command.
-pub async fn execute(config: &Config, output: OutputFormat) -> anyhow::Result<()> {
+pub async fn execute(config: &Config, out: CliOutput) -> anyhow::Result<()> {
     let pool = storage::init_db(&config.storage.db_path).await?;
 
-    if output.is_json() {
+    if out.is_json() {
         let result = collect_stats_json(&pool).await;
         pool.close().await;
         let stats = result?;
-        write_stdout(&serde_json::to_string(&stats)?)?;
+        out.json(&stats)?;
         return Ok(());
     }
 
-    eprintln!();
-    eprintln!("=== Tuitbot Analytics ===");
-    eprintln!();
+    out.info("");
+    out.info("=== Tuitbot Analytics ===");
+    out.info("");
 
-    // 1. Follower trend (7 days)
-    print_follower_trend(&pool).await;
+    if !out.quiet {
+        // 1. Follower trend (7 days)
+        print_follower_trend(&pool).await;
 
-    // 2. Top performing topics
-    print_top_topics(&pool).await;
+        // 2. Top performing topics
+        print_top_topics(&pool).await;
 
-    // 3. Engagement rates
-    print_engagement_rates(&pool).await;
+        // 3. Engagement rates
+        print_engagement_rates(&pool).await;
 
-    // 4. Performance counts
-    print_performance_counts(&pool).await;
+        // 4. Performance counts
+        print_performance_counts(&pool).await;
 
-    eprintln!();
+        eprintln!();
+    }
 
     pool.close().await;
     Ok(())

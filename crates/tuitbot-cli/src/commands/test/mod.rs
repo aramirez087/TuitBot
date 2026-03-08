@@ -13,8 +13,7 @@ use tuitbot_core::error::LlmError;
 use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::startup::{expand_tilde, load_tokens_from_file, StartupError, StoredTokens};
 
-use super::OutputFormat;
-use crate::output::write_stdout;
+use crate::output::CliOutput;
 
 /// A single diagnostic check result.
 #[derive(Clone, Serialize)]
@@ -151,17 +150,13 @@ pub async fn run_checks(config: &Config, config_path: &str) -> bool {
 ///
 /// Runs all diagnostic checks and reports results. Exits with code 1
 /// if any check fails.
-pub async fn execute(
-    config: &Config,
-    config_path: &str,
-    output: OutputFormat,
-) -> anyhow::Result<()> {
-    if output.is_json() {
+pub async fn execute(config: &Config, config_path: &str, out: CliOutput) -> anyhow::Result<()> {
+    if out.is_json() {
         let auth = evaluate_auth(load_tokens_from_file());
         let mut checks = collect_checks_with_auth(config, config_path, auth.checks);
         checks.push(check_llm_connectivity(config).await);
         let output = build_test_output(checks, Some(auth.details));
-        write_stdout(&serde_json::to_string(&output)?)?;
+        out.json(&output)?;
         if !output.passed {
             std::process::exit(1);
         }

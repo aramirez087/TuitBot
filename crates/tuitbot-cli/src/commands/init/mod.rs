@@ -39,7 +39,9 @@ use steps::{
 };
 use wizard::WizardResult;
 
-use super::{auth, test, tick, OutputFormat, TickArgs};
+use crate::output::CliOutput;
+
+use super::{auth, test, tick, TickArgs};
 
 // Re-export prompt functions used by the upgrade command.
 pub(crate) use prompts::{
@@ -50,21 +52,34 @@ pub(crate) use prompts::{
 const EXAMPLE_CONFIG: &str = include_str!("../../../config.example.toml");
 
 /// Run the init command.
-pub async fn execute(force: bool, non_interactive: bool, advanced: bool) -> Result<()> {
+pub async fn execute(
+    force: bool,
+    non_interactive: bool,
+    advanced: bool,
+    out: CliOutput,
+) -> Result<()> {
     let dir = data_dir();
     let config_path: PathBuf = dir.join("config.toml");
 
     if config_path.exists() && !force {
-        eprintln!(
-            "Configuration already exists at {}\n\
-             Use --force to overwrite.",
-            config_path.display()
-        );
+        if out.is_json() {
+            out.json(&serde_json::json!({
+                "status": "exists",
+                "path": config_path.display().to_string(),
+                "message": "Configuration already exists. Use --force to overwrite.",
+            }))?;
+        } else {
+            out.info(&format!(
+                "Configuration already exists at {}\n\
+                 Use --force to overwrite.",
+                config_path.display()
+            ));
+        }
         return Ok(());
     }
 
     if non_interactive {
-        return write_template(&dir, &config_path);
+        return write_template(&dir, &config_path, out);
     }
 
     // Guard: must be a real terminal for interactive mode.
@@ -83,19 +98,26 @@ pub async fn execute(force: bool, non_interactive: bool, advanced: bool) -> Resu
 }
 
 /// Non-interactive path: copy the embedded template.
-fn write_template(dir: &PathBuf, config_path: &PathBuf) -> Result<()> {
+fn write_template(dir: &PathBuf, config_path: &PathBuf, out: CliOutput) -> Result<()> {
     fs::create_dir_all(dir)?;
     fs::write(config_path, EXAMPLE_CONFIG)?;
 
-    eprintln!("Created {}\n", config_path.display());
-    eprintln!("Next steps:");
-    eprintln!(
-        "  1. Edit {} with your X API and LLM credentials",
-        config_path.display()
-    );
-    eprintln!("  2. tuitbot auth    — authenticate with X");
-    eprintln!("  3. tuitbot test    — validate configuration");
-    eprintln!("  4. tuitbot run     — start the agent");
+    if out.is_json() {
+        out.json(&serde_json::json!({
+            "status": "created",
+            "path": config_path.display().to_string(),
+        }))?;
+    } else {
+        out.info(&format!("Created {}\n", config_path.display()));
+        out.info("Next steps:");
+        out.info(&format!(
+            "  1. Edit {} with your X API and LLM credentials",
+            config_path.display()
+        ));
+        out.info("  2. tuitbot auth    — authenticate with X");
+        out.info("  3. tuitbot test    — validate configuration");
+        out.info("  4. tuitbot run     — start the agent");
+    }
 
     Ok(())
 }
@@ -283,7 +305,8 @@ async fn chain_post_config(config: &Config, config_path_str: &str) -> Result<()>
         require_approval: false,
     };
 
-    if let Err(e) = tick::execute(config, tick_args, OutputFormat::Text).await {
+    let text_out = CliOutput::new(false, super::OutputFormat::Text);
+    if let Err(e) = tick::execute(config, tick_args, text_out).await {
         eprintln!("\nPreview failed: {e:#}");
         print_remaining_steps(&["tuitbot tick --dry-run — retry preview"]);
     }

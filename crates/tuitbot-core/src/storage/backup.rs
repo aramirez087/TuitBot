@@ -70,7 +70,7 @@ async fn create_backup_with_prefix(
         ),
     })?;
 
-    let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+    let timestamp = Utc::now().format("%Y%m%d_%H%M%S_%3f");
     let filename = format!("{prefix}_{timestamp}.db");
     let backup_path = backup_dir.join(&filename);
 

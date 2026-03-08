@@ -5,6 +5,54 @@
 /// exit, matching standard Unix tool behavior (`cat`, `head`, `grep`).
 use std::io::{self, Write};
 
+use crate::commands::OutputFormat;
+
+/// Centralized output context that carries `--quiet` and `--output` flags.
+///
+/// Commands use this to decide what and how to print. All user-facing
+/// output should flow through these helpers so that `--quiet` suppresses
+/// informational messages and `--output json` emits structured JSON
+/// instead of human text.
+#[derive(Debug, Clone, Copy)]
+pub struct CliOutput {
+    pub quiet: bool,
+    pub format: OutputFormat,
+}
+
+impl CliOutput {
+    pub fn new(quiet: bool, format: OutputFormat) -> Self {
+        Self { quiet, format }
+    }
+
+    pub fn is_json(self) -> bool {
+        self.format.is_json()
+    }
+
+    /// Print an informational message to stderr (suppressed by `--quiet`).
+    pub fn info(&self, msg: &str) {
+        if !self.quiet && !self.is_json() {
+            eprintln!("{msg}");
+        }
+    }
+
+    /// Print an error message to stderr. In JSON mode, emits a JSON error
+    /// envelope to stdout instead.
+    pub fn error(&self, msg: &str) -> anyhow::Result<()> {
+        if self.is_json() {
+            let json = serde_json::json!({ "error": msg });
+            write_stdout(&json.to_string())
+        } else {
+            eprintln!("Error: {msg}");
+            Ok(())
+        }
+    }
+
+    /// Emit a JSON value to stdout (used by `--output json` paths).
+    pub fn json(&self, value: &impl serde::Serialize) -> anyhow::Result<()> {
+        write_stdout(&serde_json::to_string(value)?)
+    }
+}
+
 /// Reset SIGPIPE to default behavior on Unix.
 ///
 /// Rust sets SIGPIPE to SIG_IGN by default, which causes write() to return
