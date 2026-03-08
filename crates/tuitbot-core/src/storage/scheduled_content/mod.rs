@@ -516,5 +516,67 @@ pub async fn schedule_draft(
     schedule_draft_for(pool, DEFAULT_ACCOUNT_ID, id, scheduled_for).await
 }
 
+/// Unschedule a scheduled item back to draft for a specific account.
+pub async fn unschedule_draft_for(
+    pool: &DbPool,
+    account_id: &str,
+    id: i64,
+) -> Result<bool, StorageError> {
+    let result = sqlx::query(
+        "UPDATE scheduled_content SET status = 'draft', scheduled_for = NULL, \
+         updated_at = datetime('now') \
+         WHERE id = ? AND account_id = ? AND status = 'scheduled'",
+    )
+    .bind(id)
+    .bind(account_id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(result.rows_affected() > 0)
+}
+
+/// Autosave a draft's content and content_type for a specific account.
+/// Only updates if the row's `updated_at` matches `expected_updated_at`.
+/// Returns `Ok(Some(new_updated_at))` on success, `Ok(None)` on stale write.
+pub async fn autosave_draft_for(
+    pool: &DbPool,
+    account_id: &str,
+    id: i64,
+    content: &str,
+    content_type: &str,
+    expected_updated_at: &str,
+) -> Result<Option<String>, StorageError> {
+    let result = sqlx::query(
+        "UPDATE scheduled_content \
+         SET content = ?, content_type = ?, updated_at = datetime('now') \
+         WHERE id = ? AND account_id = ? AND updated_at = ?",
+    )
+    .bind(content)
+    .bind(content_type)
+    .bind(id)
+    .bind(account_id)
+    .bind(expected_updated_at)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    if result.rows_affected() == 0 {
+        return Ok(None);
+    }
+
+    // Fetch the new updated_at
+    let row = sqlx::query_as::<_, ScheduledContent>(
+        "SELECT * FROM scheduled_content WHERE id = ? AND account_id = ?",
+    )
+    .bind(id)
+    .bind(account_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(|r| r.updated_at))
+}
+
 #[cfg(test)]
 mod tests;

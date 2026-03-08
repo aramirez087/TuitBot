@@ -239,6 +239,52 @@ export interface ScheduledContentItem {
 	posted_tweet_id: string | null;
 	created_at: string;
 	updated_at: string;
+	title?: string | null;
+	notes?: string | null;
+	archived_at?: string | null;
+}
+
+// --- Draft Studio types ---
+
+export interface DraftSummary {
+	id: number;
+	title: string | null;
+	content_type: string;
+	content_preview: string;
+	status: string;
+	scheduled_for: string | null;
+	archived_at: string | null;
+	updated_at: string;
+	created_at: string;
+}
+
+export interface AutosaveResponse {
+	id: number;
+	updated_at: string;
+}
+
+export interface StaleWriteError {
+	error: 'stale_write';
+	server_updated_at: string;
+}
+
+export interface ContentRevision {
+	id: number;
+	content_id: number;
+	account_id: string;
+	content: string;
+	content_type: string;
+	trigger_kind: string;
+	created_at: string;
+}
+
+export interface ContentActivity {
+	id: number;
+	content_id: number;
+	account_id: string;
+	action: string;
+	detail: string | null;
+	created_at: string;
 }
 
 // --- Target types ---

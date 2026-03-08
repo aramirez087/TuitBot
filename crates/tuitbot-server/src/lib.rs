@@ -84,7 +84,48 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/content/scheduled/{id}",
             patch(routes::content::edit_scheduled).delete(routes::content::cancel_scheduled),
         )
-        // Drafts
+        // Draft Studio (new canonical paths)
+        .route(
+            "/drafts",
+            get(routes::content::list_studio_drafts).post(routes::content::create_studio_draft),
+        )
+        .route(
+            "/drafts/{id}",
+            get(routes::content::get_studio_draft).patch(routes::content::autosave_draft),
+        )
+        .route(
+            "/drafts/{id}/meta",
+            patch(routes::content::patch_draft_meta),
+        )
+        .route(
+            "/drafts/{id}/schedule",
+            post(routes::content::schedule_studio_draft),
+        )
+        .route(
+            "/drafts/{id}/unschedule",
+            post(routes::content::unschedule_studio_draft),
+        )
+        .route(
+            "/drafts/{id}/archive",
+            post(routes::content::archive_studio_draft),
+        )
+        .route(
+            "/drafts/{id}/restore",
+            post(routes::content::restore_studio_draft),
+        )
+        .route(
+            "/drafts/{id}/duplicate",
+            post(routes::content::duplicate_studio_draft),
+        )
+        .route(
+            "/drafts/{id}/revisions",
+            get(routes::content::list_draft_revisions).post(routes::content::create_draft_revision),
+        )
+        .route(
+            "/drafts/{id}/activity",
+            get(routes::content::list_draft_activity),
+        )
+        // Legacy drafts (backward compat)
         .route(
             "/content/drafts",
             get(routes::content::list_drafts).post(routes::content::create_draft),
