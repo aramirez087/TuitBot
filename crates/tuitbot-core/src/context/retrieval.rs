@@ -6,6 +6,7 @@
 use std::collections::HashSet;
 
 use crate::error::StorageError;
+use crate::storage::provenance::ProvenanceRef;
 use crate::storage::watchtower::{self, ChunkWithNodeContext};
 use crate::storage::DbPool;
 
@@ -160,6 +161,41 @@ pub fn format_fragments_prompt(fragments: &[FragmentContext]) -> String {
 /// Extract `VaultCitation` records from fragment contexts.
 pub fn build_citations(fragments: &[FragmentContext]) -> Vec<VaultCitation> {
     fragments.iter().map(|f| f.citation.clone()).collect()
+}
+
+// ============================================================================
+// Provenance converters
+// ============================================================================
+
+/// Convert `VaultCitation` records to `ProvenanceRef` for persistence.
+pub fn citations_to_provenance_refs(citations: &[VaultCitation]) -> Vec<ProvenanceRef> {
+    citations
+        .iter()
+        .map(|c| ProvenanceRef {
+            node_id: Some(c.node_id),
+            chunk_id: Some(c.chunk_id),
+            seed_id: None,
+            source_path: Some(c.source_path.clone()),
+            heading_path: Some(c.heading_path.clone()),
+            snippet: Some(c.snippet.clone()),
+        })
+        .collect()
+}
+
+/// Serialize citations as a JSON array for the legacy `source_chunks_json` column.
+pub fn citations_to_chunks_json(citations: &[VaultCitation]) -> String {
+    let entries: Vec<serde_json::Value> = citations
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "chunk_id": c.chunk_id,
+                "node_id": c.node_id,
+                "source_path": c.source_path,
+                "heading_path": c.heading_path,
+            })
+        })
+        .collect();
+    serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string())
 }
 
 // ============================================================================

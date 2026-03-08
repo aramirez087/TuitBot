@@ -96,6 +96,44 @@ pub async fn insert_original_tweet(
     insert_original_tweet_for(pool, DEFAULT_ACCOUNT_ID, tweet).await
 }
 
+/// Set the `source_node_id` on an existing original tweet for a specific account.
+///
+/// Used by the approval poster to propagate vault provenance after posting.
+pub async fn set_original_tweet_source_node_for(
+    pool: &DbPool,
+    account_id: &str,
+    id: i64,
+    source_node_id: i64,
+) -> Result<(), StorageError> {
+    sqlx::query("UPDATE original_tweets SET source_node_id = ? WHERE id = ? AND account_id = ?")
+        .bind(source_node_id)
+        .bind(id)
+        .bind(account_id)
+        .execute(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
+/// Insert an original tweet with provenance for a specific account.
+///
+/// Creates the tweet row and then inserts provenance link rows.
+pub async fn insert_original_tweet_with_provenance_for(
+    pool: &DbPool,
+    account_id: &str,
+    tweet: &OriginalTweet,
+    refs: &[super::provenance::ProvenanceRef],
+) -> Result<i64, StorageError> {
+    let id = insert_original_tweet_for(pool, account_id, tweet).await?;
+
+    if !refs.is_empty() {
+        super::provenance::insert_links_for(pool, account_id, "original_tweet", id, refs).await?;
+    }
+
+    Ok(id)
+}
+
 /// Get the timestamp of the most recent successfully posted original tweet for a specific account.
 pub async fn get_last_original_tweet_time_for(
     pool: &DbPool,

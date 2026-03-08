@@ -362,6 +362,27 @@ pub async fn insert_draft(
     insert_draft_for(pool, DEFAULT_ACCOUNT_ID, content_type, content, source).await
 }
 
+/// Insert a new draft with provenance for a specific account.
+///
+/// Creates the draft row and then inserts provenance link rows.
+pub async fn insert_draft_with_provenance_for(
+    pool: &DbPool,
+    account_id: &str,
+    content_type: &str,
+    content: &str,
+    source: &str,
+    refs: &[super::provenance::ProvenanceRef],
+) -> Result<i64, StorageError> {
+    let id = insert_draft_for(pool, account_id, content_type, content, source).await?;
+
+    if !refs.is_empty() {
+        super::provenance::insert_links_for(pool, account_id, "scheduled_content", id, refs)
+            .await?;
+    }
+
+    Ok(id)
+}
+
 /// List all draft items for a specific account, ordered by creation time (newest first).
 pub async fn list_drafts_for(
     pool: &DbPool,

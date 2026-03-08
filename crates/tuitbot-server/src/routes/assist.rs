@@ -11,6 +11,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::context::retrieval::VaultCitation;
 use tuitbot_core::context::winning_dna;
 use tuitbot_core::storage;
 
@@ -35,10 +36,13 @@ async fn get_generator(
 /// Resolve optional RAG context from the vault for composer assist handlers.
 ///
 /// Loads the business profile's keyword set, queries winning ancestors and
-/// content seeds via `build_draft_context()`, and returns the formatted
-/// prompt block. Returns `None` (fail-open) on any error or when no
-/// relevant context exists.
-async fn resolve_composer_rag_context(state: &AppState, account_id: &str) -> Option<String> {
+/// content seeds via `build_draft_context()`, and returns the full
+/// `DraftContext` including vault citations. Returns `None` (fail-open) on
+/// any error or when no relevant context exists.
+async fn resolve_composer_rag_context(
+    state: &AppState,
+    account_id: &str,
+) -> Option<winning_dna::DraftContext> {
     let config = match state.load_effective_config(account_id).await {
         Ok(c) => c,
         Err(e) => {
@@ -71,7 +75,7 @@ async fn resolve_composer_rag_context(state: &AppState, account_id: &str) -> Opt
     if draft_context.prompt_block.is_empty() {
         None
     } else {
-        Some(draft_context.prompt_block)
+        Some(draft_context)
     }
 }
 
@@ -88,6 +92,8 @@ pub struct AssistTweetRequest {
 pub struct AssistTweetResponse {
     pub content: String,
     pub topic: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_tweet(
@@ -98,14 +104,21 @@ pub async fn assist_tweet(
     let gen = get_generator(&state, &ctx.account_id).await?;
     let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
 
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
+
     let output = gen
-        .generate_tweet_with_context(&body.topic, None, rag_context.as_deref())
+        .generate_tweet_with_context(&body.topic, None, prompt_block)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistTweetResponse {
         content: output.text,
         topic: body.topic,
+        vault_citations: citations,
     }))
 }
 
@@ -156,6 +169,8 @@ pub struct AssistThreadRequest {
 pub struct AssistThreadResponse {
     pub tweets: Vec<String>,
     pub topic: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_thread(
@@ -166,14 +181,21 @@ pub async fn assist_thread(
     let gen = get_generator(&state, &ctx.account_id).await?;
     let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
 
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
+
     let output = gen
-        .generate_thread_with_context(&body.topic, None, rag_context.as_deref())
+        .generate_thread_with_context(&body.topic, None, prompt_block)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistThreadResponse {
         tweets: output.tweets,
         topic: body.topic,
+        vault_citations: citations,
     }))
 }
 
@@ -191,6 +213,8 @@ pub struct AssistImproveRequest {
 #[derive(Serialize)]
 pub struct AssistImproveResponse {
     pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_improve(
@@ -201,13 +225,20 @@ pub async fn assist_improve(
     let gen = get_generator(&state, &ctx.account_id).await?;
     let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
 
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
+
     let output = gen
-        .improve_draft_with_context(&body.draft, body.context.as_deref(), rag_context.as_deref())
+        .improve_draft_with_context(&body.draft, body.context.as_deref(), prompt_block)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistImproveResponse {
         content: output.text,
+        vault_citations: citations,
     }))
 }
 
