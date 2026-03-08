@@ -400,16 +400,24 @@ mod transaction {
     use reqwest::blocking::Client;
     use scraper::{ElementRef, Html, Selector};
     use sha2::{Digest, Sha256};
-    use std::sync::LazyLock;
+    use std::sync::OnceLock;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    static ON_DEMAND_FILE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r#"['|\"]ondemand\.s['|\"]:\s*['|\"]([\w]*)['|\"]"#)
-            .expect("ondemand regex is valid")
-    });
-    static INDICES_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(\(\w{1}\[(\d{1,2})\],\s*16\))+").expect("indices regex is valid")
-    });
+    static ON_DEMAND_FILE_REGEX: OnceLock<Regex> = OnceLock::new();
+    static INDICES_REGEX: OnceLock<Regex> = OnceLock::new();
+
+    fn on_demand_file_regex() -> &'static Regex {
+        ON_DEMAND_FILE_REGEX.get_or_init(|| {
+            Regex::new(r#"['|\"]ondemand\.s['|\"]:\s*['|\"]([\w]*)['|\"]"#)
+                .expect("ondemand regex is valid")
+        })
+    }
+
+    fn indices_regex() -> &'static Regex {
+        INDICES_REGEX.get_or_init(|| {
+            Regex::new(r"(\(\w{1}\[(\d{1,2})\],\s*16\))+").expect("indices regex is valid")
+        })
+    }
 
     pub(crate) struct ClientTransaction {
         additional_random_number: u8,
@@ -440,7 +448,7 @@ mod transaction {
             let mut key_byte_indices = Vec::new();
 
             let html_content = home_page.html();
-            let on_demand_file = ON_DEMAND_FILE_REGEX
+            let on_demand_file = on_demand_file_regex()
                 .captures(&html_content)
                 .ok_or_else(|| Error::Parse("Couldn't find ondemand file".into()))?;
 
@@ -455,7 +463,7 @@ mod transaction {
             let on_demand_response = client.get(&on_demand_file_url).send()?;
             let on_demand_content = on_demand_response.text()?;
 
-            for captures in INDICES_REGEX.captures_iter(&on_demand_content) {
+            for captures in indices_regex().captures_iter(&on_demand_content) {
                 if let Some(index_match) = captures.get(2) {
                     if let Ok(index) = index_match.as_str().parse::<usize>() {
                         key_byte_indices.push(index);
