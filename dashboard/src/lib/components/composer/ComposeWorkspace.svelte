@@ -31,7 +31,8 @@
 	import {
 		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
 		readAutoSave, restoreMedia, wasNavigationExit,
-		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS
+		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS,
+		DraftSaveManager, readDraftAutoSave, clearDraftAutoSave
 	} from '$lib/utils/composerAutosave';
 	import type { AttachedMedia } from './TweetEditor.svelte';
 
@@ -42,7 +43,10 @@
 		prefillTime = null,
 		prefillDate = null,
 		embedded = false,
-		canPublish = true
+		canPublish = true,
+		draftId = undefined,
+		initialContent = undefined,
+		onsyncstatus = undefined
 	}: {
 		schedule: ScheduleConfig | null;
 		onsubmit: (data: ComposeRequest) => void | Promise<void>;
@@ -51,6 +55,15 @@
 		prefillDate?: Date | null;
 		embedded?: boolean;
 		canPublish?: boolean;
+		draftId?: number;
+		initialContent?: {
+			mode: 'tweet' | 'thread';
+			tweetText: string;
+			threadBlocks: ThreadBlock[];
+			attachedMedia: AttachedMedia[];
+			updatedAt: string;
+		};
+		onsyncstatus?: (status: import('$lib/utils/composerAutosave').SyncStatus) => void;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
@@ -90,6 +103,7 @@
 
 	// Auto-save (logic extracted to composerAutosave.ts)
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let draftSaveManager: DraftSaveManager | null = null;
 	let initialized = $state(false);
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
@@ -198,19 +212,47 @@
 	}
 
 	function handleBeforeUnload() {
-		flushAutoSave();
-		markSessionActive();
+		if (draftSaveManager) {
+			draftSaveManager.flush();
+		} else {
+			flushAutoSave();
+			markSessionActive();
+		}
 	}
 
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
-		checkRecovery();
-		if (!showRecovery && !initialized) {
-			tweetText = '';
-			threadBlocks = [];
-			mode = 'tweet';
+
+		if (draftId !== undefined && initialContent) {
+			// Draft Studio mode: hydrate from server data
+			mode = initialContent.mode;
+			tweetText = initialContent.tweetText;
+			threadBlocks = initialContent.threadBlocks;
+			attachedMedia = initialContent.attachedMedia;
+
+			// Check for crash recovery data
+			const localData = readDraftAutoSave(draftId);
+			if (localData && localData.timestamp > new Date(initialContent.updatedAt).getTime()) {
+				recoveryData = localData;
+				showRecovery = true;
+			} else {
+				clearDraftAutoSave(draftId);
+			}
+
+			// Create save manager
+			const syncCallback = onsyncstatus ?? (() => {});
+			draftSaveManager = new DraftSaveManager(draftId, initialContent.updatedAt, syncCallback);
 			initialized = true;
+		} else {
+			checkRecovery();
+			if (!showRecovery && !initialized) {
+				tweetText = '';
+				threadBlocks = [];
+				mode = 'tweet';
+				initialized = true;
+			}
 		}
+
 		submitting = false;
 		submitError = null;
 		focusMode = false;
@@ -224,7 +266,7 @@
 
 		window.addEventListener('beforeunload', handleBeforeUnload);
 
-		if (embedded) {
+		if (embedded && !draftId) {
 			const tipsDismissed = await persistGet('home_tips_dismissed', false);
 			tipsVisible = !tipsDismissed;
 			window.addEventListener('tuitbot:compose', handleComposeEvent);
@@ -233,11 +275,15 @@
 
 	onDestroy(() => {
 		window.removeEventListener('beforeunload', handleBeforeUnload);
-		flushAutoSave();
+		if (draftSaveManager) {
+			draftSaveManager.destroy();
+			draftSaveManager = null;
+		} else {
+			flushAutoSave();
+			markSessionActive();
+		}
 		if (undoTimer) clearTimeout(undoTimer);
-		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
-		// Signal that this was a normal teardown (navigation), not a crash
-		markSessionActive();
+		if (embedded && !draftId) window.removeEventListener('tuitbot:compose', handleComposeEvent);
 	});
 
 	function handleComposeEvent() {
@@ -281,10 +327,14 @@
 
 	// ── Autosave / Recovery ────────────────────────────────
 	function autoSave() {
-		if (autoSaveTimer) clearTimeout(autoSaveTimer);
-		autoSaveTimer = setTimeout(() => {
-			saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
-		}, AUTOSAVE_DEBOUNCE_MS);
+		if (draftSaveManager) {
+			draftSaveManager.save(mode, tweetText, threadBlocks, attachedMedia);
+		} else {
+			if (autoSaveTimer) clearTimeout(autoSaveTimer);
+			autoSaveTimer = setTimeout(() => {
+				saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
+			}, AUTOSAVE_DEBOUNCE_MS);
+		}
 	}
 
 	function clearAutoSave() {
@@ -321,7 +371,11 @@
 
 	function dismissRecovery() {
 		showRecovery = false;
-		clearAutoSave();
+		if (draftId !== undefined) {
+			clearDraftAutoSave(draftId);
+		} else {
+			clearAutoSave();
+		}
 		initialized = true;
 	}
 
@@ -333,8 +387,12 @@
 			const data = buildComposeRequest({
 				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
 			});
-			clearAutoSave();
-			clearSessionFlag();
+			if (draftSaveManager) {
+				await draftSaveManager.flush();
+			} else {
+				clearAutoSave();
+				clearSessionFlag();
+			}
 			await onsubmit(data);
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount

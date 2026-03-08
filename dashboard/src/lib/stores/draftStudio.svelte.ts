@@ -1,5 +1,5 @@
 import { api } from '$lib/api';
-import type { DraftSummary } from '$lib/api/types';
+import type { DraftSummary, ScheduledContentItem } from '$lib/api/types';
 
 // ---------------------------------------------------------------------------
 // State
@@ -13,6 +13,7 @@ let loading = $state(true);
 let archiveLoaded = $state(false);
 let error = $state<string | null>(null);
 let syncStatus = $state<'saved' | 'saving' | 'unsaved' | 'offline' | 'conflict'>('saved');
+let fullDraft = $state<ScheduledContentItem | null>(null);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -201,6 +202,20 @@ export function initFromUrl(url: URL): void {
 	}
 }
 
+export function getFullDraft(): ScheduledContentItem | null {
+	return fullDraft;
+}
+
+export function setFullDraft(draft: ScheduledContentItem | null): void {
+	fullDraft = draft;
+}
+
+export function updateDraftInCollection(id: number, updates: Partial<DraftSummary>): void {
+	collection = collection.map((d) =>
+		d.id === id ? { ...d, ...updates } : d
+	);
+}
+
 export function reset(): void {
 	collection = [];
 	archivedCollection = [];
@@ -210,6 +225,7 @@ export function reset(): void {
 	archiveLoaded = false;
 	error = null;
 	syncStatus = 'saved';
+	fullDraft = null;
 }
 
 export function clearError(): void {
