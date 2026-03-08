@@ -49,8 +49,8 @@ pub async fn insert_chunk(
 /// Batch insert/upsert chunks for a node.
 ///
 /// Uses `chunk_hash` for dedup: if a chunk with the same hash already exists
-/// for this node, the insert is skipped (preserving existing `retrieval_boost`).
-/// Returns the IDs of all chunks (both new and existing).
+/// for this node (active or stale), it is reactivated with updated metadata.
+/// Otherwise a new chunk is inserted. Returns the IDs of all chunks.
 pub async fn upsert_chunks_for_node(
     pool: &DbPool,
     account_id: &str,
@@ -60,10 +60,10 @@ pub async fn upsert_chunks_for_node(
     let mut ids = Vec::with_capacity(chunks.len());
 
     for chunk in chunks {
-        // Check if chunk already exists by hash for this node.
+        // Check if chunk already exists by hash for this node (any status).
         let existing: Option<(i64,)> = sqlx::query_as(
             "SELECT id FROM content_chunks \
-             WHERE node_id = ? AND chunk_hash = ? AND status = 'active'",
+             WHERE node_id = ? AND chunk_hash = ?",
         )
         .bind(node_id)
         .bind(&chunk.chunk_hash)
@@ -72,7 +72,22 @@ pub async fn upsert_chunks_for_node(
         .map_err(|e| StorageError::Query { source: e })?;
 
         match existing {
-            Some((id,)) => ids.push(id),
+            Some((id,)) => {
+                // Reactivate and update metadata (heading_path/index may have shifted).
+                sqlx::query(
+                    "UPDATE content_chunks \
+                     SET status = 'active', heading_path = ?, chunk_index = ?, \
+                         updated_at = datetime('now') \
+                     WHERE id = ?",
+                )
+                .bind(&chunk.heading_path)
+                .bind(chunk.chunk_index)
+                .bind(id)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Query { source: e })?;
+                ids.push(id);
+            }
             None => {
                 let id = insert_chunk(
                     pool,

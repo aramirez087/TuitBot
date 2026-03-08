@@ -522,3 +522,274 @@ async fn e2e_restart_recovery_cursor_survives() {
     assert_eq!(ctx.sync_cursor.as_deref(), Some(cursor));
     assert_eq!(ctx.status, "active");
 }
+
+// ---------------------------------------------------------------------------
+// E2E: Fragment extraction and indexing
+// ---------------------------------------------------------------------------
+
+/// E2E: Ingest markdown with headings → verify fragments created with correct heading_path.
+#[tokio::test]
+async fn e2e_fragment_extraction_from_markdown() {
+    use crate::automation::watchtower::{chunker, ingest_file};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    let content = "\
+---
+title: Growth Strategy
+tags: [growth, product]
+---
+
+Some intro text before any heading.
+
+## Market Analysis
+
+The market is shifting toward...
+
+### Competitor Landscape
+
+Our main competitors are...
+
+## Product Roadmap
+
+Next quarter we plan to...
+";
+    std::fs::write(dir.path().join("strategy.md"), content).unwrap();
+
+    let src_id = store::insert_source_context(&pool, "local_fs", r#"{"path":"test"}"#)
+        .await
+        .unwrap();
+
+    ingest_file(&pool, src_id, dir.path(), "strategy.md", false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids.len(), 4);
+
+    let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+        .await
+        .unwrap();
+    assert_eq!(chunks.len(), 4);
+
+    // Verify heading paths.
+    assert_eq!(chunks[0].heading_path, "");
+    assert!(chunks[0].chunk_text.contains("intro text"));
+
+    assert_eq!(chunks[1].heading_path, "## Market Analysis");
+    assert!(chunks[1].chunk_text.contains("market is shifting"));
+
+    assert_eq!(
+        chunks[2].heading_path,
+        "## Market Analysis/### Competitor Landscape"
+    );
+    assert!(chunks[2].chunk_text.contains("main competitors"));
+
+    assert_eq!(chunks[3].heading_path, "## Product Roadmap");
+    assert!(chunks[3].chunk_text.contains("Next quarter"));
+
+    // Verify ordering.
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert_eq!(chunk.chunk_index, i as i64);
+    }
+
+    // Verify node transitioned to chunked.
+    let chunked = store::get_nodes_for_source(&pool, src_id, Some("chunked"))
+        .await
+        .unwrap();
+    assert_eq!(chunked.len(), 1);
+}
+
+/// E2E: Re-ingest changed content → old chunks become stale, unchanged preserved.
+#[tokio::test]
+async fn e2e_fragment_update_on_content_change() {
+    use crate::automation::watchtower::{chunker, ingest_content};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    let src_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    // V1: two sections.
+    let v1 = "## Ideas\n\nBuild something great.\n\n## Plan\n\nShip it fast.\n";
+    ingest_content(&pool, src_id, "note.md", v1, false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    let node = &nodes[0];
+
+    let ids_v1 = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids_v1.len(), 2);
+
+    // V2: keep Ideas, change Plan.
+    let v2 = "## Ideas\n\nBuild something great.\n\n## Plan\n\nShip it carefully.\n";
+    ingest_content(&pool, src_id, "note.md", v2, false)
+        .await
+        .unwrap();
+
+    let nodes_v2 = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    let node_v2 = &nodes_v2[0];
+
+    let ids_v2 = chunker::chunk_node(&pool, &node_v2.account_id, node_v2.id, &node_v2.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids_v2.len(), 2);
+
+    // Ideas chunk unchanged → same ID.
+    assert_eq!(ids_v1[0], ids_v2[0]);
+    // Plan chunk changed → new ID.
+    assert_ne!(ids_v1[1], ids_v2[1]);
+}
+
+/// E2E: Plain text file (no headings) → single root fragment.
+#[tokio::test]
+async fn e2e_plain_text_fallback_fragment() {
+    use crate::automation::watchtower::{chunker, ingest_file};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    std::fs::write(
+        dir.path().join("notes.txt"),
+        "Just a plain text file.\nNo headings here.\n",
+    )
+    .unwrap();
+
+    let src_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    ingest_file(&pool, src_id, dir.path(), "notes.txt", false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids.len(), 1);
+
+    let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+        .await
+        .unwrap();
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].heading_path, "");
+    assert!(chunks[0].chunk_text.contains("plain text file"));
+}
+
+/// E2E: Chunks from different sources are per-node and account-scoped.
+#[tokio::test]
+async fn e2e_mixed_source_fragment_isolation() {
+    use crate::automation::watchtower::{chunker, ingest_content, ingest_file};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    // Local source.
+    std::fs::write(
+        dir.path().join("local.md"),
+        "## Local Section\n\nLocal content.\n",
+    )
+    .unwrap();
+    let local_id = store::insert_source_context(&pool, "local_fs", r#"{"path":"test"}"#)
+        .await
+        .unwrap();
+    ingest_file(&pool, local_id, dir.path(), "local.md", false)
+        .await
+        .unwrap();
+
+    // Drive source.
+    let drive_id =
+        store::ensure_google_drive_source(&pool, "drv_frag", r#"{"folder_id":"drv_frag"}"#)
+            .await
+            .unwrap();
+    ingest_content(
+        &pool,
+        drive_id,
+        "gdrive://fileA/remote.md",
+        "## Remote Section\n\nRemote content.\n",
+        false,
+    )
+    .await
+    .unwrap();
+
+    // Chunk both.
+    let all_nodes = store::get_pending_content_nodes(&pool, 10).await.unwrap();
+    assert_eq!(all_nodes.len(), 2);
+
+    for node in &all_nodes {
+        chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+            .await
+            .unwrap();
+    }
+
+    // Verify each node has its own chunk, not mixed.
+    for node in &all_nodes {
+        let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+            .await
+            .unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].node_id, node.id);
+    }
+}
+
+/// E2E: File with only front-matter and no body → no fragments created.
+#[tokio::test]
+async fn e2e_empty_body_no_fragments() {
+    use crate::automation::watchtower::{chunker, ingest_content};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    let src_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    // Front-matter only, empty body.
+    let content = "---\ntitle: Empty Note\ntags: [empty]\n---\n";
+    ingest_content(&pool, src_id, "empty.md", content, false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    // No body text → no fragments.
+    assert!(ids.is_empty());
+}

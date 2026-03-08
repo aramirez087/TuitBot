@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use super::*;
+use crate::automation::watchtower::chunker::{self, extract_fragments};
 use crate::storage::init_test_db;
 use crate::storage::watchtower as store;
 
@@ -593,4 +594,224 @@ async fn watchtower_mixed_legacy_and_connection_sources() {
         !contexts.is_empty(),
         "At least the local source should be registered"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Fragment extraction (pure function tests)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn extract_fragments_with_headings() {
+    let body = "\
+Some intro text.
+
+## Market Analysis
+
+The market is shifting.
+
+### Competitor Landscape
+
+Our main competitors are...
+
+## Product Roadmap
+
+Next quarter plans.
+";
+    let frags = extract_fragments(body);
+    assert_eq!(frags.len(), 4);
+
+    assert_eq!(frags[0].heading_path, "");
+    assert!(frags[0].text.contains("Some intro text"));
+    assert_eq!(frags[0].index, 0);
+
+    assert_eq!(frags[1].heading_path, "## Market Analysis");
+    assert!(frags[1].text.contains("market is shifting"));
+    assert_eq!(frags[1].index, 1);
+
+    assert_eq!(
+        frags[2].heading_path,
+        "## Market Analysis/### Competitor Landscape"
+    );
+    assert!(frags[2].text.contains("main competitors"));
+    assert_eq!(frags[2].index, 2);
+
+    assert_eq!(frags[3].heading_path, "## Product Roadmap");
+    assert!(frags[3].text.contains("Next quarter"));
+    assert_eq!(frags[3].index, 3);
+}
+
+#[test]
+fn extract_fragments_no_headings() {
+    let body = "Just plain text\nwith multiple lines.\n";
+    let frags = extract_fragments(body);
+    assert_eq!(frags.len(), 1);
+    assert_eq!(frags[0].heading_path, "");
+    assert!(frags[0].text.contains("Just plain text"));
+}
+
+#[test]
+fn extract_fragments_nested_headings_with_reset() {
+    let body = "\
+# Title
+
+Intro.
+
+## Section A
+
+Content A.
+
+### Subsection
+
+Deep content.
+
+## Section B
+
+Back to level 2.
+";
+    let frags = extract_fragments(body);
+    assert_eq!(frags.len(), 4);
+
+    assert_eq!(frags[0].heading_path, "# Title");
+    assert!(frags[0].text.contains("Intro"));
+    assert_eq!(frags[1].heading_path, "# Title/## Section A");
+    assert_eq!(frags[2].heading_path, "# Title/## Section A/### Subsection");
+    assert_eq!(frags[3].heading_path, "# Title/## Section B");
+}
+
+#[test]
+fn extract_fragments_empty_body() {
+    let frags = extract_fragments("");
+    assert!(frags.is_empty());
+
+    let frags = extract_fragments("   \n\n  \n");
+    assert!(frags.is_empty());
+}
+
+#[test]
+fn extract_fragments_consecutive_headings_no_body() {
+    let body = "## First\n## Second\nSome content.\n";
+    let frags = extract_fragments(body);
+    // First heading has no body text → skipped.
+    assert_eq!(frags.len(), 1);
+    assert_eq!(frags[0].heading_path, "## Second");
+    assert!(frags[0].text.contains("Some content"));
+}
+
+#[test]
+fn extract_fragments_preserves_content() {
+    let body = "## Code Example\n\n```rust\nfn main() {\n    # This is not a heading\n    println!(\"hello\");\n}\n```\n\nEnd of section.\n";
+    let frags = extract_fragments(body);
+    assert_eq!(frags.len(), 1);
+    // Code block content including the `# ` line should be preserved.
+    assert!(frags[0].text.contains("# This is not a heading"));
+    assert!(frags[0].text.contains("```rust"));
+}
+
+#[test]
+fn extract_fragments_heading_inside_code_block_ignored() {
+    let body =
+        "Intro text.\n\n```\n# Not a heading\n## Also not\n```\n\n## Real Heading\n\nContent.\n";
+    let frags = extract_fragments(body);
+    assert_eq!(frags.len(), 2);
+    assert_eq!(frags[0].heading_path, "");
+    assert!(frags[0].text.contains("# Not a heading"));
+    assert_eq!(frags[1].heading_path, "## Real Heading");
+}
+
+// ---------------------------------------------------------------------------
+// chunk_node DB integration tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn chunk_node_creates_chunks() {
+    let pool = init_test_db().await.expect("init db");
+
+    let source_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    let body = "## Intro\n\nHello world.\n\n## Details\n\nMore info.\n";
+    let content = format!("---\ntitle: Test\n---\n{body}");
+
+    ingest_content(&pool, source_id, "test.md", &content, false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, source_id, Some("pending"))
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids.len(), 2);
+
+    let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+        .await
+        .unwrap();
+    assert_eq!(chunks.len(), 2);
+    assert_eq!(chunks[0].heading_path, "## Intro");
+    assert_eq!(chunks[1].heading_path, "## Details");
+
+    // Verify node status transitioned to chunked.
+    let updated_nodes = store::get_nodes_for_source(&pool, source_id, Some("chunked"))
+        .await
+        .unwrap();
+    assert_eq!(updated_nodes.len(), 1);
+}
+
+#[tokio::test]
+async fn chunk_node_stale_on_update_preserves_unchanged() {
+    let pool = init_test_db().await.expect("init db");
+
+    let source_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    // Initial ingest and chunk.
+    let content_v1 =
+        "---\ntitle: V1\n---\n## Intro\n\nOriginal intro.\n\n## Details\n\nOriginal details.\n";
+    ingest_content(&pool, source_id, "note.md", content_v1, false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, source_id, Some("pending"))
+        .await
+        .unwrap();
+    let node = &nodes[0];
+
+    let ids_v1 = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids_v1.len(), 2);
+
+    // Update content — change one section, keep the other.
+    let content_v2 =
+        "---\ntitle: V2\n---\n## Intro\n\nOriginal intro.\n\n## Details\n\nUpdated details.\n";
+    ingest_content(&pool, source_id, "note.md", content_v2, false)
+        .await
+        .unwrap();
+
+    let nodes_v2 = store::get_nodes_for_source(&pool, source_id, Some("pending"))
+        .await
+        .unwrap();
+    let node_v2 = &nodes_v2[0];
+
+    let ids_v2 = chunker::chunk_node(&pool, &node_v2.account_id, node_v2.id, &node_v2.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids_v2.len(), 2);
+
+    // The "Intro" chunk should be preserved (same ID) since content didn't change.
+    assert_eq!(ids_v1[0], ids_v2[0], "Unchanged chunk should keep same ID");
+    // The "Details" chunk should be new (different ID) since content changed.
+    assert_ne!(ids_v1[1], ids_v2[1], "Changed chunk should get new ID");
+
+    // Active chunks should only be the v2 ones.
+    let active = store::get_chunks_for_node(&pool, &node_v2.account_id, node_v2.id)
+        .await
+        .unwrap();
+    assert_eq!(active.len(), 2);
 }

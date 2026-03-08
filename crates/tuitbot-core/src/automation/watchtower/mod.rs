@@ -6,6 +6,7 @@
 //! events and remote polls funnel through `ingest_content()`, ensuring
 //! identical state transitions.
 
+pub mod chunker;
 pub mod loopback;
 
 #[cfg(test)]
@@ -24,6 +25,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::config::{ConnectorConfig, ContentSourcesConfig};
 use crate::source::ContentSourceProvider;
+use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
 use crate::storage::watchtower as store;
 use crate::storage::DbPool;
 
@@ -45,6 +47,9 @@ pub enum WatchtowerError {
 
     #[error("config error: {0}")]
     Config(String),
+
+    #[error("chunker error: {0}")]
+    Chunker(#[from] chunker::ChunkerError),
 }
 
 // ---------------------------------------------------------------------------
@@ -460,9 +465,13 @@ impl WatchtowerLoop {
             }
         }
 
+        // Chunk any nodes created during initial local scan.
+        self.chunk_pending().await;
+
         // Initial poll of remote sources.
         if !remote_map.is_empty() {
             self.poll_remote_sources(&remote_map).await;
+            self.chunk_pending().await;
         }
 
         // Partition local sources: those with ongoing monitoring vs scan-only.
@@ -568,9 +577,11 @@ impl WatchtowerLoop {
                     if let Ok(mut cd) = cooldown.lock() {
                         cd.cleanup();
                     }
+                    self.chunk_pending().await;
                 }
                 _ = remote_timer.tick(), if !remote_map.is_empty() => {
                     self.poll_remote_sources(&remote_map).await;
+                    self.chunk_pending().await;
                 }
                 result = async_rx.recv() => {
                     match result {
@@ -580,6 +591,7 @@ impl WatchtowerLoop {
                                     self.handle_event(path, &source_map, &cooldown).await;
                                 }
                             }
+                            self.chunk_pending().await;
                         }
                         Some(Err(errs)) => {
                             for e in errs {
@@ -837,6 +849,7 @@ impl WatchtowerLoop {
                 }
                 _ = interval.tick() => {
                     self.poll_remote_sources(remote_map).await;
+                    self.chunk_pending().await;
                 }
             }
         }
@@ -899,6 +912,14 @@ impl WatchtowerLoop {
         }
 
         Ok(summary)
+    }
+
+    /// Process pending content nodes: extract fragments and persist as chunks.
+    async fn chunk_pending(&self) {
+        let chunked = chunker::chunk_pending_nodes(&self.pool, DEFAULT_ACCOUNT_ID, 100).await;
+        if chunked > 0 {
+            tracing::debug!(chunked, "Watchtower chunked pending nodes");
+        }
     }
 
     /// Polling-only fallback loop when the notify watcher fails to initialize.
