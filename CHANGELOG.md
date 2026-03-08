@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.24](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.23...tuitbot-cli-v0.1.24) - 2026-03-08
+
+### Added
+
+- Session 9 — revision history and safe restore
+- Session 7 — metadata filters and organization
+- Session 3 — draft api and sync contract
+- Session 2 — draft domain and schema
+
 ## [0.1.23](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.22...tuitbot-cli-v0.1.23) - 2026-03-08
 
 ### Fixed
