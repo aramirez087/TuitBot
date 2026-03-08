@@ -21,6 +21,7 @@ pub mod strategy;
 pub mod toolkit;
 pub mod workflow;
 pub mod x_api;
+mod x_client_transaction;
 
 pub use error::*;
 

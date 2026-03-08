@@ -30,6 +30,7 @@ base64 = "0.22"
 open = "5"
 tokio-util = "0.7.18"
 regex = "1"
+scraper = "0.23.1"
 bcrypt = "0.16"
 hex = "0.4"
 notify = "7"
@@ -39,7 +40,6 @@ glob = "0.3"
 aes-gcm = "0.10"
 rquest = { version = "5", default-features = false, features = ["json"] }
 rquest-util = "2"
-x-client-transaction = { version = "0.1", path = "../x-client-transaction" }
 
 [features]
 test-helpers = []
