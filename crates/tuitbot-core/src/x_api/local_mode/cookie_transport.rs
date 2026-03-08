@@ -7,10 +7,10 @@
 use rand::RngCore;
 use rquest::header::{HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
-use x_client_transaction::ClientTransaction;
 
 use crate::error::XApiError;
 use crate::x_api::types::PostedTweet;
+use crate::x_client_transaction::ClientTransaction;
 
 use super::session::ScraperSession;
 
@@ -91,7 +91,7 @@ impl CookieTransport {
     }
 
     /// Create a transport with a pre-resolved query ID and transaction generator.
-    pub fn with_query_id(
+    pub(crate) fn with_query_id(
         session: ScraperSession,
         query_id: String,
         transaction: Option<ClientTransaction>,
@@ -372,12 +372,12 @@ impl CookieTransport {
 }
 
 /// Result of startup resolution: query ID + transaction generator.
-pub struct ResolvedTransport {
+pub(crate) struct ResolvedTransport {
     /// The CreateTweet GraphQL query ID.
-    pub query_id: String,
+    pub(crate) query_id: String,
     /// Transaction ID generator (extracted from X's homepage).
     /// `None` if initialization failed — requests will omit the header.
-    pub transaction: Option<ClientTransaction>,
+    pub(crate) transaction: Option<ClientTransaction>,
 }
 
 /// Resolve the current CreateTweet query ID and initialize the transaction
@@ -390,7 +390,7 @@ pub struct ResolvedTransport {
 ///
 /// Returns the env-var override if set, falls back to the hardcoded default
 /// if auto-detection fails. Logs the outcome at info/warn level.
-pub async fn resolve_transport() -> ResolvedTransport {
+pub(crate) async fn resolve_transport() -> ResolvedTransport {
     let query_id = resolve_query_id().await;
     let transaction = resolve_client_transaction().await;
 
@@ -426,8 +426,8 @@ async fn resolve_query_id() -> String {
 
 /// Initialize the `ClientTransaction` for generating valid transaction IDs.
 ///
-/// Uses `reqwest::blocking` internally (via the `x-client-transaction` crate),
-/// so this runs on a blocking thread via `spawn_blocking`.
+/// Uses `reqwest::blocking` internally via the vendored transaction ID
+/// generator, so this runs on a blocking thread via `spawn_blocking`.
 async fn resolve_client_transaction() -> Option<ClientTransaction> {
     match tokio::task::spawn_blocking(|| {
         let client = reqwest::blocking::Client::builder()
