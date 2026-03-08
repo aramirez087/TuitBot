@@ -1,5 +1,5 @@
 import { api } from '$lib/api';
-import type { DraftSummary, ScheduledContentItem } from '$lib/api/types';
+import type { DraftSummary, ScheduledContentItem, ContentTag } from '$lib/api/types';
 
 // ---------------------------------------------------------------------------
 // State
@@ -15,12 +15,46 @@ let error = $state<string | null>(null);
 let syncStatus = $state<'saved' | 'saving' | 'unsaved' | 'offline' | 'conflict'>('saved');
 let fullDraft = $state<ScheduledContentItem | null>(null);
 
+// Filter / sort / tag state
+let searchQuery = $state('');
+let sortBy = $state<'updated' | 'created' | 'title' | 'scheduled'>('updated');
+let tagFilter = $state<number | null>(null);
+let accountTags = $state<ContentTag[]>([]);
+let selectedDraftTags = $state<ContentTag[]>([]);
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function byUpdatedDesc(a: DraftSummary, b: DraftSummary): number {
 	return b.updated_at.localeCompare(a.updated_at);
+}
+
+function sortDrafts(drafts: DraftSummary[], by: typeof sortBy): DraftSummary[] {
+	switch (by) {
+		case 'created':
+			return [...drafts].sort((a, b) => b.created_at.localeCompare(a.created_at));
+		case 'title':
+			return [...drafts].sort((a, b) =>
+				(a.title ?? a.content_preview).localeCompare(b.title ?? b.content_preview)
+			);
+		case 'scheduled':
+			return [...drafts].sort((a, b) =>
+				(a.scheduled_for ?? 'z').localeCompare(b.scheduled_for ?? 'z')
+			);
+		default:
+			return [...drafts].sort(byUpdatedDesc);
+	}
+}
+
+function filterBySearch(drafts: DraftSummary[], q: string): DraftSummary[] {
+	if (!q.trim()) return drafts;
+	const needle = q.toLowerCase();
+	return drafts.filter(
+		(d) =>
+			(d.title ?? '').toLowerCase().includes(needle) ||
+			d.content_preview.toLowerCase().includes(needle)
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -39,7 +73,7 @@ export const postedDrafts = $derived(
 	collection.filter((d) => d.status === 'posted').sort(byUpdatedDesc)
 );
 
-export const currentTabDrafts = $derived(
+const rawTabDrafts = $derived(
 	tab === 'active'
 		? activeDrafts
 		: tab === 'scheduled'
@@ -47,6 +81,10 @@ export const currentTabDrafts = $derived(
 			: tab === 'posted'
 				? postedDrafts
 				: [...archivedCollection].sort(byUpdatedDesc)
+);
+
+export const currentTabDrafts = $derived(
+	sortDrafts(filterBySearch(rawTabDrafts, searchQuery), sortBy)
 );
 
 export const selectedDraft = $derived(
@@ -84,6 +122,26 @@ export function getSyncStatus(): typeof syncStatus {
 	return syncStatus;
 }
 
+export function getSearchQuery(): string {
+	return searchQuery;
+}
+
+export function getSortBy(): typeof sortBy {
+	return sortBy;
+}
+
+export function getTagFilter(): number | null {
+	return tagFilter;
+}
+
+export function getAccountTags(): ContentTag[] {
+	return accountTags;
+}
+
+export function getSelectedDraftTags(): ContentTag[] {
+	return selectedDraftTags;
+}
+
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
@@ -92,7 +150,9 @@ export async function loadDrafts(): Promise<void> {
 	loading = true;
 	error = null;
 	try {
-		collection = await api.draftStudio.list();
+		const params: { tag?: number } = {};
+		if (tagFilter !== null) params.tag = tagFilter;
+		collection = await api.draftStudio.list(params);
 	} catch (e) {
 		error = e instanceof Error ? e.message : 'Failed to load drafts';
 	} finally {
@@ -127,6 +187,19 @@ export function setTab(newTab: 'active' | 'scheduled' | 'posted' | 'archive'): v
 	}
 }
 
+export function setSearchQuery(q: string): void {
+	searchQuery = q;
+}
+
+export function setSortBy(by: typeof sortBy): void {
+	sortBy = by;
+}
+
+export async function setTagFilter(tagId: number | null): Promise<void> {
+	tagFilter = tagId;
+	await loadDrafts();
+}
+
 export async function createDraft(): Promise<number | null> {
 	try {
 		const result = await api.draftStudio.create({ content_type: 'tweet' });
@@ -139,7 +212,8 @@ export async function createDraft(): Promise<number | null> {
 			scheduled_for: null,
 			archived_at: null,
 			updated_at: result.updated_at,
-			created_at: result.updated_at
+			created_at: result.updated_at,
+			source: 'manual'
 		};
 		collection = [newDraft, ...collection];
 		tab = 'active';
@@ -218,10 +292,68 @@ export function setFullDraft(draft: ScheduledContentItem | null): void {
 }
 
 export function updateDraftInCollection(id: number, updates: Partial<DraftSummary>): void {
-	collection = collection.map((d) =>
-		d.id === id ? { ...d, ...updates } : d
-	);
+	collection = collection.map((d) => (d.id === id ? { ...d, ...updates } : d));
 }
+
+// ---------------------------------------------------------------------------
+// Tag actions
+// ---------------------------------------------------------------------------
+
+export async function loadTags(): Promise<void> {
+	try {
+		accountTags = await api.tags.list();
+	} catch {
+		// Non-critical — tags are optional
+	}
+}
+
+export async function loadSelectedDraftTags(): Promise<void> {
+	if (selectedId === null) {
+		selectedDraftTags = [];
+		return;
+	}
+	try {
+		selectedDraftTags = await api.draftStudio.tags(selectedId);
+	} catch {
+		selectedDraftTags = [];
+	}
+}
+
+export async function assignTag(tagId: number): Promise<void> {
+	if (selectedId === null) return;
+	try {
+		await api.draftStudio.assignTag(selectedId, tagId);
+		await loadSelectedDraftTags();
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to assign tag';
+	}
+}
+
+export async function unassignTag(tagId: number): Promise<void> {
+	if (selectedId === null) return;
+	try {
+		await api.draftStudio.unassignTag(selectedId, tagId);
+		await loadSelectedDraftTags();
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to unassign tag';
+	}
+}
+
+export async function createAndAssignTag(name: string): Promise<void> {
+	if (selectedId === null) return;
+	try {
+		const result = await api.tags.create(name);
+		await api.draftStudio.assignTag(selectedId, result.id);
+		await loadTags();
+		await loadSelectedDraftTags();
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to create tag';
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
 
 export function reset(): void {
 	collection = [];
@@ -233,6 +365,11 @@ export function reset(): void {
 	error = null;
 	syncStatus = 'saved';
 	fullDraft = null;
+	searchQuery = '';
+	sortBy = 'updated';
+	tagFilter = null;
+	accountTags = [];
+	selectedDraftTags = [];
 }
 
 export function clearError(): void {

@@ -3,6 +3,7 @@
 mod calendar;
 mod compose;
 mod draft_studio;
+mod draft_tags;
 mod drafts;
 mod list;
 mod scheduled;
@@ -21,6 +22,9 @@ pub use draft_studio::{
     duplicate_studio_draft, get_studio_draft, list_draft_activity, list_draft_revisions,
     list_studio_drafts, patch_draft_meta, restore_studio_draft, schedule_studio_draft,
     unschedule_studio_draft,
+};
+pub use draft_tags::{
+    assign_draft_tag, create_account_tag, list_account_tags, list_draft_tags, unassign_draft_tag,
 };
 pub use drafts::{
     create_draft, delete_draft, edit_draft, list_drafts, publish_draft, schedule_draft,

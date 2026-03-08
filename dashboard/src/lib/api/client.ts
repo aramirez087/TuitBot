@@ -48,7 +48,8 @@ import type {
 	DraftSummary,
 	AutosaveResponse,
 	ContentRevision,
-	ContentActivity
+	ContentActivity,
+	ContentTag
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -563,7 +564,21 @@ export const api = {
 				method: 'POST',
 				body: JSON.stringify({ trigger_kind: triggerKind ?? 'manual' })
 			}),
-		activity: (id: number) => request<ContentActivity[]>(`/api/drafts/${id}/activity`)
+		activity: (id: number) => request<ContentActivity[]>(`/api/drafts/${id}/activity`),
+		tags: (id: number) => request<ContentTag[]>(`/api/drafts/${id}/tags`),
+		assignTag: (id: number, tagId: number) =>
+			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'POST' }),
+		unassignTag: (id: number, tagId: number) =>
+			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'DELETE' })
+	},
+
+	tags: {
+		list: () => request<ContentTag[]>('/api/tags'),
+		create: (name: string, color?: string) =>
+			request<{ id: number }>('/api/tags', {
+				method: 'POST',
+				body: JSON.stringify({ name, color: color ?? null })
+			})
 	},
 
 	mcp: {

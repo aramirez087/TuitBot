@@ -60,6 +60,8 @@ pub struct ScheduledContent {
     /// Soft-delete timestamp (NULL = not archived).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub archived_at: Option<String>,
+    /// Origin of the content: manual, assist, or discovery.
+    pub source: String,
 }
 
 /// A revision snapshot of content at a meaningful event.

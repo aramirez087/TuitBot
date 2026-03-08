@@ -256,6 +256,14 @@ export interface DraftSummary {
 	archived_at: string | null;
 	updated_at: string;
 	created_at: string;
+	source: string;
+}
+
+export interface ContentTag {
+	id: number;
+	account_id: string;
+	name: string;
+	color: string | null;
 }
 
 export interface AutosaveResponse {

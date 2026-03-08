@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Plus, Loader2, Undo2 } from 'lucide-svelte';
-	import type { DraftSummary } from '$lib/api/types';
+	import type { DraftSummary, ContentTag } from '$lib/api/types';
 	import DraftRailItem from './DraftRailItem.svelte';
+	import DraftFilterBar from './DraftFilterBar.svelte';
 
 	type TabKey = 'active' | 'scheduled' | 'posted' | 'archive';
 
@@ -11,25 +12,41 @@
 		tab,
 		tabCounts,
 		loading,
+		searchQuery = '',
+		sortBy = 'updated',
+		tagFilter = null,
+		accountTags = [],
 		onselect,
 		ontabchange,
 		oncreate,
 		onarchive,
 		onduplicate,
-		onrestore
+		onrestore,
+		onsearch,
+		onsort,
+		ontagfilter
 	}: {
 		drafts: DraftSummary[];
 		selectedId: number | null;
 		tab: TabKey;
 		tabCounts: { active: number; scheduled: number; posted: number; archive: number };
 		loading: boolean;
+		searchQuery?: string;
+		sortBy?: string;
+		tagFilter?: number | null;
+		accountTags?: ContentTag[];
 		onselect: (id: number) => void;
 		ontabchange: (tab: TabKey) => void;
 		oncreate: () => void;
 		onarchive: (id: number) => void;
 		onduplicate: (id: number) => void;
 		onrestore: (id: number) => void;
+		onsearch?: (q: string) => void;
+		onsort?: (by: string) => void;
+		ontagfilter?: (tagId: number | null) => void;
 	} = $props();
+
+	let filterBarComponent: DraftFilterBar | undefined = $state();
 
 	const tabs: Array<{ key: TabKey; label: string }> = [
 		{ key: 'active', label: 'Drafts' },
@@ -159,6 +176,12 @@
 			case '2': ontabchange('scheduled'); break;
 			case '3': ontabchange('posted'); break;
 			case '4': ontabchange('archive'); break;
+			case '/':
+				if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+					e.preventDefault();
+					filterBarComponent?.focusSearch();
+				}
+				break;
 		}
 	}
 
@@ -197,6 +220,19 @@
 			</button>
 		{/each}
 	</div>
+
+	{#if onsearch && onsort && ontagfilter}
+		<DraftFilterBar
+			bind:this={filterBarComponent}
+			{searchQuery}
+			{sortBy}
+			{tagFilter}
+			tags={accountTags}
+			{onsearch}
+			{onsort}
+			{ontagfilter}
+		/>
+	{/if}
 
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div

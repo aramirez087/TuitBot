@@ -126,6 +126,8 @@ export const SHORTCUT_CATALOG: ShortcutDef[] = [
 	{ combo: 'tab', label: 'Next post', category: 'Thread', when: 'thread' },
 	{ combo: 'shift+tab', label: 'Previous post', category: 'Thread', when: 'thread' },
 	// Draft Studio — active in rail context
+	{ combo: 'cmd+shift+d', label: 'Toggle details panel', category: 'DraftStudio', when: 'always' },
+	{ combo: '/', label: 'Focus search', category: 'DraftStudio', when: 'always' },
 	{ combo: 'n', label: 'New draft', category: 'DraftStudio', when: 'always' },
 	{ combo: 'backspace', label: 'Archive draft', category: 'DraftStudio', when: 'always' },
 	{ combo: 'd', label: 'Duplicate draft', category: 'DraftStudio', when: 'always' },

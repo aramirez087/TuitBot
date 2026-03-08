@@ -39,6 +39,7 @@ pub struct DraftSummary {
     pub archived_at: Option<String>,
     pub updated_at: String,
     pub created_at: String,
+    pub source: String,
 }
 
 #[derive(Deserialize)]
@@ -145,6 +146,7 @@ fn to_summary(item: &scheduled_content::ScheduledContent) -> DraftSummary {
         archived_at: item.archived_at.clone(),
         updated_at: item.updated_at.clone(),
         created_at: item.created_at.clone(),
+        source: item.source.clone(),
     }
 }
 

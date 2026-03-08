@@ -84,6 +84,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/content/scheduled/{id}",
             patch(routes::content::edit_scheduled).delete(routes::content::cancel_scheduled),
         )
+        // Draft Studio — Tags (literal paths before parameterized)
+        .route(
+            "/tags",
+            get(routes::content::list_account_tags).post(routes::content::create_account_tag),
+        )
         // Draft Studio (new canonical paths)
         .route(
             "/drafts",
@@ -124,6 +129,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/drafts/{id}/activity",
             get(routes::content::list_draft_activity),
+        )
+        .route("/drafts/{id}/tags", get(routes::content::list_draft_tags))
+        .route(
+            "/drafts/{id}/tags/{tag_id}",
+            post(routes::content::assign_draft_tag).delete(routes::content::unassign_draft_tag),
         )
         // Legacy drafts (backward compat)
         .route(

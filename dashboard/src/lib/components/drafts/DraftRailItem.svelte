@@ -47,6 +47,14 @@
 		draft.title ?? (draft.content_preview?.trim() || 'Untitled draft')
 	);
 
+	const sourceBadge = $derived(
+		draft.source === 'assist' ? 'AI' : draft.source === 'discovery' ? 'Disc' : null
+	);
+
+	const isReady = $derived(
+		(draft.content_preview?.trim().length ?? 0) > 10
+	);
+
 	let rootEl: HTMLDivElement | undefined = $state();
 
 	function stopProp(fn: () => void) {
@@ -76,6 +84,7 @@
 	onclick={onselect}
 	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onselect(); } }}
 >
+	<span class="ready-dot" class:ready={isReady}></span>
 	<div class="item-top">
 		<span class="item-title">{displayTitle}</span>
 		<span class="item-time">{relativeTime(draft.updated_at)}</span>
@@ -83,6 +92,9 @@
 	<div class="item-bottom">
 		<div class="item-meta">
 			<span class="type-badge">{draft.content_type}</span>
+			{#if sourceBadge}
+				<span class="source-badge">{sourceBadge}</span>
+			{/if}
 			{#if draft.status === 'scheduled' && draft.scheduled_for}
 				<span class="scheduled-badge">scheduled</span>
 			{/if}
@@ -241,5 +253,31 @@
 	.action-btn--danger:hover {
 		background: color-mix(in srgb, var(--color-danger) 15%, transparent);
 		color: var(--color-danger);
+	}
+
+	.ready-dot {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--color-warning, #d29922);
+		opacity: 0.6;
+	}
+
+	.ready-dot.ready {
+		background: var(--color-success, #2ea043);
+	}
+
+	.source-badge {
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--color-text-muted);
+		background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+		padding: 1px 5px;
+		border-radius: 3px;
 	}
 </style>

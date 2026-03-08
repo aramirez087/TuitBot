@@ -48,6 +48,25 @@ pub async fn assign_tag_for(
     Ok(())
 }
 
+/// List tags assigned to a specific content item for an account.
+pub async fn list_draft_tags_for(
+    pool: &DbPool,
+    account_id: &str,
+    content_id: i64,
+) -> Result<Vec<ContentTag>, StorageError> {
+    sqlx::query_as::<_, ContentTag>(
+        "SELECT ct.* FROM content_tags ct \
+         INNER JOIN content_tag_assignments cta ON cta.tag_id = ct.id \
+         WHERE cta.content_id = ? AND ct.account_id = ? \
+         ORDER BY ct.name",
+    )
+    .bind(content_id)
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
 /// Remove a tag assignment from a content item.
 pub async fn unassign_tag_for(
     pool: &DbPool,
