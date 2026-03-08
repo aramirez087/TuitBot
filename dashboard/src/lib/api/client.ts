@@ -605,6 +605,14 @@ export const api = {
 			)
 	},
 
+	sources: {
+		reindex: (id: number) =>
+			request<{ status: string; source_id: number }>(
+				`/api/sources/${id}/reindex`,
+				{ method: 'POST' }
+			),
+	},
+
 	vault: {
 		sources: () => request<{ sources: VaultSourceStatus[] }>('/api/vault/sources'),
 		searchNotes: (params: { q?: string; source_id?: number; limit?: number } = {}) => {
