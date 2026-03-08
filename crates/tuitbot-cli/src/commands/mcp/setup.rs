@@ -28,6 +28,9 @@ pub async fn run_setup(out: crate::output::CliOutput) -> Result<()> {
             )?;
             std::process::exit(1);
         }
+        if out.quiet {
+            bail!("Interactive setup requires a terminal.");
+        }
         bail!(
             "Interactive setup requires a terminal.\n\n\
              For non-interactive MCP usage, set environment variables:\n  \

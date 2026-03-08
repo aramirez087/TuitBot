@@ -156,6 +156,21 @@ pub async fn execute(config: &Config, args: ApproveArgs, out: CliOutput) -> anyh
         return Ok(());
     }
 
+    // When --output json or --quiet is set without an explicit subcommand,
+    // fall back to listing pending items (interactive mode needs a TTY).
+    if out.is_json() {
+        let pending = storage::approval_queue::get_pending(&pool).await?;
+        let items: Vec<ApprovalItemJson> = pending.iter().map(ApprovalItemJson::from).collect();
+        out.json(&items)?;
+        pool.close().await;
+        return Ok(());
+    }
+
+    if out.quiet {
+        pool.close().await;
+        return Ok(());
+    }
+
     // Interactive mode (existing behavior)
     // Expire items older than 24 hours
     let expired = storage::approval_queue::expire_old_items(&pool, 24).await?;

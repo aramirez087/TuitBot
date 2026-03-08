@@ -77,7 +77,9 @@ pub async fn execute(non_interactive: bool, config_path_str: &str) -> Result<()>
     }
 
     if non_interactive {
-        return defaults::apply_defaults(&config_path, &missing);
+        // Deprecated command: always text output.
+        let out = crate::output::CliOutput::new(false, crate::commands::OutputFormat::Text);
+        return defaults::apply_defaults(&config_path, &missing, out);
     }
 
     if !std::io::stdin().is_terminal() {

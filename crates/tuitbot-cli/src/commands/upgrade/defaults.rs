@@ -7,8 +7,13 @@ use super::content_sources;
 use super::group::UpgradeGroup;
 use super::patch::patch_config;
 use super::UpgradeAnswers;
+use crate::output::CliOutput;
 
-pub(crate) fn apply_defaults(config_path: &Path, missing: &[UpgradeGroup]) -> Result<()> {
+pub(crate) fn apply_defaults(
+    config_path: &Path,
+    missing: &[UpgradeGroup],
+    out: CliOutput,
+) -> Result<()> {
     let answers = UpgradeAnswers {
         persona: if missing.contains(&UpgradeGroup::Persona) {
             Some((vec![], vec![], vec![]))
@@ -56,15 +61,17 @@ pub(crate) fn apply_defaults(config_path: &Path, missing: &[UpgradeGroup]) -> Re
 
     patch_config(config_path, missing, &answers)?;
 
-    eprintln!("Applied default values for new features:");
+    out.info("Applied default values for new features:");
     for group in missing {
-        eprintln!("  * {}", group.display_name());
+        out.info(&format!("  * {}", group.display_name()));
     }
-    eprintln!("Backup saved to {}.bak", config_path.display());
+    out.info(&format!("Backup saved to {}.bak", config_path.display()));
 
-    // Print legacy SA-key notice.
-    let content = fs::read_to_string(config_path).unwrap_or_default();
-    content_sources::print_legacy_sa_key_notice(&content);
+    // Print legacy SA-key notice (only in text mode).
+    if !out.quiet && !out.is_json() {
+        let content = fs::read_to_string(config_path).unwrap_or_default();
+        content_sources::print_legacy_sa_key_notice(&content);
+    }
 
     Ok(())
 }

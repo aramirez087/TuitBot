@@ -106,7 +106,8 @@ pub async fn execute(
                                 &bold,
                                 &dim,
                                 out,
-                            );
+                            )
+                            .map(|_| ());
                         }
                     }
 
@@ -142,7 +143,7 @@ pub async fn execute(
                                     "current_version": current.to_string(),
                                     "latest_version": latest.to_string(),
                                 }))?;
-                                bail!("Binary update skipped: {reason}");
+                                std::process::exit(1);
                             }
                             if non_interactive {
                                 bail!("Binary update skipped: {e}");
@@ -153,7 +154,8 @@ pub async fn execute(
                                 &bold,
                                 &dim,
                                 out,
-                            );
+                            )
+                            .map(|_| ());
                         }
                     };
 
@@ -195,7 +197,7 @@ pub async fn execute(
                                     "current_version": current.to_string(),
                                     "latest_version": latest.to_string(),
                                 }))?;
-                                bail!("Binary update skipped: {reason}");
+                                std::process::exit(1);
                             }
                             if non_interactive {
                                 bail!("Binary update skipped: {reason}");
@@ -206,7 +208,8 @@ pub async fn execute(
                                 &bold,
                                 &dim,
                                 out,
-                            );
+                            )
+                            .map(|_| ());
                         }
                     };
 
@@ -300,7 +303,7 @@ pub async fn execute(
         // the server stays stuck at an old version when the CLI is already current.
         if !check_only {
             if let Ok(releases) = &fetched_releases {
-                check_and_update_server(releases, &green, &dim).await;
+                check_and_update_server(releases, &green, &dim, out).await;
             }
         }
 
@@ -309,10 +312,19 @@ pub async fn execute(
         bail!("--check and --config-only cannot be used together.");
     }
 
-    let _ = binary_updated; // used for future JSON output
-
     // Phase 2: Config upgrade
-    run_config_upgrade(non_interactive, config_path_str, &bold, &dim, out)
+    let config_up_to_date = run_config_upgrade(non_interactive, config_path_str, &bold, &dim, out)?;
+
+    // Emit JSON summary for the full update flow (non-check-only).
+    if out.is_json() {
+        out.json(&serde_json::json!({
+            "current_version": current.to_string(),
+            "binary_updated": binary_updated,
+            "config_up_to_date": config_up_to_date,
+        }))?;
+    }
+
+    Ok(())
 }
 
 /// Pre-run check: hint about `tuitbot update` when config has missing features.
@@ -368,7 +380,12 @@ pub async fn check_before_run(config_path_str: &str) -> Result<()> {
 ///
 /// This runs independently of the CLI update check so the server can be updated
 /// even when the CLI is already at the latest version (bootstrapping fix).
-async fn check_and_update_server(releases: &[GitHubRelease], green: &Style, dim: &Style) {
+async fn check_and_update_server(
+    releases: &[GitHubRelease],
+    green: &Style,
+    dim: &Style,
+    out: crate::output::CliOutput,
+) {
     let server_exe = match detect_server_path() {
         Some(path) => path,
         None => return, // server not installed — nothing to do
@@ -377,10 +394,10 @@ async fn check_and_update_server(releases: &[GitHubRelease], green: &Style, dim:
     let server_asset = match asset_name_for_binary("tuitbot-server") {
         Some(name) => name,
         None => {
-            eprintln!(
+            out.info(&format!(
                 "  {} Server update skipped: unsupported platform",
                 dim.apply_to("ℹ"),
-            );
+            ));
             return;
         }
     };
@@ -395,48 +412,48 @@ async fn check_and_update_server(releases: &[GitHubRelease], green: &Style, dim:
     // Compare against the installed server version (if detectable)
     if let Some(server_version) = detect_server_version(&server_exe) {
         if server_version >= release_version {
-            eprintln!(
+            out.info(&format!(
                 "  {} tuitbot-server is up to date (v{server_version}).",
                 dim.apply_to("ℹ"),
-            );
+            ));
             return;
         }
-        eprintln!(
+        out.info(&format!(
             "  {} tuitbot-server v{server_version} → v{release_version}",
             green.apply_to("Server update available:"),
-        );
+        ));
     } else {
-        eprintln!(
+        out.info(&format!(
             "  {} Could not detect server version; attempting update to v{release_version}.",
             dim.apply_to("ℹ"),
-        );
+        ));
     }
 
     match update_target_binary(release, "tuitbot-server", &server_asset, &server_exe).await {
         Ok(()) => {
-            eprintln!(
+            out.info(&format!(
                 "  {} Updated tuitbot-server at {}",
                 green.apply_to("✓"),
                 server_exe.display()
-            );
-            eprintln!(
+            ));
+            out.info(&format!(
                 "  {}",
                 dim.apply_to(
                     "Restart the server to use the new version (e.g., sudo systemctl restart tuitbot)."
                 )
-            );
+            ));
         }
         Err(e) => {
-            eprintln!(
+            out.info(&format!(
                 "  {} Server update failed: {e}",
                 Style::new().yellow().bold().apply_to("⚠"),
-            );
+            ));
             let hint = if cfg!(unix) && server_exe.starts_with("/usr") {
                 "Hint: You may need to run with sudo to update the server binary."
             } else {
                 "Hint: Make sure tuitbot-server is not running, then try again."
             };
-            eprintln!("  {}", dim.apply_to(hint));
+            out.info(&format!("  {}", dim.apply_to(hint)));
         }
     }
 }
@@ -445,13 +462,14 @@ async fn check_and_update_server(releases: &[GitHubRelease], green: &Style, dim:
 // Config upgrade (Phase 2)
 // ---------------------------------------------------------------------------
 
+/// Run config upgrade. Returns `true` if config was already up to date.
 fn run_config_upgrade(
     non_interactive: bool,
     config_path_str: &str,
     bold: &Style,
     dim: &Style,
     out: crate::output::CliOutput,
-) -> Result<()> {
+) -> Result<bool> {
     let config_path = upgrade::expand_tilde(config_path_str);
 
     if !config_path.exists() {
@@ -459,7 +477,7 @@ fn run_config_upgrade(
             "  {}",
             dim.apply_to("No config file found — run 'tuitbot init' to create one.")
         ));
-        return Ok(());
+        return Ok(true);
     }
 
     out.info(&format!("{}", bold.apply_to("Checking configuration...")));
@@ -468,7 +486,7 @@ fn run_config_upgrade(
 
     if missing.is_empty() {
         out.info("  Config is up to date.");
-        return Ok(());
+        return Ok(true);
     }
 
     out.info("  New feature groups to configure:");
@@ -482,7 +500,7 @@ fn run_config_upgrade(
     out.info("");
 
     if non_interactive {
-        upgrade::apply_defaults(&config_path, &missing)?;
+        upgrade::apply_defaults(&config_path, &missing, out)?;
     } else if std::io::stdin().is_terminal() {
         upgrade::run_upgrade_wizard(&config_path, &missing)?;
     } else {
@@ -494,5 +512,5 @@ fn run_config_upgrade(
         ));
     }
 
-    Ok(())
+    Ok(false)
 }
