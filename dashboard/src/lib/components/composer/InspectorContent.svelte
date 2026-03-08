@@ -3,6 +3,7 @@
 	import TimePicker from '../TimePicker.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import FromNotesPanel from '../FromNotesPanel.svelte';
+	import FromVaultPanel from './FromVaultPanel.svelte';
 
 	let {
 		schedule,
@@ -11,14 +12,16 @@
 		voiceCue,
 		assisting,
 		hasExistingContent,
-		showFromNotes,
+		notesPanelMode,
 		showUndo,
 		mode,
 		onselect,
 		oncuechange,
 		onaiassist,
 		onopenotes,
+		onopenvault,
 		ongenerate,
+		ongeneratefromvault,
 		onclosenotes,
 		onundo,
 		voicePanelRef = $bindable()
@@ -29,14 +32,16 @@
 		voiceCue: string;
 		assisting: boolean;
 		hasExistingContent: boolean;
-		showFromNotes: boolean;
+		notesPanelMode: 'notes' | 'vault' | null;
 		showUndo: boolean;
 		mode: 'tweet' | 'thread';
 		onselect: (time: string | null) => void;
 		oncuechange: (cue: string) => void;
 		onaiassist: () => void;
 		onopenotes: () => void;
+		onopenvault: () => void;
 		ongenerate: (notes: string) => Promise<void>;
+		ongeneratefromvault: (selectedNodeIds: number[]) => Promise<void>;
 		onclosenotes: () => void;
 		onundo: () => void;
 		voicePanelRef?: VoiceContextPanel;
@@ -74,19 +79,41 @@
 		<button class="ai-action-btn" onclick={onaiassist} disabled={assisting}>
 			{assisting ? 'Working...' : hasExistingContent ? 'Improve with AI' : 'AI generate'}
 		</button>
-		<button class="ai-action-btn secondary" onclick={onopenotes}>
+		<button
+			class="ai-action-btn secondary"
+			class:active={notesPanelMode === 'notes'}
+			onclick={onopenotes}
+		>
 			From notes
+		</button>
+		<button
+			class="ai-action-btn secondary"
+			class:active={notesPanelMode === 'vault'}
+			onclick={onopenvault}
+		>
+			From vault
 		</button>
 	</div>
 </div>
 
-{#if showFromNotes}
+{#if notesPanelMode === 'notes'}
 	<div class="inspector-section">
 		<FromNotesPanel
 			{mode}
 			{hasExistingContent}
 			compact={true}
 			ongenerate={ongenerate}
+			onclose={onclosenotes}
+			onundo={onundo}
+			{showUndo}
+		/>
+	</div>
+{:else if notesPanelMode === 'vault'}
+	<div class="inspector-section">
+		<FromVaultPanel
+			{mode}
+			{hasExistingContent}
+			ongenerate={ongeneratefromvault}
 			onclose={onclosenotes}
 			onundo={onundo}
 			{showUndo}
@@ -147,6 +174,7 @@
 	.ai-actions-row {
 		display: flex;
 		gap: 6px;
+		flex-wrap: wrap;
 	}
 
 	.ai-action-btn {
@@ -180,6 +208,11 @@
 
 	.ai-action-btn.secondary:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+	}
+
+	.ai-action-btn.secondary.active {
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+		border-color: var(--color-accent);
 	}
 
 	@media (prefers-reduced-motion: reduce) {

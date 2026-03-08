@@ -6,6 +6,7 @@
 		type ComposeRequest,
 		type ThreadBlock
 	} from '$lib/api';
+	import type { VaultCitation } from '$lib/api/types';
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
 	import { matchEvent } from '$lib/utils/shortcuts';
 	import { buildComposeRequest, topicWithCue } from '$lib/utils/composeHandlers';
@@ -26,6 +27,7 @@
 	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
 	import ComposerToolbar from './ComposerToolbar.svelte';
 	import ComposerInsertBar from './ComposerInsertBar.svelte';
+	import CitationChips from './CitationChips.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
 	import { persistGet, persistSet } from '$lib/stores/persistence';
 	import {
@@ -67,7 +69,8 @@
 	let threadFlowRef: ThreadFlowLane | undefined = $state();
 	let tweetEditorRef: TweetEditor | undefined = $state();
 	let voicePanelRef: VoiceContextPanel | undefined = $state();
-	let showFromNotes = $state(false);
+	let notesPanelMode = $state<'notes' | 'vault' | null>(null);
+	let vaultCitations = $state<VaultCitation[]>([]);
 	let assisting = $state(false);
 	let voiceCue = $state('');
 	let previewMode = $state(false);
@@ -83,6 +86,7 @@
 	let undoSnapshot = $state<{
 		mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[];
 		media?: AttachedMedia[]; selectedTime?: string | null;
+		citations?: VaultCitation[];
 	} | null>(null);
 	let showUndo = $state(false);
 	let undoMessage = $state('Content replaced.');
@@ -215,7 +219,8 @@
 		submitError = null;
 		focusMode = false;
 		paletteOpen = false;
-		showFromNotes = false;
+		notesPanelMode = null;
+		vaultCitations = [];
 		voiceCue = '';
 		undoSnapshot = null;
 		showUndo = false;
@@ -333,6 +338,15 @@
 			const data = buildComposeRequest({
 				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
 			});
+			if (vaultCitations.length > 0) {
+				data.provenance = vaultCitations.map((c) => ({
+					node_id: c.node_id,
+					chunk_id: c.chunk_id,
+					source_path: c.source_path,
+					heading_path: c.heading_path,
+					snippet: c.snippet
+				}));
+			}
 			clearAutoSave();
 			clearSessionFlag();
 			await onsubmit(data);
@@ -355,7 +369,8 @@
 				submitting = false;
 				submitError = null;
 				focusMode = false;
-				showFromNotes = false;
+				notesPanelMode = null;
+				vaultCitations = [];
 				voiceCue = '';
 				previewMode = false;
 
@@ -472,7 +487,7 @@
 		if (matchEvent(e, 'cmd+i')) { e.preventDefault(); toggleInspector(); return; }
 		if (matchEvent(e, 'cmd+shift+p')) { e.preventDefault(); togglePreview(); return; }
 		if (e.key === 'Escape') {
-			if (showFromNotes) showFromNotes = false;
+			if (notesPanelMode) notesPanelMode = null;
 			else if (isMobile && inspectorOpen) inspectorOpen = false;
 			else if (!embedded && focusMode) focusMode = false;
 			else if (!embedded) handleClose();
@@ -488,7 +503,8 @@
 			case 'mode-thread': switchMode('thread'); break;
 			case 'submit': handleSubmit(); break;
 			case 'ai-improve': handleInlineAssist(); break;
-			case 'ai-from-notes': showFromNotes = true; if (!inspectorOpen) inspectorOpen = true; break;
+			case 'ai-from-notes': notesPanelMode = 'notes'; if (!inspectorOpen) inspectorOpen = true; break;
+			case 'ai-from-vault': notesPanelMode = 'vault'; if (!inspectorOpen) inspectorOpen = true; break;
 			case 'ai-generate': handleAiAssist(); break;
 			case 'toggle-inspector': toggleInspector(); break;
 			case 'toggle-preview': togglePreview(); break;
@@ -545,7 +561,7 @@
 
 	async function handleGenerateFromNotes(notesInput: string) {
 		submitError = null;
-		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
+		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks], citations: [...vaultCitations] };
 		undoMessage = 'Content replaced.';
 
 		if (mode === 'thread') {
@@ -560,8 +576,32 @@
 			const result = await api.assist.improve(notesInput, context);
 			tweetText = result.content;
 		}
+		vaultCitations = [];
 		voicePanelRef?.saveCueToHistory();
-		showFromNotes = false;
+		notesPanelMode = null;
+		showUndo = true;
+		if (undoTimer) clearTimeout(undoTimer);
+		undoTimer = setTimeout(() => { showUndo = false; }, 10000);
+	}
+
+	async function handleGenerateFromVault(selectedNodeIds: number[]) {
+		submitError = null;
+		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks], citations: [...vaultCitations] };
+		undoMessage = 'Content replaced.';
+
+		if (mode === 'thread') {
+			const result = await api.assist.thread(topicWithCue(voiceCue, tweetText || 'Generate thread from vault'), selectedNodeIds);
+			threadBlocks = result.tweets.map((text, i) => ({
+				id: crypto.randomUUID(), text, media_paths: [], order: i
+			}));
+			if (result.vault_citations) vaultCitations = result.vault_citations;
+		} else {
+			const result = await api.assist.tweet(topicWithCue(voiceCue, tweetText || 'Generate tweet from vault'), selectedNodeIds);
+			tweetText = result.content;
+			if (result.vault_citations) vaultCitations = result.vault_citations;
+		}
+		voicePanelRef?.saveCueToHistory();
+		notesPanelMode = null;
 		showUndo = true;
 		if (undoTimer) clearTimeout(undoTimer);
 		undoTimer = setTimeout(() => { showUndo = false; }, 10000);
@@ -574,6 +614,7 @@
 		threadBlocks = undoSnapshot.blocks;
 		if (undoSnapshot.media) attachedMedia = undoSnapshot.media;
 		if (undoSnapshot.selectedTime !== undefined) selectedTime = undoSnapshot.selectedTime;
+		vaultCitations = undoSnapshot.citations ?? [];
 		undoSnapshot = null;
 		showUndo = false;
 		if (undoTimer) clearTimeout(undoTimer);
@@ -706,7 +747,16 @@
 
 			<ComposerInsertBar oninsert={handleInsertText} />
 
-			{#if showUndo && !showFromNotes}
+			{#if vaultCitations.length > 0 && notesPanelMode !== 'vault'}
+				<CitationChips
+					citations={vaultCitations}
+					onremove={(chunkId) => {
+						vaultCitations = vaultCitations.filter((c) => c.chunk_id !== chunkId);
+					}}
+				/>
+			{/if}
+
+			{#if showUndo && !notesPanelMode}
 				<div class="undo-banner">
 					<span>{undoMessage}</span>
 					<button class="undo-btn" onclick={handleUndo}>Undo</button>
@@ -717,14 +767,16 @@
 		{#snippet inspector()}
 			<InspectorContent
 				{schedule} {selectedTime} {targetDate} {voiceCue}
-				{assisting} {hasExistingContent} {showFromNotes} {showUndo} {mode}
+				{assisting} {hasExistingContent} {notesPanelMode} {showUndo} {mode}
 				bind:voicePanelRef={voicePanelRef}
 				onselect={(time) => { selectedTime = time; }}
 				oncuechange={(c) => { voiceCue = c; }}
 				onaiassist={handleAiAssist}
-				onopenotes={() => { showFromNotes = true; }}
+				onopenotes={() => { notesPanelMode = 'notes'; }}
+				onopenvault={() => { notesPanelMode = 'vault'; }}
 				ongenerate={handleGenerateFromNotes}
-				onclosenotes={() => { showFromNotes = false; }}
+				ongeneratefromvault={handleGenerateFromVault}
+				onclosenotes={() => { notesPanelMode = null; }}
 				onundo={handleUndo}
 			/>
 		{/snippet}
@@ -739,14 +791,16 @@
 			{#snippet children()}
 				<InspectorContent
 					{schedule} {selectedTime} {targetDate} {voiceCue}
-					{assisting} {hasExistingContent} {showFromNotes} {showUndo} {mode}
+					{assisting} {hasExistingContent} {notesPanelMode} {showUndo} {mode}
 					bind:voicePanelRef={voicePanelRef}
 					onselect={(time) => { selectedTime = time; }}
 					oncuechange={(c) => { voiceCue = c; }}
 					onaiassist={handleAiAssist}
-					onopenotes={() => { showFromNotes = true; }}
+					onopenotes={() => { notesPanelMode = 'notes'; }}
+					onopenvault={() => { notesPanelMode = 'vault'; }}
 					ongenerate={handleGenerateFromNotes}
-					onclosenotes={() => { showFromNotes = false; }}
+					ongeneratefromvault={handleGenerateFromVault}
+					onclosenotes={() => { notesPanelMode = null; }}
 					onundo={handleUndo}
 				/>
 			{/snippet}
