@@ -5,10 +5,9 @@
 	import { ChevronLeft, ChevronRight, Plus, Calendar, LayoutGrid, Loader2 } from 'lucide-svelte';
 	import CalendarWeekView from '$lib/components/CalendarWeekView.svelte';
 	import CalendarMonthView from '$lib/components/CalendarMonthView.svelte';
-	import ComposeModal from '$lib/components/ComposeModal.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import type { ComposeRequest } from '$lib/api';
+	import { api } from '$lib/api';
 	import {
 		calendarItems,
 		schedule,
@@ -20,7 +19,6 @@
 		monthDays,
 		loadCalendar,
 		loadSchedule,
-		composeContent,
 		cancelScheduledItem,
 		goNext,
 		goPrev,
@@ -30,10 +28,6 @@
 		stopAutoRefresh
 	} from '$lib/stores/calendar';
 	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
-
-	let composeOpen = $state(false);
-	let composePrefillTime = $state<string | null>(null);
-	let composePrefillDate = $state<Date | null>(null);
 
 	const headerLabel = $derived(() => {
 		const d = $currentDate;
@@ -50,23 +44,33 @@
 		}
 	});
 
-	function openCompose(date: Date | null = null, prefillTime: string | null = null) {
-		composePrefillDate = date;
-		composePrefillTime = prefillTime;
-		composeOpen = true;
+	function buildScheduledFor(date: Date, time: string | null): string | undefined {
+		if (!time) return undefined;
+		const y = date.getFullYear();
+		const m = String(date.getMonth() + 1).padStart(2, '0');
+		const d = String(date.getDate()).padStart(2, '0');
+		return `${y}-${m}-${d}T${time}:00`;
+	}
+
+	async function createDraftAndRedirect(date: Date | null, time: string | null, source: string) {
+		try {
+			const scheduledFor = date && time ? buildScheduledFor(date, time) : undefined;
+			const result = await api.draftStudio.create({ content_type: 'tweet' });
+			console.info('[draft-studio]', { event: 'draft_created', id: result.id, source });
+			const params = new URLSearchParams({ id: String(result.id) });
+			if (scheduledFor) params.set('prefill_schedule', scheduledFor);
+			goto(`/drafts?${params.toString()}`);
+		} catch {
+			goto('/drafts?new=true');
+		}
 	}
 
 	function handleSlotClick(date: Date, time: string) {
-		openCompose(date, time);
+		createDraftAndRedirect(date, time, 'calendar-slot');
 	}
 
 	function handleDayClick(date: Date) {
-		openCompose(date);
-	}
-
-	async function handleCompose(data: ComposeRequest) {
-		await composeContent(data);
-		composeOpen = false;
+		createDraftAndRedirect(date, null, 'calendar-day');
 	}
 
 	function handleCancel(id: number) {
@@ -82,9 +86,9 @@
 		loadCalendar();
 		startAutoRefresh();
 
-		// Auto-open composer if redirected from onboarding.
+		// Onboarding redirect: create a draft instead of opening compose modal
 		if ($page.url.searchParams.get('compose') === 'true') {
-			openCompose(new Date());
+			createDraftAndRedirect(new Date(), null, 'onboarding-redirect');
 		}
 
 		const handler = () => { loadSchedule(); loadCalendar(); };
@@ -108,9 +112,9 @@
 			<span class="timezone-badge">{$schedule.timezone}</span>
 		{/if}
 	</div>
-	<button class="compose-btn" onclick={() => openCompose(new Date())}>
+	<button class="compose-btn" onclick={() => createDraftAndRedirect(new Date(), null, 'calendar-button')}>
 		<Plus size={14} />
-		Compose
+		New Draft
 	</button>
 </div>
 
@@ -170,9 +174,9 @@
 	{#if $calendarItems.length === 0 && !$loading}
 		<EmptyState
 			title="No content scheduled"
-			description="Click a time slot or use the Compose button to schedule your first post."
-			actionLabel="Compose"
-			onaction={() => openCompose(new Date())}
+			description="Click a time slot or use the New Draft button to start writing in Draft Studio."
+			actionLabel="New Draft"
+			onaction={() => createDraftAndRedirect(new Date(), null, 'calendar-empty')}
 		/>
 	{/if}
 
@@ -195,15 +199,6 @@
 		</span>
 	</div>
 {/if}
-
-<ComposeModal
-	open={composeOpen}
-	prefillTime={composePrefillTime}
-	prefillDate={composePrefillDate}
-	schedule={$schedule}
-	onclose={() => (composeOpen = false)}
-	onsubmit={handleCompose}
-/>
 
 <style>
 	.page-header {

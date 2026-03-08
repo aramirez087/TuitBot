@@ -49,6 +49,18 @@
 		studio.loadDrafts();
 		studio.loadTags();
 
+		// Handle ?new=true param (from Cmd+N or external redirect)
+		if ($page.url.searchParams.get('new') === 'true') {
+			const url = new URL(window.location.href);
+			url.searchParams.delete('new');
+			history.replaceState(null, '', url.toString());
+			studio.createDraft().then((newId) => {
+				if (newId !== null) {
+					console.info('[draft-studio]', { event: 'draft_created', id: newId, source: 'cmd-n' });
+				}
+			});
+		}
+
 		const handler = () => {
 			studio.reset();
 			hydration = null;
@@ -96,6 +108,7 @@
 			const draft = await api.draftStudio.get(id);
 			if (studio.getSelectedId() !== id) return;
 			studio.setFullDraft(draft);
+			console.info('[draft-studio]', { event: 'draft_selected', id, source: 'fetch' });
 			hydration = parseServerDraft(draft);
 			hydrationDraftId = id;
 		} catch {
@@ -141,8 +154,11 @@
 		};
 	}
 
-	function handleCreate() {
-		studio.createDraft();
+	async function handleCreate() {
+		const newId = await studio.createDraft();
+		if (newId !== null) {
+			console.info('[draft-studio]', { event: 'draft_created', id: newId, source: 'rail-button' });
+		}
 	}
 
 	function handleArchive(id: number) {
@@ -161,6 +177,9 @@
 		syncStatus = status;
 		if (status === 'conflict') {
 			conflictDraftId = studio.getSelectedId();
+		}
+		if (status === 'offline') {
+			console.info('[draft-studio]', { event: 'save_failed', id: studio.getSelectedId(), syncStatus: status });
 		}
 	}
 
@@ -204,14 +223,20 @@
 		const id = studio.getSelectedId();
 		if (id === null) return;
 		const success = await studio.scheduleDraft(id, scheduledFor);
-		if (success) await fetchDraft(id);
+		if (success) {
+			console.info('[draft-studio]', { event: 'transition', id, from: 'draft', to: 'scheduled' });
+			await fetchDraft(id);
+		}
 	}
 
 	async function handleUnschedule() {
 		const id = studio.getSelectedId();
 		if (id === null) return;
 		const success = await studio.unscheduleDraft(id);
-		if (success) await fetchDraft(id);
+		if (success) {
+			console.info('[draft-studio]', { event: 'transition', id, from: 'scheduled', to: 'draft' });
+			await fetchDraft(id);
+		}
 	}
 
 	async function handleReschedule(scheduledFor: string) {
@@ -231,6 +256,7 @@
 		if (id === null) return;
 		const success = await studio.restoreFromRevision(revisionId);
 		if (success) {
+			console.info('[draft-studio]', { event: 'restore_executed', id, revisionId });
 			hydration = null;
 			hydrationDraftId = null;
 			loadingDraft = true;
