@@ -6,6 +6,7 @@
 
 pub mod author;
 pub mod engagement;
+pub mod retrieval;
 pub mod topics;
 pub mod winning_dna;
 

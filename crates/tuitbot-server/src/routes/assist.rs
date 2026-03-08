@@ -54,6 +54,7 @@ async fn resolve_composer_rag_context(state: &AppState, account_id: &str) -> Opt
 
     let draft_context = match winning_dna::build_draft_context(
         &state.db,
+        account_id,
         &keywords,
         winning_dna::MAX_ANCESTORS,
         winning_dna::RECENCY_HALF_LIFE_DAYS,

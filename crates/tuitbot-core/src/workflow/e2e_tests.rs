@@ -490,6 +490,7 @@ mod tests {
                 candidate_ids: vec![],
                 archetype: None,
                 mention_product: false,
+                account_id: None,
             },
         )
         .await

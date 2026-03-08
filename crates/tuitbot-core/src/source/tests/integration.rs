@@ -96,9 +96,15 @@ async fn e2e_local_folder_ingest_to_seed_pipeline() {
         .any(|s| s.seed_text.contains("Product strategy")));
 
     // Step 8: Build draft context — should use cold-start path (no ancestors).
-    let ctx = build_draft_context(&pool, &["strategy".into()], 5, 14.0)
-        .await
-        .unwrap();
+    let ctx = build_draft_context(
+        &pool,
+        crate::storage::accounts::DEFAULT_ACCOUNT_ID,
+        &["strategy".into()],
+        5,
+        14.0,
+    )
+    .await
+    .unwrap();
     assert!(ctx.winning_ancestors.is_empty());
     assert_eq!(ctx.content_seeds.len(), 2);
     assert!(!ctx.prompt_block.is_empty());
@@ -190,9 +196,15 @@ async fn e2e_google_drive_ingest_to_seed_pipeline() {
         .unwrap();
 
     // Step 7: Build draft context -> cold-start seeds appear.
-    let ctx = build_draft_context(&pool, &["remote".into()], 5, 14.0)
-        .await
-        .unwrap();
+    let ctx = build_draft_context(
+        &pool,
+        crate::storage::accounts::DEFAULT_ACCOUNT_ID,
+        &["remote".into()],
+        5,
+        14.0,
+    )
+    .await
+    .unwrap();
     assert!(ctx.winning_ancestors.is_empty());
     assert_eq!(ctx.content_seeds.len(), 1);
     assert!(ctx.content_seeds[0]
@@ -279,7 +291,15 @@ async fn e2e_mixed_sources_feed_draft_context() {
     }
 
     // Build context — seeds from both sources appear.
-    let ctx = build_draft_context(&pool, &[], 5, 14.0).await.unwrap();
+    let ctx = build_draft_context(
+        &pool,
+        crate::storage::accounts::DEFAULT_ACCOUNT_ID,
+        &[],
+        5,
+        14.0,
+    )
+    .await
+    .unwrap();
     assert_eq!(ctx.content_seeds.len(), 2);
 
     let texts: Vec<&str> = ctx

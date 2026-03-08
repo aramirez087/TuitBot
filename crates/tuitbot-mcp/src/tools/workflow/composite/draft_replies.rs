@@ -51,6 +51,7 @@ pub async fn execute(
             candidate_ids: candidate_ids.to_vec(),
             archetype: archetype_str.map(String::from),
             mention_product,
+            account_id: None,
         },
     )
     .await;

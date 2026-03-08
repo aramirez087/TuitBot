@@ -239,3 +239,14 @@ pub struct SeedWithContext {
     /// Engagement weight for retrieval ranking.
     pub engagement_weight: f64,
 }
+
+/// A content chunk joined with its parent node metadata for retrieval display.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ChunkWithNodeContext {
+    /// The underlying chunk data.
+    pub chunk: ContentChunk,
+    /// Relative path of the parent content node.
+    pub relative_path: String,
+    /// Title of the parent content node (may be None for untitled notes).
+    pub source_title: Option<String>,
+}

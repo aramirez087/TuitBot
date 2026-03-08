@@ -1,6 +1,6 @@
 //! CRUD operations for content_chunks.
 
-use super::{ContentChunk, ContentChunkRow};
+use super::{ChunkWithNodeContext, ContentChunk, ContentChunkRow};
 use crate::error::StorageError;
 use crate::storage::DbPool;
 
@@ -271,4 +271,118 @@ pub async fn search_chunks_by_keywords(
         .map_err(|e| StorageError::Query { source: e })?;
 
     Ok(rows.into_iter().map(ContentChunk::from_row).collect())
+}
+
+/// Row type for chunk + node context JOIN query.
+type ChunkWithContextRow = (
+    i64,            // cc.id
+    String,         // cc.account_id
+    i64,            // cc.node_id
+    String,         // cc.heading_path
+    String,         // cc.chunk_text
+    String,         // cc.chunk_hash
+    i64,            // cc.chunk_index
+    f64,            // cc.retrieval_boost
+    String,         // cc.status
+    String,         // cc.created_at
+    String,         // cc.updated_at
+    String,         // cn.relative_path
+    Option<String>, // cn.title
+);
+
+fn chunk_with_context_from_row(r: ChunkWithContextRow) -> ChunkWithNodeContext {
+    let chunk = ContentChunk::from_row((r.0, r.1, r.2, r.3, r.4, r.5, r.6, r.7, r.8, r.9, r.10));
+    ChunkWithNodeContext {
+        chunk,
+        relative_path: r.11,
+        source_title: r.12,
+    }
+}
+
+/// Search chunks matching keywords, joined with parent node metadata.
+///
+/// Returns up to `limit` active chunks for the given account with their
+/// parent node's `relative_path` and `title` for citation display.
+pub async fn search_chunks_with_context(
+    pool: &DbPool,
+    account_id: &str,
+    keywords: &[&str],
+    limit: u32,
+) -> Result<Vec<ChunkWithNodeContext>, StorageError> {
+    if keywords.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let like_clauses: Vec<String> = keywords
+        .iter()
+        .map(|_| "cc.chunk_text LIKE '%' || ? || '%'".to_string())
+        .collect();
+    let where_likes = like_clauses.join(" OR ");
+
+    let sql = format!(
+        "SELECT cc.id, cc.account_id, cc.node_id, cc.heading_path, cc.chunk_text, \
+                cc.chunk_hash, cc.chunk_index, cc.retrieval_boost, cc.status, \
+                cc.created_at, cc.updated_at, cn.relative_path, cn.title \
+         FROM content_chunks cc \
+         JOIN content_nodes cn ON cn.id = cc.node_id AND cn.account_id = cc.account_id \
+         WHERE cc.account_id = ? AND cc.status = 'active' AND ({where_likes}) \
+         ORDER BY cc.retrieval_boost DESC \
+         LIMIT ?"
+    );
+
+    let mut q = sqlx::query_as::<_, ChunkWithContextRow>(&sql);
+    q = q.bind(account_id);
+    for kw in keywords {
+        q = q.bind(*kw);
+    }
+    q = q.bind(limit);
+
+    let rows = q
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(chunk_with_context_from_row).collect())
+}
+
+/// Get chunks for specific nodes, joined with parent node metadata.
+///
+/// Returns active chunks for the given node IDs, ordered by retrieval_boost DESC.
+pub async fn get_chunks_for_nodes_with_context(
+    pool: &DbPool,
+    account_id: &str,
+    node_ids: &[i64],
+    limit: u32,
+) -> Result<Vec<ChunkWithNodeContext>, StorageError> {
+    if node_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = node_ids.iter().map(|_| "?").collect();
+    let in_clause = placeholders.join(", ");
+
+    let sql = format!(
+        "SELECT cc.id, cc.account_id, cc.node_id, cc.heading_path, cc.chunk_text, \
+                cc.chunk_hash, cc.chunk_index, cc.retrieval_boost, cc.status, \
+                cc.created_at, cc.updated_at, cn.relative_path, cn.title \
+         FROM content_chunks cc \
+         JOIN content_nodes cn ON cn.id = cc.node_id AND cn.account_id = cc.account_id \
+         WHERE cc.account_id = ? AND cc.status = 'active' AND cc.node_id IN ({in_clause}) \
+         ORDER BY cc.retrieval_boost DESC \
+         LIMIT ?"
+    );
+
+    let mut q = sqlx::query_as::<_, ChunkWithContextRow>(&sql);
+    q = q.bind(account_id);
+    for nid in node_ids {
+        q = q.bind(nid);
+    }
+    q = q.bind(limit);
+
+    let rows = q
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(chunk_with_context_from_row).collect())
 }

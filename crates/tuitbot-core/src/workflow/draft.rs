@@ -23,6 +23,8 @@ pub struct DraftInput {
     pub archetype: Option<String>,
     /// Whether to mention the product in the reply.
     pub mention_product: bool,
+    /// Account ID for scoping RAG context retrieval.
+    pub account_id: Option<String>,
 }
 
 /// Execute the draft step: fetch tweets, generate replies, check safety.
@@ -51,8 +53,14 @@ pub async fn execute(
     // Build RAG context from winning ancestors + content seeds (one DB call, shared)
     let topic_keywords = config.business.draft_context_keywords();
 
+    let account_id = input
+        .account_id
+        .as_deref()
+        .unwrap_or(crate::storage::accounts::DEFAULT_ACCOUNT_ID);
+
     let rag_context = winning_dna::build_draft_context(
         db,
+        account_id,
         &topic_keywords,
         winning_dna::MAX_ANCESTORS,
         winning_dna::RECENCY_HALF_LIFE_DAYS,

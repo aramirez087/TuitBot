@@ -329,9 +329,10 @@ async fn get_max_performance_score_with_data() {
 #[tokio::test]
 async fn get_scored_ancestors_empty() {
     let pool = init_test_db().await.expect("init db");
-    let ancestors = get_scored_ancestors(&pool, &[], 0.1, 10)
-        .await
-        .expect("query");
+    let ancestors =
+        get_scored_ancestors(&pool, "00000000-0000-0000-0000-000000000000", &[], 0.1, 10)
+            .await
+            .expect("query");
     assert!(ancestors.is_empty());
 }
 
@@ -355,9 +356,10 @@ async fn get_scored_ancestors_returns_scored_items() {
         .await
         .expect("update score");
 
-    let ancestors = get_scored_ancestors(&pool, &[], 0.1, 10)
-        .await
-        .expect("query");
+    let ancestors =
+        get_scored_ancestors(&pool, "00000000-0000-0000-0000-000000000000", &[], 0.1, 10)
+            .await
+            .expect("query");
     assert_eq!(ancestors.len(), 1);
     assert_eq!(ancestors[0].content_type, "tweet");
     assert_eq!(ancestors[0].id, "tw1");
@@ -384,8 +386,9 @@ async fn get_scored_ancestors_filters_low_engagement() {
         .expect("update score");
 
     // min_score = 0.1, so this ancestor should be filtered out
-    let ancestors = get_scored_ancestors(&pool, &[], 0.1, 10)
-        .await
-        .expect("query");
+    let ancestors =
+        get_scored_ancestors(&pool, "00000000-0000-0000-0000-000000000000", &[], 0.1, 10)
+            .await
+            .expect("query");
     assert!(ancestors.is_empty());
 }
