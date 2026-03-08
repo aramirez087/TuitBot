@@ -220,6 +220,119 @@ pub async fn mark_node_processed(pool: &DbPool, node_id: i64) -> Result<(), Stor
     Ok(())
 }
 
+/// Search content nodes by title or path for a specific account.
+///
+/// Returns nodes matching the query (LIKE-based), without loading body_text
+/// into the API response layer. The caller should omit body_text when serializing.
+pub async fn search_nodes_for(
+    pool: &DbPool,
+    account_id: &str,
+    query: &str,
+    limit: u32,
+) -> Result<Vec<ContentNode>, StorageError> {
+    let rows: Vec<ContentNodeRow> = sqlx::query_as(
+        "SELECT id, account_id, source_id, relative_path, content_hash, \
+                    title, body_text, front_matter_json, tags, status, \
+                    ingested_at, updated_at \
+             FROM content_nodes \
+             WHERE account_id = ? AND (title LIKE '%' || ? || '%' OR relative_path LIKE '%' || ? || '%') \
+             ORDER BY updated_at DESC \
+             LIMIT ?",
+    )
+    .bind(account_id)
+    .bind(query)
+    .bind(query)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(ContentNode::from_row).collect())
+}
+
+/// Get all content nodes for a specific account and source.
+pub async fn get_nodes_for_source_for(
+    pool: &DbPool,
+    account_id: &str,
+    source_id: i64,
+    limit: u32,
+) -> Result<Vec<ContentNode>, StorageError> {
+    let rows: Vec<ContentNodeRow> = sqlx::query_as(
+        "SELECT id, account_id, source_id, relative_path, content_hash, \
+                    title, body_text, front_matter_json, tags, status, \
+                    ingested_at, updated_at \
+             FROM content_nodes \
+             WHERE account_id = ? AND source_id = ? \
+             ORDER BY updated_at DESC \
+             LIMIT ?",
+    )
+    .bind(account_id)
+    .bind(source_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(ContentNode::from_row).collect())
+}
+
+/// Get a content node by ID, scoped to account.
+pub async fn get_content_node_for(
+    pool: &DbPool,
+    account_id: &str,
+    node_id: i64,
+) -> Result<Option<ContentNode>, StorageError> {
+    let row: Option<ContentNodeRow> = sqlx::query_as(
+        "SELECT id, account_id, source_id, relative_path, content_hash, \
+                    title, body_text, front_matter_json, tags, status, \
+                    ingested_at, updated_at \
+             FROM content_nodes WHERE id = ? AND account_id = ?",
+    )
+    .bind(node_id)
+    .bind(account_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(ContentNode::from_row))
+}
+
+/// Count active chunks for a node, scoped to account.
+pub async fn count_chunks_for_node(
+    pool: &DbPool,
+    account_id: &str,
+    node_id: i64,
+) -> Result<i64, StorageError> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM content_chunks \
+         WHERE account_id = ? AND node_id = ? AND status = 'active'",
+    )
+    .bind(account_id)
+    .bind(node_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.0)
+}
+
+/// Count content nodes for a source, scoped to account.
+pub async fn count_nodes_for_source(
+    pool: &DbPool,
+    account_id: &str,
+    source_id: i64,
+) -> Result<i64, StorageError> {
+    let row: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM content_nodes WHERE account_id = ? AND source_id = ?")
+            .bind(account_id)
+            .bind(source_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.0)
+}
+
 /// Mark a content node as 'chunked' for a specific account.
 pub async fn mark_node_chunked(
     pool: &DbPool,

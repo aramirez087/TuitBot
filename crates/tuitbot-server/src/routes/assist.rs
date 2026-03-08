@@ -42,6 +42,7 @@ async fn get_generator(
 async fn resolve_composer_rag_context(
     state: &AppState,
     account_id: &str,
+    selected_node_ids: Option<&[i64]>,
 ) -> Option<winning_dna::DraftContext> {
     let config = match state.load_effective_config(account_id).await {
         Ok(c) => c,
@@ -56,12 +57,13 @@ async fn resolve_composer_rag_context(
         return None;
     }
 
-    let draft_context = match winning_dna::build_draft_context(
+    let draft_context = match winning_dna::build_draft_context_with_selection(
         &state.db,
         account_id,
         &keywords,
         winning_dna::MAX_ANCESTORS,
         winning_dna::RECENCY_HALF_LIFE_DAYS,
+        selected_node_ids,
     )
     .await
     {
@@ -86,6 +88,8 @@ async fn resolve_composer_rag_context(
 #[derive(Deserialize)]
 pub struct AssistTweetRequest {
     pub topic: String,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
@@ -102,7 +106,8 @@ pub async fn assist_tweet(
     Json(body): Json<AssistTweetRequest>,
 ) -> Result<Json<AssistTweetResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
-    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
 
     let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
     let citations = rag_context
@@ -163,6 +168,8 @@ pub async fn assist_reply(
 #[derive(Deserialize)]
 pub struct AssistThreadRequest {
     pub topic: String,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
@@ -179,7 +186,8 @@ pub async fn assist_thread(
     Json(body): Json<AssistThreadRequest>,
 ) -> Result<Json<AssistThreadResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
-    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
 
     let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
     let citations = rag_context
@@ -208,6 +216,8 @@ pub struct AssistImproveRequest {
     pub draft: String,
     #[serde(default)]
     pub context: Option<String>,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
@@ -223,7 +233,8 @@ pub async fn assist_improve(
     Json(body): Json<AssistImproveRequest>,
 ) -> Result<Json<AssistImproveResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
-    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
 
     let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
     let citations = rag_context
@@ -379,7 +390,7 @@ mod tests {
     #[tokio::test]
     async fn resolve_rag_returns_none_when_config_missing() {
         let state = test_state(PathBuf::from("/nonexistent/config.toml")).await;
-        let result = resolve_composer_rag_context(&state, "test-account").await;
+        let result = resolve_composer_rag_context(&state, "test-account", None).await;
         assert!(
             result.is_none(),
             "should return None when config is missing"
@@ -397,7 +408,7 @@ mod tests {
         .expect("write config");
 
         let state = test_state(config_path).await;
-        let result = resolve_composer_rag_context(&state, "test-account").await;
+        let result = resolve_composer_rag_context(&state, "test-account", None).await;
         assert!(
             result.is_none(),
             "should return None when DB has no ancestor data"
@@ -413,10 +424,31 @@ mod tests {
             .expect("write config");
 
         let state = test_state(config_path).await;
-        let result = resolve_composer_rag_context(&state, "test-account").await;
+        let result = resolve_composer_rag_context(&state, "test-account", None).await;
         assert!(
             result.is_none(),
             "should return None when keywords are empty"
         );
+    }
+
+    #[test]
+    fn selected_node_ids_is_optional() {
+        // Verify existing request shapes still deserialize without selected_node_ids.
+        let json = r#"{"topic": "Rust async"}"#;
+        let req: AssistTweetRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.topic, "Rust async");
+        assert!(req.selected_node_ids.is_none());
+
+        let json = r#"{"topic": "Rust async", "selected_node_ids": [1, 2, 3]}"#;
+        let req: AssistTweetRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.selected_node_ids.unwrap(), vec![1, 2, 3]);
+
+        let json = r#"{"topic": "threads"}"#;
+        let req: AssistThreadRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.selected_node_ids.is_none());
+
+        let json = r#"{"draft": "hello"}"#;
+        let req: AssistImproveRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.selected_node_ids.is_none());
     }
 }

@@ -154,6 +154,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(routes::assist::assist_optimal_times),
         )
         .route("/assist/mode", get(routes::assist::get_mode))
+        // Vault
+        .route("/vault/sources", get(routes::vault::vault_sources))
+        .route("/vault/notes", get(routes::vault::search_notes))
+        .route("/vault/notes/{id}", get(routes::vault::note_detail))
+        .route("/vault/search", get(routes::vault::search_fragments))
+        .route("/vault/resolve-refs", post(routes::vault::resolve_refs))
         // Discovery feed
         .route("/discovery/feed", get(routes::discovery::feed))
         .route("/discovery/keywords", get(routes::discovery::keywords))

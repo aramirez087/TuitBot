@@ -300,6 +300,29 @@ pub async fn build_draft_context(
     max_ancestors: u32,
     half_life_days: f64,
 ) -> Result<DraftContext, StorageError> {
+    build_draft_context_with_selection(
+        pool,
+        account_id,
+        topic_keywords,
+        max_ancestors,
+        half_life_days,
+        None,
+    )
+    .await
+}
+
+/// Build draft context with optional selected note IDs for biased retrieval.
+///
+/// When `selected_node_ids` is provided, chunks from those notes are
+/// retrieved first, then remaining slots are filled with keyword matches.
+pub async fn build_draft_context_with_selection(
+    pool: &DbPool,
+    account_id: &str,
+    topic_keywords: &[String],
+    max_ancestors: u32,
+    half_life_days: f64,
+    selected_node_ids: Option<&[i64]>,
+) -> Result<DraftContext, StorageError> {
     // Tier 1: Winning ancestors (always attempted)
     let ancestors = retrieve_ancestors(
         pool,
@@ -315,7 +338,7 @@ pub async fn build_draft_context(
         pool,
         account_id,
         topic_keywords,
-        None,
+        selected_node_ids,
         retrieval::MAX_FRAGMENTS,
     )
     .await?;

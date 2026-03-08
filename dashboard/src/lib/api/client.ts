@@ -44,7 +44,12 @@ import type {
 	LinkResponse,
 	ConnectorStatusResponse,
 	DisconnectResponse,
-	AccountAuthStatus
+	AccountAuthStatus,
+	VaultCitation,
+	VaultSourceStatus,
+	VaultNoteItem,
+	VaultNoteDetail,
+	ProvenanceRef
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -414,11 +419,17 @@ export const api = {
 	},
 
 	assist: {
-		tweet: (topic: string) =>
-			request<{ content: string; topic: string }>('/api/assist/tweet', {
-				method: 'POST',
-				body: JSON.stringify({ topic })
-			}),
+		tweet: (topic: string, selectedNodeIds?: number[]) =>
+			request<{ content: string; topic: string; vault_citations?: VaultCitation[] }>(
+				'/api/assist/tweet',
+				{
+					method: 'POST',
+					body: JSON.stringify({
+						topic,
+						...(selectedNodeIds && { selected_node_ids: selectedNodeIds })
+					})
+				}
+			),
 		reply: (tweetText: string, tweetAuthor: string, mentionProduct: boolean = false) =>
 			request<{ content: string }>('/api/assist/reply', {
 				method: 'POST',
@@ -428,16 +439,29 @@ export const api = {
 					mention_product: mentionProduct
 				})
 			}),
-		thread: (topic: string) =>
-			request<{ tweets: string[]; topic: string }>('/api/assist/thread', {
-				method: 'POST',
-				body: JSON.stringify({ topic })
-			}),
-		improve: (draft: string, context?: string) =>
-			request<{ content: string }>('/api/assist/improve', {
-				method: 'POST',
-				body: JSON.stringify({ draft, context })
-			}),
+		thread: (topic: string, selectedNodeIds?: number[]) =>
+			request<{ tweets: string[]; topic: string; vault_citations?: VaultCitation[] }>(
+				'/api/assist/thread',
+				{
+					method: 'POST',
+					body: JSON.stringify({
+						topic,
+						...(selectedNodeIds && { selected_node_ids: selectedNodeIds })
+					})
+				}
+			),
+		improve: (draft: string, context?: string, selectedNodeIds?: number[]) =>
+			request<{ content: string; vault_citations?: VaultCitation[] }>(
+				'/api/assist/improve',
+				{
+					method: 'POST',
+					body: JSON.stringify({
+						draft,
+						context,
+						...(selectedNodeIds && { selected_node_ids: selectedNodeIds })
+					})
+				}
+			),
 		topics: () =>
 			request<{ topics: Array<{ topic: string; score: number }> }>('/api/assist/topics'),
 		optimalTimes: () =>
@@ -453,7 +477,8 @@ export const api = {
 			contentType: string,
 			content: string,
 			source: string = 'manual',
-			blocks?: ThreadBlock[]
+			blocks?: ThreadBlock[],
+			provenance?: ProvenanceRef[]
 		) =>
 			request<{ id: number; status: string }>('/api/content/drafts', {
 				method: 'POST',
@@ -461,7 +486,8 @@ export const api = {
 					content_type: contentType,
 					content,
 					source,
-					...(blocks && { blocks })
+					...(blocks && { blocks }),
+					...(provenance && { provenance })
 				})
 			}),
 		edit: (id: number, content?: string, blocks?: ThreadBlock[]) =>
@@ -577,5 +603,30 @@ export const api = {
 					body: JSON.stringify({ content })
 				}
 			)
+	},
+
+	vault: {
+		sources: () => request<{ sources: VaultSourceStatus[] }>('/api/vault/sources'),
+		searchNotes: (params: { q?: string; source_id?: number; limit?: number } = {}) => {
+			const query = new URLSearchParams();
+			if (params.q) query.set('q', params.q);
+			if (params.source_id) query.set('source_id', params.source_id.toString());
+			if (params.limit) query.set('limit', params.limit.toString());
+			const qs = query.toString();
+			return request<{ notes: VaultNoteItem[] }>(`/api/vault/notes${qs ? `?${qs}` : ''}`);
+		},
+		noteDetail: (id: number) => request<VaultNoteDetail>(`/api/vault/notes/${id}`),
+		searchFragments: (params: { q: string; limit?: number }) => {
+			const query = new URLSearchParams({ q: params.q });
+			if (params.limit) query.set('limit', params.limit.toString());
+			return request<{ fragments: VaultCitation[] }>(
+				`/api/vault/search?${query.toString()}`
+			);
+		},
+		resolveRefs: (nodeIds: number[]) =>
+			request<{ citations: VaultCitation[] }>('/api/vault/resolve-refs', {
+				method: 'POST',
+				body: JSON.stringify({ node_ids: nodeIds })
+			})
 	}
 };

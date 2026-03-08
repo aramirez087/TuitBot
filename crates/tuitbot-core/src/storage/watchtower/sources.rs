@@ -247,6 +247,25 @@ pub async fn ensure_google_drive_source(
     ensure_google_drive_source_for(pool, DEFAULT_ACCOUNT_ID, folder_id, config_json).await
 }
 
+/// Get all source contexts for a specific account regardless of status.
+pub async fn get_all_source_contexts_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<Vec<SourceContext>, StorageError> {
+    let rows: Vec<SourceContextRow> = sqlx::query_as(
+        "SELECT id, account_id, source_type, config_json, sync_cursor, \
+                    status, error_message, created_at, updated_at \
+             FROM source_contexts \
+             WHERE account_id = ? ORDER BY id",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(SourceContext::from_row).collect())
+}
+
 /// Ensure a "manual" source context exists for a specific account, returning its ID.
 pub async fn ensure_manual_source_for(
     pool: &DbPool,
