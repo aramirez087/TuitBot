@@ -421,6 +421,7 @@ mod draft_tests {
                 candidate_ids: vec!["t1".to_string()],
                 archetype: None,
                 mention_product: false,
+                account_id: None,
             },
         )
         .await
@@ -451,6 +452,7 @@ mod draft_tests {
                 candidate_ids: vec!["nonexistent".to_string()],
                 archetype: None,
                 mention_product: false,
+                account_id: None,
             },
         )
         .await
@@ -476,6 +478,7 @@ mod draft_tests {
                 candidate_ids: vec![],
                 archetype: None,
                 mention_product: false,
+                account_id: None,
             },
         )
         .await

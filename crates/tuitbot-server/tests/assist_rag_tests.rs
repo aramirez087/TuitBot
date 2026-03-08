@@ -159,6 +159,120 @@ async fn seed_vault_seeds(pool: &DbPool) {
     .expect("insert draft seed");
 }
 
+/// Seed vault data via content chunks (the fragment retrieval path).
+/// After this, `build_draft_context` should return a `DraftContext` with
+/// `prompt_block` containing `"Relevant knowledge"`.
+async fn seed_vault_chunks(pool: &DbPool) {
+    let source_id = watchtower::insert_source_context(pool, "local_fs", "{}")
+        .await
+        .expect("insert source context");
+
+    watchtower::upsert_content_node(
+        pool,
+        source_id,
+        "testing-guide.md",
+        "hash-chunk-test-1",
+        Some("Testing Guide"),
+        "Unit testing and integration testing strategies for developers",
+        None,
+        None,
+    )
+    .await
+    .expect("upsert content node");
+
+    // Insert a chunk for the node (node_id = 1 since it's the first insert)
+    watchtower::insert_chunk(
+        pool,
+        DEFAULT_ACCOUNT_ID,
+        1,
+        "# Testing Guide",
+        "Unit testing and integration testing strategies for developers",
+        "hash-chunk-body-1",
+        0,
+    )
+    .await
+    .expect("insert chunk");
+}
+
+/// Seed both ancestors and vault chunks for mixed-context tests.
+async fn seed_vault_ancestors_and_chunks(pool: &DbPool) {
+    seed_vault_ancestors(pool).await;
+
+    // The source context and node for chunks need separate IDs since
+    // seed_vault_ancestors doesn't create source contexts/nodes.
+    let source_id = watchtower::insert_source_context(pool, "local_fs", "{}")
+        .await
+        .expect("insert source context");
+
+    watchtower::upsert_content_node(
+        pool,
+        source_id,
+        "testing-strategies.md",
+        "hash-mixed-1",
+        Some("Testing Strategies"),
+        "Advanced testing patterns for distributed systems",
+        None,
+        None,
+    )
+    .await
+    .expect("upsert content node");
+
+    // Node ID is 1 (first content_nodes row)
+    watchtower::insert_chunk(
+        pool,
+        DEFAULT_ACCOUNT_ID,
+        1,
+        "# Testing Strategies",
+        "Advanced testing patterns for distributed systems",
+        "hash-mixed-chunk-1",
+        0,
+    )
+    .await
+    .expect("insert chunk");
+}
+
+/// Seed chunks for a specific account (used for isolation tests).
+async fn seed_vault_chunks_for_account(pool: &DbPool, account_id: &str) {
+    let source_id = watchtower::insert_source_context_for(pool, account_id, "local_fs", "{}")
+        .await
+        .expect("insert source context");
+
+    watchtower::upsert_content_node_for(
+        pool,
+        account_id,
+        source_id,
+        "private-notes.md",
+        "hash-private-1",
+        Some("Private Notes"),
+        "Secret strategies about growth hacking",
+        None,
+        None,
+    )
+    .await
+    .expect("upsert content node");
+
+    // Get the node ID from the just-inserted row
+    let node_id: (i64,) = sqlx::query_as(
+        "SELECT id FROM content_nodes WHERE account_id = ? ORDER BY id DESC LIMIT 1",
+    )
+    .bind(account_id)
+    .fetch_one(pool)
+    .await
+    .expect("get node id");
+
+    watchtower::insert_chunk(
+        pool,
+        account_id,
+        node_id.0,
+        "# Private Notes",
+        "Secret strategies about growth hacking",
+        &format!("hash-private-{account_id}"),
+        0,
+    )
+    .await
+    .expect("insert chunk");
+}
+
 /// Seed vault data via the ancestors path (winning tweets with performance
 /// data). After this, `build_draft_context` should return a `DraftContext`
 /// with `prompt_block` containing `"Winning patterns"`.
@@ -236,8 +350,8 @@ async fn build_test_router_with_generator(
         content_generators: Mutex::new(generators),
         runtimes: Mutex::new(HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: RwLock::new(None),
+        content_sources: RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 
@@ -277,8 +391,8 @@ async fn build_test_router_no_generator() -> (axum::Router, tempfile::TempDir) {
         content_generators: Mutex::new(HashMap::new()),
         runtimes: Mutex::new(HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: RwLock::new(None),
+        content_sources: RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 
@@ -601,6 +715,92 @@ async fn improve_tone_only_no_vault() {
     assert!(
         !any_prompt_contains(&captured, "Relevant ideas").await,
         "No vault context when DB is empty"
+    );
+}
+
+// ============================================================================
+// Tests — Ancestors path (Winning patterns header)
+// ============================================================================
+
+// ============================================================================
+// Tests — Fragment (chunk) path (Relevant knowledge header)
+// ============================================================================
+
+#[tokio::test]
+async fn tweet_with_fragment_context() {
+    let (router, captured, _dir) = build_test_router_with_generator(
+        vec!["A tweet grounded in vault knowledge.".to_string()],
+        Some(|pool| Box::pin(seed_vault_chunks(pool))),
+    )
+    .await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/assist/tweet",
+        serde_json::json!({ "topic": "testing" }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["content"].as_str().is_some());
+    assert!(
+        any_prompt_contains(&captured, "Relevant knowledge").await,
+        "System prompt should contain vault fragment context"
+    );
+}
+
+#[tokio::test]
+async fn tweet_with_mixed_ancestor_and_fragment_context() {
+    let (router, captured, _dir) = build_test_router_with_generator(
+        vec!["A tweet with both patterns and knowledge.".to_string()],
+        Some(|pool| Box::pin(seed_vault_ancestors_and_chunks(pool))),
+    )
+    .await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/assist/tweet",
+        serde_json::json!({ "topic": "testing" }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["content"].as_str().is_some());
+    assert!(
+        any_prompt_contains(&captured, "Winning patterns").await,
+        "System prompt should contain ancestor patterns"
+    );
+    assert!(
+        any_prompt_contains(&captured, "Relevant knowledge").await,
+        "System prompt should contain vault fragment context"
+    );
+}
+
+#[tokio::test]
+async fn fragment_context_account_isolation() {
+    // Seed chunks for account "account-isolated" — the default test account
+    // should NOT see them.
+    let (router, captured, _dir) = build_test_router_with_generator(
+        vec!["A tweet without leaked context.".to_string()],
+        Some(|pool| Box::pin(seed_vault_chunks_for_account(pool, "account-isolated"))),
+    )
+    .await;
+
+    let (status, _body) = post_json(
+        router,
+        "/api/assist/tweet",
+        serde_json::json!({ "topic": "growth" }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        !any_prompt_contains(&captured, "Secret strategies").await,
+        "Default account should NOT see chunks from another account"
+    );
+    assert!(
+        !any_prompt_contains(&captured, "Relevant knowledge").await,
+        "No fragment context should leak across accounts"
     );
 }
 

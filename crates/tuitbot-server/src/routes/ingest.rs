@@ -117,25 +117,29 @@ pub async fn ingest(
 
     // Process file hints through the shared ingest pipeline.
     if !body.file_hints.is_empty() {
-        // Find the first configured local_fs source to resolve base path.
-        let source_entry = state
-            .content_sources
-            .sources
-            .iter()
-            .find(|s| s.source_type == "local_fs" && s.path.is_some());
+        // Extract needed data from config under a short-lived read guard.
+        let local_source_info = {
+            let content_sources = state.content_sources.read().await;
+            content_sources
+                .sources
+                .iter()
+                .find(|s| s.source_type == "local_fs" && s.path.is_some())
+                .map(|entry| {
+                    let path_str = entry.path.clone().unwrap();
+                    let config_json = serde_json::json!({
+                        "path": &path_str,
+                        "file_patterns": entry.file_patterns,
+                        "loop_back_enabled": entry.loop_back_enabled,
+                    })
+                    .to_string();
+                    (path_str, config_json)
+                })
+        };
 
-        if let Some(entry) = source_entry {
-            let path_str = entry.path.as_deref().unwrap();
-            let base_path = PathBuf::from(tuitbot_core::storage::expand_tilde(path_str));
+        if let Some((path_str, config_json)) = local_source_info {
+            let base_path = PathBuf::from(tuitbot_core::storage::expand_tilde(&path_str));
 
-            let config_json = serde_json::json!({
-                "path": path_str,
-                "file_patterns": entry.file_patterns,
-                "loop_back_enabled": entry.loop_back_enabled,
-            })
-            .to_string();
-
-            let source_id = watchtower::ensure_local_fs_source(&state.db, path_str, &config_json)
+            let source_id = watchtower::ensure_local_fs_source(&state.db, &path_str, &config_json)
                 .await
                 .map_err(ApiError::Storage)?;
 

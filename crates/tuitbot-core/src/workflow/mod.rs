@@ -26,6 +26,7 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::content::frameworks::ReplyArchetype;
+use crate::context::retrieval::VaultCitation;
 use crate::error::XApiError;
 use crate::llm::{GenerationParams, LlmProvider, LlmResponse};
 use crate::toolkit::ToolkitError;
@@ -136,6 +137,8 @@ pub enum DraftResult {
         char_count: usize,
         confidence: String,
         risks: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        vault_citations: Vec<VaultCitation>,
     },
     #[serde(rename = "error")]
     Error {

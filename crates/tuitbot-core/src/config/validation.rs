@@ -290,6 +290,60 @@ impl Config {
                 });
             }
 
+            // Validate change_detection value.
+            let valid_cd = [
+                super::types::CHANGE_DETECTION_AUTO,
+                super::types::CHANGE_DETECTION_POLL,
+                super::types::CHANGE_DETECTION_NONE,
+            ];
+            if !valid_cd.contains(&source.change_detection.as_str()) {
+                errors.push(ConfigError::InvalidValue {
+                    field: format!("content_sources.sources[{}].change_detection", i),
+                    message: format!(
+                        "must be one of: auto, poll, none — got '{}'",
+                        source.change_detection
+                    ),
+                });
+            }
+
+            // Validate poll_interval_seconds minimum.
+            if let Some(interval) = source.poll_interval_seconds {
+                if interval < super::types::MIN_POLL_INTERVAL_SECONDS {
+                    errors.push(ConfigError::InvalidValue {
+                        field: format!("content_sources.sources[{}].poll_interval_seconds", i),
+                        message: format!(
+                            "must be at least {} seconds, got {}",
+                            super::types::MIN_POLL_INTERVAL_SECONDS,
+                            interval
+                        ),
+                    });
+                }
+            }
+
+            // Validate enabled sources have required fields.
+            if source.is_enabled() {
+                if source.source_type == "local_fs"
+                    && source.path.as_ref().map_or(true, |p| p.is_empty())
+                {
+                    errors.push(ConfigError::MissingField {
+                        field: format!(
+                            "content_sources.sources[{}].path (required for enabled local_fs source)",
+                            i
+                        ),
+                    });
+                }
+                if source.source_type == "google_drive"
+                    && source.folder_id.as_ref().map_or(true, |f| f.is_empty())
+                {
+                    errors.push(ConfigError::MissingField {
+                        field: format!(
+                            "content_sources.sources[{}].folder_id (required for enabled google_drive source)",
+                            i
+                        ),
+                    });
+                }
+            }
+
             // Warn if both connection_id and service_account_key are set.
             // Not a blocking error -- session 04 handles precedence.
             if source.source_type == "google_drive"
@@ -308,6 +362,7 @@ impl Config {
             // The Watchtower will skip this source at runtime, but surface it
             // during validation so the user knows to connect via the dashboard.
             if source.source_type == "google_drive"
+                && source.is_enabled()
                 && source.connection_id.is_none()
                 && source.service_account_key.is_none()
             {

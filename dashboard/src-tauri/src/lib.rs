@@ -29,6 +29,42 @@ fn get_api_token() -> Result<String, String> {
     read_api_token()
 }
 
+/// Tauri command: open an external URL via the OS.
+///
+/// Only `obsidian://` and `file://` schemes are allowed, preventing
+/// arbitrary URL opens.  Used by the dashboard to deep-link into an
+/// Obsidian vault from citation chips and settings.
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let parsed = url::Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
+    match parsed.scheme() {
+        "obsidian" | "file" => {}
+        scheme => return Err(format!("Scheme '{scheme}' is not allowed")),
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {e}"))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &url])
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {e}"))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| format!("Failed to open URL: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Tauri command: open an isolated OAuth webview that intercepts the callback.
 ///
 /// When X redirects to the callback URL, the webview extracts the `code`
@@ -234,7 +270,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_api_token, open_oauth_window])
+        .invoke_handler(tauri::generate_handler![get_api_token, open_oauth_window, open_external_url])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

@@ -197,6 +197,7 @@ export interface ComposeRequest {
 	scheduled_for?: string;
 	media_paths?: string[];
 	blocks?: ThreadBlock[];
+	provenance?: ProvenanceRef[];
 }
 
 /**
@@ -740,4 +741,66 @@ export interface AccountAuthStatus {
 	oauth_expires_at: string | null;
 	scraper_linked: boolean;
 	has_credentials: boolean;
+}
+
+// --- Vault types ---
+
+export interface VaultCitation {
+	chunk_id: number;
+	node_id: number;
+	heading_path: string;
+	source_path: string;
+	source_title: string | null;
+	snippet: string;
+	retrieval_boost: number;
+}
+
+export interface ProvenanceRef {
+	node_id?: number;
+	chunk_id?: number;
+	seed_id?: number;
+	source_path?: string;
+	heading_path?: string;
+	snippet?: string;
+}
+
+export interface VaultSourceStatus {
+	id: number;
+	source_type: string;
+	status: string;
+	error_message: string | null;
+	node_count: number;
+	updated_at: string;
+	/** Local vault path for `local_fs` sources — used for Obsidian URI deep links. */
+	path?: string;
+}
+
+export interface VaultNoteItem {
+	node_id: number;
+	source_id: number;
+	title: string | null;
+	relative_path: string;
+	tags: string | null;
+	status: string;
+	chunk_count: number;
+	updated_at: string;
+}
+
+export interface VaultChunkSummary {
+	chunk_id: number;
+	heading_path: string;
+	snippet: string;
+	retrieval_boost: number;
+}
+
+export interface VaultNoteDetail {
+	node_id: number;
+	source_id: number;
+	title: string | null;
+	relative_path: string;
+	tags: string | null;
+	status: string;
+	ingested_at: string;
+	updated_at: string;
+	chunks: VaultChunkSummary[];
 }

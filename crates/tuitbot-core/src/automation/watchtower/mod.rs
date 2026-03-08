@@ -6,6 +6,7 @@
 //! events and remote polls funnel through `ingest_content()`, ensuring
 //! identical state transitions.
 
+pub mod chunker;
 pub mod loopback;
 
 #[cfg(test)]
@@ -24,6 +25,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::config::{ConnectorConfig, ContentSourcesConfig};
 use crate::source::ContentSourceProvider;
+use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
 use crate::storage::watchtower as store;
 use crate::storage::DbPool;
 
@@ -45,6 +47,9 @@ pub enum WatchtowerError {
 
     #[error("config error: {0}")]
     Config(String),
+
+    #[error("chunker error: {0}")]
+    Chunker(#[from] chunker::ChunkerError),
 }
 
 // ---------------------------------------------------------------------------
@@ -330,18 +335,19 @@ impl WatchtowerLoop {
     /// - interval-based polling for remote sources (e.g. Google Drive)
     pub async fn run(&self, cancel: CancellationToken) {
         // Split config into local (watchable) and remote (pollable) sources.
+        // Uses `is_enabled()` which respects both `enabled` and legacy `watch`.
         let local_sources: Vec<_> = self
             .config
             .sources
             .iter()
-            .filter(|s| s.source_type == "local_fs" && s.watch && s.path.is_some())
+            .filter(|s| s.source_type == "local_fs" && s.is_enabled() && s.path.is_some())
             .collect();
 
         let remote_sources: Vec<_> = self
             .config
             .sources
             .iter()
-            .filter(|s| s.source_type == "google_drive" && s.folder_id.is_some())
+            .filter(|s| s.source_type == "google_drive" && s.is_enabled() && s.folder_id.is_some())
             .collect();
 
         if local_sources.is_empty() && remote_sources.is_empty() {
@@ -434,24 +440,66 @@ impl WatchtowerLoop {
             return;
         }
 
-        // Initial scan of all local directories.
+        // Initial scan of all local directories (all enabled sources, regardless of change_detection).
         for (source_id, base_path, patterns) in &source_map {
-            if let Err(e) = self.scan_directory(*source_id, base_path, patterns).await {
-                tracing::error!(
-                    path = %base_path.display(),
-                    error = %e,
-                    "Initial scan failed"
-                );
+            let _ = store::update_source_status(&self.pool, *source_id, "syncing", None).await;
+            match self.scan_directory(*source_id, base_path, patterns).await {
+                Ok(_) => {
+                    let _ =
+                        store::update_source_status(&self.pool, *source_id, "active", None).await;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        path = %base_path.display(),
+                        error = %e,
+                        "Initial scan failed"
+                    );
+                    let _ = store::update_source_status(
+                        &self.pool,
+                        *source_id,
+                        "error",
+                        Some(&e.to_string()),
+                    )
+                    .await;
+                }
             }
         }
+
+        // Chunk any nodes created during initial local scan.
+        self.chunk_pending().await;
 
         // Initial poll of remote sources.
         if !remote_map.is_empty() {
             self.poll_remote_sources(&remote_map).await;
+            self.chunk_pending().await;
         }
 
-        // If there are no local sources, only run remote polling.
-        if source_map.is_empty() {
+        // Partition local sources: those with ongoing monitoring vs scan-only.
+        // Scan-only sources (`change_detection = "none"`) already did their initial
+        // scan above and don't participate in the event loop.
+        let watch_source_map: Vec<_> = source_map
+            .iter()
+            .zip(local_sources.iter())
+            .filter(|(_, src)| !src.is_scan_only())
+            .map(|(entry, _)| entry.clone())
+            .collect();
+
+        // Further split: sources that need notify vs poll-only.
+        let notify_source_map: Vec<_> = source_map
+            .iter()
+            .zip(local_sources.iter())
+            .filter(|(_, src)| src.effective_change_detection() == "auto")
+            .map(|(entry, _)| entry.clone())
+            .collect();
+
+        // If no sources need ongoing monitoring, only run remote polling.
+        if watch_source_map.is_empty() {
+            if remote_map.is_empty() {
+                tracing::info!(
+                    "Watchtower: all local sources are scan-only and no remote sources, exiting"
+                );
+                return;
+            }
             self.remote_only_loop(&remote_map, cancel).await;
             return;
         }
@@ -469,13 +517,13 @@ impl WatchtowerLoop {
                 Ok(d) => d,
                 Err(e) => {
                     tracing::error!(error = %e, "Failed to create filesystem watcher, falling back to polling");
-                    self.polling_loop(&source_map, cancel).await;
+                    self.polling_loop(&watch_source_map, cancel).await;
                     return;
                 }
             };
 
-        // Register directories with the watcher.
-        for (_, base_path, _) in &source_map {
+        // Register directories with the notify watcher (only "auto" sources, not poll-only).
+        for (_, base_path, _) in &notify_source_map {
             if let Err(e) = debouncer.watch(base_path, RecursiveMode::Recursive) {
                 tracing::error!(
                     path = %base_path.display(),
@@ -487,6 +535,8 @@ impl WatchtowerLoop {
 
         tracing::info!(
             local_sources = source_map.len(),
+            watching = notify_source_map.len(),
+            polling = watch_source_map.len() - notify_source_map.len(),
             remote_sources = remote_map.len(),
             "Watchtower watching for changes"
         );
@@ -513,8 +563,9 @@ impl WatchtowerLoop {
                     break;
                 }
                 _ = fallback_timer.tick() => {
-                    // Periodic fallback scan to catch any missed events.
-                    for (source_id, base_path, patterns) in &source_map {
+                    // Periodic fallback scan for all local sources with ongoing monitoring
+                    // (both "auto" and "poll" change_detection modes).
+                    for (source_id, base_path, patterns) in &watch_source_map {
                         if let Err(e) = self.scan_directory(*source_id, base_path, patterns).await {
                             tracing::warn!(
                                 path = %base_path.display(),
@@ -526,9 +577,11 @@ impl WatchtowerLoop {
                     if let Ok(mut cd) = cooldown.lock() {
                         cd.cleanup();
                     }
+                    self.chunk_pending().await;
                 }
                 _ = remote_timer.tick(), if !remote_map.is_empty() => {
                     self.poll_remote_sources(&remote_map).await;
+                    self.chunk_pending().await;
                 }
                 result = async_rx.recv() => {
                     match result {
@@ -538,6 +591,7 @@ impl WatchtowerLoop {
                                     self.handle_event(path, &source_map, &cooldown).await;
                                 }
                             }
+                            self.chunk_pending().await;
                         }
                         Some(Err(errs)) => {
                             for e in errs {
@@ -670,6 +724,8 @@ impl WatchtowerLoop {
     /// Poll all remote sources for changes, ingest new/updated content.
     async fn poll_remote_sources(&self, remote_sources: &[RemoteSource]) {
         for (source_id, provider, patterns, _interval) in remote_sources {
+            let _ = store::update_source_status(&self.pool, *source_id, "syncing", None).await;
+
             let cursor = match store::get_source_context(&self.pool, *source_id).await {
                 Ok(Some(ctx)) => ctx.sync_cursor,
                 Ok(None) => None,
@@ -731,13 +787,15 @@ impl WatchtowerLoop {
                         "Remote poll complete"
                     );
 
-                    // Update sync cursor.
+                    // Update sync cursor and mark active.
                     let new_cursor = chrono::Utc::now().to_rfc3339();
                     if let Err(e) =
                         store::update_sync_cursor(&self.pool, *source_id, &new_cursor).await
                     {
                         tracing::warn!(error = %e, "Failed to update remote sync cursor");
                     }
+                    let _ =
+                        store::update_source_status(&self.pool, *source_id, "active", None).await;
                 }
                 Err(crate::source::SourceError::ConnectionBroken {
                     connection_id,
@@ -791,6 +849,7 @@ impl WatchtowerLoop {
                 }
                 _ = interval.tick() => {
                     self.poll_remote_sources(remote_map).await;
+                    self.chunk_pending().await;
                 }
             }
         }
@@ -823,6 +882,44 @@ impl WatchtowerLoop {
                 connector,
             ),
         )
+    }
+
+    /// Perform a one-shot full rescan of a single local source.
+    ///
+    /// Used by the reindex API. Sets status to `"syncing"` before the scan
+    /// and `"active"` (or `"error"`) afterward.
+    pub async fn reindex_local_source(
+        pool: &DbPool,
+        source_id: i64,
+        base_path: &Path,
+        patterns: &[String],
+    ) -> Result<IngestSummary, WatchtowerError> {
+        store::update_source_status(pool, source_id, "syncing", None).await?;
+
+        let mut rel_paths = Vec::new();
+        Self::walk_directory(base_path, base_path, patterns, &mut rel_paths)?;
+
+        let summary = ingest_files(pool, source_id, base_path, &rel_paths, true).await;
+
+        let cursor = chrono::Utc::now().to_rfc3339();
+        let _ = store::update_sync_cursor(pool, source_id, &cursor).await;
+
+        if summary.errors.is_empty() {
+            let _ = store::update_source_status(pool, source_id, "active", None).await;
+        } else {
+            let msg = format!("{} errors during reindex", summary.errors.len());
+            let _ = store::update_source_status(pool, source_id, "error", Some(&msg)).await;
+        }
+
+        Ok(summary)
+    }
+
+    /// Process pending content nodes: extract fragments and persist as chunks.
+    async fn chunk_pending(&self) {
+        let chunked = chunker::chunk_pending_nodes(&self.pool, DEFAULT_ACCOUNT_ID, 100).await;
+        if chunked > 0 {
+            tracing::debug!(chunked, "Watchtower chunked pending nodes");
+        }
     }
 
     /// Polling-only fallback loop when the notify watcher fails to initialize.

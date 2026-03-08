@@ -17,6 +17,7 @@ async fn migration_creates_new_tables() {
     assert!(table_names.contains(&"source_contexts"));
     assert!(table_names.contains(&"content_nodes"));
     assert!(table_names.contains(&"draft_seeds"));
+    assert!(table_names.contains(&"content_chunks"));
 }
 
 #[tokio::test]
@@ -55,6 +56,33 @@ async fn migration_adds_source_node_id_to_tweets() {
             .expect("pragma");
     let col_names: Vec<&str> = cols.iter().map(|c| c.0.as_str()).collect();
     assert!(col_names.contains(&"source_node_id"));
+}
+
+#[tokio::test]
+async fn migration_adds_chunk_id_to_draft_seeds() {
+    let pool = init_test_db().await.expect("init db");
+
+    let cols: Vec<(String,)> = sqlx::query_as("SELECT name FROM pragma_table_info('draft_seeds')")
+        .fetch_all(&pool)
+        .await
+        .expect("pragma");
+    let col_names: Vec<&str> = cols.iter().map(|c| c.0.as_str()).collect();
+    assert!(col_names.contains(&"chunk_id"));
+}
+
+#[tokio::test]
+async fn migration_adds_provenance_to_approval_queue() {
+    let pool = init_test_db().await.expect("init db");
+
+    let cols: Vec<(String,)> =
+        sqlx::query_as("SELECT name FROM pragma_table_info('approval_queue')")
+            .fetch_all(&pool)
+            .await
+            .expect("pragma");
+    let col_names: Vec<&str> = cols.iter().map(|c| c.0.as_str()).collect();
+    assert!(col_names.contains(&"source_node_id"));
+    assert!(col_names.contains(&"source_seed_id"));
+    assert!(col_names.contains(&"source_chunks_json"));
 }
 
 #[tokio::test]
@@ -194,7 +222,7 @@ async fn content_node_upsert_by_hash() {
     .expect("upsert");
     assert_eq!(r1, UpsertResult::Inserted);
 
-    // Upsert with different hash → Updated
+    // Upsert with different hash -> Updated
     let r2 = upsert_content_node(
         &pool,
         source_id,
@@ -241,7 +269,7 @@ async fn content_node_dedup_same_hash() {
     .await
     .expect("upsert");
 
-    // Same hash → Skipped
+    // Same hash -> Skipped
     let result = upsert_content_node(
         &pool,
         source_id,
@@ -686,4 +714,487 @@ async fn update_connection_metadata_works() {
         .expect("get")
         .expect("should exist");
     assert_eq!(conn.metadata_json, metadata);
+}
+
+// ============================================================================
+// Content chunks tests
+// ============================================================================
+
+const TEST_ACCOUNT: &str = "00000000-0000-0000-0000-000000000000";
+const OTHER_ACCOUNT: &str = "11111111-1111-1111-1111-111111111111";
+
+async fn setup_node(pool: &crate::storage::DbPool) -> i64 {
+    let source_id = insert_source_context(pool, "local_fs", "{}")
+        .await
+        .expect("insert source");
+    upsert_content_node(
+        pool,
+        source_id,
+        "test.md",
+        "h1",
+        Some("Test"),
+        "Body",
+        None,
+        None,
+    )
+    .await
+    .expect("upsert");
+    // Return the node id (first content node)
+    let node = get_content_node(pool, 1)
+        .await
+        .expect("get")
+        .expect("exists");
+    node.id
+}
+
+#[tokio::test]
+async fn insert_and_get_chunk() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    let chunk_id = insert_chunk(
+        &pool,
+        TEST_ACCOUNT,
+        node_id,
+        "## Intro",
+        "This is the intro section.",
+        "hash_intro",
+        0,
+    )
+    .await
+    .expect("insert chunk");
+
+    let chunk = get_chunk_by_id(&pool, TEST_ACCOUNT, chunk_id)
+        .await
+        .expect("get")
+        .expect("should exist");
+    assert_eq!(chunk.node_id, node_id);
+    assert_eq!(chunk.heading_path, "## Intro");
+    assert_eq!(chunk.chunk_text, "This is the intro section.");
+    assert_eq!(chunk.chunk_hash, "hash_intro");
+    assert_eq!(chunk.chunk_index, 0);
+    assert!((chunk.retrieval_boost - 1.0).abs() < 0.001);
+    assert_eq!(chunk.status, "active");
+}
+
+#[tokio::test]
+async fn upsert_chunks_dedup_by_hash() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    let chunks = vec![
+        NewChunk {
+            heading_path: "## A".to_string(),
+            chunk_text: "Section A".to_string(),
+            chunk_hash: "hash_a".to_string(),
+            chunk_index: 0,
+        },
+        NewChunk {
+            heading_path: "## B".to_string(),
+            chunk_text: "Section B".to_string(),
+            chunk_hash: "hash_b".to_string(),
+            chunk_index: 1,
+        },
+    ];
+
+    let ids1 = upsert_chunks_for_node(&pool, TEST_ACCOUNT, node_id, &chunks)
+        .await
+        .expect("upsert");
+    assert_eq!(ids1.len(), 2);
+
+    // Upsert again with same hashes -> should reuse existing IDs
+    let ids2 = upsert_chunks_for_node(&pool, TEST_ACCOUNT, node_id, &chunks)
+        .await
+        .expect("upsert again");
+    assert_eq!(ids1, ids2);
+
+    // Different hash -> new chunk
+    let chunks2 = vec![NewChunk {
+        heading_path: "## A".to_string(),
+        chunk_text: "Section A modified".to_string(),
+        chunk_hash: "hash_a_v2".to_string(),
+        chunk_index: 0,
+    }];
+    let ids3 = upsert_chunks_for_node(&pool, TEST_ACCOUNT, node_id, &chunks2)
+        .await
+        .expect("upsert new");
+    assert_ne!(ids3[0], ids1[0]);
+}
+
+#[tokio::test]
+async fn get_chunks_for_node_ordered() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    // Insert in reverse order
+    insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "Chunk 2", "h2", 2)
+        .await
+        .expect("insert");
+    insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "Chunk 0", "h0", 0)
+        .await
+        .expect("insert");
+    insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "Chunk 1", "h1", 1)
+        .await
+        .expect("insert");
+
+    let chunks = get_chunks_for_node(&pool, TEST_ACCOUNT, node_id)
+        .await
+        .expect("get");
+    assert_eq!(chunks.len(), 3);
+    assert_eq!(chunks[0].chunk_index, 0);
+    assert_eq!(chunks[1].chunk_index, 1);
+    assert_eq!(chunks[2].chunk_index, 2);
+}
+
+#[tokio::test]
+async fn mark_chunks_stale_for_node() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "A", "ha", 0)
+        .await
+        .expect("insert");
+    insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "B", "hb", 1)
+        .await
+        .expect("insert");
+
+    let affected = mark_chunks_stale(&pool, TEST_ACCOUNT, node_id)
+        .await
+        .expect("mark stale");
+    assert_eq!(affected, 2);
+
+    // Active chunks should be empty
+    let active = get_chunks_for_node(&pool, TEST_ACCOUNT, node_id)
+        .await
+        .expect("get");
+    assert!(active.is_empty());
+}
+
+#[tokio::test]
+async fn get_chunks_by_ids_filters_by_account() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    let id1 = insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "Chunk A", "ha", 0)
+        .await
+        .expect("insert");
+    let id2 = insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "Chunk B", "hb", 1)
+        .await
+        .expect("insert");
+
+    // Same account -> returns both
+    let found = get_chunks_by_ids(&pool, TEST_ACCOUNT, &[id1, id2])
+        .await
+        .expect("get");
+    assert_eq!(found.len(), 2);
+
+    // Different account -> returns none
+    let found = get_chunks_by_ids(&pool, OTHER_ACCOUNT, &[id1, id2])
+        .await
+        .expect("get");
+    assert!(found.is_empty());
+}
+
+#[tokio::test]
+async fn search_chunks_by_keywords_matches() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    insert_chunk(
+        &pool,
+        TEST_ACCOUNT,
+        node_id,
+        "## Rust",
+        "Ownership and borrowing in Rust",
+        "h1",
+        0,
+    )
+    .await
+    .expect("insert");
+    insert_chunk(
+        &pool,
+        TEST_ACCOUNT,
+        node_id,
+        "## Python",
+        "Dynamic typing in Python",
+        "h2",
+        1,
+    )
+    .await
+    .expect("insert");
+
+    // Search for "Rust"
+    let results = search_chunks_by_keywords(&pool, TEST_ACCOUNT, &["Rust"], 10)
+        .await
+        .expect("search");
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].heading_path, "## Rust");
+
+    // Search for "typing" -> matches Python chunk
+    let results = search_chunks_by_keywords(&pool, TEST_ACCOUNT, &["typing"], 10)
+        .await
+        .expect("search");
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].heading_path, "## Python");
+
+    // Search with multiple keywords
+    let results = search_chunks_by_keywords(&pool, TEST_ACCOUNT, &["Rust", "Python"], 10)
+        .await
+        .expect("search");
+    assert_eq!(results.len(), 2);
+
+    // Empty keywords -> empty results
+    let results = search_chunks_by_keywords(&pool, TEST_ACCOUNT, &[], 10)
+        .await
+        .expect("search");
+    assert!(results.is_empty());
+}
+
+#[tokio::test]
+async fn search_chunks_respects_boost_ordering() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    let low_id = insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "topic here", "h1", 0)
+        .await
+        .expect("insert");
+    let high_id = insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "topic there", "h2", 1)
+        .await
+        .expect("insert");
+
+    update_chunk_retrieval_boost(&pool, TEST_ACCOUNT, high_id, 3.0)
+        .await
+        .expect("boost");
+    update_chunk_retrieval_boost(&pool, TEST_ACCOUNT, low_id, 0.5)
+        .await
+        .expect("boost");
+
+    let results = search_chunks_by_keywords(&pool, TEST_ACCOUNT, &["topic"], 10)
+        .await
+        .expect("search");
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].id, high_id);
+    assert_eq!(results[1].id, low_id);
+}
+
+#[tokio::test]
+async fn update_chunk_retrieval_boost_clamps() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    let chunk_id = insert_chunk(&pool, TEST_ACCOUNT, node_id, "", "Text", "h1", 0)
+        .await
+        .expect("insert");
+
+    // Too high -> clamped to 5.0
+    update_chunk_retrieval_boost(&pool, TEST_ACCOUNT, chunk_id, 10.0)
+        .await
+        .expect("boost");
+    let chunk = get_chunk_by_id(&pool, TEST_ACCOUNT, chunk_id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert!((chunk.retrieval_boost - 5.0).abs() < 0.001);
+
+    // Too low -> clamped to 0.1
+    update_chunk_retrieval_boost(&pool, TEST_ACCOUNT, chunk_id, 0.001)
+        .await
+        .expect("boost");
+    let chunk = get_chunk_by_id(&pool, TEST_ACCOUNT, chunk_id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert!((chunk.retrieval_boost - 0.1).abs() < 0.001);
+}
+
+// ============================================================================
+// Account-scoped _for variant tests
+// ============================================================================
+
+#[tokio::test]
+async fn insert_source_context_for_scopes_to_account() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id_a = insert_source_context_for(&pool, "acct-a", "local_fs", "{}")
+        .await
+        .expect("insert A");
+    let id_b = insert_source_context_for(&pool, "acct-b", "local_fs", "{}")
+        .await
+        .expect("insert B");
+
+    // Scoped query for acct-a
+    let sources_a = get_source_contexts_for(&pool, "acct-a").await.expect("get");
+    assert_eq!(sources_a.len(), 1);
+    assert_eq!(sources_a[0].id, id_a);
+
+    // Scoped query for acct-b
+    let sources_b = get_source_contexts_for(&pool, "acct-b").await.expect("get");
+    assert_eq!(sources_b.len(), 1);
+    assert_eq!(sources_b[0].id, id_b);
+}
+
+#[tokio::test]
+async fn get_pending_nodes_for_scopes_to_account() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Create sources for two accounts
+    let src_a = insert_source_context_for(&pool, "acct-a", "local_fs", "{}")
+        .await
+        .expect("insert");
+    let src_b = insert_source_context_for(&pool, "acct-b", "local_fs", "{}")
+        .await
+        .expect("insert");
+
+    // Create nodes under different accounts
+    upsert_content_node_for(&pool, "acct-a", src_a, "a.md", "h1", None, "A", None, None)
+        .await
+        .expect("upsert");
+    upsert_content_node_for(&pool, "acct-b", src_b, "b.md", "h2", None, "B", None, None)
+        .await
+        .expect("upsert");
+
+    let pending_a = get_pending_content_nodes_for(&pool, "acct-a", 10)
+        .await
+        .expect("get");
+    assert_eq!(pending_a.len(), 1);
+    assert_eq!(pending_a[0].relative_path, "a.md");
+
+    let pending_b = get_pending_content_nodes_for(&pool, "acct-b", 10)
+        .await
+        .expect("get");
+    assert_eq!(pending_b.len(), 1);
+    assert_eq!(pending_b[0].relative_path, "b.md");
+}
+
+#[tokio::test]
+async fn draft_seed_chunk_id_round_trip() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    // Insert a chunk
+    let chunk_id = insert_chunk(&pool, TEST_ACCOUNT, node_id, "## H", "Text", "hh", 0)
+        .await
+        .expect("insert chunk");
+
+    // Insert seed with chunk_id
+    let seed_id = insert_draft_seed_for(
+        &pool,
+        TEST_ACCOUNT,
+        node_id,
+        "Hook text",
+        Some("tip"),
+        Some(chunk_id),
+    )
+    .await
+    .expect("insert seed");
+
+    // Read it back
+    let seeds = get_pending_seeds_for(&pool, TEST_ACCOUNT, 10)
+        .await
+        .expect("get");
+    assert_eq!(seeds.len(), 1);
+    assert_eq!(seeds[0].id, seed_id);
+    assert_eq!(seeds[0].chunk_id, Some(chunk_id));
+
+    // Insert seed without chunk_id
+    let seed_id2 = insert_draft_seed(&pool, node_id, "No chunk", None)
+        .await
+        .expect("insert");
+    let seeds = get_pending_seeds(&pool, 10).await.expect("get");
+    let seed2 = seeds.iter().find(|s| s.id == seed_id2).expect("find");
+    assert_eq!(seed2.chunk_id, None);
+}
+
+#[tokio::test]
+async fn mark_node_chunked_changes_status() {
+    let pool = init_test_db().await.expect("init db");
+    let node_id = setup_node(&pool).await;
+
+    mark_node_chunked(&pool, TEST_ACCOUNT, node_id)
+        .await
+        .expect("mark chunked");
+
+    let node = get_content_node(&pool, node_id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(node.status, "chunked");
+}
+
+#[tokio::test]
+async fn account_isolation_cross_account_invisible() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Create source and node for TEST_ACCOUNT
+    let src = insert_source_context_for(&pool, TEST_ACCOUNT, "local_fs", "{}")
+        .await
+        .expect("insert");
+    upsert_content_node_for(
+        &pool,
+        TEST_ACCOUNT,
+        src,
+        "secret.md",
+        "h1",
+        Some("Secret"),
+        "Secret body",
+        None,
+        None,
+    )
+    .await
+    .expect("upsert");
+
+    let node = get_content_node(&pool, 1)
+        .await
+        .expect("get")
+        .expect("exists");
+
+    // Insert chunks for TEST_ACCOUNT
+    insert_chunk(&pool, TEST_ACCOUNT, node.id, "", "Secret data", "sh", 0)
+        .await
+        .expect("insert");
+
+    // OTHER_ACCOUNT should see nothing
+    let sources = get_source_contexts_for(&pool, OTHER_ACCOUNT)
+        .await
+        .expect("get");
+    assert!(sources.is_empty());
+
+    let pending = get_pending_content_nodes_for(&pool, OTHER_ACCOUNT, 10)
+        .await
+        .expect("get");
+    assert!(pending.is_empty());
+
+    let chunks = get_chunks_for_node(&pool, OTHER_ACCOUNT, node.id)
+        .await
+        .expect("get");
+    assert!(chunks.is_empty());
+
+    let search = search_chunks_by_keywords(&pool, OTHER_ACCOUNT, &["Secret"], 10)
+        .await
+        .expect("search");
+    assert!(search.is_empty());
+
+    let seeds = get_pending_seeds_for(&pool, OTHER_ACCOUNT, 10)
+        .await
+        .expect("get");
+    assert!(seeds.is_empty());
+}
+
+#[tokio::test]
+async fn ensure_manual_source_for_scoped() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id_a = ensure_manual_source_for(&pool, "acct-a")
+        .await
+        .expect("ensure A");
+    let id_b = ensure_manual_source_for(&pool, "acct-b")
+        .await
+        .expect("ensure B");
+    assert_ne!(id_a, id_b);
+
+    // Idempotent
+    let id_a2 = ensure_manual_source_for(&pool, "acct-a")
+        .await
+        .expect("ensure A again");
+    assert_eq!(id_a, id_a2);
 }

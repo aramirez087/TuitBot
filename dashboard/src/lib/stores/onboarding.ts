@@ -54,7 +54,8 @@ function createOnboardingStore() {
 		source_type: 'local_fs',
 		vault_path: '',
 		vault_watch: true,
-		vault_loop_back: true,
+		// Loop-back defaults off: provenance tracking works but file write-back is not yet complete.
+		vault_loop_back: false,
 		folder_id: '',
 		connection_id: null,
 		poll_interval_seconds: 300,
@@ -88,7 +89,7 @@ function createOnboardingStore() {
 				source_type: 'local_fs',
 				vault_path: '',
 				vault_watch: true,
-				vault_loop_back: true,
+				vault_loop_back: false,
 				folder_id: '',
 				connection_id: null,
 				poll_interval_seconds: 300,

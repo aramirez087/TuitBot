@@ -139,6 +139,15 @@ pub trait TweetSearcher: Send + Sync {
     async fn search_tweets(&self, query: &str) -> Result<Vec<LoopTweet>, LoopError>;
 }
 
+/// Output from reply generation, carrying both the text and optional vault citations.
+#[derive(Debug, Clone)]
+pub struct ReplyOutput {
+    /// The generated reply text.
+    pub text: String,
+    /// Vault citations used to ground the reply (empty when no vault context).
+    pub vault_citations: Vec<crate::context::retrieval::VaultCitation>,
+}
+
 /// Port for generating reply content via LLM.
 #[async_trait::async_trait]
 pub trait ReplyGenerator: Send + Sync {
@@ -152,6 +161,25 @@ pub trait ReplyGenerator: Send + Sync {
         author: &str,
         mention_product: bool,
     ) -> Result<String, LoopError>;
+
+    /// Generate a reply with optional RAG context from the vault.
+    ///
+    /// Default implementation ignores RAG context and delegates to `generate_reply`.
+    /// Override in adapters that support vault-aware generation.
+    async fn generate_reply_with_rag(
+        &self,
+        tweet_text: &str,
+        author: &str,
+        mention_product: bool,
+    ) -> Result<ReplyOutput, LoopError> {
+        let text = self
+            .generate_reply(tweet_text, author, mention_product)
+            .await?;
+        Ok(ReplyOutput {
+            text,
+            vault_citations: vec![],
+        })
+    }
 }
 
 /// Port for safety checks (rate limits and dedup).
@@ -479,6 +507,16 @@ mod tests {
         };
         let debug = format!("{tweet:?}");
         assert!(debug.contains("123"));
+    }
+
+    #[test]
+    fn reply_output_creation() {
+        let output = ReplyOutput {
+            text: "Great point!".to_string(),
+            vault_citations: vec![],
+        };
+        assert_eq!(output.text, "Great point!");
+        assert!(output.vault_citations.is_empty());
     }
 
     #[test]

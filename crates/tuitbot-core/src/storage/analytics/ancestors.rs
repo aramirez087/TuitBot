@@ -122,13 +122,14 @@ fn ancestor_row_from_tuple(r: AncestorQueryRow) -> AncestorRow {
     }
 }
 
-/// Query scored ancestors with engagement_score populated.
+/// Query scored ancestors with engagement_score populated, scoped to an account.
 ///
 /// Returns ancestors where `engagement_score >= min_score`, ordered by
 /// engagement_score DESC. For topic matching, uses the `topic` column on
 /// original_tweets and LIKE-based content matching on replies.
 pub async fn get_scored_ancestors(
     pool: &DbPool,
+    account_id: &str,
     topic_keywords: &[String],
     min_score: f64,
     limit: u32,
@@ -142,7 +143,8 @@ pub async fn get_scored_ancestors(
                         ot.created_at \
                  FROM tweet_performance tp \
                  JOIN original_tweets ot ON ot.tweet_id = tp.tweet_id \
-                 WHERE tp.engagement_score IS NOT NULL \
+                 WHERE ot.account_id = ? \
+                   AND tp.engagement_score IS NOT NULL \
                    AND tp.engagement_score >= ? \
                  UNION ALL \
                  SELECT 'reply', rp.reply_id, SUBSTR(rs.reply_content, 1, 120), \
@@ -150,12 +152,15 @@ pub async fn get_scored_ancestors(
                         rs.created_at \
                  FROM reply_performance rp \
                  JOIN replies_sent rs ON rs.reply_tweet_id = rp.reply_id \
-                 WHERE rp.engagement_score IS NOT NULL \
+                 WHERE rs.account_id = ? \
+                   AND rp.engagement_score IS NOT NULL \
                    AND rp.engagement_score >= ? \
                  ORDER BY engagement_score DESC \
                  LIMIT ?",
         )
+        .bind(account_id)
         .bind(min_score)
+        .bind(account_id)
         .bind(min_score)
         .bind(limit)
         .fetch_all(pool)
@@ -184,7 +189,8 @@ pub async fn get_scored_ancestors(
                 ot.created_at \
          FROM tweet_performance tp \
          JOIN original_tweets ot ON ot.tweet_id = tp.tweet_id \
-         WHERE tp.engagement_score IS NOT NULL \
+         WHERE ot.account_id = ? \
+           AND tp.engagement_score IS NOT NULL \
            AND tp.engagement_score >= ? \
            AND (ot.topic IN ({topic_placeholders})) \
          UNION ALL \
@@ -193,7 +199,8 @@ pub async fn get_scored_ancestors(
                 rs.created_at \
          FROM reply_performance rp \
          JOIN replies_sent rs ON rs.reply_tweet_id = rp.reply_id \
-         WHERE rp.engagement_score IS NOT NULL \
+         WHERE rs.account_id = ? \
+           AND rp.engagement_score IS NOT NULL \
            AND rp.engagement_score >= ? \
            AND ({like_clause}) \
          ORDER BY engagement_score DESC \
@@ -202,12 +209,14 @@ pub async fn get_scored_ancestors(
 
     let mut query = sqlx::query_as::<_, AncestorQueryRow>(&query_str);
 
-    // Bind: min_score for tweets, then topic keywords for IN clause
+    // Bind: account_id for tweets, min_score, then topic keywords for IN clause
+    query = query.bind(account_id);
     query = query.bind(min_score);
     for kw in topic_keywords {
         query = query.bind(kw);
     }
-    // Bind: min_score for replies, then keywords for LIKE clauses, then limit
+    // Bind: account_id for replies, min_score, keywords for LIKE clauses, then limit
+    query = query.bind(account_id);
     query = query.bind(min_score);
     for kw in topic_keywords {
         query = query.bind(kw);

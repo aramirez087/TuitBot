@@ -3,6 +3,7 @@
 use super::{ApprovalItem, ApprovalRow, ApprovalStats, ReviewAction};
 use crate::error::StorageError;
 use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
+use crate::storage::provenance::ProvenanceRef;
 use crate::storage::DbPool;
 
 /// Standard SELECT columns for approval queue queries.
@@ -12,7 +13,8 @@ const SELECT_COLS: &str = "id, action_type, target_tweet_id, target_author, \
     COALESCE(detected_risks, '[]') AS detected_risks, COALESCE(qa_report, '{}') AS qa_report, \
     COALESCE(qa_hard_flags, '[]') AS qa_hard_flags, COALESCE(qa_soft_flags, '[]') AS qa_soft_flags, \
     COALESCE(qa_recommendations, '[]') AS qa_recommendations, COALESCE(qa_score, 0) AS qa_score, \
-    COALESCE(qa_requires_override, 0) AS qa_requires_override, qa_override_by, qa_override_note, qa_override_at";
+    COALESCE(qa_requires_override, 0) AS qa_requires_override, qa_override_by, qa_override_note, qa_override_at, \
+    source_node_id, source_seed_id, COALESCE(source_chunks_json, '[]') AS source_chunks_json";
 
 /// Insert a new item into the approval queue for a specific account.
 #[allow(clippy::too_many_arguments)]
@@ -142,6 +144,84 @@ pub async fn enqueue_with_context(
         detected_risks,
     )
     .await
+}
+
+/// Bundled provenance input for `enqueue_with_provenance_for`.
+pub struct ProvenanceInput {
+    pub source_node_id: Option<i64>,
+    pub source_seed_id: Option<i64>,
+    pub source_chunks_json: String,
+    pub refs: Vec<ProvenanceRef>,
+}
+
+/// Insert a new item into the approval queue with provenance for a specific account.
+///
+/// Populates the inline provenance columns (`source_node_id`, `source_seed_id`,
+/// `source_chunks_json`) and inserts rows into `vault_provenance_links`.
+#[allow(clippy::too_many_arguments)]
+pub async fn enqueue_with_provenance_for(
+    pool: &DbPool,
+    account_id: &str,
+    action_type: &str,
+    target_tweet_id: &str,
+    target_author: &str,
+    generated_content: &str,
+    topic: &str,
+    archetype: &str,
+    score: f64,
+    media_paths: &str,
+    reason: Option<&str>,
+    detected_risks: Option<&str>,
+    provenance: Option<&ProvenanceInput>,
+) -> Result<i64, StorageError> {
+    let (source_node_id, source_seed_id, source_chunks_json) = match provenance {
+        Some(p) => (
+            p.source_node_id,
+            p.source_seed_id,
+            p.source_chunks_json.as_str(),
+        ),
+        None => (None, None, "[]"),
+    };
+
+    let result = sqlx::query(
+        "INSERT INTO approval_queue (account_id, action_type, target_tweet_id, target_author, \
+         generated_content, topic, archetype, score, media_paths, reason, detected_risks, \
+         source_node_id, source_seed_id, source_chunks_json) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(account_id)
+    .bind(action_type)
+    .bind(target_tweet_id)
+    .bind(target_author)
+    .bind(generated_content)
+    .bind(topic)
+    .bind(archetype)
+    .bind(score)
+    .bind(media_paths)
+    .bind(reason)
+    .bind(detected_risks.unwrap_or("[]"))
+    .bind(source_node_id)
+    .bind(source_seed_id)
+    .bind(source_chunks_json)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let id = result.last_insert_rowid();
+
+    // Insert provenance link rows.
+    if let Some(p) = provenance {
+        crate::storage::provenance::insert_links_for(
+            pool,
+            account_id,
+            "approval_queue",
+            id,
+            &p.refs,
+        )
+        .await?;
+    }
+
+    Ok(id)
 }
 
 /// Get all pending approval items for a specific account, ordered by creation time (oldest first).

@@ -38,6 +38,9 @@ struct ApprovalRow {
     qa_override_by: Option<String>,
     qa_override_note: Option<String>,
     qa_override_at: Option<String>,
+    source_node_id: Option<i64>,
+    source_seed_id: Option<i64>,
+    source_chunks_json: String,
 }
 
 /// A pending item in the approval queue.
@@ -84,6 +87,13 @@ pub struct ApprovalItem {
     pub qa_override_note: Option<String>,
     /// Timestamp of override action.
     pub qa_override_at: Option<String>,
+    /// Source content node that influenced this draft.
+    pub source_node_id: Option<i64>,
+    /// Source seed used to generate this draft.
+    pub source_seed_id: Option<i64>,
+    /// JSON array of selected chunk references.
+    #[serde(serialize_with = "serialize_json_string")]
+    pub source_chunks_json: String,
 }
 
 /// Serialize a JSON-encoded string as a raw JSON value.
@@ -127,6 +137,9 @@ impl From<ApprovalRow> for ApprovalItem {
             qa_override_by: r.qa_override_by,
             qa_override_note: r.qa_override_note,
             qa_override_at: r.qa_override_at,
+            source_node_id: r.source_node_id,
+            source_seed_id: r.source_seed_id,
+            source_chunks_json: r.source_chunks_json,
         }
     }
 }

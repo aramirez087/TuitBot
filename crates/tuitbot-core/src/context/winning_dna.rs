@@ -4,6 +4,7 @@
 //! engagement-weighted success scores, and retrieves ranked ancestors
 //! for use as RAG context in new draft generation.
 
+use crate::context::retrieval::{self, VaultCitation};
 use crate::error::StorageError;
 use crate::storage::analytics;
 use crate::storage::watchtower;
@@ -30,6 +31,9 @@ pub const MIN_ENGAGEMENT_SCORE: f64 = 0.1;
 /// Maximum character count for the formatted RAG prompt block.
 /// Conservative estimate at ~500 tokens (4 chars/token).
 pub const RAG_MAX_CHARS: usize = 2000;
+
+/// Maximum character count for the ancestor prompt section when combined with fragments.
+pub const MAX_ANCESTOR_CHARS: usize = 800;
 
 /// Maximum number of cold-start seeds to retrieve as fallback.
 pub const MAX_COLD_START_SEEDS: u32 = 5;
@@ -64,6 +68,8 @@ pub struct DraftContext {
     pub winning_ancestors: Vec<WinningAncestor>,
     /// Content seeds from ingested notes (cold-start fallback).
     pub content_seeds: Vec<ContentSeedContext>,
+    /// Structured citations for vault fragments used in the prompt.
+    pub vault_citations: Vec<VaultCitation>,
     /// Formatted text block for LLM prompt injection.
     pub prompt_block: String,
 }
@@ -214,12 +220,14 @@ pub fn compute_retrieval_weight(engagement_score: f64, days_since: f64, half_lif
 /// retrieval weights with recency decay, and returns the top K.
 pub async fn retrieve_ancestors(
     pool: &DbPool,
+    account_id: &str,
     topic_keywords: &[String],
     max_results: u32,
     half_life_days: f64,
 ) -> Result<Vec<WinningAncestor>, StorageError> {
     let rows =
-        analytics::get_scored_ancestors(pool, topic_keywords, MIN_ENGAGEMENT_SCORE, 50).await?;
+        analytics::get_scored_ancestors(pool, account_id, topic_keywords, MIN_ENGAGEMENT_SCORE, 50)
+            .await?;
 
     let now = chrono::Utc::now();
 
@@ -256,12 +264,13 @@ pub async fn retrieve_ancestors(
     Ok(ancestors)
 }
 
-/// Retrieve cold-start seeds when no performance data exists.
+/// Retrieve cold-start seeds when no performance data and no chunks exist.
 pub async fn retrieve_cold_start_seeds(
     pool: &DbPool,
+    account_id: &str,
     max_results: u32,
 ) -> Result<Vec<ContentSeedContext>, StorageError> {
-    let rows = watchtower::get_seeds_for_context(pool, max_results).await?;
+    let rows = watchtower::get_seeds_for_context_for(pool, account_id, max_results).await?;
 
     Ok(rows
         .into_iter()
@@ -274,34 +283,114 @@ pub async fn retrieve_cold_start_seeds(
         .collect())
 }
 
-/// Build the complete draft context: ancestors first, cold-start seeds as fallback.
+/// Build the complete draft context using a three-tier model:
 ///
-/// The `prompt_block` is capped at `RAG_MAX_CHARS` characters and formatted
-/// for direct injection into LLM system prompts.
+/// 1. **Winning ancestors** — behavioral patterns from high-performing content
+/// 2. **Vault fragments** — knowledge from the user's notes via chunk retrieval
+/// 3. **Content seeds** — LLM-extracted hooks as last-resort fallback
+///
+/// Ancestors and fragments combine when both are available. Seeds are used
+/// only when no fragments exist (chunking hasn't run or vault is empty).
+///
+/// The `prompt_block` is capped at `RAG_MAX_CHARS` characters.
 pub async fn build_draft_context(
     pool: &DbPool,
+    account_id: &str,
     topic_keywords: &[String],
     max_ancestors: u32,
     half_life_days: f64,
 ) -> Result<DraftContext, StorageError> {
-    let ancestors = retrieve_ancestors(pool, topic_keywords, max_ancestors, half_life_days).await?;
+    build_draft_context_with_selection(
+        pool,
+        account_id,
+        topic_keywords,
+        max_ancestors,
+        half_life_days,
+        None,
+    )
+    .await
+}
 
-    if !ancestors.is_empty() {
-        let prompt_block = format_ancestors_prompt(&ancestors);
+/// Build draft context with optional selected note IDs for biased retrieval.
+///
+/// When `selected_node_ids` is provided, chunks from those notes are
+/// retrieved first, then remaining slots are filled with keyword matches.
+pub async fn build_draft_context_with_selection(
+    pool: &DbPool,
+    account_id: &str,
+    topic_keywords: &[String],
+    max_ancestors: u32,
+    half_life_days: f64,
+    selected_node_ids: Option<&[i64]>,
+) -> Result<DraftContext, StorageError> {
+    // Tier 1: Winning ancestors (always attempted)
+    let ancestors = retrieve_ancestors(
+        pool,
+        account_id,
+        topic_keywords,
+        max_ancestors,
+        half_life_days,
+    )
+    .await?;
+
+    // Tier 2: Vault fragments via keyword search (always attempted)
+    let fragments = retrieval::retrieve_vault_fragments(
+        pool,
+        account_id,
+        topic_keywords,
+        selected_node_ids,
+        retrieval::MAX_FRAGMENTS,
+    )
+    .await?;
+
+    let has_ancestors = !ancestors.is_empty();
+    let has_fragments = !fragments.is_empty();
+
+    // Combined: ancestors + fragments
+    if has_ancestors && has_fragments {
+        let vault_citations = retrieval::build_citations(&fragments);
+        let ancestor_block = format_ancestors_prompt_capped(&ancestors, MAX_ANCESTOR_CHARS);
+        let fragment_block = retrieval::format_fragments_prompt(&fragments);
+        let prompt_block = combine_prompt_blocks(&ancestor_block, &fragment_block);
         return Ok(DraftContext {
             winning_ancestors: ancestors,
             content_seeds: vec![],
+            vault_citations,
             prompt_block,
         });
     }
 
-    // Cold-start fallback: use content seeds
-    let seeds = retrieve_cold_start_seeds(pool, MAX_COLD_START_SEEDS).await?;
+    // Ancestors only
+    if has_ancestors {
+        let prompt_block = format_ancestors_prompt(&ancestors);
+        return Ok(DraftContext {
+            winning_ancestors: ancestors,
+            content_seeds: vec![],
+            vault_citations: vec![],
+            prompt_block,
+        });
+    }
+
+    // Fragments only
+    if has_fragments {
+        let vault_citations = retrieval::build_citations(&fragments);
+        let prompt_block = retrieval::format_fragments_prompt(&fragments);
+        return Ok(DraftContext {
+            winning_ancestors: vec![],
+            content_seeds: vec![],
+            vault_citations,
+            prompt_block,
+        });
+    }
+
+    // Tier 3: Cold-start fallback — content seeds
+    let seeds = retrieve_cold_start_seeds(pool, account_id, MAX_COLD_START_SEEDS).await?;
     let prompt_block = format_seeds_prompt(&seeds);
 
     Ok(DraftContext {
         winning_ancestors: vec![],
         content_seeds: seeds,
+        vault_citations: vec![],
         prompt_block,
     })
 }
@@ -337,6 +426,58 @@ fn format_ancestors_prompt(ancestors: &[WinningAncestor]) -> String {
         block.truncate(RAG_MAX_CHARS);
     }
     block
+}
+
+/// Format ancestors with a custom character cap (used when combining with fragments).
+fn format_ancestors_prompt_capped(ancestors: &[WinningAncestor], max_chars: usize) -> String {
+    if ancestors.is_empty() {
+        return String::new();
+    }
+
+    let mut block = String::from("\nWinning patterns from your best-performing content:\n");
+
+    for (i, a) in ancestors.iter().enumerate() {
+        let entry = format!(
+            "{}. [{}] ({}): \"{}\"\n",
+            i + 1,
+            a.archetype_vibe,
+            a.content_type,
+            a.content_preview,
+        );
+        if block.len() + entry.len() > max_chars {
+            break;
+        }
+        block.push_str(&entry);
+    }
+
+    block.push_str("Use these patterns as inspiration but don't copy them directly.\n");
+
+    if block.len() > max_chars {
+        block.truncate(max_chars);
+    }
+    block
+}
+
+/// Combine ancestor and fragment prompt blocks, respecting `RAG_MAX_CHARS`.
+fn combine_prompt_blocks(ancestor_block: &str, fragment_block: &str) -> String {
+    let combined = format!("{ancestor_block}{fragment_block}");
+    if combined.len() > RAG_MAX_CHARS {
+        truncate_at_char_boundary(&combined, RAG_MAX_CHARS)
+    } else {
+        combined
+    }
+}
+
+/// Truncate a string at the given byte position, backing up to a char boundary.
+fn truncate_at_char_boundary(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s[..end].to_string()
 }
 
 fn format_seeds_prompt(seeds: &[ContentSeedContext]) -> String {
@@ -601,10 +742,12 @@ mod tests {
 
     // --- DB integration tests ---
 
+    const TEST_ACCOUNT: &str = "00000000-0000-0000-0000-000000000000";
+
     #[tokio::test]
     async fn retrieve_ancestors_empty_db() {
         let pool = crate::storage::init_test_db().await.expect("init db");
-        let ancestors = retrieve_ancestors(&pool, &[], 5, 14.0)
+        let ancestors = retrieve_ancestors(&pool, TEST_ACCOUNT, &[], 5, 14.0)
             .await
             .expect("retrieve");
         assert!(ancestors.is_empty());
@@ -637,7 +780,7 @@ mod tests {
                 .expect("update score");
         }
 
-        let ancestors = retrieve_ancestors(&pool, &[], 5, 14.0)
+        let ancestors = retrieve_ancestors(&pool, TEST_ACCOUNT, &[], 5, 14.0)
             .await
             .expect("retrieve");
         assert_eq!(ancestors.len(), 2);
@@ -678,7 +821,7 @@ mod tests {
         .await
         .expect("insert seed");
 
-        let ctx = build_draft_context(&pool, &[], 5, 14.0)
+        let ctx = build_draft_context(&pool, TEST_ACCOUNT, &[], 5, 14.0)
             .await
             .expect("build context");
         assert!(ctx.winning_ancestors.is_empty());
@@ -705,7 +848,7 @@ mod tests {
             .await
             .expect("update score");
 
-        let ctx = build_draft_context(&pool, &[], 5, 14.0)
+        let ctx = build_draft_context(&pool, TEST_ACCOUNT, &[], 5, 14.0)
             .await
             .expect("build context");
         assert_eq!(ctx.winning_ancestors.len(), 1);
@@ -716,11 +859,192 @@ mod tests {
     #[tokio::test]
     async fn build_draft_context_empty_db_returns_empty_prompt() {
         let pool = crate::storage::init_test_db().await.expect("init db");
-        let ctx = build_draft_context(&pool, &[], 5, 14.0)
+        let ctx = build_draft_context(&pool, TEST_ACCOUNT, &[], 5, 14.0)
             .await
             .expect("build context");
         assert!(ctx.winning_ancestors.is_empty());
         assert!(ctx.content_seeds.is_empty());
         assert!(ctx.prompt_block.is_empty());
+    }
+
+    #[tokio::test]
+    async fn retrieve_ancestors_account_isolation() {
+        let pool = crate::storage::init_test_db().await.expect("init db");
+
+        // Insert tweet for account A
+        sqlx::query(
+            "INSERT INTO original_tweets (account_id, tweet_id, content, topic, status, created_at) \
+             VALUES ('account-a', 'tw-a', 'Account A tweet', 'rust', 'sent', '2026-02-27T10:00:00Z')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert tweet");
+
+        analytics::upsert_tweet_performance(&pool, "tw-a", 10, 5, 3, 500, 82.0)
+            .await
+            .expect("upsert perf");
+        analytics::update_tweet_engagement_score(&pool, "tw-a", 0.9)
+            .await
+            .expect("update score");
+
+        // Query as account B → should get nothing
+        let ancestors = retrieve_ancestors(&pool, "account-b", &[], 5, 14.0)
+            .await
+            .expect("retrieve");
+        assert!(
+            ancestors.is_empty(),
+            "account B should see no ancestors from account A"
+        );
+
+        // Query as account A → should get 1
+        let ancestors = retrieve_ancestors(&pool, "account-a", &[], 5, 14.0)
+            .await
+            .expect("retrieve");
+        assert_eq!(ancestors.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn build_draft_context_with_fragments() {
+        let pool = crate::storage::init_test_db().await.expect("init db");
+
+        // Insert source + node + chunk
+        let source_id = watchtower::insert_source_context(&pool, "local_fs", "{}")
+            .await
+            .expect("insert source");
+        watchtower::upsert_content_node(
+            &pool,
+            source_id,
+            "rust-tips.md",
+            "h-frag",
+            Some("Rust Tips"),
+            "Ownership makes concurrency safe in Rust",
+            None,
+            None,
+        )
+        .await
+        .expect("upsert node");
+
+        // Insert a chunk directly
+        watchtower::insert_chunk(
+            &pool,
+            TEST_ACCOUNT,
+            1,
+            "# Rust Tips",
+            "Ownership makes concurrency safe in Rust",
+            "hash-frag-1",
+            0,
+        )
+        .await
+        .expect("insert chunk");
+
+        let ctx = build_draft_context(&pool, TEST_ACCOUNT, &["rust".to_string()], 5, 14.0)
+            .await
+            .expect("build context");
+
+        assert!(ctx.prompt_block.contains("Relevant knowledge"));
+        assert_eq!(ctx.vault_citations.len(), 1);
+        assert_eq!(ctx.vault_citations[0].source_path, "rust-tips.md");
+    }
+
+    #[tokio::test]
+    async fn build_draft_context_mixed_ancestors_and_fragments() {
+        let pool = crate::storage::init_test_db().await.expect("init db");
+
+        // Seed ancestors
+        sqlx::query(
+            "INSERT INTO original_tweets (account_id, tweet_id, content, topic, status, created_at) \
+             VALUES (?, 'tw-mix', 'Testing patterns rock', 'testing', 'sent', '2026-02-27T10:00:00Z')",
+        )
+        .bind(TEST_ACCOUNT)
+        .execute(&pool)
+        .await
+        .expect("insert tweet");
+        analytics::upsert_tweet_performance(&pool, "tw-mix", 10, 5, 3, 500, 82.0)
+            .await
+            .expect("upsert perf");
+        analytics::update_tweet_engagement_score(&pool, "tw-mix", 0.9)
+            .await
+            .expect("update score");
+
+        // Seed vault chunks
+        let source_id = watchtower::insert_source_context(&pool, "local_fs", "{}")
+            .await
+            .expect("insert source");
+        watchtower::upsert_content_node(
+            &pool,
+            source_id,
+            "testing.md",
+            "h-mix",
+            Some("Testing Notes"),
+            "Testing strategies for better code",
+            None,
+            None,
+        )
+        .await
+        .expect("upsert node");
+        watchtower::insert_chunk(
+            &pool,
+            TEST_ACCOUNT,
+            1,
+            "# Testing",
+            "Testing strategies for better code",
+            "hash-mix-1",
+            0,
+        )
+        .await
+        .expect("insert chunk");
+
+        let ctx = build_draft_context(&pool, TEST_ACCOUNT, &["testing".to_string()], 5, 14.0)
+            .await
+            .expect("build context");
+
+        assert!(!ctx.winning_ancestors.is_empty(), "should have ancestors");
+        assert!(!ctx.vault_citations.is_empty(), "should have citations");
+        assert!(ctx.prompt_block.contains("Winning patterns"));
+        assert!(ctx.prompt_block.contains("Relevant knowledge"));
+        assert!(ctx.prompt_block.len() <= RAG_MAX_CHARS);
+    }
+
+    #[tokio::test]
+    async fn fragment_citations_populated_correctly() {
+        let pool = crate::storage::init_test_db().await.expect("init db");
+
+        let source_id = watchtower::insert_source_context(&pool, "local_fs", "{}")
+            .await
+            .expect("insert source");
+        watchtower::upsert_content_node(
+            &pool,
+            source_id,
+            "notes/deep-work.md",
+            "h-cite",
+            Some("Deep Work"),
+            "Focus on cognitively demanding tasks",
+            None,
+            None,
+        )
+        .await
+        .expect("upsert node");
+        watchtower::insert_chunk(
+            &pool,
+            TEST_ACCOUNT,
+            1,
+            "# Productivity > ## Deep Work",
+            "Focus on cognitively demanding tasks without distraction",
+            "hash-cite-1",
+            0,
+        )
+        .await
+        .expect("insert chunk");
+
+        let ctx = build_draft_context(&pool, TEST_ACCOUNT, &["focus".to_string()], 5, 14.0)
+            .await
+            .expect("build context");
+
+        assert_eq!(ctx.vault_citations.len(), 1);
+        let cite = &ctx.vault_citations[0];
+        assert_eq!(cite.source_path, "notes/deep-work.md");
+        assert_eq!(cite.source_title.as_deref(), Some("Deep Work"));
+        assert_eq!(cite.heading_path, "# Productivity > ## Deep Work");
+        assert!(cite.snippet.contains("cognitively demanding"));
     }
 }

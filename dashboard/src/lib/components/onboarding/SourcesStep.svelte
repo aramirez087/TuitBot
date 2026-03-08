@@ -59,11 +59,13 @@
 </script>
 
 <div class="step">
-	<h2>Content Source (Optional)</h2>
+	<h2>Knowledge Vault</h2>
 	<p class="step-description">
-		Connect a content source so the Watchtower can index your content
-		and use it for smarter replies and tweets. You can configure this later in Settings.
+		Connect your Obsidian vault, notes folder, or Google Drive so Tuitbot can
+		split your notes into fragments, use them as context when generating tweets
+		and replies, and track which notes contributed to each post.
 	</p>
+	<p class="skip-hint">You can skip this step and set it up later in Settings.</p>
 
 	{#if !isCloud}
 		<div class="field-group">
@@ -83,7 +85,7 @@
 	{:else}
 		<p class="capability-hint">
 			Local folder sources are not available in cloud deployments.
-			Connect a Google Drive folder to provide your content.
+			Connect a Google Drive folder to provide your notes.
 		</p>
 	{/if}
 
@@ -113,19 +115,19 @@
 		{#if $activeGoogleDrive || $onboardingData.connection_id}
 			<div class="field-group">
 				<label class="field-label" for="folder_id_input">
-					<Cloud size={14} /> Google Drive Folder ID (optional)
+					<Cloud size={14} /> Google Drive Folder ID
 				</label>
 				<input id="folder_id_input" type="text" class="text-input" bind:value={folderId}
 					placeholder="1aBcD_eFgHiJkLmNoPqRsTuVwXyZ" />
 				<span class="field-hint">
-					Without a folder ID, Tuitbot will index your entire Drive.
-					Find the folder ID in the Google Drive URL after /folders/.
+					Required. Find the folder ID in your Google Drive URL after <code>/folders/</code>.
 				</span>
 			</div>
 			<div class="field-group">
 				<label class="field-label" for="poll_interval_input">Poll Interval (seconds)</label>
 				<input id="poll_interval_input" type="number" class="text-input poll-input"
 					bind:value={pollInterval} min="60" max="86400" />
+				<span class="field-hint">How often to check Google Drive for new or changed files (minimum 60s).</span>
 			</div>
 		{:else}
 			<p class="connect-hint">
@@ -143,8 +145,8 @@
 				</span>
 				<span class="toggle-hint">
 					{sourceType === 'google_drive'
-						? 'Periodically check for new or modified files'
-						: 'Re-index automatically when files change'}
+						? 'Polls your Drive folder at the configured interval for new or modified files'
+						: 'Re-index automatically when local files are added or modified'}
 				</span>
 			</div>
 			<button type="button" class="toggle" class:active={vaultWatch}
@@ -157,7 +159,10 @@
 			<div class="toggle-row">
 				<div class="toggle-info">
 					<span class="toggle-label">Loop back</span>
-					<span class="toggle-hint">Write performance metadata into file frontmatter</span>
+					<span class="toggle-hint">
+						Write tweet performance data back into note frontmatter (local vaults only).
+						Currently tracks which notes were used — file write-back coming soon.
+					</span>
 				</div>
 				<button type="button" class="toggle" class:active={vaultLoopBack}
 					onclick={() => (vaultLoopBack = !vaultLoopBack)} role="switch"
@@ -173,9 +178,11 @@
 	.step { display: flex; flex-direction: column; gap: 24px; }
 	h2 { font-size: 20px; font-weight: 700; color: var(--color-text); margin: 0; }
 	.step-description { font-size: 14px; color: var(--color-text-muted); margin: -16px 0 0; line-height: 1.5; }
+	.skip-hint { font-size: 12px; color: var(--color-text-subtle); margin: -16px 0 0; }
 	.field-group { display: flex; flex-direction: column; gap: 10px; }
 	.field-label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--color-text); }
 	.field-hint { font-size: 12px; color: var(--color-text-muted); line-height: 1.4; }
+	.field-hint code { font-size: 11px; padding: 1px 4px; background: var(--color-surface); border-radius: 3px; }
 	.capability-hint { font-size: 13px; color: var(--color-text-muted); margin: -4px 0 0; padding: 10px 14px; background: color-mix(in srgb, var(--color-accent) 6%, transparent); border-radius: 8px; line-height: 1.4; }
 	.connect-hint { font-size: 13px; color: var(--color-text-muted); padding: 10px 14px; background: color-mix(in srgb, var(--color-accent) 6%, transparent); border-radius: 8px; line-height: 1.4; margin: 0; }
 	.text-input { padding: 10px 14px; background: var(--color-surface); border: 2px solid var(--color-border); border-radius: 8px; color: var(--color-text); font-size: 14px; font-family: var(--font-sans); outline: none; transition: border-color 0.15s; }
@@ -189,7 +196,7 @@
 	.toggle-row + .toggle-row { border-top: 1px solid var(--color-border-subtle); }
 	.toggle-info { display: flex; flex-direction: column; gap: 2px; }
 	.toggle-label { font-size: 14px; font-weight: 500; color: var(--color-text); }
-	.toggle-hint { font-size: 12px; color: var(--color-text-muted); }
+	.toggle-hint { font-size: 12px; color: var(--color-text-muted); max-width: 340px; line-height: 1.4; }
 	.toggle { border: none; background: none; padding: 0; cursor: pointer; }
 	.toggle-track { display: flex; align-items: center; width: 42px; height: 24px; padding: 2px; background: var(--color-border); border-radius: 12px; transition: background 0.2s; }
 	.toggle.active .toggle-track { background: var(--color-accent); }

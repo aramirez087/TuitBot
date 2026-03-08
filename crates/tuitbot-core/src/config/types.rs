@@ -504,8 +504,28 @@ pub struct ContentSourceEntry {
     pub connection_id: Option<i64>,
 
     /// Whether to watch for changes in real-time.
+    ///
+    /// **Deprecated:** Use `enabled` and `change_detection` instead.
+    /// Kept for backward compatibility — when `enabled` is `None`, the
+    /// value of `watch` is used as the fallback.
     #[serde(default = "default_watch")]
     pub watch: bool,
+
+    /// Whether this source participates in ingestion at all.
+    ///
+    /// When `None`, falls back to `watch` for backward compatibility.
+    /// When `Some(false)`, the source is completely skipped.
+    #[serde(default)]
+    pub enabled: Option<bool>,
+
+    /// How changes are detected for this source.
+    ///
+    /// - `"auto"` (default) — local_fs: notify watcher + fallback poll;
+    ///   google_drive: interval poll.
+    /// - `"poll"` — poll only (useful when notify is unreliable, e.g. NFS).
+    /// - `"none"` — initial scan only, no ongoing monitoring.
+    #[serde(default = "default_change_detection")]
+    pub change_detection: String,
 
     /// File patterns to include.
     #[serde(default = "default_file_patterns")]
@@ -520,11 +540,52 @@ pub struct ContentSourceEntry {
     pub poll_interval_seconds: Option<u64>,
 }
 
+/// Valid values for `ContentSourceEntry::change_detection`.
+pub const CHANGE_DETECTION_AUTO: &str = "auto";
+pub const CHANGE_DETECTION_POLL: &str = "poll";
+pub const CHANGE_DETECTION_NONE: &str = "none";
+
+/// Minimum allowed poll interval in seconds.
+pub const MIN_POLL_INTERVAL_SECONDS: u64 = 30;
+
+impl ContentSourceEntry {
+    /// Whether this source should participate in ingestion.
+    ///
+    /// Prefers `enabled` when explicitly set; otherwise falls back to
+    /// the legacy `watch` field for backward compatibility.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.unwrap_or(self.watch)
+    }
+
+    /// The effective change detection mode for this source.
+    ///
+    /// Returns `"none"` when the source is disabled (short-circuit).
+    pub fn effective_change_detection(&self) -> &str {
+        if !self.is_enabled() {
+            return CHANGE_DETECTION_NONE;
+        }
+        &self.change_detection
+    }
+
+    /// Whether this source uses poll-only change detection.
+    pub fn is_poll_only(&self) -> bool {
+        self.effective_change_detection() == CHANGE_DETECTION_POLL
+    }
+
+    /// Whether this source should only do an initial scan with no ongoing monitoring.
+    pub fn is_scan_only(&self) -> bool {
+        self.effective_change_detection() == CHANGE_DETECTION_NONE
+    }
+}
+
 fn default_source_type() -> String {
     "local_fs".to_string()
 }
 fn default_watch() -> bool {
     true
+}
+fn default_change_detection() -> String {
+    CHANGE_DETECTION_AUTO.to_string()
 }
 fn default_file_patterns() -> Vec<String> {
     vec!["*.md".to_string(), "*.txt".to_string()]
