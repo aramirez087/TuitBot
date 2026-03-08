@@ -1,9 +1,14 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
-	import { X, Film, Users, Captions } from 'lucide-svelte';
-	import MediaAltBadge from './composer/MediaAltBadge.svelte';
-	import { startMediaDrag, endMediaDrag, isMediaDragActive, performTransfer } from '$lib/stores/mediaDrag';
+	import { onMount } from "svelte";
+	import { api } from "$lib/api";
+	import { X, Film, Users, Captions } from "lucide-svelte";
+	import MediaAltBadge from "./composer/MediaAltBadge.svelte";
+	import {
+		startMediaDrag,
+		endMediaDrag,
+		isMediaDragActive,
+		performTransfer,
+	} from "$lib/stores/mediaDrag";
 
 	let {
 		mediaPaths = [],
@@ -12,7 +17,7 @@
 		disabled = false,
 		altTexts = {},
 		onaltchange,
-		blockId = '',
+		blockId = "",
 	}: {
 		mediaPaths: string[];
 		onmediachange: (paths: string[]) => void;
@@ -23,7 +28,8 @@
 		blockId?: string;
 	} = $props();
 
-	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
+	const ACCEPTED_TYPES =
+		"image/jpeg,image/png,image/webp,image/gif,video/mp4";
 	const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 	const MAX_GIF_SIZE = 15 * 1024 * 1024;
 	const MAX_VIDEO_SIZE = 512 * 1024 * 1024;
@@ -35,28 +41,38 @@
 	let draggingPath = $state<string | null>(null);
 
 	// Mouse-based drag state
-	let mouseDownInfo = $state<{ path: string; x: number; y: number } | null>(null);
+	let mouseDownInfo = $state<{ path: string; x: number; y: number } | null>(
+		null,
+	);
 	let ghostEl: HTMLDivElement | null = null;
 	let currentTargetBlockId: string | null = null;
 	let currentTargetEl: HTMLElement | null = null;
 
-	let localPreviews = $state<Map<string, { url: string; type: string }>>(new Map());
+	let localPreviews = $state<Map<string, { url: string; type: string }>>(
+		new Map(),
+	);
 	const mediaCount = $derived(mediaPaths.length);
 
 	const hasGifOrVideo = $derived(
 		mediaPaths.some((p) => {
 			const preview = localPreviews.get(p);
-			if (preview) return preview.type === 'image/gif' || preview.type === 'video/mp4';
-			return p.endsWith('.gif') || p.endsWith('.mp4');
-		})
+			if (preview)
+				return (
+					preview.type === "image/gif" || preview.type === "video/mp4"
+				);
+			return p.endsWith(".gif") || p.endsWith(".mp4");
+		}),
 	);
 	const canAttachMore = $derived(
-		!disabled && !uploading && !hasGifOrVideo && mediaPaths.length < maxMedia
+		!disabled &&
+			!uploading &&
+			!hasGifOrVideo &&
+			mediaPaths.length < maxMedia,
 	);
 
 	function getMaxSize(type: string): number {
-		if (type === 'video/mp4') return MAX_VIDEO_SIZE;
-		if (type === 'image/gif') return MAX_GIF_SIZE;
+		if (type === "video/mp4") return MAX_VIDEO_SIZE;
+		if (type === "image/gif") return MAX_GIF_SIZE;
 		return MAX_IMAGE_SIZE;
 	}
 
@@ -67,13 +83,14 @@
 				error = `Maximum ${maxMedia} media per tweet.`;
 				break;
 			}
-			const isGifOrVideo = file.type === 'image/gif' || file.type === 'video/mp4';
+			const isGifOrVideo =
+				file.type === "image/gif" || file.type === "video/mp4";
 			if (isGifOrVideo && mediaPaths.length > 0) {
-				error = 'GIF/video cannot be combined with other media.';
+				error = "GIF/video cannot be combined with other media.";
 				break;
 			}
 			if (!isGifOrVideo && hasGifOrVideo) {
-				error = 'Cannot add images when GIF/video is attached.';
+				error = "Cannot add images when GIF/video is attached.";
 				break;
 			}
 			const maxSize = getMaxSize(file.type);
@@ -86,12 +103,12 @@
 				const result = await api.media.upload(file);
 				localPreviews.set(result.path, {
 					url: URL.createObjectURL(file),
-					type: result.media_type
+					type: result.media_type,
 				});
 				localPreviews = new Map(localPreviews);
 				onmediachange([...mediaPaths, result.path]);
 			} catch (err) {
-				error = err instanceof Error ? err.message : 'Upload failed';
+				error = err instanceof Error ? err.message : "Upload failed";
 				break;
 			} finally {
 				uploading = false;
@@ -113,7 +130,7 @@
 
 	function isVideo(path: string): boolean {
 		const preview = localPreviews.get(path);
-		return preview?.type === 'video/mp4' || path.endsWith('.mp4');
+		return preview?.type === "video/mp4" || path.endsWith(".mp4");
 	}
 
 	// ── File drop from Finder (HTML5 DnD for external files only) ──
@@ -143,12 +160,12 @@
 	function handleThumbMouseDown(e: MouseEvent, path: string) {
 		// Don't start drag if clicking on buttons inside the thumb
 		const target = e.target as HTMLElement;
-		if (target.closest('button')) return;
+		if (target.closest("button")) return;
 		if (!blockId) return;
 		e.preventDefault();
 		mouseDownInfo = { path, x: e.clientX, y: e.clientY };
-		document.addEventListener('mousemove', handleDocMouseMove);
-		document.addEventListener('mouseup', handleDocMouseUp);
+		document.addEventListener("mousemove", handleDocMouseMove);
+		document.addEventListener("mouseup", handleDocMouseUp);
 	}
 
 	function handleDocMouseMove(e: MouseEvent) {
@@ -158,7 +175,8 @@
 		if (!draggingPath) {
 			const dx = e.clientX - mouseDownInfo.x;
 			const dy = e.clientY - mouseDownInfo.y;
-			if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+			if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD)
+				return;
 			// Start the drag
 			draggingPath = mouseDownInfo.path;
 			startMediaDrag(mouseDownInfo.path, blockId);
@@ -172,30 +190,36 @@
 		}
 
 		// Detect target card via elementFromPoint (hide ghost first so it doesn't block)
-		if (ghostEl) ghostEl.style.pointerEvents = 'none';
+		if (ghostEl) ghostEl.style.pointerEvents = "none";
 		const elUnder = document.elementFromPoint(e.clientX, e.clientY);
-		if (ghostEl) ghostEl.style.pointerEvents = '';
+		if (ghostEl) ghostEl.style.pointerEvents = "";
 
-		const cardEl = elUnder?.closest('[data-block-id]') as HTMLElement | null;
+		const cardEl = elUnder?.closest(
+			"[data-block-id]",
+		) as HTMLElement | null;
 		const newTargetId = cardEl?.dataset.blockId ?? null;
 
 		if (newTargetId !== currentTargetBlockId) {
 			// Remove highlight from previous target
 			if (currentTargetEl) {
-				currentTargetEl.classList.remove('media-transfer-target');
+				currentTargetEl.classList.remove("media-transfer-target");
 			}
 			currentTargetBlockId = newTargetId;
 			currentTargetEl = cardEl;
 			// Add highlight to new target (if different from source)
-			if (currentTargetEl && currentTargetBlockId && currentTargetBlockId !== blockId) {
-				currentTargetEl.classList.add('media-transfer-target');
+			if (
+				currentTargetEl &&
+				currentTargetBlockId &&
+				currentTargetBlockId !== blockId
+			) {
+				currentTargetEl.classList.add("media-transfer-target");
 			}
 		}
 	}
 
 	function handleDocMouseUp(_e: MouseEvent) {
-		document.removeEventListener('mousemove', handleDocMouseMove);
-		document.removeEventListener('mouseup', handleDocMouseUp);
+		document.removeEventListener("mousemove", handleDocMouseMove);
+		document.removeEventListener("mouseup", handleDocMouseUp);
 
 		if (draggingPath && currentTargetBlockId) {
 			performTransfer(currentTargetBlockId);
@@ -205,7 +229,7 @@
 
 		// Cleanup
 		if (currentTargetEl) {
-			currentTargetEl.classList.remove('media-transfer-target');
+			currentTargetEl.classList.remove("media-transfer-target");
 		}
 		destroyGhost();
 		draggingPath = null;
@@ -216,8 +240,8 @@
 
 	function createGhost(x: number, y: number) {
 		if (!mouseDownInfo) return;
-		const el = document.createElement('div');
-		el.className = 'media-drag-ghost';
+		const el = document.createElement("div");
+		el.className = "media-drag-ghost";
 		el.style.cssText = `
 			position: fixed;
 			left: ${x - 24}px;
@@ -234,15 +258,15 @@
 		`;
 		const url = getPreviewUrl(mouseDownInfo.path);
 		if (isVideo(mouseDownInfo.path)) {
-			const vid = document.createElement('video');
+			const vid = document.createElement("video");
 			vid.src = url;
 			vid.muted = true;
-			vid.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+			vid.style.cssText = "width:100%;height:100%;object-fit:cover;";
 			el.appendChild(vid);
 		} else {
-			const img = document.createElement('img');
+			const img = document.createElement("img");
 			img.src = url;
-			img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+			img.style.cssText = "width:100%;height:100%;object-fit:cover;";
 			el.appendChild(img);
 		}
 		document.body.appendChild(el);
@@ -259,7 +283,7 @@
 	function handleFileSelect(e: Event) {
 		const input = e.target as HTMLInputElement;
 		if (input.files?.length) handleFiles(input.files);
-		input.value = '';
+		input.value = "";
 	}
 
 	export function triggerAttach() {
@@ -293,21 +317,29 @@
 					onmousedown={(e) => handleThumbMouseDown(e, path)}
 				>
 					{#if isVideo(path)}
-						<video src={getPreviewUrl(path)} class="thumb-img" muted></video>
-						<span class="media-badge"><Film size={12} /> Video</span>
+						<video src={getPreviewUrl(path)} class="thumb-img" muted
+						></video>
+						<span class="media-badge"><Film size={12} /> Video</span
+						>
 					{:else}
-						<img src={getPreviewUrl(path)} alt="" class="thumb-img" />
+						<img
+							src={getPreviewUrl(path)}
+							alt=""
+							class="thumb-img"
+						/>
 					{/if}
 					<button
 						class="remove-btn"
 						onclick={() => removeMedia(path)}
-						aria-label="Remove media attachment {mediaPaths.indexOf(path) + 1}"
+						aria-label="Remove media attachment {mediaPaths.indexOf(
+							path,
+						) + 1}"
 					>
 						<X size={12} />
 					</button>
 					{#if onaltchange && !isVideo(path)}
 						<MediaAltBadge
-							altText={altTexts[path] ?? ''}
+							altText={altTexts[path] ?? ""}
 							onchange={(alt) => onaltchange(path, alt)}
 						/>
 					{/if}
@@ -315,7 +347,11 @@
 			{/each}
 		</div>
 		<div class="media-links">
-			<button class="media-link disabled" title="Coming soon" aria-label="Tag people (coming soon)">
+			<button
+				class="media-link disabled"
+				title="Coming soon"
+				aria-label="Tag people (coming soon)"
+			>
 				<Users size={12} />
 				<span>Tag People</span>
 			</button>
@@ -324,7 +360,7 @@
 					class="media-link"
 					onclick={() => {
 						const badge = document.querySelector<HTMLButtonElement>(
-							'.media-slot [aria-label^="Add alt text"], .media-slot [aria-label^="Edit alt text"]'
+							'.media-slot [aria-label^="Add alt text"], .media-slot [aria-label^="Edit alt text"]',
 						);
 						badge?.click();
 					}}
@@ -367,31 +403,50 @@
 		gap: 2px;
 		border-radius: 12px;
 		overflow: hidden;
-		margin-top: 8px;
-		margin-bottom: 8px;
+		margin: 8px 0;
 		border: 1px solid var(--color-border-subtle);
 	}
 
-	.media-thumbs.single { grid-template-columns: 1fr; }
-	.media-thumbs.double { grid-template-columns: 1fr 1fr; }
+	.media-thumbs.single {
+		grid-template-columns: 1fr;
+	}
+	.media-thumbs.single .thumb-img {
+		height: auto;
+		max-height: 600px;
+	}
+
+	.media-thumbs.double {
+		grid-template-columns: 1fr 1fr;
+		aspect-ratio: 3 / 2;
+	}
+
 	.media-thumbs.triple {
 		grid-template-columns: 1fr 1fr;
 		grid-template-rows: 1fr 1fr;
+		aspect-ratio: 3 / 2;
 	}
-	.media-thumbs.triple .thumb:first-child { grid-row: 1 / 3; }
+	.media-thumbs.triple .thumb:first-child {
+		grid-row: 1 / 3;
+	}
+
 	.media-thumbs.quad {
 		grid-template-columns: 1fr 1fr;
 		grid-template-rows: 1fr 1fr;
+		aspect-ratio: 3 / 2;
 	}
 
 	.thumb {
 		position: relative;
 		overflow: hidden;
-		min-height: 80px;
 		background: var(--color-surface-active);
 		cursor: grab;
 		transition: opacity 0.15s ease;
 		user-select: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
 	}
 
 	.thumb:active {
@@ -401,9 +456,6 @@
 	.thumb.thumb-dragging {
 		opacity: 0.4;
 	}
-
-	.media-thumbs.single .thumb { aspect-ratio: 16 / 9; }
-	.media-thumbs.double .thumb { aspect-ratio: 1; }
 
 	.thumb-img {
 		width: 100%;
@@ -488,7 +540,9 @@
 		color: var(--color-text-muted);
 	}
 
-	.hidden { display: none; }
+	.hidden {
+		display: none;
+	}
 
 	.slot-error {
 		margin-top: 4px;
@@ -497,10 +551,16 @@
 	}
 
 	@media (pointer: coarse) {
-		.remove-btn { width: 32px; height: 32px; }
+		.remove-btn {
+			width: 32px;
+			height: 32px;
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.media-slot, .remove-btn { transition: none; }
+		.media-slot,
+		.remove-btn {
+			transition: none;
+		}
 	}
 </style>
