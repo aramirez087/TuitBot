@@ -31,6 +31,9 @@ Thumbs.db
 
 # Documentation build output
 site/
+docs/generated/coverage-report.json
+docs/generated/coverage-report.md
+roadmap/artifacts/
 
 # Dashboard (Svelte + Tauri)
 dashboard/node_modules/

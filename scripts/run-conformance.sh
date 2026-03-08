@@ -36,7 +36,7 @@ echo ""
 
 if [ "$REPORT_ONLY" = true ]; then
   echo "--- Generating coverage report only ---"
-  cargo test -p tuitbot-mcp generate_coverage_report -- --exact 2>&1 | tail -5
+  cargo test -p tuitbot-mcp tools::conformance_tests::coverage::generate_coverage_report -- --exact 2>&1 | tail -5
   echo ""
   echo "Reports written to:"
   echo "  $REPORT_DIR/coverage-report.json"
@@ -72,7 +72,7 @@ cargo test -p tuitbot-mcp eval_session09 -- --quiet 2>&1 | tail -3
 echo ""
 echo "--- Phase 2: Coverage report generation ---"
 echo ""
-cargo test -p tuitbot-mcp generate_coverage_report -- --exact 2>&1 | tail -3
+cargo test -p tuitbot-mcp tools::conformance_tests::coverage::generate_coverage_report -- --exact 2>&1 | tail -3
 
 echo ""
 echo "Reports written to:"
