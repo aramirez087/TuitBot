@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { FolderOpen, Cloud, ChevronDown, ChevronRight, RefreshCw, Loader2 } from 'lucide-svelte';
+	import { FolderOpen, Cloud, ChevronDown, ChevronRight, RefreshCw, Loader2, ExternalLink } from 'lucide-svelte';
+	import { buildObsidianVaultUri, openExternalUrl } from '$lib/utils/obsidianUri';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 	import DriveConnectCard from '$lib/components/onboarding/DriveConnectCard.svelte';
 	import { draft, updateDraft } from '$lib/stores/settings';
@@ -158,6 +159,16 @@
 		} catch { browseError = 'Could not open folder picker'; }
 	}
 
+	const obsidianVaultUri = $derived(
+		isDesktop && sourceType === 'local_fs' && sourcePath
+			? buildObsidianVaultUri(sourcePath)
+			: null
+	);
+
+	async function handleOpenVaultInObsidian() {
+		if (obsidianVaultUri) await openExternalUrl(obsidianVaultUri);
+	}
+
 	function toggleWatch() { updateSource({ watch: !sourceWatch }); }
 	function toggleLoopBack() { updateSource({ loop_back_enabled: !sourceLoopBack }); }
 	function handleConnected(connId: number, _email: string) { updateSource({ connection_id: connId, service_account_key: null }); }
@@ -249,6 +260,11 @@
 						{/if}
 					</div>
 					<span class="field-hint">{canNativePicker ? 'Click Browse to select your Obsidian vault or notes folder.' : 'Enter the full server-side path to your notes folder.'}</span>
+					{#if obsidianVaultUri}
+						<button type="button" class="open-obsidian-link" onclick={handleOpenVaultInObsidian}>
+							<ExternalLink size={12} /> Open vault in Obsidian
+						</button>
+					{/if}
 					{#if browseError}<span class="field-error">{browseError}</span>{/if}
 				</div>
 			{/if}
@@ -362,6 +378,9 @@
 	.rescan-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: var(--color-surface-hover); border: 1px solid var(--color-border); border-radius: 5px; font-size: 12px; color: var(--color-text-muted); cursor: pointer; transition: all 0.15s; }
 	.rescan-btn:hover:not(:disabled) { color: var(--color-text); border-color: var(--color-accent); }
 	.rescan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+	.open-obsidian-link { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: none; background: none; color: var(--color-accent); font-size: 12px; cursor: pointer; transition: opacity 0.15s; }
+	.open-obsidian-link:hover { opacity: 0.8; text-decoration: underline; }
 
 	:global(.spin) { animation: spin 1s linear infinite; }
 	@keyframes spin { to { transform: rotate(360deg); } }

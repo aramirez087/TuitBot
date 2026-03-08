@@ -717,6 +717,8 @@ export interface VaultSourceStatus {
 	error_message: string | null;
 	node_count: number;
 	updated_at: string;
+	/** Local vault path for `local_fs` sources — used for Obsidian URI deep links. */
+	path?: string;
 }
 
 export interface VaultNoteItem {

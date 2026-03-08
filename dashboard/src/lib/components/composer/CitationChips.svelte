@@ -1,13 +1,18 @@
 <script lang="ts">
 	import type { VaultCitation } from '$lib/api/types';
-	import { X, FileText, ChevronDown, ChevronUp } from 'lucide-svelte';
+	import { X, FileText, ChevronDown, ChevronUp, ExternalLink } from 'lucide-svelte';
+	import { buildObsidianUri, openExternalUrl } from '$lib/utils/obsidianUri';
 
 	let {
 		citations,
-		onremove
+		onremove,
+		vaultPath = null,
+		isDesktop = false
 	}: {
 		citations: VaultCitation[];
 		onremove?: (chunkId: number) => void;
+		vaultPath?: string | null;
+		isDesktop?: boolean;
 	} = $props();
 
 	let expandedId = $state<number | null>(null);
@@ -27,6 +32,17 @@
 		const title = c.source_title || c.source_path.split('/').pop() || 'Note';
 		const heading = c.heading_path.split(' > ').pop() || '';
 		return heading && heading !== title ? `${title} › ${heading}` : title;
+	}
+
+	function obsidianUriFor(cit: VaultCitation): string | null {
+		if (!isDesktop || !vaultPath) return null;
+		return buildObsidianUri(vaultPath, cit.source_path);
+	}
+
+	async function handleOpenInObsidian(e: Event, cit: VaultCitation) {
+		e.stopPropagation();
+		const uri = obsidianUriFor(cit);
+		if (uri) await openExternalUrl(uri);
 	}
 </script>
 
@@ -52,14 +68,28 @@
 							<ChevronDown size={10} />
 						{/if}
 					</button>
-					{#if onremove}
-						<button
-							class="chip-remove"
-							onclick={() => onremove?.(cit.chunk_id)}
-							aria-label="Remove citation from {chipLabel(cit)}"
-						>
-							<X size={10} />
-						</button>
+					{#if obsidianUriFor(cit) || onremove}
+						<div class="chip-actions">
+							{#if obsidianUriFor(cit)}
+								<button
+									class="chip-action chip-open"
+									onclick={(e) => handleOpenInObsidian(e, cit)}
+									aria-label="Open in Obsidian"
+									title="Open in Obsidian"
+								>
+									<ExternalLink size={10} />
+								</button>
+							{/if}
+							{#if onremove}
+								<button
+									class="chip-action chip-remove"
+									onclick={() => onremove?.(cit.chunk_id)}
+									aria-label="Remove citation from {chipLabel(cit)}"
+								>
+									<X size={10} />
+								</button>
+							{/if}
+						</div>
 					{/if}
 					{#if expandedId === cit.chunk_id}
 						<div class="chip-detail">
@@ -109,11 +139,21 @@
 		gap: 1px;
 		flex-direction: column;
 		position: relative;
+		padding-right: 20px;
 	}
 
 	.chip-wrapper > :first-child {
 		display: flex;
 		flex-direction: row;
+	}
+
+	.chip-actions {
+		position: absolute;
+		top: 0;
+		right: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
 	}
 
 	.citation-chip {
@@ -148,7 +188,7 @@
 		white-space: nowrap;
 	}
 
-	.chip-remove {
+	.chip-action {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -160,10 +200,12 @@
 		color: var(--color-text-subtle);
 		cursor: pointer;
 		padding: 0;
-		position: absolute;
-		top: 0;
-		right: -18px;
 		transition: all 0.1s ease;
+	}
+
+	.chip-open:hover {
+		background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+		color: var(--color-accent);
 	}
 
 	.chip-remove:hover {
@@ -199,7 +241,7 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.citation-chip,
-		.chip-remove {
+		.chip-action {
 			transition: none;
 		}
 	}
@@ -210,10 +252,13 @@
 			min-height: 32px;
 		}
 
-		.chip-remove {
+		.chip-action {
 			width: 24px;
 			height: 24px;
-			right: -26px;
+		}
+
+		.chip-wrapper {
+			padding-right: 28px;
 		}
 	}
 </style>

@@ -60,6 +60,10 @@ pub struct VaultSourceStatusItem {
     pub error_message: Option<String>,
     pub node_count: i64,
     pub updated_at: String,
+    /// For `local_fs` sources, the configured vault path.  Used by the
+    /// desktop frontend to construct `obsidian://` deep-link URIs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 pub async fn vault_sources(
@@ -73,6 +77,13 @@ pub async fn vault_sources(
         let count = watchtower::count_nodes_for_source(&state.db, &ctx.account_id, src.id)
             .await
             .unwrap_or(0);
+        let path = if src.source_type == "local_fs" {
+            serde_json::from_str::<serde_json::Value>(&src.config_json)
+                .ok()
+                .and_then(|v| v.get("path").and_then(|p| p.as_str().map(String::from)))
+        } else {
+            None
+        };
         items.push(VaultSourceStatusItem {
             id: src.id,
             source_type: src.source_type,
@@ -80,6 +91,7 @@ pub async fn vault_sources(
             error_message: src.error_message,
             node_count: count,
             updated_at: src.updated_at,
+            path,
         });
     }
 

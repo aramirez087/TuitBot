@@ -29,6 +29,7 @@
 	import ComposerInsertBar from './ComposerInsertBar.svelte';
 	import CitationChips from './CitationChips.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
+	import { deploymentMode } from '$lib/stores/runtime';
 	import { persistGet, persistSet } from '$lib/stores/persistence';
 	import {
 		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
@@ -77,6 +78,10 @@
 	let inspectorOpen = $state(loadInspectorState());
 	let isMobile = $state(false);
 	let statusAnnouncement = $state('');
+
+	// Desktop vault path for Obsidian deep-links
+	let localVaultPath = $state<string | null>(null);
+	const isDesktop = $derived($deploymentMode === 'desktop');
 
 	// Home-surface state (only active when embedded)
 	let tipsVisible = $state(false);
@@ -228,6 +233,15 @@
 		inspectorOpen = loadInspectorState();
 
 		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		// Load vault path for Obsidian deep-links (desktop only)
+		if ($deploymentMode === 'desktop') {
+			try {
+				const res = await api.vault.sources();
+				const localSrc = res.sources.find((s) => s.source_type === 'local_fs');
+				if (localSrc?.path) localVaultPath = localSrc.path;
+			} catch { /* vault path is best-effort */ }
+		}
 
 		if (embedded) {
 			const tipsDismissed = await persistGet('home_tips_dismissed', false);
@@ -750,6 +764,8 @@
 			{#if vaultCitations.length > 0 && notesPanelMode !== 'vault'}
 				<CitationChips
 					citations={vaultCitations}
+					vaultPath={localVaultPath}
+					{isDesktop}
 					onremove={(chunkId) => {
 						vaultCitations = vaultCitations.filter((c) => c.chunk_id !== chunkId);
 					}}
