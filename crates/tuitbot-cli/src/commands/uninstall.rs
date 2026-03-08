@@ -78,7 +78,9 @@ fn discover() -> UninstallInventory {
         subdirs.sort_by(|a, b| a.name.cmp(&b.name));
     }
 
-    let cli_binary = std::env::current_exe().ok().filter(|p| p.exists());
+    let cli_binary = std::env::current_exe()
+        .ok()
+        .filter(|p| p.exists() && is_installed_path(p));
     let server_binary = detect_server_path();
     let server_running = is_server_running();
 
@@ -116,6 +118,38 @@ fn dir_size(path: &Path) -> (usize, u64) {
     }
 
     (count, size)
+}
+
+/// Check whether a binary path looks like a standard install location
+/// rather than a temporary/ad-hoc extraction directory.
+///
+/// Prevents uninstall from deleting locally extracted release artifacts
+/// or binaries run from random working directories.
+fn is_installed_path(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+
+    // Standard cargo/system install roots
+    if s.contains("/.cargo/bin/")
+        || s.contains("/usr/local/bin/")
+        || s.contains("/usr/bin/")
+        || s.contains("/opt/")
+        || s.contains("/bin/tuitbot")
+    {
+        return true;
+    }
+
+    // Windows: typical cargo install path
+    #[cfg(windows)]
+    if s.contains("\\.cargo\\bin\\") || s.contains("\\Program Files") {
+        return true;
+    }
+
+    // macOS: Homebrew
+    if s.contains("/Cellar/") || s.contains("/homebrew/") {
+        return true;
+    }
+
+    false
 }
 
 /// Walk PATH to find `tuitbot-server` binary.

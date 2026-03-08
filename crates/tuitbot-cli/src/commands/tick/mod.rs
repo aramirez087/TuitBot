@@ -295,10 +295,14 @@ pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow:
 
     print_output(&output, out);
 
-    // 9. Exit code: the process exits 0 on Ok, 1 via anyhow::bail.
+    // 9. Exit code: non-zero when any loop failed.
     if !output.success {
-        // Don't bail — we still want the output. Process exits 0 since
-        // loop-level failures are captured in the JSON output.
+        if out.is_json() {
+            // JSON output already contains the failure details; exit directly
+            // to avoid a duplicate error envelope from the main error handler.
+            std::process::exit(1);
+        }
+        anyhow::bail!("tick failed: {} error(s)", output.errors.len());
     }
 
     Ok(())

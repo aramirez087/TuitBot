@@ -134,18 +134,21 @@ async fn run() -> anyhow::Result<()> {
     // - Verbose (-v): debug level, includes module paths.
     // - Quiet (-q): error level, minimal format.
     let suppress_logs = cli.quiet || commands::OutputFormat::from_str(&cli.output).is_json();
-    let filter = if std::env::var("RUST_LOG").is_ok() {
+    let filter = if suppress_logs {
+        // --quiet and --output json always suppress logs, even if RUST_LOG is set.
+        // This prevents tracing output from polluting JSON on stdout.
+        EnvFilter::new("error")
+    } else if std::env::var("RUST_LOG").is_ok() {
         EnvFilter::from_default_env()
     } else if cli.verbose {
         EnvFilter::new("tuitbot=debug,tuitbot_core=debug,info")
-    } else if suppress_logs {
-        EnvFilter::new("error")
     } else {
         EnvFilter::new("tuitbot=info,tuitbot_core=info,warn")
     };
 
     tracing_subscriber::fmt()
         .with_env_filter(filter)
+        .with_writer(std::io::stderr)
         .with_target(cli.verbose)
         .compact()
         .init();
