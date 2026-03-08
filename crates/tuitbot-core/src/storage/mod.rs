@@ -16,6 +16,7 @@ pub mod llm_usage;
 pub mod mcp_telemetry;
 pub mod media;
 pub mod mutation_audit;
+pub mod provenance;
 pub mod rate_limits;
 pub mod replies;
 pub mod reset;
@@ -181,6 +182,9 @@ mod tests {
         assert!(table_names.contains(&"content_tags"));
         assert!(table_names.contains(&"content_tag_assignments"));
         assert!(table_names.contains(&"content_activity"));
+        // Vault tables
+        assert!(table_names.contains(&"content_chunks"));
+        assert!(table_names.contains(&"vault_provenance_links"));
     }
 
     #[tokio::test]

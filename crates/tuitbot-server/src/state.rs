@@ -10,6 +10,7 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tuitbot_core::automation::circuit_breaker::CircuitBreaker;
 use tuitbot_core::automation::Runtime;
+use tuitbot_core::automation::WatchtowerLoop;
 use tuitbot_core::config::{
     effective_config, Config, ConnectorConfig, ContentSourcesConfig, DeploymentMode,
 };
@@ -63,9 +64,9 @@ pub struct AppState {
     /// Optional circuit breaker for X API rate-limit protection.
     pub circuit_breaker: Option<Arc<CircuitBreaker>>,
     /// Cancellation token for the Watchtower filesystem watcher (None if not running).
-    pub watchtower_cancel: Option<CancellationToken>,
+    pub watchtower_cancel: RwLock<Option<CancellationToken>>,
     /// Content sources configuration for the Watchtower.
-    pub content_sources: ContentSourcesConfig,
+    pub content_sources: RwLock<ContentSourcesConfig>,
     /// Connector configuration for remote source OAuth flows.
     pub connector_config: ConnectorConfig,
     /// Deployment mode (desktop, self_host, or cloud).
@@ -165,5 +166,72 @@ impl AppState {
             .insert(account_id.to_string(), gen.clone());
 
         Ok(gen)
+    }
+
+    /// Cancel the running Watchtower (if any), reload config from disk,
+    /// and spawn a new Watchtower loop with the updated sources.
+    ///
+    /// Called after `PATCH /api/settings` modifies `content_sources` or
+    /// `deployment_mode`.
+    pub async fn restart_watchtower(&self) {
+        // 1. Cancel existing watchtower.
+        if let Some(cancel) = self.watchtower_cancel.write().await.take() {
+            cancel.cancel();
+            tracing::info!("Watchtower cancelled for config reload");
+        }
+
+        // 2. Reload config from disk.
+        let loaded_config = Config::load(Some(&self.config_path.to_string_lossy())).ok();
+        let new_sources = loaded_config
+            .as_ref()
+            .map(|c| c.content_sources.clone())
+            .unwrap_or_default();
+        let connector_config = loaded_config
+            .as_ref()
+            .map(|c| c.connectors.clone())
+            .unwrap_or_default();
+        let deployment_mode = loaded_config
+            .as_ref()
+            .map(|c| c.deployment_mode.clone())
+            .unwrap_or_default();
+
+        // 3. Check if any sources are enabled and eligible.
+        let has_enabled: Vec<_> = new_sources
+            .sources
+            .iter()
+            .filter(|s| {
+                s.is_enabled()
+                    && deployment_mode.allows_source_type(&s.source_type)
+                    && (s.path.is_some() || s.folder_id.is_some())
+            })
+            .collect();
+
+        if has_enabled.is_empty() {
+            tracing::info!("Watchtower restart: no enabled sources, not spawning");
+            *self.content_sources.write().await = new_sources;
+            return;
+        }
+
+        // 4. Spawn new WatchtowerLoop.
+        let cancel = CancellationToken::new();
+        let watchtower = WatchtowerLoop::new(
+            self.db.clone(),
+            new_sources.clone(),
+            connector_config,
+            self.data_dir.clone(),
+        );
+        let cancel_clone = cancel.clone();
+        tokio::spawn(async move {
+            watchtower.run(cancel_clone).await;
+        });
+
+        tracing::info!(
+            sources = has_enabled.len(),
+            "Watchtower restarted with updated config"
+        );
+
+        // 5. Update state.
+        *self.watchtower_cancel.write().await = Some(cancel);
+        *self.content_sources.write().await = new_sources;
     }
 }

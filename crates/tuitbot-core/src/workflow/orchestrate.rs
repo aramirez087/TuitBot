@@ -140,6 +140,7 @@ pub async fn run_discovery_cycle(
             candidate_ids: actionable_ids,
             archetype: None,
             mention_product: input.mention_product,
+            account_id: None,
         },
     )
     .await?;

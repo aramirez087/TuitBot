@@ -325,13 +325,13 @@ impl DiscoveryLoop {
             };
         }
 
-        // Generate reply (product mention decided by caller or random)
-        let reply_text = match self
+        // Generate reply with vault context (product mention always on for discovery)
+        let reply_output = match self
             .generator
-            .generate_reply(&tweet.text, &tweet.author_username, true)
+            .generate_reply_with_rag(&tweet.text, &tweet.author_username, true)
             .await
         {
-            Ok(text) => text,
+            Ok(output) => output,
             Err(e) => {
                 tracing::error!(
                     tweet_id = %tweet.id,
@@ -344,6 +344,7 @@ impl DiscoveryLoop {
                 };
             }
         };
+        let reply_text = reply_output.text;
 
         tracing::info!(
             author = %tweet.author_username,

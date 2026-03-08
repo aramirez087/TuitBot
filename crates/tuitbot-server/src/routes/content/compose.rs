@@ -10,6 +10,7 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
+use tuitbot_core::storage::provenance::ProvenanceRef;
 use tuitbot_core::storage::{action_log, approval_queue, scheduled_content};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
@@ -53,6 +54,9 @@ pub struct ComposeTweetRequest {
     pub text: String,
     /// Optional ISO 8601 timestamp to schedule the tweet.
     pub scheduled_for: Option<String>,
+    /// Optional provenance refs linking this content to vault source material.
+    #[serde(default)]
+    pub provenance: Option<Vec<ProvenanceRef>>,
 }
 
 /// `POST /api/content/tweets` — compose and queue a manual tweet.
@@ -72,7 +76,9 @@ pub async fn compose_tweet(
     let approval_mode = read_approval_mode(&state, &ctx.account_id).await?;
 
     if approval_mode {
-        let id = approval_queue::enqueue_for(
+        let prov_input = build_provenance_input(body.provenance.as_deref());
+
+        let id = approval_queue::enqueue_with_provenance_for(
             &state.db,
             &ctx.account_id,
             "tweet",
@@ -83,6 +89,9 @@ pub async fn compose_tweet(
             "", // no archetype
             0.0,
             "[]",
+            None,
+            None,
+            prov_input.as_ref(),
         )
         .await?;
 
@@ -189,6 +198,9 @@ pub struct ComposeRequest {
     /// Optional structured thread blocks. Takes precedence over `content` for threads.
     #[serde(default)]
     pub blocks: Option<Vec<ThreadBlockRequest>>,
+    /// Optional provenance refs linking this content to vault source material.
+    #[serde(default)]
+    pub provenance: Option<Vec<ProvenanceRef>>,
 }
 
 /// `POST /api/content/compose` — compose manual content (tweet or thread).
@@ -298,7 +310,9 @@ async fn compose_thread_blocks_flow(
 
     if approval_mode {
         let media_json = serde_json::to_string(&all_media).unwrap_or_else(|_| "[]".to_string());
-        let id = approval_queue::enqueue_for(
+        let prov_input = build_provenance_input(body.provenance.as_deref());
+
+        let id = approval_queue::enqueue_with_provenance_for(
             &state.db,
             &ctx.account_id,
             "thread",
@@ -309,6 +323,9 @@ async fn compose_thread_blocks_flow(
             "",
             0.0,
             &media_json,
+            None,
+            None,
+            prov_input.as_ref(),
         )
         .await?;
 
@@ -398,7 +415,10 @@ async fn persist_content(
     if approval_mode {
         let media_paths = body.media_paths.as_deref().unwrap_or(&[]);
         let media_json = serde_json::to_string(media_paths).unwrap_or_else(|_| "[]".to_string());
-        let id = approval_queue::enqueue_for(
+
+        let prov_input = build_provenance_input(body.provenance.as_deref());
+
+        let id = approval_queue::enqueue_with_provenance_for(
             &state.db,
             &ctx.account_id,
             &body.content_type,
@@ -409,6 +429,9 @@ async fn persist_content(
             "",
             0.0,
             &media_json,
+            None,
+            None,
+            prov_input.as_ref(),
         )
         .await?;
 
@@ -638,4 +661,25 @@ async fn try_post_thread_now(
         "status": "posted",
         "tweet_ids": tweet_ids,
     })))
+}
+
+/// Build a `ProvenanceInput` from optional provenance refs.
+fn build_provenance_input(
+    provenance: Option<&[ProvenanceRef]>,
+) -> Option<approval_queue::ProvenanceInput> {
+    let refs = provenance?;
+    if refs.is_empty() {
+        return None;
+    }
+
+    let source_node_id = refs.iter().find_map(|r| r.node_id);
+    let source_seed_id = refs.iter().find_map(|r| r.seed_id);
+    let source_chunks_json = serde_json::to_string(refs).unwrap_or_else(|_| "[]".to_string());
+
+    Some(approval_queue::ProvenanceInput {
+        source_node_id,
+        source_seed_id,
+        source_chunks_json,
+        refs: refs.to_vec(),
+    })
 }

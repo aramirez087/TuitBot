@@ -378,13 +378,13 @@ impl TargetLoop {
             };
         }
 
-        // Generate reply (no product mention for target accounts — be genuine)
-        let reply_text = match self
+        // Generate reply with vault context (no product mention — genuine engagement)
+        let reply_output = match self
             .generator
-            .generate_reply(&tweet.text, username, false)
+            .generate_reply_with_rag(&tweet.text, username, false)
             .await
         {
-            Ok(text) => text,
+            Ok(output) => output,
             Err(e) => {
                 return TargetResult::Failed {
                     tweet_id: tweet.id.clone(),
@@ -392,6 +392,7 @@ impl TargetLoop {
                 };
             }
         };
+        let reply_text = reply_output.text;
 
         tracing::info!(
             username = %username,

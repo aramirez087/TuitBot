@@ -384,6 +384,13 @@ pub async fn patch_settings(
             ))
         })?;
 
+        // Restart Watchtower when content_sources or deployment_mode changes.
+        let touches_sources =
+            patch.get("content_sources").is_some() || patch.get("deployment_mode").is_some();
+        if touches_sources {
+            state.restart_watchtower().await;
+        }
+
         let mut json = serde_json::to_value(config)
             .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
         redact_service_account_keys(&mut json);
@@ -624,8 +631,8 @@ pub async fn factory_reset(
     };
 
     // 3. Cancel watchtower.
-    if let Some(ref token) = state.watchtower_cancel {
-        token.cancel();
+    if let Some(cancel) = state.watchtower_cancel.write().await.take() {
+        cancel.cancel();
     }
 
     // 4. Clear all DB table contents (single transaction).

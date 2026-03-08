@@ -184,8 +184,9 @@ async fn main() -> Result<()> {
         .unwrap_or_default();
 
     // Conditionally start the Watchtower filesystem watcher.
+    // Uses `is_enabled()` which respects both `enabled` and legacy `watch`.
     let watchtower_cancel = {
-        let watch_sources: Vec<_> = content_sources
+        let enabled_sources: Vec<_> = content_sources
             .sources
             .iter()
             .filter(|s| {
@@ -197,11 +198,11 @@ async fn main() -> Result<()> {
                     );
                     return false;
                 }
-                s.watch && (s.path.is_some() || s.folder_id.is_some())
+                s.is_enabled() && (s.path.is_some() || s.folder_id.is_some())
             })
             .collect();
 
-        if !watch_sources.is_empty() {
+        if !enabled_sources.is_empty() {
             let cancel = CancellationToken::new();
             let watchtower = WatchtowerLoop::new(
                 pool.clone(),
@@ -213,7 +214,7 @@ async fn main() -> Result<()> {
             tokio::spawn(async move {
                 watchtower.run(cancel_clone).await;
             });
-            tracing::info!(sources = watch_sources.len(), "Watchtower started");
+            tracing::info!(sources = enabled_sources.len(), "Watchtower started");
             Some(cancel)
         } else {
             None
@@ -234,8 +235,8 @@ async fn main() -> Result<()> {
         runtimes: Mutex::new(HashMap::new()),
         content_generators: Mutex::new(content_generators),
         circuit_breaker: None,
-        watchtower_cancel: watchtower_cancel.clone(),
-        content_sources,
+        watchtower_cancel: tokio::sync::RwLock::new(watchtower_cancel),
+        content_sources: tokio::sync::RwLock::new(content_sources),
         connector_config,
         deployment_mode,
         pending_oauth: Mutex::new(HashMap::new()),
@@ -246,7 +247,7 @@ async fn main() -> Result<()> {
             .unwrap_or_default(),
     });
 
-    let router = tuitbot_server::build_router(state);
+    let router = tuitbot_server::build_router(state.clone());
 
     // Warn about network exposure when binding to 0.0.0.0.
     if bind_host == "0.0.0.0" {
@@ -261,7 +262,7 @@ async fn main() -> Result<()> {
     axum::serve(listener, router).await?;
 
     // Cancel watchtower on shutdown.
-    if let Some(cancel) = watchtower_cancel {
+    if let Some(cancel) = state.watchtower_cancel.read().await.as_ref() {
         cancel.cancel();
     }
 

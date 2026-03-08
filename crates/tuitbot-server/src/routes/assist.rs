@@ -11,11 +11,12 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use tuitbot_core::content::ContentGenerator;
-use tuitbot_core::context::winning_dna;
+use tuitbot_core::context::retrieval::VaultCitation;
 use tuitbot_core::storage;
 
 use crate::account::AccountContext;
 use crate::error::ApiError;
+use crate::routes::rag_helpers::resolve_composer_rag_context;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -32,48 +33,6 @@ async fn get_generator(
         .map_err(ApiError::BadRequest)
 }
 
-/// Resolve optional RAG context from the vault for composer assist handlers.
-///
-/// Loads the business profile's keyword set, queries winning ancestors and
-/// content seeds via `build_draft_context()`, and returns the formatted
-/// prompt block. Returns `None` (fail-open) on any error or when no
-/// relevant context exists.
-async fn resolve_composer_rag_context(state: &AppState, account_id: &str) -> Option<String> {
-    let config = match state.load_effective_config(account_id).await {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::warn!("composer RAG: failed to load config: {e}");
-            return None;
-        }
-    };
-
-    let keywords = config.business.draft_context_keywords();
-    if keywords.is_empty() {
-        return None;
-    }
-
-    let draft_context = match winning_dna::build_draft_context(
-        &state.db,
-        &keywords,
-        winning_dna::MAX_ANCESTORS,
-        winning_dna::RECENCY_HALF_LIFE_DAYS,
-    )
-    .await
-    {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            tracing::warn!("composer RAG: failed to build draft context: {e}");
-            return None;
-        }
-    };
-
-    if draft_context.prompt_block.is_empty() {
-        None
-    } else {
-        Some(draft_context.prompt_block)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // POST /api/assist/tweet
 // ---------------------------------------------------------------------------
@@ -81,12 +40,16 @@ async fn resolve_composer_rag_context(state: &AppState, account_id: &str) -> Opt
 #[derive(Deserialize)]
 pub struct AssistTweetRequest {
     pub topic: String,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
 pub struct AssistTweetResponse {
     pub content: String,
     pub topic: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_tweet(
@@ -95,16 +58,24 @@ pub async fn assist_tweet(
     Json(body): Json<AssistTweetRequest>,
 ) -> Result<Json<AssistTweetResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
-    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
+
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
 
     let output = gen
-        .generate_tweet_with_context(&body.topic, None, rag_context.as_deref())
+        .generate_tweet_with_context(&body.topic, None, prompt_block)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistTweetResponse {
         content: output.text,
         topic: body.topic,
+        vault_citations: citations,
     }))
 }
 
@@ -118,11 +89,15 @@ pub struct AssistReplyRequest {
     pub tweet_author: String,
     #[serde(default)]
     pub mention_product: bool,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
 pub struct AssistReplyResponse {
     pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_reply(
@@ -131,14 +106,29 @@ pub async fn assist_reply(
     Json(body): Json<AssistReplyRequest>,
 ) -> Result<Json<AssistReplyResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
+
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
 
     let output = gen
-        .generate_reply(&body.tweet_text, &body.tweet_author, body.mention_product)
+        .generate_reply_with_context(
+            &body.tweet_text,
+            &body.tweet_author,
+            body.mention_product,
+            None,
+            prompt_block,
+        )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistReplyResponse {
         content: output.text,
+        vault_citations: citations,
     }))
 }
 
@@ -149,12 +139,16 @@ pub async fn assist_reply(
 #[derive(Deserialize)]
 pub struct AssistThreadRequest {
     pub topic: String,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
 pub struct AssistThreadResponse {
     pub tweets: Vec<String>,
     pub topic: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_thread(
@@ -163,16 +157,24 @@ pub async fn assist_thread(
     Json(body): Json<AssistThreadRequest>,
 ) -> Result<Json<AssistThreadResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
-    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
+
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
 
     let output = gen
-        .generate_thread_with_context(&body.topic, None, rag_context.as_deref())
+        .generate_thread_with_context(&body.topic, None, prompt_block)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistThreadResponse {
         tweets: output.tweets,
         topic: body.topic,
+        vault_citations: citations,
     }))
 }
 
@@ -185,11 +187,15 @@ pub struct AssistImproveRequest {
     pub draft: String,
     #[serde(default)]
     pub context: Option<String>,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
 pub struct AssistImproveResponse {
     pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_improve(
@@ -198,15 +204,23 @@ pub async fn assist_improve(
     Json(body): Json<AssistImproveRequest>,
 ) -> Result<Json<AssistImproveResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
-    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id).await;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
+
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
 
     let output = gen
-        .improve_draft_with_context(&body.draft, body.context.as_deref(), rag_context.as_deref())
+        .improve_draft_with_context(&body.draft, body.context.as_deref(), prompt_block)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistImproveResponse {
         content: output.text,
+        vault_citations: citations,
     }))
 }
 
@@ -333,8 +347,8 @@ mod tests {
             runtimes: Mutex::new(HashMap::new()),
             content_generators: Mutex::new(HashMap::new()),
             circuit_breaker: None,
-            watchtower_cancel: None,
-            content_sources: Default::default(),
+            watchtower_cancel: RwLock::new(None),
+            content_sources: RwLock::new(Default::default()),
             connector_config: Default::default(),
             deployment_mode: Default::default(),
 
@@ -347,7 +361,7 @@ mod tests {
     #[tokio::test]
     async fn resolve_rag_returns_none_when_config_missing() {
         let state = test_state(PathBuf::from("/nonexistent/config.toml")).await;
-        let result = resolve_composer_rag_context(&state, "test-account").await;
+        let result = resolve_composer_rag_context(&state, "test-account", None).await;
         assert!(
             result.is_none(),
             "should return None when config is missing"
@@ -365,7 +379,7 @@ mod tests {
         .expect("write config");
 
         let state = test_state(config_path).await;
-        let result = resolve_composer_rag_context(&state, "test-account").await;
+        let result = resolve_composer_rag_context(&state, "test-account", None).await;
         assert!(
             result.is_none(),
             "should return None when DB has no ancestor data"
@@ -381,10 +395,54 @@ mod tests {
             .expect("write config");
 
         let state = test_state(config_path).await;
-        let result = resolve_composer_rag_context(&state, "test-account").await;
+        let result = resolve_composer_rag_context(&state, "test-account", None).await;
         assert!(
             result.is_none(),
             "should return None when keywords are empty"
         );
+    }
+
+    #[test]
+    fn selected_node_ids_is_optional() {
+        // Verify existing request shapes still deserialize without selected_node_ids.
+        let json = r#"{"topic": "Rust async"}"#;
+        let req: AssistTweetRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.topic, "Rust async");
+        assert!(req.selected_node_ids.is_none());
+
+        let json = r#"{"topic": "Rust async", "selected_node_ids": [1, 2, 3]}"#;
+        let req: AssistTweetRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.selected_node_ids.unwrap(), vec![1, 2, 3]);
+
+        let json = r#"{"topic": "threads"}"#;
+        let req: AssistThreadRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.selected_node_ids.is_none());
+
+        let json = r#"{"draft": "hello"}"#;
+        let req: AssistImproveRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.selected_node_ids.is_none());
+    }
+
+    #[test]
+    fn reply_request_selected_node_ids_is_optional() {
+        let json = r#"{"tweet_text": "hello", "tweet_author": "user"}"#;
+        let req: AssistReplyRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.tweet_text, "hello");
+        assert!(!req.mention_product);
+        assert!(req.selected_node_ids.is_none());
+
+        let json = r#"{"tweet_text": "hi", "tweet_author": "u", "selected_node_ids": [10, 20]}"#;
+        let req: AssistReplyRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.selected_node_ids.unwrap(), vec![10, 20]);
+    }
+
+    #[test]
+    fn reply_response_omits_empty_citations() {
+        let resp = AssistReplyResponse {
+            content: "Great point!".to_string(),
+            vault_citations: vec![],
+        };
+        let json = serde_json::to_string(&resp).expect("serialize");
+        assert!(!json.contains("vault_citations"));
     }
 }

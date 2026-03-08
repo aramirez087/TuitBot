@@ -7,10 +7,14 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tuitbot_core::content::ContentGenerator;
-use tuitbot_core::storage::{self, approval_queue};
+use tuitbot_core::context::retrieval::VaultCitation;
+use tuitbot_core::storage::approval_queue::{self, ProvenanceInput};
+use tuitbot_core::storage::provenance::ProvenanceRef;
+use tuitbot_core::storage::{self};
 
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
+use crate::routes::rag_helpers::resolve_composer_rag_context;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -116,12 +120,16 @@ pub async fn keywords(
 pub struct ComposeReplyRequest {
     #[serde(default)]
     pub mention_product: bool,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
 pub struct ComposeReplyResponse {
     pub content: String,
     pub tweet_id: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn compose_reply(
@@ -139,14 +147,30 @@ pub async fn compose_reply(
             ApiError::NotFound(format!("Tweet {tweet_id} not found in discovered tweets"))
         })?;
 
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
+
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
+
     let output = gen
-        .generate_reply(&tweet.content, &tweet.author_username, body.mention_product)
+        .generate_reply_with_context(
+            &tweet.content,
+            &tweet.author_username,
+            body.mention_product,
+            None,
+            prompt_block,
+        )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(ComposeReplyResponse {
         content: output.text,
         tweet_id,
+        vault_citations: citations,
     }))
 }
 
@@ -157,6 +181,8 @@ pub async fn compose_reply(
 #[derive(Deserialize)]
 pub struct QueueReplyRequest {
     pub content: String,
+    #[serde(default)]
+    pub provenance: Option<Vec<ProvenanceRef>>,
 }
 
 pub async fn queue_reply(
@@ -182,7 +208,15 @@ pub async fn queue_reply(
         .map(|t| t.author_username)
         .unwrap_or_default();
 
-    let queue_id = approval_queue::enqueue_for(
+    // Build provenance input when citations are provided.
+    let provenance_input = body.provenance.as_ref().map(|refs| ProvenanceInput {
+        source_node_id: refs.first().and_then(|r| r.node_id),
+        source_seed_id: None,
+        source_chunks_json: "[]".to_string(),
+        refs: refs.clone(),
+    });
+
+    let queue_id = approval_queue::enqueue_with_provenance_for(
         &state.db,
         &ctx.account_id,
         "reply",
@@ -193,16 +227,62 @@ pub async fn queue_reply(
         "",  // archetype
         0.0, // score
         "[]",
+        None, // reason
+        None, // detected_risks
+        provenance_input.as_ref(),
     )
     .await?;
 
     // Auto-approve for immediate posting.
-    storage::approval_queue::update_status_for(&state.db, &ctx.account_id, queue_id, "approved")
-        .await?;
+    approval_queue::update_status_for(&state.db, &ctx.account_id, queue_id, "approved").await?;
 
     Ok(Json(json!({
         "approval_queue_id": queue_id,
         "tweet_id": tweet_id,
         "status": "queued_for_posting"
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn queue_reply_request_provenance_is_optional() {
+        let json = r#"{"content": "Great reply!"}"#;
+        let req: QueueReplyRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.content, "Great reply!");
+        assert!(req.provenance.is_none());
+    }
+
+    #[test]
+    fn queue_reply_request_with_provenance() {
+        let json = r#"{
+            "content": "Thanks!",
+            "provenance": [{"node_id": 1, "chunk_id": 2, "source_path": "notes/foo.md"}]
+        }"#;
+        let req: QueueReplyRequest = serde_json::from_str(json).expect("deserialize");
+        let refs = req.provenance.unwrap();
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].node_id, Some(1));
+    }
+
+    #[test]
+    fn compose_reply_request_selected_node_ids_optional() {
+        let json = r#"{"mention_product": true}"#;
+        let req: ComposeReplyRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.mention_product);
+        assert!(req.selected_node_ids.is_none());
+    }
+
+    #[test]
+    fn compose_reply_response_omits_empty_citations() {
+        let resp = ComposeReplyResponse {
+            content: "Nice!".to_string(),
+            tweet_id: "123".to_string(),
+            vault_citations: vec![],
+        };
+        let json = serde_json::to_string(&resp).expect("serialize");
+        assert!(!json.contains("vault_citations"));
+    }
 }

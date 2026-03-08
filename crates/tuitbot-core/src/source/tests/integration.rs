@@ -96,9 +96,15 @@ async fn e2e_local_folder_ingest_to_seed_pipeline() {
         .any(|s| s.seed_text.contains("Product strategy")));
 
     // Step 8: Build draft context — should use cold-start path (no ancestors).
-    let ctx = build_draft_context(&pool, &["strategy".into()], 5, 14.0)
-        .await
-        .unwrap();
+    let ctx = build_draft_context(
+        &pool,
+        crate::storage::accounts::DEFAULT_ACCOUNT_ID,
+        &["strategy".into()],
+        5,
+        14.0,
+    )
+    .await
+    .unwrap();
     assert!(ctx.winning_ancestors.is_empty());
     assert_eq!(ctx.content_seeds.len(), 2);
     assert!(!ctx.prompt_block.is_empty());
@@ -190,9 +196,15 @@ async fn e2e_google_drive_ingest_to_seed_pipeline() {
         .unwrap();
 
     // Step 7: Build draft context -> cold-start seeds appear.
-    let ctx = build_draft_context(&pool, &["remote".into()], 5, 14.0)
-        .await
-        .unwrap();
+    let ctx = build_draft_context(
+        &pool,
+        crate::storage::accounts::DEFAULT_ACCOUNT_ID,
+        &["remote".into()],
+        5,
+        14.0,
+    )
+    .await
+    .unwrap();
     assert!(ctx.winning_ancestors.is_empty());
     assert_eq!(ctx.content_seeds.len(), 1);
     assert!(ctx.content_seeds[0]
@@ -279,7 +291,15 @@ async fn e2e_mixed_sources_feed_draft_context() {
     }
 
     // Build context — seeds from both sources appear.
-    let ctx = build_draft_context(&pool, &[], 5, 14.0).await.unwrap();
+    let ctx = build_draft_context(
+        &pool,
+        crate::storage::accounts::DEFAULT_ACCOUNT_ID,
+        &[],
+        5,
+        14.0,
+    )
+    .await
+    .unwrap();
     assert_eq!(ctx.content_seeds.len(), 2);
 
     let texts: Vec<&str> = ctx
@@ -401,6 +421,8 @@ async fn e2e_loopback_writes_metadata_and_reingest_detects_change() {
         url: "https://x.com/user/status/tweet_999".to_string(),
         published_at: "2026-02-28T10:00:00Z".to_string(),
         content_type: "tweet".to_string(),
+        status: None,
+        thread_url: None,
     };
     let written =
         loopback::write_metadata_to_file(dir.path().join("launch.md").as_path(), &entry).unwrap();
@@ -521,4 +543,446 @@ async fn e2e_restart_recovery_cursor_survives() {
     // The cursor should survive the "restart" (it's in the DB).
     assert_eq!(ctx.sync_cursor.as_deref(), Some(cursor));
     assert_eq!(ctx.status, "active");
+}
+
+// ---------------------------------------------------------------------------
+// E2E: Fragment extraction and indexing
+// ---------------------------------------------------------------------------
+
+/// E2E: Ingest markdown with headings → verify fragments created with correct heading_path.
+#[tokio::test]
+async fn e2e_fragment_extraction_from_markdown() {
+    use crate::automation::watchtower::{chunker, ingest_file};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    let content = "\
+---
+title: Growth Strategy
+tags: [growth, product]
+---
+
+Some intro text before any heading.
+
+## Market Analysis
+
+The market is shifting toward...
+
+### Competitor Landscape
+
+Our main competitors are...
+
+## Product Roadmap
+
+Next quarter we plan to...
+";
+    std::fs::write(dir.path().join("strategy.md"), content).unwrap();
+
+    let src_id = store::insert_source_context(&pool, "local_fs", r#"{"path":"test"}"#)
+        .await
+        .unwrap();
+
+    ingest_file(&pool, src_id, dir.path(), "strategy.md", false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids.len(), 4);
+
+    let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+        .await
+        .unwrap();
+    assert_eq!(chunks.len(), 4);
+
+    // Verify heading paths.
+    assert_eq!(chunks[0].heading_path, "");
+    assert!(chunks[0].chunk_text.contains("intro text"));
+
+    assert_eq!(chunks[1].heading_path, "## Market Analysis");
+    assert!(chunks[1].chunk_text.contains("market is shifting"));
+
+    assert_eq!(
+        chunks[2].heading_path,
+        "## Market Analysis/### Competitor Landscape"
+    );
+    assert!(chunks[2].chunk_text.contains("main competitors"));
+
+    assert_eq!(chunks[3].heading_path, "## Product Roadmap");
+    assert!(chunks[3].chunk_text.contains("Next quarter"));
+
+    // Verify ordering.
+    for (i, chunk) in chunks.iter().enumerate() {
+        assert_eq!(chunk.chunk_index, i as i64);
+    }
+
+    // Verify node transitioned to chunked.
+    let chunked = store::get_nodes_for_source(&pool, src_id, Some("chunked"))
+        .await
+        .unwrap();
+    assert_eq!(chunked.len(), 1);
+}
+
+/// E2E: Re-ingest changed content → old chunks become stale, unchanged preserved.
+#[tokio::test]
+async fn e2e_fragment_update_on_content_change() {
+    use crate::automation::watchtower::{chunker, ingest_content};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    let src_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    // V1: two sections.
+    let v1 = "## Ideas\n\nBuild something great.\n\n## Plan\n\nShip it fast.\n";
+    ingest_content(&pool, src_id, "note.md", v1, false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    let node = &nodes[0];
+
+    let ids_v1 = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids_v1.len(), 2);
+
+    // V2: keep Ideas, change Plan.
+    let v2 = "## Ideas\n\nBuild something great.\n\n## Plan\n\nShip it carefully.\n";
+    ingest_content(&pool, src_id, "note.md", v2, false)
+        .await
+        .unwrap();
+
+    let nodes_v2 = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    let node_v2 = &nodes_v2[0];
+
+    let ids_v2 = chunker::chunk_node(&pool, &node_v2.account_id, node_v2.id, &node_v2.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids_v2.len(), 2);
+
+    // Ideas chunk unchanged → same ID.
+    assert_eq!(ids_v1[0], ids_v2[0]);
+    // Plan chunk changed → new ID.
+    assert_ne!(ids_v1[1], ids_v2[1]);
+}
+
+/// E2E: Plain text file (no headings) → single root fragment.
+#[tokio::test]
+async fn e2e_plain_text_fallback_fragment() {
+    use crate::automation::watchtower::{chunker, ingest_file};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    std::fs::write(
+        dir.path().join("notes.txt"),
+        "Just a plain text file.\nNo headings here.\n",
+    )
+    .unwrap();
+
+    let src_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    ingest_file(&pool, src_id, dir.path(), "notes.txt", false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    assert_eq!(ids.len(), 1);
+
+    let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+        .await
+        .unwrap();
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].heading_path, "");
+    assert!(chunks[0].chunk_text.contains("plain text file"));
+}
+
+/// E2E: Chunks from different sources are per-node and account-scoped.
+#[tokio::test]
+async fn e2e_mixed_source_fragment_isolation() {
+    use crate::automation::watchtower::{chunker, ingest_content, ingest_file};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    // Local source.
+    std::fs::write(
+        dir.path().join("local.md"),
+        "## Local Section\n\nLocal content.\n",
+    )
+    .unwrap();
+    let local_id = store::insert_source_context(&pool, "local_fs", r#"{"path":"test"}"#)
+        .await
+        .unwrap();
+    ingest_file(&pool, local_id, dir.path(), "local.md", false)
+        .await
+        .unwrap();
+
+    // Drive source.
+    let drive_id =
+        store::ensure_google_drive_source(&pool, "drv_frag", r#"{"folder_id":"drv_frag"}"#)
+            .await
+            .unwrap();
+    ingest_content(
+        &pool,
+        drive_id,
+        "gdrive://fileA/remote.md",
+        "## Remote Section\n\nRemote content.\n",
+        false,
+    )
+    .await
+    .unwrap();
+
+    // Chunk both.
+    let all_nodes = store::get_pending_content_nodes(&pool, 10).await.unwrap();
+    assert_eq!(all_nodes.len(), 2);
+
+    for node in &all_nodes {
+        chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+            .await
+            .unwrap();
+    }
+
+    // Verify each node has its own chunk, not mixed.
+    for node in &all_nodes {
+        let chunks = store::get_chunks_for_node(&pool, &node.account_id, node.id)
+            .await
+            .unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].node_id, node.id);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// E2E: Provenance-driven loopback
+// ---------------------------------------------------------------------------
+
+/// E2E: Provenance-driven loopback writes metadata to source note and is idempotent.
+#[tokio::test]
+async fn e2e_provenance_driven_loopback_writes_to_source_note() {
+    use crate::automation::watchtower::{ingest_file, loopback};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    // Step 1: Create source with a real path in config_json.
+    let config = serde_json::json!({ "path": dir.path().to_str().unwrap() }).to_string();
+    let src_id = store::insert_source_context(&pool, "local_fs", &config)
+        .await
+        .unwrap();
+
+    // Step 2: Write and ingest a markdown file.
+    std::fs::write(
+        dir.path().join("ideas.md"),
+        "---\ntitle: Big Ideas\n---\nSome great ideas here.\n",
+    )
+    .unwrap();
+    ingest_file(&pool, src_id, dir.path(), "ideas.md", false)
+        .await
+        .unwrap();
+
+    // Get the node_id.
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node_id = nodes[0].id;
+
+    // Step 3: Execute loopback.
+    let result = loopback::execute_loopback(
+        &pool,
+        node_id,
+        "tweet_lb_001",
+        "https://x.com/i/status/tweet_lb_001",
+        "tweet",
+    )
+    .await;
+    assert_eq!(result, loopback::LoopBackResult::Written);
+
+    // Step 4: Verify the file has tuitbot metadata.
+    let content = std::fs::read_to_string(dir.path().join("ideas.md")).unwrap();
+    assert!(content.contains("tweet_lb_001"));
+    assert!(content.contains("Big Ideas") || content.contains("title"));
+    assert!(content.contains("Some great ideas here."));
+
+    // Step 5: Idempotent — second call returns AlreadyPresent.
+    let result2 = loopback::execute_loopback(
+        &pool,
+        node_id,
+        "tweet_lb_001",
+        "https://x.com/i/status/tweet_lb_001",
+        "tweet",
+    )
+    .await;
+    assert_eq!(result2, loopback::LoopBackResult::AlreadyPresent);
+
+    // Step 6: Re-ingest detects hash change.
+    let r = ingest_file(&pool, src_id, dir.path(), "ideas.md", false)
+        .await
+        .unwrap();
+    assert_eq!(r, store::UpsertResult::Updated);
+}
+
+/// E2E: Loopback skips non-local (google_drive) sources gracefully.
+#[tokio::test]
+async fn e2e_loopback_skips_non_local_sources() {
+    use crate::automation::watchtower::{ingest_content, loopback};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    // Create a Google Drive source.
+    let src_id = store::ensure_google_drive_source(&pool, "drv_lb", r#"{"folder_id":"drv_lb"}"#)
+        .await
+        .unwrap();
+
+    // Ingest content into it.
+    ingest_content(
+        &pool,
+        src_id,
+        "gdrive://fileY/doc.md",
+        "Remote content.\n",
+        false,
+    )
+    .await
+    .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node_id = nodes[0].id;
+
+    // Loopback should return SourceNotWritable.
+    let result = loopback::execute_loopback(
+        &pool,
+        node_id,
+        "tweet_skip",
+        "https://x.com/i/status/tweet_skip",
+        "tweet",
+    )
+    .await;
+    assert!(matches!(
+        result,
+        loopback::LoopBackResult::SourceNotWritable(_)
+    ));
+}
+
+/// E2E: Loopback writes to multiple notes from same posting event.
+#[tokio::test]
+async fn e2e_loopback_multiple_nodes_from_same_post() {
+    use crate::automation::watchtower::{ingest_file, loopback};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    let config = serde_json::json!({ "path": dir.path().to_str().unwrap() }).to_string();
+    let src_id = store::insert_source_context(&pool, "local_fs", &config)
+        .await
+        .unwrap();
+
+    // Create two notes.
+    std::fs::write(dir.path().join("note_a.md"), "Content from note A.\n").unwrap();
+    std::fs::write(dir.path().join("note_b.md"), "Content from note B.\n").unwrap();
+
+    ingest_file(&pool, src_id, dir.path(), "note_a.md", false)
+        .await
+        .unwrap();
+    ingest_file(&pool, src_id, dir.path(), "note_b.md", false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 2);
+
+    // Execute loopback for both nodes with the same tweet_id.
+    for node in &nodes {
+        let result = loopback::execute_loopback(
+            &pool,
+            node.id,
+            "tweet_multi",
+            "https://x.com/i/status/tweet_multi",
+            "tweet",
+        )
+        .await;
+        assert_eq!(result, loopback::LoopBackResult::Written);
+    }
+
+    // Verify both files got metadata.
+    let a = std::fs::read_to_string(dir.path().join("note_a.md")).unwrap();
+    let b = std::fs::read_to_string(dir.path().join("note_b.md")).unwrap();
+    assert!(a.contains("tweet_multi"));
+    assert!(b.contains("tweet_multi"));
+    assert!(a.contains("Content from note A."));
+    assert!(b.contains("Content from note B."));
+}
+
+/// E2E: File with only front-matter and no body → no fragments created.
+#[tokio::test]
+async fn e2e_empty_body_no_fragments() {
+    use crate::automation::watchtower::{chunker, ingest_content};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    let src_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    // Front-matter only, empty body.
+    let content = "---\ntitle: Empty Note\ntags: [empty]\n---\n";
+    ingest_content(&pool, src_id, "empty.md", content, false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, Some("pending"))
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node = &nodes[0];
+
+    let ids = chunker::chunk_node(&pool, &node.account_id, node.id, &node.body_text)
+        .await
+        .unwrap();
+    // No body text → no fragments.
+    assert!(ids.is_empty());
 }

@@ -10,7 +10,8 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
-use tuitbot_core::storage::{approval_queue, scheduled_content};
+use tuitbot_core::storage::provenance::ProvenanceRef;
+use tuitbot_core::storage::{approval_queue, provenance, scheduled_content};
 
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
@@ -26,6 +27,9 @@ pub struct CreateDraftRequest {
     pub source: String,
     #[serde(default)]
     pub blocks: Option<Vec<ThreadBlockRequest>>,
+    /// Optional provenance refs linking this draft to vault source material.
+    #[serde(default)]
+    pub provenance: Option<Vec<ProvenanceRef>>,
 }
 
 fn default_source() -> String {
@@ -68,15 +72,28 @@ pub async fn create_draft(
         body.content.clone()
     };
 
-    let id = scheduled_content::insert_draft_for(
-        &state.db,
-        &ctx.account_id,
-        &body.content_type,
-        &content,
-        &body.source,
-    )
-    .await
-    .map_err(ApiError::Storage)?;
+    let id = if let Some(ref refs) = body.provenance {
+        scheduled_content::insert_draft_with_provenance_for(
+            &state.db,
+            &ctx.account_id,
+            &body.content_type,
+            &content,
+            &body.source,
+            refs,
+        )
+        .await
+        .map_err(ApiError::Storage)?
+    } else {
+        scheduled_content::insert_draft_for(
+            &state.db,
+            &ctx.account_id,
+            &body.content_type,
+            &content,
+            &body.source,
+        )
+        .await
+        .map_err(ApiError::Storage)?
+    };
 
     Ok(Json(json!({ "id": id, "status": "draft" })))
 }
@@ -200,8 +217,38 @@ pub async fn publish_draft(
         )));
     }
 
+    // Load provenance links from the draft's scheduled_content record.
+    let draft_links =
+        provenance::get_links_for(&state.db, &ctx.account_id, "scheduled_content", id)
+            .await
+            .map_err(ApiError::Storage)?;
+
+    let prov_input = if draft_links.is_empty() {
+        None
+    } else {
+        let refs: Vec<ProvenanceRef> = draft_links
+            .iter()
+            .map(|l| ProvenanceRef {
+                node_id: l.node_id,
+                chunk_id: l.chunk_id,
+                seed_id: l.seed_id,
+                source_path: l.source_path.clone(),
+                heading_path: l.heading_path.clone(),
+                snippet: l.snippet.clone(),
+            })
+            .collect();
+        let source_node_id = refs.iter().find_map(|r| r.node_id);
+        let source_seed_id = refs.iter().find_map(|r| r.seed_id);
+        Some(approval_queue::ProvenanceInput {
+            source_node_id,
+            source_seed_id,
+            source_chunks_json: serde_json::to_string(&refs).unwrap_or_else(|_| "[]".to_string()),
+            refs,
+        })
+    };
+
     // Queue into approval queue for immediate posting.
-    let queue_id = approval_queue::enqueue_for(
+    let queue_id = approval_queue::enqueue_with_provenance_for(
         &state.db,
         &ctx.account_id,
         &item.content_type,
@@ -212,6 +259,9 @@ pub async fn publish_draft(
         "",  // archetype
         0.0, // score
         "[]",
+        None,
+        None,
+        prov_input.as_ref(),
     )
     .await
     .map_err(ApiError::Storage)?;
