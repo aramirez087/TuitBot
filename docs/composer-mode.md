@@ -2,7 +2,9 @@
 
 Composer Mode transforms Tuitbot from a fully autonomous agent into a user-driven writing tool with on-demand AI intelligence. The same scoring engine, LLM integration, and safety guardrails power both modes — the difference is who decides when to post.
 
-The composer UX is designed to be faster, more structurally powerful, and more accessible than any comparable tool. It gives you keyboard-first control over every aspect of content creation while providing real-time preview, auto-save recovery, and AI-assisted writing — all in a single modal.
+The composer UX is designed to be faster, more structurally powerful, and more accessible than any comparable tool. It gives you keyboard-first control over every aspect of content creation while providing real-time preview, server-backed autosave with revision history, and AI-assisted writing.
+
+All writing flows through **Draft Studio** (`/drafts`), a three-zone workspace with a draft rail, full composer, and details/history panel. The home page, calendar, and `Cmd+N` shortcut all create server-backed drafts and redirect into Draft Studio.
 
 ## Enabling Composer Mode
 
@@ -174,18 +176,17 @@ Typefully provides only `Cmd+Enter` for submission. Tuitbot provides 16 shortcut
 
 ## Auto-Save & Recovery
 
-Content is automatically saved to `localStorage` with a 500 ms debounce. If you close the modal without submitting, a recovery prompt appears the next time you open the Compose Modal.
+Draft Studio uses **server-backed autosave** with a 500 ms debounce. Every keystroke is persisted to the server, with revision history tracking all changes. The sync badge in the composer header shows the current save status (saved, saving, unsaved, offline, conflict).
 
-- **Recover:** Restores the saved content (mode, tweet text, thread blocks)
-- **Discard:** Clears the saved draft and starts fresh
-
-Auto-save uses the storage key `tuitbot:compose:draft` with a 7-day TTL. Saved content is cleared on successful submit.
+- **Conflict resolution:** If two sessions edit the same draft, a conflict banner offers "Use mine" or "Reload server" options.
+- **Revision history:** Every autosave creates a revision. View and restore past versions from the History panel (`Cmd+Shift+H`).
+- **Fallback:** `localStorage` recovery is retained as a last-resort fallback for offline scenarios, using the storage key `tuitbot:compose:draft` with a 7-day TTL.
 
 ### Edge Cases
 
-- Multiple browser tabs share the same `localStorage` key; the last write wins
-- If `localStorage` quota is exceeded, auto-save fails silently (no data loss, just no recovery)
-- Content older than 7 days is automatically discarded on the next compose open
+- Multiple browser tabs editing the same draft may trigger conflict resolution
+- If the server is unreachable, sync status shows "offline" and retries on reconnection
+- `localStorage` fallback kicks in only when the server autosave path is unavailable
 
 ## Voice Context
 
@@ -370,18 +371,22 @@ Upload media files before attaching them to tweets or thread cards:
 
 Accepted types: JPEG, PNG, WebP, GIF, MP4. Size limits: images 5 MB, GIF 15 MB, video 512 MB.
 
-## Drafts
+## Draft Studio
 
-Drafts give you a workspace for content that is not yet ready to post. Create drafts manually, generate them with AI Assist, or save Discovery Feed replies for later editing.
+Draft Studio is the canonical writing workspace at `/drafts`. All compose entry points — home page, calendar, `Cmd+N`, sidebar — create server-backed drafts and open them in Draft Studio.
+
+### Workspace Layout
+
+- **Rail zone (left):** Filterable, searchable list of drafts with tabs for Active, Scheduled, Posted, and Archive. Supports tag filtering and multiple sort orders.
+- **Composer zone (center):** Full ComposeWorkspace with tweet/thread editing, preview, and AI assist.
+- **Details/History zone (right):** Metadata editing (title, notes, tags, scheduling) and revision history with one-click restore.
 
 ### Workflow
 
-1. **Create** a draft — manually or via AI Assist.
-2. **Edit** the draft text, adjust the topic, or attach media. Thread drafts use the structured blocks format.
-3. **Schedule** the draft for a specific time, or **publish** it immediately (routes through the approval queue and posting pipeline).
-4. **Delete** drafts you no longer need.
-
-Editing a draft opens the Compose Modal pre-filled with the draft content, including thread blocks and media.
+1. **Create** a draft — from the home page quick-start, calendar time slot, `Cmd+N`, or the rail's "+" button.
+2. **Edit** the draft text, adjust metadata, or attach media. Thread drafts use the structured blocks format.
+3. **Schedule** the draft for a specific time from the details panel, or **publish** it immediately.
+4. **Archive** drafts you no longer need (soft-delete with restore capability).
 
 ### API Endpoints
 
@@ -487,13 +492,14 @@ If you are upgrading from a pre-thread-composer version, here is what changed:
 | Empty card | Card with no text content | Type content or delete the empty card |
 | Submission returns 400 | Empty cards, single-card thread, or malformed blocks | Ensure at least 2 non-empty cards with unique IDs |
 
-### Auto-Save Recovery Issues
+### Autosave & Sync Issues
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| No recovery prompt on reopen | Auto-save expired (> 7 days) or was cleared | Content beyond TTL is permanently discarded |
-| Recovery restores wrong content | Multiple browser tabs writing concurrently | Auto-save uses a single `localStorage` key; last write wins |
-| "Recover" button appears to do nothing | `localStorage` corrupted or at quota | Clear browser storage for the site (`Application > Storage` in DevTools) |
+| Sync badge stuck on "saving" | Server unreachable or slow response | Check server connection; badge recovers automatically on reconnection |
+| Conflict banner appears | Two sessions edited the same draft concurrently | Choose "Use mine" to keep local changes or "Reload server" to fetch latest |
+| Revision not appearing in history | Very rapid edits within debounce window | Revisions are created per autosave cycle (500ms debounce); pause briefly |
+| localStorage recovery prompt | Server was offline during editing session | Recover content, then verify it matches the server version |
 
 ### Media in Threads
 
