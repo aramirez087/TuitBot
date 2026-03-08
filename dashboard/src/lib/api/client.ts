@@ -565,6 +565,10 @@ export const api = {
 				body: JSON.stringify({ trigger_kind: triggerKind ?? 'manual' })
 			}),
 		activity: (id: number) => request<ContentActivity[]>(`/api/drafts/${id}/activity`),
+		restoreRevision: (id: number, revisionId: number) =>
+			request<ScheduledContentItem>(`/api/drafts/${id}/revisions/${revisionId}/restore`, {
+				method: 'POST'
+			}),
 		tags: (id: number) => request<ContentTag[]>(`/api/drafts/${id}/tags`),
 		assignTag: (id: number, tagId: number) =>
 			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'POST' }),

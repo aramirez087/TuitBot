@@ -28,6 +28,25 @@ pub async fn insert_revision_for(
     Ok(result.last_insert_rowid())
 }
 
+/// Fetch a single revision by ID, scoped to account + content item.
+pub async fn get_revision_for(
+    pool: &DbPool,
+    account_id: &str,
+    content_id: i64,
+    revision_id: i64,
+) -> Result<Option<ContentRevision>, StorageError> {
+    sqlx::query_as::<_, ContentRevision>(
+        "SELECT * FROM content_revisions \
+         WHERE id = ? AND content_id = ? AND account_id = ?",
+    )
+    .bind(revision_id)
+    .bind(content_id)
+    .bind(account_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
 /// List revision snapshots for a content item, newest first.
 pub async fn list_revisions_for(
     pool: &DbPool,

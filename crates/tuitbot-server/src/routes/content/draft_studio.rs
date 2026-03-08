@@ -513,6 +513,70 @@ pub async fn duplicate_studio_draft(
     Ok(Json(json!({ "id": new_id })))
 }
 
+/// `POST /api/drafts/:id/revisions/:rev_id/restore` — restore content from a revision.
+///
+/// Safety: snapshots the current content as a `pre_restore` revision before
+/// overwriting, so restore is always non-lossy.
+pub async fn restore_from_revision(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Path((id, rev_id)): Path<(i64, i64)>,
+) -> Result<Json<scheduled_content::ScheduledContent>, ApiError> {
+    require_mutate(&ctx)?;
+
+    // 1. Fetch current draft
+    let current = scheduled_content::get_by_id_for(&state.db, &ctx.account_id, id)
+        .await
+        .map_err(ApiError::Storage)?
+        .ok_or_else(|| ApiError::NotFound(format!("Draft {id} not found")))?;
+
+    // 2. Fetch target revision (verify ownership via account+content scope)
+    let target_rev = scheduled_content::get_revision_for(&state.db, &ctx.account_id, id, rev_id)
+        .await
+        .map_err(ApiError::Storage)?
+        .ok_or_else(|| ApiError::NotFound(format!("Revision {rev_id} not found")))?;
+
+    // 3. Snapshot current state as pre_restore
+    let _ = scheduled_content::insert_revision_for(
+        &state.db,
+        &ctx.account_id,
+        id,
+        &current.content,
+        &current.content_type,
+        "pre_restore",
+    )
+    .await;
+
+    // 4. Update content to revision's content
+    let _ = scheduled_content::autosave_draft_for(
+        &state.db,
+        &ctx.account_id,
+        id,
+        &target_rev.content,
+        &target_rev.content_type,
+        &current.updated_at,
+    )
+    .await
+    .map_err(ApiError::Storage)?;
+
+    // 5. Log activity
+    let _ = scheduled_content::insert_activity_for(
+        &state.db,
+        &ctx.account_id,
+        id,
+        "revision_restored",
+        Some(&json!({"from_revision_id": rev_id}).to_string()),
+    )
+    .await;
+
+    // 6. Return updated draft
+    let updated = scheduled_content::get_by_id_for(&state.db, &ctx.account_id, id)
+        .await
+        .map_err(ApiError::Storage)?
+        .ok_or_else(|| ApiError::NotFound(format!("Draft {id} not found")))?;
+    Ok(Json(updated))
+}
+
 /// `GET /api/drafts/:id/revisions` — list revision snapshots.
 pub async fn list_draft_revisions(
     State(state): State<Arc<AppState>>,

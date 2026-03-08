@@ -127,6 +127,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(routes::content::list_draft_revisions).post(routes::content::create_draft_revision),
         )
         .route(
+            "/drafts/{id}/revisions/{rev_id}/restore",
+            post(routes::content::restore_from_revision),
+        )
+        .route(
             "/drafts/{id}/activity",
             get(routes::content::list_draft_activity),
         )

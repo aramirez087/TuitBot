@@ -1,5 +1,11 @@
 import { api } from '$lib/api';
-import type { DraftSummary, ScheduledContentItem, ContentTag } from '$lib/api/types';
+import type {
+	DraftSummary,
+	ScheduledContentItem,
+	ContentTag,
+	ContentRevision,
+	ContentActivity
+} from '$lib/api/types';
 
 // ---------------------------------------------------------------------------
 // State
@@ -14,6 +20,10 @@ let archiveLoaded = $state(false);
 let error = $state<string | null>(null);
 let syncStatus = $state<'saved' | 'saving' | 'unsaved' | 'offline' | 'conflict'>('saved');
 let fullDraft = $state<ScheduledContentItem | null>(null);
+
+// Revision / activity state
+let revisions = $state<ContentRevision[]>([]);
+let activity = $state<ContentActivity[]>([]);
 
 // Filter / sort / tag state
 let searchQuery = $state('');
@@ -140,6 +150,14 @@ export function getAccountTags(): ContentTag[] {
 
 export function getSelectedDraftTags(): ContentTag[] {
 	return selectedDraftTags;
+}
+
+export function getRevisions(): ContentRevision[] {
+	return revisions;
+}
+
+export function getActivity(): ContentActivity[] {
+	return activity;
 }
 
 // ---------------------------------------------------------------------------
@@ -342,6 +360,49 @@ export function updateDraftInCollection(id: number, updates: Partial<DraftSummar
 }
 
 // ---------------------------------------------------------------------------
+// Revision / activity actions
+// ---------------------------------------------------------------------------
+
+export async function loadRevisions(): Promise<void> {
+	if (selectedId === null) {
+		revisions = [];
+		return;
+	}
+	try {
+		revisions = await api.draftStudio.revisions(selectedId);
+	} catch {
+		revisions = [];
+	}
+}
+
+export async function loadActivity(): Promise<void> {
+	if (selectedId === null) {
+		activity = [];
+		return;
+	}
+	try {
+		activity = await api.draftStudio.activity(selectedId);
+	} catch {
+		activity = [];
+	}
+}
+
+export async function restoreFromRevision(revisionId: number): Promise<boolean> {
+	if (selectedId === null) return false;
+	try {
+		const updated = await api.draftStudio.restoreRevision(selectedId, revisionId);
+		fullDraft = updated;
+		updateDraftInCollection(selectedId, { updated_at: updated.updated_at });
+		await loadRevisions();
+		await loadActivity();
+		return true;
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to restore revision';
+		return false;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Tag actions
 // ---------------------------------------------------------------------------
 
@@ -411,6 +472,8 @@ export function reset(): void {
 	error = null;
 	syncStatus = 'saved';
 	fullDraft = null;
+	revisions = [];
+	activity = [];
 	searchQuery = '';
 	sortBy = 'updated';
 	tagFilter = null;

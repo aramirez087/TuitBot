@@ -15,6 +15,7 @@
 	import DraftEmptyState from './DraftEmptyState.svelte';
 	import DraftSyncBadge from './DraftSyncBadge.svelte';
 	import DraftDetailsPanel from './DraftDetailsPanel.svelte';
+	import DraftHistoryPanel from './DraftHistoryPanel.svelte';
 	import ComposeWorkspace from '$lib/components/composer/ComposeWorkspace.svelte';
 
 	let loadingDraft = $state(false);
@@ -23,6 +24,7 @@
 	let railComponent: DraftRail | undefined = $state();
 	let composerZoneEl: HTMLDivElement | undefined = $state();
 	let detailsPanelOpen = $state(true);
+	let activePanel = $state<'details' | 'history'>('details');
 
 	interface HydrationPayload {
 		mode: 'tweet' | 'thread';
@@ -78,6 +80,15 @@
 	$effect(() => {
 		void studio.getSelectedId();
 		studio.loadSelectedDraftTags();
+	});
+
+	// Reload history when draft changes while history panel is open
+	$effect(() => {
+		void studio.getSelectedId();
+		if (activePanel === 'history' && detailsPanelOpen) {
+			studio.loadRevisions();
+			studio.loadActivity();
+		}
 	});
 
 	async function fetchDraft(id: number) {
@@ -215,6 +226,25 @@
 		if (id !== null) handleDuplicate(id);
 	}
 
+	async function handleRestoreFromRevision(revisionId: number) {
+		const id = studio.getSelectedId();
+		if (id === null) return;
+		const success = await studio.restoreFromRevision(revisionId);
+		if (success) {
+			hydration = null;
+			hydrationDraftId = null;
+			loadingDraft = true;
+			await fetchDraft(id);
+		}
+	}
+
+	function switchToHistory() {
+		activePanel = 'history';
+		detailsPanelOpen = true;
+		studio.loadRevisions();
+		studio.loadActivity();
+	}
+
 	function handleDraftAction(actionId: string) {
 		const id = studio.getSelectedId();
 		switch (actionId) {
@@ -263,7 +293,17 @@
 		// Cmd+Shift+D toggles details panel
 		if (matchEvent(e, 'cmd+shift+d')) {
 			e.preventDefault();
+			activePanel = 'details';
 			detailsPanelOpen = !detailsPanelOpen;
+		}
+		// Cmd+Shift+H toggles history panel
+		if (matchEvent(e, 'cmd+shift+h')) {
+			e.preventDefault();
+			if (activePanel === 'history' && detailsPanelOpen) {
+				detailsPanelOpen = false;
+			} else {
+				switchToHistory();
+			}
 		}
 	}
 </script>
@@ -352,21 +392,44 @@
 
 	{#if detailsPanelOpen && studio.getSelectedId() !== null}
 		<div class="details-zone">
-			<DraftDetailsPanel
-				draft={studio.getFullDraft()}
-				draftSummary={studio.selectedDraft}
-				tags={studio.getSelectedDraftTags()}
-				allTags={studio.getAccountTags()}
-				onupdatemeta={handleMetaUpdate}
-				onassigntag={handleAssignTag}
-				onunassigntag={handleUnassignTag}
-				oncreatetag={handleCreateTag}
-				onschedule={handleSchedule}
-				onunschedule={handleUnschedule}
-				onreschedule={handleReschedule}
-				onduplicate={handleDuplicateFromDetails}
-				onclose={() => detailsPanelOpen = false}
-			/>
+			<div class="panel-switcher">
+				<button
+					type="button"
+					class="panel-tab"
+					class:active={activePanel === 'details'}
+					onclick={() => activePanel = 'details'}
+				>Details</button>
+				<button
+					type="button"
+					class="panel-tab"
+					class:active={activePanel === 'history'}
+					onclick={switchToHistory}
+				>History</button>
+			</div>
+			{#if activePanel === 'details'}
+				<DraftDetailsPanel
+					draft={studio.getFullDraft()}
+					draftSummary={studio.selectedDraft}
+					tags={studio.getSelectedDraftTags()}
+					allTags={studio.getAccountTags()}
+					onupdatemeta={handleMetaUpdate}
+					onassigntag={handleAssignTag}
+					onunassigntag={handleUnassignTag}
+					oncreatetag={handleCreateTag}
+					onschedule={handleSchedule}
+					onunschedule={handleUnschedule}
+					onreschedule={handleReschedule}
+					onduplicate={handleDuplicateFromDetails}
+					onclose={() => detailsPanelOpen = false}
+				/>
+			{:else}
+				<DraftHistoryPanel
+					revisions={studio.getRevisions()}
+					activity={studio.getActivity()}
+					onrestore={handleRestoreFromRevision}
+					onclose={() => detailsPanelOpen = false}
+				/>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -398,8 +461,39 @@
 	}
 
 	.details-zone {
+		display: flex;
+		flex-direction: column;
 		min-width: 0;
 		overflow: hidden;
+	}
+
+	.panel-switcher {
+		display: flex;
+		border-bottom: 1px solid var(--color-border-subtle);
+		flex-shrink: 0;
+		background: var(--color-surface);
+	}
+
+	.panel-tab {
+		flex: 1;
+		padding: 8px 0;
+		border: none;
+		border-bottom: 2px solid transparent;
+		background: transparent;
+		color: var(--color-text-subtle);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: color 0.15s, border-color 0.15s;
+	}
+
+	.panel-tab:hover {
+		color: var(--color-text);
+	}
+
+	.panel-tab.active {
+		color: var(--color-accent);
+		border-bottom-color: var(--color-accent);
 	}
 
 	.composer-header {
