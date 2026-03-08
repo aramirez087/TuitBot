@@ -4253,7 +4253,7 @@ dependencies = [
 
 [[package]]
 name = "tuitbot-core"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -4292,7 +4292,7 @@ dependencies = [
 
 [[package]]
 name = "tuitbot-mcp"
-version = "0.1.21"
+version = "0.1.22"
 dependencies = [
  "anyhow",
  "async-trait",
