@@ -8,8 +8,9 @@
 use std::io::Write;
 use tuitbot_core::config::Config;
 use tuitbot_core::startup::{
-    build_auth_url, build_redirect_uri, exchange_auth_code, extract_auth_code, generate_pkce,
-    save_tokens_to_file, token_file_path, verify_credentials,
+    build_auth_url, build_redirect_uri, exchange_auth_code, extract_auth_code,
+    extract_callback_state, generate_pkce, save_tokens_to_file, token_file_path,
+    verify_credentials,
 };
 
 /// Execute the `tuitbot auth` command.
@@ -44,17 +45,24 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
         "local_callback" => {
             if is_headless_environment() {
                 eprintln!("Headless environment detected — using manual authentication.\n");
-                run_manual_mode(&auth_url)?
+                run_manual_mode(&auth_url, &pkce.state)?
             } else {
                 run_callback_mode(
                     &auth_url,
                     &config.auth.callback_host,
                     config.auth.callback_port,
+                    &pkce.state,
                 )
                 .await?
             }
         }
-        _ => run_manual_mode(&auth_url)?,
+        "manual" => run_manual_mode(&auth_url, &pkce.state)?,
+        other => {
+            anyhow::bail!(
+                "Invalid auth mode: '{other}'. Must be 'manual' or 'local_callback'.\n\
+                 Fix [auth].mode in your config file or use --mode manual|local_callback."
+            );
+        }
     };
 
     // 5. Exchange the authorization code for tokens.
@@ -89,7 +97,7 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
 /// Designed as the primary headless-friendly auth flow. Works from any
 /// terminal — local, SSH, VPS, or OpenClaw. The user opens the URL on
 /// any device with a browser, authorizes, then copies the code back.
-fn run_manual_mode(auth_url: &str) -> anyhow::Result<String> {
+fn run_manual_mode(auth_url: &str, expected_state: &str) -> anyhow::Result<String> {
     let token_path = token_file_path();
 
     eprintln!("=== X API Authentication ===\n");
@@ -112,7 +120,14 @@ fn run_manual_mode(auth_url: &str) -> anyhow::Result<String> {
         .read_line(&mut input)
         .map_err(|e| anyhow::anyhow!("failed to read input: {e}"))?;
 
-    let code = extract_auth_code(&input);
+    let trimmed = input.trim();
+
+    // If the input looks like a URL, validate the state parameter.
+    if trimmed.contains("code=") || trimmed.contains("state=") {
+        validate_callback_state(trimmed, expected_state)?;
+    }
+
+    let code = extract_auth_code(trimmed);
     if code.is_empty() {
         anyhow::bail!("No authorization code provided.");
     }
@@ -120,8 +135,32 @@ fn run_manual_mode(auth_url: &str) -> anyhow::Result<String> {
     Ok(code)
 }
 
+/// Validate the `state` parameter from a callback URL against the expected value.
+fn validate_callback_state(input: &str, expected_state: &str) -> anyhow::Result<()> {
+    let returned_state = extract_callback_state(input);
+    if returned_state.is_empty() {
+        anyhow::bail!(
+            "Callback URL is missing the 'state' parameter.\n\
+             Make sure you copied the entire URL from the address bar."
+        );
+    }
+    if returned_state != expected_state {
+        anyhow::bail!(
+            "OAuth state mismatch — the callback state does not match this auth session.\n\
+             This can happen if the URL is from a different or expired auth attempt.\n\
+             Please restart the auth flow and use the new URL."
+        );
+    }
+    Ok(())
+}
+
 /// Callback mode: start a local HTTP server, open the browser, and wait.
-async fn run_callback_mode(auth_url: &str, host: &str, port: u16) -> anyhow::Result<String> {
+async fn run_callback_mode(
+    auth_url: &str,
+    host: &str,
+    port: u16,
+    expected_state: &str,
+) -> anyhow::Result<String> {
     let addr = format!("{host}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
         anyhow::anyhow!(
@@ -142,13 +181,13 @@ async fn run_callback_mode(auth_url: &str, host: &str, port: u16) -> anyhow::Res
              Falling back to manual authentication.\n"
         );
         drop(listener);
-        return run_manual_mode(auth_url);
+        return run_manual_mode(auth_url, expected_state);
     }
 
     // Wait for the callback with a 120-second timeout.
     let code = tokio::time::timeout(
         std::time::Duration::from_secs(120),
-        wait_for_callback(&listener),
+        wait_for_callback(&listener, expected_state),
     )
     .await
     .map_err(|_| {
@@ -162,7 +201,10 @@ async fn run_callback_mode(auth_url: &str, host: &str, port: u16) -> anyhow::Res
 }
 
 /// Wait for a single HTTP callback request and extract the authorization code.
-async fn wait_for_callback(listener: &tokio::net::TcpListener) -> anyhow::Result<String> {
+async fn wait_for_callback(
+    listener: &tokio::net::TcpListener,
+    expected_state: &str,
+) -> anyhow::Result<String> {
     let (mut stream, _addr) = listener.accept().await?;
 
     // Read the HTTP request.
@@ -176,7 +218,6 @@ async fn wait_for_callback(listener: &tokio::net::TcpListener) -> anyhow::Result
 
     // Check for access_denied error.
     if path.contains("error=access_denied") {
-        // Send error response.
         let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
             <html><body><h2>Authorization Denied</h2>\
             <p>You denied the authorization request. You can close this tab.</p>\
@@ -187,10 +228,26 @@ async fn wait_for_callback(listener: &tokio::net::TcpListener) -> anyhow::Result
         anyhow::bail!("Authorization denied by user.");
     }
 
+    // Validate the state parameter (CSRF protection).
+    let returned_state = extract_callback_state(path);
+    if returned_state.is_empty() || returned_state != expected_state {
+        let response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n\
+            <html><body><h2>Error</h2>\
+            <p>OAuth state mismatch. This may be a stale or forged callback. \
+            Please restart the auth flow.</p>\
+            </body></html>";
+        tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes())
+            .await
+            .ok();
+        anyhow::bail!(
+            "OAuth state mismatch in callback — the returned state does not match \
+             this auth session. Please restart the auth flow."
+        );
+    }
+
     // Extract the code parameter.
     let code = extract_auth_code(path);
     if code.is_empty() {
-        // Send error response.
         let response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n\
             <html><body><h2>Error</h2>\
             <p>No authorization code found in the callback.</p>\

@@ -468,6 +468,24 @@ pub fn extract_auth_code(input: &str) -> String {
     trimmed.to_string()
 }
 
+/// Extract the `state` parameter from a callback URL or query string.
+///
+/// Returns an empty string if no `state` parameter is found.
+pub fn extract_callback_state(input: &str) -> String {
+    let query = if let Some(q) = input.split('?').nth(1) {
+        // Strip HTTP version suffix if present (e.g. " HTTP/1.1").
+        q.split_whitespace().next().unwrap_or(q)
+    } else {
+        input.trim()
+    };
+    for pair in query.split('&') {
+        if let Some(value) = pair.strip_prefix("state=") {
+            return value.to_string();
+        }
+    }
+    String::new()
+}
+
 // ============================================================================
 // Startup Banner
 // ============================================================================
@@ -509,6 +527,18 @@ pub fn expand_tilde(path: &str) -> PathBuf {
         }
     }
     PathBuf::from(path)
+}
+
+/// Resolve the database path by loading the config file and reading `storage.db_path`.
+///
+/// Falls back to `~/.tuitbot/tuitbot.db` if the config cannot be loaded.
+pub fn resolve_db_path(config_path: &str) -> PathBuf {
+    use crate::config::Config;
+    if let Ok(config) = Config::load(Some(config_path)) {
+        expand_tilde(&config.storage.db_path)
+    } else {
+        data_dir().join("tuitbot.db")
+    }
 }
 
 // ============================================================================
