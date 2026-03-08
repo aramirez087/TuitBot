@@ -176,6 +176,7 @@ mod tests {
         assert!(table_names.contains(&"source_contexts"));
         assert!(table_names.contains(&"content_nodes"));
         assert!(table_names.contains(&"draft_seeds"));
+        assert!(table_names.contains(&"content_chunks"));
     }
 
     #[tokio::test]

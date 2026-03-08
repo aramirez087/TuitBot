@@ -12,7 +12,8 @@ const SELECT_COLS: &str = "id, action_type, target_tweet_id, target_author, \
     COALESCE(detected_risks, '[]') AS detected_risks, COALESCE(qa_report, '{}') AS qa_report, \
     COALESCE(qa_hard_flags, '[]') AS qa_hard_flags, COALESCE(qa_soft_flags, '[]') AS qa_soft_flags, \
     COALESCE(qa_recommendations, '[]') AS qa_recommendations, COALESCE(qa_score, 0) AS qa_score, \
-    COALESCE(qa_requires_override, 0) AS qa_requires_override, qa_override_by, qa_override_note, qa_override_at";
+    COALESCE(qa_requires_override, 0) AS qa_requires_override, qa_override_by, qa_override_note, qa_override_at, \
+    source_node_id, source_seed_id, COALESCE(source_chunks_json, '[]') AS source_chunks_json";
 
 /// Insert a new item into the approval queue for a specific account.
 #[allow(clippy::too_many_arguments)]
