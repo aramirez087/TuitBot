@@ -4,6 +4,7 @@
 	import * as threadOps from "$lib/utils/threadOps";
 	import { fly, fade } from "svelte/transition";
 	import { flip } from "svelte/animate";
+	import { registerTransferHandler } from "$lib/stores/mediaDrag";
 	import ThreadFlowCard from "./ThreadFlowCard.svelte";
 
 	let {
@@ -178,6 +179,17 @@
 		focusBlock(result.targetId, result.cursorPos);
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
+
+	function handleMediaTransfer(targetBlockId: string, mediaPath: string, sourceBlockId: string) {
+		const result = threadOps.moveMediaBetweenBlocks(blocks, sourceBlockId, targetBlockId, mediaPath);
+		if (result) onchange(result);
+	}
+
+	// Register the media transfer handler so MediaSlot's mouse-based drag can call it
+	$effect(() => {
+		registerTransferHandler(handleMediaTransfer);
+		return () => registerTransferHandler(null);
+	});
 
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
@@ -447,6 +459,8 @@
 				onmerge={() => mergeWithNext(block.id)}
 				onremove={() => removeBlock(block.id)}
 				onaddafter={() => addBlockAfter(block.id)}
+				onmoveup={i > 0 ? () => moveBlock(block.id, i - 1) : undefined}
+				onmovedown={i < sortedBlocks.length - 1 ? () => moveBlock(block.id, i + 1) : undefined}
 				ondragstart={(e) => handleDragStart(e, block.id)}
 				ondragend={handleDragEnd}
 				ondragover={(e) => handleCardDragOver(e, block.id)}

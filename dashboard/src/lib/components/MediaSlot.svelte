@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { X, Film, Users, Captions } from 'lucide-svelte';
 	import MediaAltBadge from './composer/MediaAltBadge.svelte';
+	import { startMediaDrag, endMediaDrag, isMediaDragActive, performTransfer } from '$lib/stores/mediaDrag';
 
 	let {
 		mediaPaths = [],
@@ -9,7 +11,8 @@
 		maxMedia = 4,
 		disabled = false,
 		altTexts = {},
-		onaltchange
+		onaltchange,
+		blockId = '',
 	}: {
 		mediaPaths: string[];
 		onmediachange: (paths: string[]) => void;
@@ -17,6 +20,7 @@
 		disabled?: boolean;
 		altTexts?: Record<string, string>;
 		onaltchange?: (path: string, altText: string) => void;
+		blockId?: string;
 	} = $props();
 
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
@@ -28,6 +32,13 @@
 	let error = $state<string | null>(null);
 	let fileInput: HTMLInputElement | undefined = $state();
 	let dragOver = $state(false);
+	let draggingPath = $state<string | null>(null);
+
+	// Mouse-based drag state
+	let mouseDownInfo = $state<{ path: string; x: number; y: number } | null>(null);
+	let ghostEl: HTMLDivElement | null = null;
+	let currentTargetBlockId: string | null = null;
+	let currentTargetEl: HTMLElement | null = null;
 
 	let localPreviews = $state<Map<string, { url: string; type: string }>>(new Map());
 	const mediaCount = $derived(mediaPaths.length);
@@ -105,7 +116,10 @@
 		return preview?.type === 'video/mp4' || path.endsWith('.mp4');
 	}
 
+	// ── File drop from Finder (HTML5 DnD for external files only) ──
 	function handleDragOver(e: DragEvent) {
+		// Only handle external file drops, not intra-page media drags
+		if (isMediaDragActive()) return;
 		e.preventDefault();
 		if (canAttachMore) dragOver = true;
 	}
@@ -116,9 +130,130 @@
 
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
+		e.stopPropagation();
 		dragOver = false;
+		if (isMediaDragActive()) return;
 		if (!canAttachMore || !e.dataTransfer?.files.length) return;
 		handleFiles(e.dataTransfer.files);
+	}
+
+	// ── Mouse-based media drag between tweets ──
+	const DRAG_THRESHOLD = 5;
+
+	function handleThumbMouseDown(e: MouseEvent, path: string) {
+		// Don't start drag if clicking on buttons inside the thumb
+		const target = e.target as HTMLElement;
+		if (target.closest('button')) return;
+		if (!blockId) return;
+		e.preventDefault();
+		mouseDownInfo = { path, x: e.clientX, y: e.clientY };
+		document.addEventListener('mousemove', handleDocMouseMove);
+		document.addEventListener('mouseup', handleDocMouseUp);
+	}
+
+	function handleDocMouseMove(e: MouseEvent) {
+		if (!mouseDownInfo) return;
+
+		// Check threshold before starting drag
+		if (!draggingPath) {
+			const dx = e.clientX - mouseDownInfo.x;
+			const dy = e.clientY - mouseDownInfo.y;
+			if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+			// Start the drag
+			draggingPath = mouseDownInfo.path;
+			startMediaDrag(mouseDownInfo.path, blockId);
+			createGhost(e.clientX, e.clientY);
+		}
+
+		// Move ghost
+		if (ghostEl) {
+			ghostEl.style.left = `${e.clientX - 24}px`;
+			ghostEl.style.top = `${e.clientY - 24}px`;
+		}
+
+		// Detect target card via elementFromPoint (hide ghost first so it doesn't block)
+		if (ghostEl) ghostEl.style.pointerEvents = 'none';
+		const elUnder = document.elementFromPoint(e.clientX, e.clientY);
+		if (ghostEl) ghostEl.style.pointerEvents = '';
+
+		const cardEl = elUnder?.closest('[data-block-id]') as HTMLElement | null;
+		const newTargetId = cardEl?.dataset.blockId ?? null;
+
+		if (newTargetId !== currentTargetBlockId) {
+			// Remove highlight from previous target
+			if (currentTargetEl) {
+				currentTargetEl.classList.remove('media-transfer-target');
+			}
+			currentTargetBlockId = newTargetId;
+			currentTargetEl = cardEl;
+			// Add highlight to new target (if different from source)
+			if (currentTargetEl && currentTargetBlockId && currentTargetBlockId !== blockId) {
+				currentTargetEl.classList.add('media-transfer-target');
+			}
+		}
+	}
+
+	function handleDocMouseUp(_e: MouseEvent) {
+		document.removeEventListener('mousemove', handleDocMouseMove);
+		document.removeEventListener('mouseup', handleDocMouseUp);
+
+		if (draggingPath && currentTargetBlockId) {
+			performTransfer(currentTargetBlockId);
+		} else {
+			endMediaDrag();
+		}
+
+		// Cleanup
+		if (currentTargetEl) {
+			currentTargetEl.classList.remove('media-transfer-target');
+		}
+		destroyGhost();
+		draggingPath = null;
+		mouseDownInfo = null;
+		currentTargetBlockId = null;
+		currentTargetEl = null;
+	}
+
+	function createGhost(x: number, y: number) {
+		if (!mouseDownInfo) return;
+		const el = document.createElement('div');
+		el.className = 'media-drag-ghost';
+		el.style.cssText = `
+			position: fixed;
+			left: ${x - 24}px;
+			top: ${y - 24}px;
+			width: 48px;
+			height: 48px;
+			border-radius: 8px;
+			overflow: hidden;
+			box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+			z-index: 9999;
+			pointer-events: none;
+			opacity: 0.85;
+			transition: none;
+		`;
+		const url = getPreviewUrl(mouseDownInfo.path);
+		if (isVideo(mouseDownInfo.path)) {
+			const vid = document.createElement('video');
+			vid.src = url;
+			vid.muted = true;
+			vid.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+			el.appendChild(vid);
+		} else {
+			const img = document.createElement('img');
+			img.src = url;
+			img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+			el.appendChild(img);
+		}
+		document.body.appendChild(el);
+		ghostEl = el;
+	}
+
+	function destroyGhost() {
+		if (ghostEl) {
+			ghostEl.remove();
+			ghostEl = null;
+		}
 	}
 
 	function handleFileSelect(e: Event) {
@@ -150,7 +285,13 @@
 			class:quad={mediaCount >= 4}
 		>
 			{#each mediaPaths as path (path)}
-				<div class="thumb">
+				<div
+					class="thumb"
+					class:thumb-dragging={draggingPath === path}
+					role="button"
+					tabindex="-1"
+					onmousedown={(e) => handleThumbMouseDown(e, path)}
+				>
 					{#if isVideo(path)}
 						<video src={getPreviewUrl(path)} class="thumb-img" muted></video>
 						<span class="media-badge"><Film size={12} /> Video</span>
@@ -248,6 +389,17 @@
 		overflow: hidden;
 		min-height: 80px;
 		background: var(--color-surface-active);
+		cursor: grab;
+		transition: opacity 0.15s ease;
+		user-select: none;
+	}
+
+	.thumb:active {
+		cursor: grabbing;
+	}
+
+	.thumb.thumb-dragging {
+		opacity: 0.4;
 	}
 
 	.media-thumbs.single .thumb { aspect-ratio: 16 / 9; }
@@ -258,6 +410,9 @@
 		height: 100%;
 		object-fit: cover;
 		display: block;
+		pointer-events: none;
+		user-select: none;
+		-webkit-user-drag: none;
 	}
 
 	.media-badge {

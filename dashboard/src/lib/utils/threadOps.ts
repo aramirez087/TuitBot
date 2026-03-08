@@ -213,6 +213,42 @@ export function mergeWithPrevious(
 }
 
 /**
+ * Move a media item from one block to another.
+ * Returns null if the transfer is invalid (target full, GIF/video exclusivity).
+ */
+export function moveMediaBetweenBlocks(
+	blocks: ThreadBlock[],
+	sourceBlockId: string,
+	targetBlockId: string,
+	mediaPath: string
+): ThreadBlock[] | null {
+	if (sourceBlockId === targetBlockId) return null;
+	const source = blocks.find((b) => b.id === sourceBlockId);
+	const target = blocks.find((b) => b.id === targetBlockId);
+	if (!source || !target) return null;
+	if (!source.media_paths.includes(mediaPath)) return null;
+
+	const isGifOrVideo = mediaPath.endsWith('.gif') || mediaPath.endsWith('.mp4');
+
+	// Target already has media and we're adding a GIF/video → invalid
+	if (isGifOrVideo && target.media_paths.length > 0) return null;
+	// Target has a GIF/video already → can't add anything
+	if (target.media_paths.some((p) => p.endsWith('.gif') || p.endsWith('.mp4'))) return null;
+	// Target would exceed 4 media
+	if (target.media_paths.length >= 4) return null;
+
+	return blocks.map((b) => {
+		if (b.id === sourceBlockId) {
+			return { ...b, media_paths: b.media_paths.filter((p) => p !== mediaPath) };
+		}
+		if (b.id === targetBlockId) {
+			return { ...b, media_paths: [...b.media_paths, mediaPath] };
+		}
+		return b;
+	});
+}
+
+/**
  * Validate a thread for submission readiness.
  */
 export function validateThread(

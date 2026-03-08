@@ -2,7 +2,7 @@
 	import { onMount } from "svelte";
 	import type { ThreadBlock } from "$lib/api";
 	import { tweetWeightedLen, wordCount, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
-	import { GripVertical, Merge, Trash2, Image } from "lucide-svelte";
+	import { GripVertical, Merge, Trash2, Image, ChevronUp, ChevronDown } from "lucide-svelte";
 	import MediaSlot from "../MediaSlot.svelte";
 	import CharRing from "./CharRing.svelte";
 
@@ -23,6 +23,8 @@
 		onmerge,
 		onremove,
 		onaddafter,
+		onmoveup,
+		onmovedown,
 		ondragstart,
 		ondragend,
 		ondragover,
@@ -46,6 +48,8 @@
 		onmerge: () => void;
 		onremove: () => void;
 		onaddafter: () => void;
+		onmoveup?: () => void;
+		onmovedown?: () => void;
 		ondragstart: (e: DragEvent) => void;
 		ondragend: () => void;
 		ondragover: (e: DragEvent) => void;
@@ -145,6 +149,7 @@
 				bind:this={mediaSlotRef}
 				mediaPaths={block.media_paths}
 				onmediachange={(paths) => onmedia(paths)}
+				blockId={block.id}
 			/>
 		</div>
 
@@ -164,6 +169,26 @@
 					>
 						<Image size={13} />
 					</button>
+					{#if onmoveup && !isFirst}
+						<button
+							class="footer-action-btn"
+							onclick={() => onmoveup()}
+							title="Move up (Alt+\u2191)"
+							aria-label={`Move post ${index + 1} up`}
+						>
+							<ChevronUp size={13} />
+						</button>
+					{/if}
+					{#if onmovedown && !isLast}
+						<button
+							class="footer-action-btn"
+							onclick={() => onmovedown()}
+							title="Move down (Alt+\u2193)"
+							aria-label={`Move post ${index + 1} down`}
+						>
+							<ChevronDown size={13} />
+						</button>
+					{/if}
 					<div
 						class="footer-handle"
 						draggable="true"
@@ -220,6 +245,12 @@
 	.flow-card.assisting {
 		opacity: 0.7;
 		pointer-events: none;
+	}
+
+	.flow-card:global(.media-transfer-target) {
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+		border-left-color: var(--color-accent);
+		border-radius: 6px;
 	}
 
 	/* ── Gutter (avatar + spine) ──────────── */
