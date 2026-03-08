@@ -333,8 +333,8 @@ mod tests {
             runtimes: Mutex::new(HashMap::new()),
             content_generators: Mutex::new(HashMap::new()),
             circuit_breaker: None,
-            watchtower_cancel: None,
-            content_sources: Default::default(),
+            watchtower_cancel: RwLock::new(None),
+            content_sources: RwLock::new(Default::default()),
             connector_config: Default::default(),
             deployment_mode: Default::default(),
 

@@ -91,6 +91,20 @@ pub async fn get_source_contexts(pool: &DbPool) -> Result<Vec<SourceContext>, St
     Ok(rows.into_iter().map(SourceContext::from_row).collect())
 }
 
+/// Get all source contexts regardless of status (for status APIs).
+pub async fn get_all_source_contexts(pool: &DbPool) -> Result<Vec<SourceContext>, StorageError> {
+    let rows: Vec<SourceContextRow> = sqlx::query_as(
+        "SELECT id, account_id, source_type, config_json, sync_cursor, \
+                    status, error_message, created_at, updated_at \
+             FROM source_contexts ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(SourceContext::from_row).collect())
+}
+
 /// Update the sync cursor for a source context.
 pub async fn update_sync_cursor(pool: &DbPool, id: i64, cursor: &str) -> Result<(), StorageError> {
     sqlx::query(

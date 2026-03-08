@@ -375,6 +375,8 @@ async fn watcher_cancels_with_sources() {
             file_patterns: vec!["*.md".to_string()],
             loop_back_enabled: false,
             poll_interval_seconds: None,
+            enabled: None,
+            change_detection: "auto".to_string(),
         }],
     };
 
@@ -419,6 +421,8 @@ async fn watchtower_skips_source_without_auth() {
             file_patterns: vec!["*.md".to_string()],
             loop_back_enabled: false,
             poll_interval_seconds: Some(300),
+            enabled: None,
+            change_detection: "auto".to_string(),
         }],
     };
 
@@ -541,6 +545,8 @@ async fn watchtower_mixed_legacy_and_connection_sources() {
                 file_patterns: vec!["*.md".to_string()],
                 loop_back_enabled: false,
                 poll_interval_seconds: None,
+                enabled: None,
+                change_detection: "auto".to_string(),
             },
             crate::config::ContentSourceEntry {
                 source_type: "google_drive".to_string(),
@@ -552,6 +558,8 @@ async fn watchtower_mixed_legacy_and_connection_sources() {
                 file_patterns: vec!["*.md".to_string()],
                 loop_back_enabled: false,
                 poll_interval_seconds: Some(300),
+                enabled: None,
+                change_detection: "auto".to_string(),
             },
         ],
     };

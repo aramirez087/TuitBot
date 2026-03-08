@@ -103,6 +103,12 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         // Ingest
         .route("/ingest", post(routes::ingest::ingest))
+        // Sources
+        .route("/sources/status", get(routes::sources::source_status))
+        .route(
+            "/sources/{id}/reindex",
+            post(routes::sources::reindex_source),
+        )
         // Targets
         .route(
             "/targets",

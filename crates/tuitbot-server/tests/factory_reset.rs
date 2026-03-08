@@ -50,8 +50,8 @@ async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: tokio::sync::RwLock::new(None),
+        content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 

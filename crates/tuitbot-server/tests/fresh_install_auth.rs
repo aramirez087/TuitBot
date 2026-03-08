@@ -51,8 +51,8 @@ async fn test_router_with_dir(dir: &std::path::Path) -> axum::Router {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: tokio::sync::RwLock::new(None),
+        content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 
@@ -276,8 +276,8 @@ async fn init_with_claim_produces_valid_session() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: tokio::sync::RwLock::new(None),
+        content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 
@@ -361,8 +361,8 @@ async fn login_detects_out_of_band_passphrase_reset() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: tokio::sync::RwLock::new(None),
+        content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 
@@ -427,8 +427,8 @@ async fn login_detects_new_passphrase_file() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: tokio::sync::RwLock::new(None),
+        content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 

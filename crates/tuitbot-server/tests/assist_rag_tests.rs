@@ -236,8 +236,8 @@ async fn build_test_router_with_generator(
         content_generators: Mutex::new(generators),
         runtimes: Mutex::new(HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: RwLock::new(None),
+        content_sources: RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 
@@ -277,8 +277,8 @@ async fn build_test_router_no_generator() -> (axum::Router, tempfile::TempDir) {
         content_generators: Mutex::new(HashMap::new()),
         runtimes: Mutex::new(HashMap::new()),
         circuit_breaker: None,
-        watchtower_cancel: None,
-        content_sources: Default::default(),
+        watchtower_cancel: RwLock::new(None),
+        content_sources: RwLock::new(Default::default()),
         connector_config: Default::default(),
         deployment_mode: Default::default(),
 

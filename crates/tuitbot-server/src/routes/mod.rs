@@ -18,6 +18,7 @@ pub mod replies;
 pub mod runtime;
 pub mod scraper_session;
 pub mod settings;
+pub mod sources;
 pub mod strategy;
 pub mod targets;
 pub mod x_auth;
