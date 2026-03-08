@@ -262,6 +262,52 @@ export async function restoreDraft(id: number): Promise<void> {
 	}
 }
 
+export async function scheduleDraft(id: number, scheduledFor: string): Promise<boolean> {
+	try {
+		const result = await api.draftStudio.schedule(id, scheduledFor);
+		collection = collection.map((d) =>
+			d.id === id
+				? { ...d, status: result.status, scheduled_for: result.scheduled_for }
+				: d
+		);
+		tab = 'scheduled';
+		return true;
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to schedule draft';
+		return false;
+	}
+}
+
+export async function unscheduleDraft(id: number): Promise<boolean> {
+	try {
+		await api.draftStudio.unschedule(id);
+		collection = collection.map((d) =>
+			d.id === id ? { ...d, status: 'draft', scheduled_for: null } : d
+		);
+		tab = 'active';
+		return true;
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to unschedule draft';
+		return false;
+	}
+}
+
+export async function rescheduleDraft(id: number, scheduledFor: string): Promise<boolean> {
+	try {
+		await api.draftStudio.unschedule(id);
+		const result = await api.draftStudio.schedule(id, scheduledFor);
+		collection = collection.map((d) =>
+			d.id === id
+				? { ...d, status: result.status, scheduled_for: result.scheduled_for }
+				: d
+		);
+		return true;
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to reschedule draft';
+		return false;
+	}
+}
+
 export async function duplicateDraft(id: number): Promise<void> {
 	try {
 		const result = await api.draftStudio.duplicate(id);

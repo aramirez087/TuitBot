@@ -7,6 +7,7 @@
 	import type { ScheduledContentItem } from '$lib/api/types';
 	import type { SyncStatus } from '$lib/utils/composerAutosave';
 	import type { AttachedMedia } from '$lib/components/composer/TweetEditor.svelte';
+	import type { ComposeRequest } from '$lib/api';
 	import type { PaletteAction } from '$lib/components/CommandPalette.svelte';
 	import { matchEvent } from '$lib/utils/shortcuts';
 	import { Plus, Copy, Archive, ArrowLeft } from 'lucide-svelte';
@@ -179,8 +180,39 @@
 		}
 	}
 
-	function handleDraftSubmit() {
-		// Schedule/publish flows are in Session 08.
+	async function handleDraftSubmit(data: ComposeRequest) {
+		const id = studio.getSelectedId();
+		if (id === null) return;
+		if (data.scheduled_for) {
+			const success = await studio.scheduleDraft(id, data.scheduled_for);
+			if (success) await fetchDraft(id);
+		}
+	}
+
+	async function handleSchedule(scheduledFor: string) {
+		const id = studio.getSelectedId();
+		if (id === null) return;
+		const success = await studio.scheduleDraft(id, scheduledFor);
+		if (success) await fetchDraft(id);
+	}
+
+	async function handleUnschedule() {
+		const id = studio.getSelectedId();
+		if (id === null) return;
+		const success = await studio.unscheduleDraft(id);
+		if (success) await fetchDraft(id);
+	}
+
+	async function handleReschedule(scheduledFor: string) {
+		const id = studio.getSelectedId();
+		if (id === null) return;
+		const success = await studio.rescheduleDraft(id, scheduledFor);
+		if (success) await fetchDraft(id);
+	}
+
+	function handleDuplicateFromDetails() {
+		const id = studio.getSelectedId();
+		if (id !== null) handleDuplicate(id);
 	}
 
 	function handleDraftAction(actionId: string) {
@@ -329,6 +361,10 @@
 				onassigntag={handleAssignTag}
 				onunassigntag={handleUnassignTag}
 				oncreatetag={handleCreateTag}
+				onschedule={handleSchedule}
+				onunschedule={handleUnschedule}
+				onreschedule={handleReschedule}
+				onduplicate={handleDuplicateFromDetails}
 				onclose={() => detailsPanelOpen = false}
 			/>
 		</div>

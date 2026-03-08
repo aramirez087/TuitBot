@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { ChevronLeft, ChevronRight, Plus, Calendar, LayoutGrid, Loader2 } from 'lucide-svelte';
 	import CalendarWeekView from '$lib/components/CalendarWeekView.svelte';
@@ -70,6 +71,10 @@
 
 	function handleCancel(id: number) {
 		cancelScheduledItem(id);
+	}
+
+	function handleEditScheduled(id: number) {
+		goto(`/drafts?id=${id}`);
 	}
 
 	onMount(() => {
@@ -150,6 +155,7 @@
 				onslotclick={handleSlotClick}
 				ondayclick={handleDayClick}
 				oncancel={handleCancel}
+				onedit={handleEditScheduled}
 			/>
 		{:else}
 			<CalendarMonthView
