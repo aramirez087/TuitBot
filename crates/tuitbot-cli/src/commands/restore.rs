@@ -7,9 +7,10 @@ use tuitbot_core::startup::data_dir;
 use tuitbot_core::storage;
 
 use super::RestoreArgs;
+use crate::output::CliOutput;
 
 /// Execute the `tuitbot restore` command.
-pub async fn execute(args: RestoreArgs) -> anyhow::Result<()> {
+pub async fn execute(args: RestoreArgs, out: CliOutput) -> anyhow::Result<()> {
     let backup_path = PathBuf::from(&args.backup_path);
 
     if !backup_path.exists() {
@@ -17,21 +18,29 @@ pub async fn execute(args: RestoreArgs) -> anyhow::Result<()> {
     }
 
     // Validate.
-    eprintln!("Validating backup: {}", backup_path.display());
+    out.info(&format!("Validating backup: {}", backup_path.display()));
     let validation = storage::backup::validate_backup(&backup_path).await?;
 
     for msg in &validation.messages {
-        eprintln!("  {msg}");
+        out.info(&format!("  {msg}"));
     }
 
     if !validation.valid {
         anyhow::bail!("Backup validation failed. Aborting restore.");
     }
 
-    eprintln!("  Tables: {}", validation.tables.join(", "));
+    out.info(&format!("  Tables: {}", validation.tables.join(", ")));
 
     if args.validate_only {
-        eprintln!("\nValidation passed. Use without --validate-only to restore.");
+        if out.is_json() {
+            out.json(&serde_json::json!({
+                "status": "valid",
+                "tables": validation.tables,
+                "messages": validation.messages,
+            }))?;
+        } else {
+            out.info("\nValidation passed. Use without --validate-only to restore.");
+        }
         return Ok(());
     }
 
@@ -44,16 +53,24 @@ pub async fn execute(args: RestoreArgs) -> anyhow::Result<()> {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
         if !input.trim().eq_ignore_ascii_case("y") {
-            eprintln!("Aborted.");
+            out.info("Aborted.");
             return Ok(());
         }
     }
 
     // Restore.
-    eprintln!("Restoring...");
+    out.info("Restoring...");
     storage::backup::restore_from_backup(&backup_path, &target).await?;
-    eprintln!("Restore complete: {}", target.display());
-    eprintln!("Restart the server or run `tuitbot test` to verify connectivity.");
+
+    if out.is_json() {
+        out.json(&serde_json::json!({
+            "status": "restored",
+            "target": target.display().to_string(),
+        }))?;
+    } else {
+        out.info(&format!("Restore complete: {}", target.display()));
+        out.info("Restart the server or run `tuitbot test` to verify connectivity.");
+    }
 
     Ok(())
 }

@@ -15,8 +15,8 @@ use serde::Serialize;
 use tuitbot_core::config::Config;
 use tuitbot_core::storage;
 
-use super::{ApproveArgs, OutputFormat};
-use crate::output::write_stdout;
+use super::ApproveArgs;
+use crate::output::CliOutput;
 
 #[derive(Serialize)]
 struct ApprovalItemJson {
@@ -54,17 +54,20 @@ struct ApproveActionResult {
 }
 
 /// Execute the `tuitbot approve` command.
-pub async fn execute(
-    config: &Config,
-    args: ApproveArgs,
-    output: OutputFormat,
-) -> anyhow::Result<()> {
+pub async fn execute(config: &Config, args: ApproveArgs, out: CliOutput) -> anyhow::Result<()> {
     let is_non_interactive =
         args.list || args.approve.is_some() || args.reject.is_some() || args.approve_all;
 
     if !config.approval_mode && !is_non_interactive {
-        eprintln!("Approval mode is not enabled.");
-        eprintln!("Set `approval_mode = true` in your config.toml to queue posts for review.");
+        if out.is_json() {
+            out.json(&serde_json::json!({
+                "error": "Approval mode is not enabled",
+                "hint": "Set `approval_mode = true` in your config.toml",
+            }))?;
+        } else {
+            out.info("Approval mode is not enabled.");
+            out.info("Set `approval_mode = true` in your config.toml to queue posts for review.");
+        }
         return Ok(());
     }
 
@@ -73,14 +76,14 @@ pub async fn execute(
     // Handle non-interactive modes
     if args.list {
         let pending = storage::approval_queue::get_pending(&pool).await?;
-        if output.is_json() {
+        if out.is_json() {
             let items: Vec<ApprovalItemJson> = pending.iter().map(ApprovalItemJson::from).collect();
-            write_stdout(&serde_json::to_string(&items)?)?;
+            out.json(&items)?;
         } else if pending.is_empty() {
-            eprintln!("No pending items.");
+            out.info("No pending items.");
         } else {
             for item in &pending {
-                eprintln!(
+                out.info(&format!(
                     "  #{} [{}] {} | topic: {} | score: {:.1} | {}",
                     item.id,
                     item.action_type,
@@ -96,9 +99,9 @@ pub async fn execute(
                     },
                     item.score,
                     item.created_at,
-                );
+                ));
             }
-            eprintln!("\n{} pending item(s).", pending.len());
+            out.info(&format!("\n{} pending item(s).", pending.len()));
         }
         pool.close().await;
         return Ok(());
@@ -106,14 +109,14 @@ pub async fn execute(
 
     if let Some(id) = args.approve {
         storage::approval_queue::update_status(&pool, id, "approved").await?;
-        if output.is_json() {
+        if out.is_json() {
             let result = ApproveActionResult {
                 id,
                 status: "approved".to_string(),
             };
-            write_stdout(&serde_json::to_string(&result)?)?;
+            out.json(&result)?;
         } else {
-            eprintln!("Approved item #{id}.");
+            out.info(&format!("Approved item #{id}."));
         }
         pool.close().await;
         return Ok(());
@@ -121,14 +124,14 @@ pub async fn execute(
 
     if let Some(id) = args.reject {
         storage::approval_queue::update_status(&pool, id, "rejected").await?;
-        if output.is_json() {
+        if out.is_json() {
             let result = ApproveActionResult {
                 id,
                 status: "rejected".to_string(),
             };
-            write_stdout(&serde_json::to_string(&result)?)?;
+            out.json(&result)?;
         } else {
-            eprintln!("Rejected item #{id}.");
+            out.info(&format!("Rejected item #{id}."));
         }
         pool.close().await;
         return Ok(());
@@ -144,10 +147,10 @@ pub async fn execute(
                 status: "approved".to_string(),
             });
         }
-        if output.is_json() {
-            write_stdout(&serde_json::to_string(&results)?)?;
+        if out.is_json() {
+            out.json(&results)?;
         } else {
-            eprintln!("Approved {} item(s).", results.len());
+            out.info(&format!("Approved {} item(s).", results.len()));
         }
         pool.close().await;
         return Ok(());

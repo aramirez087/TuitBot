@@ -78,7 +78,9 @@ fn discover() -> UninstallInventory {
         subdirs.sort_by(|a, b| a.name.cmp(&b.name));
     }
 
-    let cli_binary = std::env::current_exe().ok().filter(|p| p.exists());
+    let cli_binary = std::env::current_exe()
+        .ok()
+        .filter(|p| p.exists() && is_installed_path(p));
     let server_binary = detect_server_path();
     let server_running = is_server_running();
 
@@ -116,6 +118,38 @@ fn dir_size(path: &Path) -> (usize, u64) {
     }
 
     (count, size)
+}
+
+/// Check whether a binary path looks like a standard install location
+/// rather than a temporary/ad-hoc extraction directory.
+///
+/// Prevents uninstall from deleting locally extracted release artifacts
+/// or binaries run from random working directories.
+fn is_installed_path(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+
+    // Standard cargo/system install roots
+    if s.contains("/.cargo/bin/")
+        || s.contains("/usr/local/bin/")
+        || s.contains("/usr/bin/")
+        || s.contains("/opt/")
+        || s.contains("/bin/tuitbot")
+    {
+        return true;
+    }
+
+    // Windows: typical cargo install path
+    #[cfg(windows)]
+    if s.contains("\\.cargo\\bin\\") || s.contains("\\Program Files") {
+        return true;
+    }
+
+    // macOS: Homebrew
+    if s.contains("/Cellar/") || s.contains("/homebrew/") {
+        return true;
+    }
+
+    false
 }
 
 /// Walk PATH to find `tuitbot-server` binary.
@@ -264,12 +298,22 @@ fn remove_binary(path: &Path) -> io::Result<()> {
 // ============================================================================
 
 /// Execute the `tuitbot uninstall` command.
-pub fn execute(force: bool, data_only: bool) -> anyhow::Result<()> {
+pub fn execute(force: bool, data_only: bool, out: crate::output::CliOutput) -> anyhow::Result<()> {
     let inv = discover();
 
-    print_inventory(&inv, data_only);
+    if !out.is_json() && !out.quiet {
+        print_inventory(&inv, data_only);
+    }
 
     if !inv.data_dir_exists && inv.cli_binary.is_none() && inv.server_binary.is_none() {
+        if out.is_json() {
+            out.json(&serde_json::json!({
+                "status": "noop",
+                "message": "Nothing to remove"
+            }))?;
+        } else {
+            out.info("Nothing to remove — Tuitbot does not appear to be installed.");
+        }
         return Ok(());
     }
 
@@ -282,28 +326,38 @@ pub fn execute(force: bool, data_only: bool) -> anyhow::Result<()> {
             .unwrap_or(false);
 
         if !confirmed {
-            println!("Aborted.");
+            out.info("Aborted.");
             return Ok(());
         }
-        println!();
+        out.info("");
     }
+
+    let mut removed = Vec::new();
+    let mut errors = Vec::new();
 
     // 1. Data directory
     if inv.data_dir_exists {
         match remove_data_dir(&inv.data_dir) {
             Ok(()) => {
                 let display = shorten_home(&inv.data_dir);
-                println!("  {} Removed {display}", console::style("✓").green());
+                out.info(&format!(
+                    "  {} Removed {display}",
+                    console::style("✓").green()
+                ));
+                removed.push(display);
             }
             Err(e) => {
                 let display = shorten_home(&inv.data_dir);
-                eprintln!(
-                    "  {} Failed to remove {display}: {e}",
-                    console::style("✗").red()
-                );
-                if e.kind() == io::ErrorKind::PermissionDenied {
-                    eprintln!("    Hint: try running with sudo");
+                if !out.quiet {
+                    eprintln!(
+                        "  {} Failed to remove {display}: {e}",
+                        console::style("✗").red()
+                    );
+                    if e.kind() == io::ErrorKind::PermissionDenied {
+                        eprintln!("    Hint: try running with sudo");
+                    }
                 }
+                errors.push(format!("Failed to remove {display}: {e}"));
             }
         }
     }
@@ -313,13 +367,20 @@ pub fn execute(force: bool, data_only: bool) -> anyhow::Result<()> {
         if let Some(ref server_path) = inv.server_binary {
             match remove_binary(server_path) {
                 Ok(()) => {
-                    println!("  {} Removed tuitbot-server", console::style("✓").green());
+                    out.info(&format!(
+                        "  {} Removed tuitbot-server",
+                        console::style("✓").green()
+                    ));
+                    removed.push("tuitbot-server".to_string());
                 }
                 Err(e) => {
-                    eprintln!(
-                        "  {} Failed to remove tuitbot-server: {e}",
-                        console::style("✗").red()
-                    );
+                    if !out.quiet {
+                        eprintln!(
+                            "  {} Failed to remove tuitbot-server: {e}",
+                            console::style("✗").red()
+                        );
+                    }
+                    errors.push(format!("Failed to remove tuitbot-server: {e}"));
                 }
             }
         }
@@ -328,34 +389,49 @@ pub fn execute(force: bool, data_only: bool) -> anyhow::Result<()> {
         if let Some(ref cli_path) = inv.cli_binary {
             match remove_binary(cli_path) {
                 Ok(()) => {
-                    println!(
+                    out.info(&format!(
                         "  {} Removed tuitbot (this binary)",
                         console::style("✓").green()
-                    );
+                    ));
+                    removed.push("tuitbot".to_string());
                 }
                 Err(e) => {
-                    eprintln!(
-                        "  {} Failed to remove tuitbot: {e}",
-                        console::style("✗").red()
-                    );
+                    if !out.quiet {
+                        eprintln!(
+                            "  {} Failed to remove tuitbot: {e}",
+                            console::style("✗").red()
+                        );
+                    }
+                    errors.push(format!("Failed to remove tuitbot: {e}"));
                 }
             }
         }
     }
 
-    // Summary
-    println!();
-    if data_only {
-        println!("Tuitbot data has been removed.");
-        println!();
-        println!("To reinitialize:");
-        println!("  tuitbot init");
+    if out.is_json() {
+        out.json(&serde_json::json!({
+            "status": if errors.is_empty() { "success" } else { "partial" },
+            "removed": removed,
+            "errors": errors,
+            "data_only": data_only,
+        }))?;
     } else {
-        println!("Tuitbot has been completely removed.");
-        println!();
-        println!("To reinstall:");
-        println!("  cargo install tuitbot-cli tuitbot-server");
-        println!("  tuitbot init");
+        // Summary
+        out.info("");
+        if data_only {
+            if inv.data_dir_exists {
+                out.info("Tuitbot data has been removed.");
+            }
+            out.info("");
+            out.info("To reinitialize:");
+            out.info("  tuitbot init");
+        } else {
+            out.info("Tuitbot has been completely removed.");
+            out.info("");
+            out.info("To reinstall:");
+            out.info("  cargo install tuitbot-cli tuitbot-server");
+            out.info("  tuitbot init");
+        }
     }
 
     Ok(())

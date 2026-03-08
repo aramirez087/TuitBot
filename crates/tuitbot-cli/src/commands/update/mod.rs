@@ -46,35 +46,45 @@ pub async fn execute(
     check_only: bool,
     config_only: bool,
     config_path_str: &str,
+    out: crate::output::CliOutput,
 ) -> Result<()> {
     let bold = Style::new().bold();
     let dim = Style::new().dim();
     let green = Style::new().green().bold();
     let current = Version::parse(CURRENT_VERSION).context("Failed to parse current version")?;
 
+    let mut binary_updated = false;
+
     // Phase 1: Binary update
     if !config_only {
-        eprintln!("{}", bold.apply_to("Checking for updates..."));
-        eprintln!();
+        out.info(&format!("{}", bold.apply_to("Checking for updates...")));
+        out.info("");
 
         let fetched_releases = check_recent_releases().await;
 
         match &fetched_releases {
             Ok(releases) => match latest_known_release(releases) {
                 Some((latest_release, latest)) if is_newer(&latest, &current) => {
-                    eprintln!(
+                    out.info(&format!(
                         "  {} {} → {}",
                         green.apply_to("New version available:"),
                         current,
                         latest
-                    );
+                    ));
 
                     if check_only {
-                        eprintln!();
-                        eprintln!(
+                        if out.is_json() {
+                            return out.json(&serde_json::json!({
+                                "update_available": true,
+                                "current_version": current.to_string(),
+                                "latest_version": latest.to_string(),
+                            }));
+                        }
+                        out.info("");
+                        out.info(&format!(
                             "{}",
                             dim.apply_to("Run 'tuitbot update' to install the update.")
-                        );
+                        ));
                         return Ok(());
                     }
 
@@ -87,14 +97,15 @@ pub async fn execute(
                             .interact()?;
 
                         if !proceed {
-                            eprintln!("{}", dim.apply_to("Update skipped."));
-                            eprintln!();
+                            out.info(&format!("{}", dim.apply_to("Update skipped.")));
+                            out.info("");
                             // Fall through to config upgrade
                             return run_config_upgrade(
                                 non_interactive,
                                 config_path_str,
                                 &bold,
                                 &dim,
+                                out,
                             );
                         }
                     }
@@ -104,29 +115,44 @@ pub async fn execute(
                     {
                         Ok(name) => name,
                         Err(e) => {
-                            eprintln!();
-                            eprintln!(
+                            let reason = format!("{e}");
+                            out.info("");
+                            out.info(&format!(
                                 "  {} Binary update skipped: {e}",
                                 Style::new().yellow().bold().apply_to("⚠"),
-                            );
-                            eprintln!(
+                            ));
+                            out.info(&format!(
                                     "  {}",
                                     dim.apply_to(
                                         "No prebuilt binary is published for this platform. Build from source or install manually."
                                     )
-                                );
-                            eprintln!(
+                                ));
+                            out.info(&format!(
                                     "  {}",
                                     dim.apply_to(
                                         "Manual downloads: https://github.com/aramirez087/TuitBot/releases"
                                     )
-                                );
-                            eprintln!();
+                                ));
+                            out.info("");
+                            if non_interactive && out.is_json() {
+                                out.json(&serde_json::json!({
+                                    "binary_updated": false,
+                                    "binary_skipped": true,
+                                    "reason": reason,
+                                    "current_version": current.to_string(),
+                                    "latest_version": latest.to_string(),
+                                }))?;
+                                bail!("Binary update skipped: {reason}");
+                            }
+                            if non_interactive {
+                                bail!("Binary update skipped: {e}");
+                            }
                             return run_config_upgrade(
                                 non_interactive,
                                 config_path_str,
                                 &bold,
                                 &dim,
+                                out,
                             );
                         }
                     };
@@ -138,103 +164,134 @@ pub async fn execute(
                     ) {
                         Some(found) => found,
                         None => {
-                            eprintln!();
-                            eprintln!(
-                                "  {} Binary update skipped: no compatible asset found for '{}'",
+                            let reason = format!("no compatible asset found for '{asset_name}'");
+                            out.info("");
+                            out.info(&format!(
+                                "  {} Binary update skipped: {reason}",
                                 Style::new().yellow().bold().apply_to("⚠"),
-                                asset_name,
-                            );
-                            eprintln!(
+                            ));
+                            out.info(&format!(
                                 "  {} Latest release checked: {}",
                                 dim.apply_to("Tag:"),
                                 latest_release.tag_name,
-                            );
-                            eprintln!(
+                            ));
+                            out.info(&format!(
                                 "  {} {}",
                                 dim.apply_to("Available assets:"),
                                 available_asset_names(latest_release),
-                            );
-                            eprintln!(
+                            ));
+                            out.info(&format!(
                                     "  {}",
                                     dim.apply_to(
                                         "Manual downloads: https://github.com/aramirez087/TuitBot/releases"
                                     )
-                                );
-                            eprintln!();
+                                ));
+                            out.info("");
+                            if non_interactive && out.is_json() {
+                                out.json(&serde_json::json!({
+                                    "binary_updated": false,
+                                    "binary_skipped": true,
+                                    "reason": reason,
+                                    "current_version": current.to_string(),
+                                    "latest_version": latest.to_string(),
+                                }))?;
+                                bail!("Binary update skipped: {reason}");
+                            }
+                            if non_interactive {
+                                bail!("Binary update skipped: {reason}");
+                            }
                             return run_config_upgrade(
                                 non_interactive,
                                 config_path_str,
                                 &bold,
                                 &dim,
+                                out,
                             );
                         }
                     };
 
                     if release_version != latest {
-                        eprintln!(
+                        out.info(&format!(
                             "  {} Latest version v{} has no '{}' asset; installing newest compatible v{}.",
                             Style::new().yellow().bold().apply_to("⚠"),
                             latest,
                             asset_name,
                             release_version
-                        );
+                        ));
                     }
 
                     // Phase 1a: Update CLI binary
                     match update_cli_binary(release_for_update).await {
                         Ok(()) => {
-                            eprintln!();
-                            eprintln!(
+                            binary_updated = true;
+                            out.info("");
+                            out.info(&format!(
                                 "  {} Updated tuitbot to v{}",
                                 green.apply_to("✓"),
                                 release_version
-                            );
+                            ));
                         }
                         Err(e) => {
-                            eprintln!();
-                            eprintln!(
+                            out.info("");
+                            out.info(&format!(
                                 "  {} CLI binary update failed: {e}",
                                 Style::new().red().bold().apply_to("✗"),
-                            );
-                            eprintln!(
+                            ));
+                            out.info(&format!(
                                 "  {}",
                                 dim.apply_to(
                                     "You can download manually from: https://github.com/aramirez087/TuitBot/releases"
                                 )
-                            );
+                            ));
                         }
                     }
                 }
                 Some((_, latest)) => {
-                    eprintln!("  Already up to date (v{current}).");
+                    out.info(&format!("  Already up to date (v{current})."));
                     if latest != current {
-                        eprintln!("  {}", dim.apply_to(format!("(latest release: v{latest})")));
+                        out.info(&format!(
+                            "  {}",
+                            dim.apply_to(format!("(latest release: v{latest})"))
+                        ));
                     }
 
                     if check_only {
+                        if out.is_json() {
+                            return out.json(&serde_json::json!({
+                                "update_available": false,
+                                "current_version": current.to_string(),
+                            }));
+                        }
                         return Ok(());
                     }
                 }
                 None => {
-                    eprintln!(
+                    out.info(&format!(
                         "  {} Could not find a parseable CLI release tag",
                         Style::new().yellow().bold().apply_to("⚠"),
-                    );
+                    ));
 
                     if check_only {
+                        if out.is_json() {
+                            return out.json(&serde_json::json!({
+                                "update_available": false,
+                                "current_version": current.to_string(),
+                                "warning": "Could not find a parseable CLI release tag",
+                            }));
+                        }
                         return Ok(());
                     }
                 }
             },
             Err(e) => {
-                eprintln!(
+                out.info(&format!(
                     "  {} Could not check for updates: {e}",
                     Style::new().yellow().bold().apply_to("⚠"),
-                );
-                eprintln!(
+                ));
+                out.info(&format!(
                     "  {}",
                     dim.apply_to("Skipping binary update, continuing with config upgrade...")
-                );
+                ));
             }
         }
 
@@ -247,13 +304,15 @@ pub async fn execute(
             }
         }
 
-        eprintln!();
+        out.info("");
     } else if check_only {
         bail!("--check and --config-only cannot be used together.");
     }
 
+    let _ = binary_updated; // used for future JSON output
+
     // Phase 2: Config upgrade
-    run_config_upgrade(non_interactive, config_path_str, &bold, &dim)
+    run_config_upgrade(non_interactive, config_path_str, &bold, &dim, out)
 }
 
 /// Pre-run check: hint about `tuitbot update` when config has missing features.
@@ -391,43 +450,48 @@ fn run_config_upgrade(
     config_path_str: &str,
     bold: &Style,
     dim: &Style,
+    out: crate::output::CliOutput,
 ) -> Result<()> {
     let config_path = upgrade::expand_tilde(config_path_str);
 
     if !config_path.exists() {
-        eprintln!(
+        out.info(&format!(
             "  {}",
             dim.apply_to("No config file found — run 'tuitbot init' to create one.")
-        );
+        ));
         return Ok(());
     }
 
-    eprintln!("{}", bold.apply_to("Checking configuration..."));
+    out.info(&format!("{}", bold.apply_to("Checking configuration...")));
 
     let missing = upgrade::detect_missing_features(&config_path)?;
 
     if missing.is_empty() {
-        eprintln!("  Config is up to date.");
+        out.info("  Config is up to date.");
         return Ok(());
     }
 
-    eprintln!("  New feature groups to configure:");
+    out.info("  New feature groups to configure:");
     for group in &missing {
-        eprintln!("    • {} — {}", group.display_name(), group.description());
+        out.info(&format!(
+            "    • {} — {}",
+            group.display_name(),
+            group.description()
+        ));
     }
-    eprintln!();
+    out.info("");
 
     if non_interactive {
         upgrade::apply_defaults(&config_path, &missing)?;
     } else if std::io::stdin().is_terminal() {
         upgrade::run_upgrade_wizard(&config_path, &missing)?;
     } else {
-        eprintln!(
+        out.info(&format!(
             "  {}",
             dim.apply_to(
                 "Non-interactive terminal detected. Use --non-interactive to apply defaults."
             )
-        );
+        ));
     }
 
     Ok(())

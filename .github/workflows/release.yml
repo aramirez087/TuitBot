@@ -153,11 +153,24 @@ jobs:
         if: matrix.cross
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: Build tuitbot binary
+        if: ${{ matrix.cross != true }}
+        run: cargo build --locked --release --package tuitbot-cli --target ${{ matrix.target }}
+
+      - name: Build tuitbot binary (aarch64-linux cross)
+        if: matrix.cross
         env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC: aarch64-linux-gnu-gcc
+          CXX: aarch64-linux-gnu-g++
+          AR: aarch64-linux-gnu-ar
+          RANLIB: aarch64-linux-gnu-ranlib
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+          RANLIB_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ranlib
         run: cargo build --locked --release --package tuitbot-cli --target ${{ matrix.target }}
 
       - name: Set up Node.js
@@ -172,8 +185,21 @@ jobs:
           cp -r build/* ../crates/tuitbot-server/dashboard-dist/
 
       - name: Build tuitbot-server binary
+        if: ${{ matrix.cross != true }}
+        run: cargo build --locked --release --package tuitbot-server --target ${{ matrix.target }}
+
+      - name: Build tuitbot-server binary (aarch64-linux cross)
+        if: matrix.cross
         env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.cross && 'aarch64-linux-gnu-gcc' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC: aarch64-linux-gnu-gcc
+          CXX: aarch64-linux-gnu-g++
+          AR: aarch64-linux-gnu-ar
+          RANLIB: aarch64-linux-gnu-ranlib
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+          RANLIB_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ranlib
         run: cargo build --locked --release --package tuitbot-server --target ${{ matrix.target }}
 
       - name: Package CLI archive (Unix)
@@ -257,13 +283,43 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - name: Verify artifacts were downloaded
+      - name: Verify complete release asset set
+        env:
+          BUILD_ASSETS_RESULT: ${{ needs.build-assets.result }}
         run: |
           set -euo pipefail
-          count=$(find dist -type f -name 'tuitbot-*' | wc -l)
-          echo "Found $count artifact(s)"
-          if [ "$count" -eq 0 ]; then
-            echo "::error::No artifacts downloaded — all build-assets matrix legs failed."
+          expected=(
+            tuitbot-x86_64-unknown-linux-gnu.tar.gz
+            tuitbot-server-x86_64-unknown-linux-gnu.tar.gz
+            tuitbot-aarch64-unknown-linux-gnu.tar.gz
+            tuitbot-server-aarch64-unknown-linux-gnu.tar.gz
+            tuitbot-x86_64-apple-darwin.tar.gz
+            tuitbot-server-x86_64-apple-darwin.tar.gz
+            tuitbot-aarch64-apple-darwin.tar.gz
+            tuitbot-server-aarch64-apple-darwin.tar.gz
+            tuitbot-x86_64-pc-windows-msvc.zip
+            tuitbot-server-x86_64-pc-windows-msvc.zip
+          )
+          missing=()
+          for asset in "${expected[@]}"; do
+            if [ ! -f "dist/$asset" ]; then
+              missing+=("$asset")
+            fi
+          done
+
+          echo "Downloaded release archives:"
+          find dist -maxdepth 1 -type f \
+            \( -name 'tuitbot-*.tar.gz' -o -name 'tuitbot-*.zip' -o -name 'tuitbot-server-*.tar.gz' -o -name 'tuitbot-server-*.zip' \) \
+            -printf '%f\n' | sort
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing expected release assets."
+            printf '%s\n' "${missing[@]}"
+            exit 1
+          fi
+
+          if [ "$BUILD_ASSETS_RESULT" != "success" ]; then
+            echo "::error::build-assets result was $BUILD_ASSETS_RESULT; refusing to publish."
             exit 1
           fi
 
@@ -281,10 +337,3 @@ jobs:
         run: |
           set -euo pipefail
           gh release upload "$TAG" dist/* --clobber --repo "$GH_REPO"
-
-      - name: Fail workflow if any build leg failed
-        if: ${{ needs.build-assets.result != 'success' }}
-        run: |
-          echo "::warning::Some build-assets matrix legs failed. Assets were uploaded for successful builds only."
-          echo "build-assets result: ${{ needs.build-assets.result }}"
-          exit 1

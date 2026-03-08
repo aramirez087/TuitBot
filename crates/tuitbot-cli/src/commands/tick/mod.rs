@@ -21,9 +21,9 @@ use tuitbot_core::automation::{
 };
 use tuitbot_core::config::{Config, OperatingMode};
 
-use super::{OutputFormat, TickArgs};
+use super::TickArgs;
 use crate::deps::RuntimeDeps;
-use crate::output::write_stdout;
+use crate::output::CliOutput;
 
 // ============================================================================
 // JSON output types
@@ -108,11 +108,7 @@ impl LoopFilter {
 // ============================================================================
 
 /// Execute the `tuitbot tick` command.
-pub async fn execute(
-    config: &Config,
-    args: TickArgs,
-    output_format: OutputFormat,
-) -> anyhow::Result<()> {
+pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow::Result<()> {
     let start = Instant::now();
     let filter = LoopFilter::from_args(&args);
 
@@ -153,7 +149,7 @@ pub async fn execute(
     };
 
     // Print dry-run banner so the user knows no posts will be made.
-    if args.dry_run && !output_format.is_json() {
+    if args.dry_run && !out.is_json() {
         eprintln!("Dry run: showing what the bot would do. No posts will be made.");
         eprintln!();
     }
@@ -190,7 +186,7 @@ pub async fn execute(
             enrichment_tip: None,
         };
 
-        print_output(&output, output_format);
+        print_output(&output, out);
         return Ok(());
     }
 
@@ -297,12 +293,16 @@ pub async fn execute(
         enrichment_tip,
     };
 
-    print_output(&output, output_format);
+    print_output(&output, out);
 
-    // 9. Exit code: the process exits 0 on Ok, 1 via anyhow::bail.
+    // 9. Exit code: non-zero when any loop failed.
     if !output.success {
-        // Don't bail — we still want the output. Process exits 0 since
-        // loop-level failures are captured in the JSON output.
+        if out.is_json() {
+            // JSON output already contains the failure details; exit directly
+            // to avoid a duplicate error envelope from the main error handler.
+            std::process::exit(1);
+        }
+        anyhow::bail!("tick failed: {} error(s)", output.errors.len());
     }
 
     Ok(())
@@ -688,11 +688,10 @@ async fn run_thread(
 // Output
 // ============================================================================
 
-fn print_output(output: &TickOutput, format: OutputFormat) {
-    if format.is_json() {
-        let json = serde_json::to_string_pretty(output).expect("serialization cannot fail");
-        let _ = write_stdout(&json);
-    } else {
+fn print_output(output: &TickOutput, out: CliOutput) {
+    if out.is_json() {
+        let _ = out.json(output);
+    } else if !out.quiet {
         print_text_output(output);
     }
 }

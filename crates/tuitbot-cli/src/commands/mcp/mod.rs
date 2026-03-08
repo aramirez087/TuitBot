@@ -42,6 +42,6 @@ pub fn print_manifest(profile_str: &str) -> anyhow::Result<()> {
 }
 
 /// Execute the `tuitbot mcp setup` interactive wizard.
-pub async fn execute_setup() -> anyhow::Result<()> {
-    setup::run_setup().await
+pub async fn execute_setup(out: crate::output::CliOutput) -> anyhow::Result<()> {
+    setup::run_setup(out).await
 }

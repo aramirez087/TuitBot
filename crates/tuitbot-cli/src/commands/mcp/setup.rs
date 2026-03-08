@@ -18,9 +18,16 @@ use super::detect;
 use crate::commands::auth;
 
 /// Run the interactive MCP setup wizard.
-pub async fn run_setup() -> Result<()> {
+pub async fn run_setup(out: crate::output::CliOutput) -> Result<()> {
     // 1. TTY guard
     if !std::io::stdin().is_terminal() {
+        if out.is_json() {
+            out.error(
+                "Interactive setup requires a terminal. \
+                 For non-interactive MCP usage, set environment variables.",
+            )?;
+            std::process::exit(1);
+        }
         bail!(
             "Interactive setup requires a terminal.\n\n\
              For non-interactive MCP usage, set environment variables:\n  \

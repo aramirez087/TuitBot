@@ -6,18 +6,19 @@ use tuitbot_core::startup::data_dir;
 use tuitbot_core::storage;
 
 use super::BackupArgs;
+use crate::output::CliOutput;
 
 /// Execute the `tuitbot backup` command.
-pub async fn execute(args: BackupArgs) -> anyhow::Result<()> {
+pub async fn execute(args: BackupArgs, out: CliOutput) -> anyhow::Result<()> {
     let data = data_dir();
     let db_path = data.join("tuitbot.db");
 
     if args.list {
-        return list_backups(&data);
+        return list_backups(&data, out);
     }
 
     if let Some(keep) = args.prune {
-        return prune_backups(&data, keep);
+        return prune_backups(&data, keep, out);
     }
 
     // Create a backup.
@@ -37,46 +38,81 @@ pub async fn execute(args: BackupArgs) -> anyhow::Result<()> {
     // Open a read-only pool to the existing DB for VACUUM INTO.
     let pool = storage::init_db(&db_path.to_string_lossy()).await?;
 
-    eprintln!("Creating backup...");
+    out.info("Creating backup...");
     let result = storage::backup::create_backup(&pool, &backup_dir).await?;
     pool.close().await;
 
-    eprintln!("Backup created successfully:");
-    eprintln!("  Path: {}", result.path.display());
-    eprintln!("  Size: {} bytes", result.size_bytes);
-    eprintln!("  Duration: {}ms", result.duration_ms);
+    if out.is_json() {
+        out.json(&serde_json::json!({
+            "status": "success",
+            "path": result.path.display().to_string(),
+            "size_bytes": result.size_bytes,
+            "duration_ms": result.duration_ms,
+        }))?;
+    } else {
+        out.info("Backup created successfully:");
+        out.info(&format!("  Path: {}", result.path.display()));
+        out.info(&format!("  Size: {} bytes", result.size_bytes));
+        out.info(&format!("  Duration: {}ms", result.duration_ms));
+    }
 
     Ok(())
 }
 
-fn list_backups(data_dir: &std::path::Path) -> anyhow::Result<()> {
+fn list_backups(data_dir: &std::path::Path, out: CliOutput) -> anyhow::Result<()> {
     let backup_dir = data_dir.join("backups");
     let backups = storage::backup::list_backups(&backup_dir);
 
+    if out.is_json() {
+        let items: Vec<serde_json::Value> = backups
+            .iter()
+            .map(|b| {
+                serde_json::json!({
+                    "path": b.path.display().to_string(),
+                    "size_bytes": b.size_bytes,
+                    "timestamp": b.timestamp,
+                })
+            })
+            .collect();
+        return out.json(&items);
+    }
+
     if backups.is_empty() {
-        eprintln!("No backups found in {}", backup_dir.display());
+        out.info(&format!("No backups found in {}", backup_dir.display()));
         return Ok(());
     }
 
-    eprintln!("Backups in {}:", backup_dir.display());
+    out.info(&format!("Backups in {}:", backup_dir.display()));
     for backup in &backups {
         let ts = backup.timestamp.as_deref().unwrap_or("unknown");
         let size_kb = backup.size_bytes / 1024;
-        eprintln!("  {} ({ts}) — {size_kb} KB", backup.path.display());
+        out.info(&format!(
+            "  {} ({ts}) — {size_kb} KB",
+            backup.path.display()
+        ));
     }
-    eprintln!("\nTotal: {} backup(s)", backups.len());
+    out.info(&format!("\nTotal: {} backup(s)", backups.len()));
 
     Ok(())
 }
 
-fn prune_backups(data_dir: &std::path::Path, keep: usize) -> anyhow::Result<()> {
+fn prune_backups(data_dir: &std::path::Path, keep: usize, out: CliOutput) -> anyhow::Result<()> {
     let backup_dir = data_dir.join("backups");
     let deleted = storage::backup::prune_backups(&backup_dir, keep)?;
 
+    if out.is_json() {
+        return out.json(&serde_json::json!({
+            "pruned": deleted,
+            "kept": keep,
+        }));
+    }
+
     if deleted == 0 {
-        eprintln!("Nothing to prune (at most {keep} backups exist).");
+        out.info(&format!("Nothing to prune (at most {keep} backups exist)."));
     } else {
-        eprintln!("Pruned {deleted} old backup(s), kept {keep} most recent.");
+        out.info(&format!(
+            "Pruned {deleted} old backup(s), kept {keep} most recent."
+        ));
     }
 
     Ok(())
