@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.23](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.22...tuitbot-cli-v0.1.23) - 2026-03-08
+
+### Fixed
+
+- suppress logs polluting JSON stdout, safe uninstall path, tick exit code
+- prevent init prompt auto-confirm and return non-zero on auth failure
+- honor --quiet and --output json flags across all CLI commands, fix exit codes
+
 ## [0.1.22](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.21...tuitbot-cli-v0.1.22) - 2026-03-07
 
 ### Added
