@@ -236,8 +236,14 @@ async fn run_advanced_wizard(dir: &PathBuf, config_path: &PathBuf) -> Result<()>
 /// Shared post-config chaining: auth → test → preview (dry run).
 ///
 /// Used by both quickstart and advanced flows. On failure at any step,
-/// prints actionable remaining steps and returns Ok (does not propagate).
+/// prints actionable remaining steps and returns an error so that the
+/// exit code reflects the partial success.
 async fn chain_post_config(config: &Config, config_path_str: &str) -> Result<()> {
+    // Flush any buffered terminal input so the next Confirm prompt
+    // waits for fresh user input instead of auto-accepting leftover bytes
+    // from prior prompts.
+    flush_stdin();
+
     // Step A: Authenticate
     let do_auth = Confirm::new()
         .with_prompt("Connect your X account now?")
@@ -260,7 +266,7 @@ async fn chain_post_config(config: &Config, config_path_str: &str) -> Result<()>
             "tuitbot test           — verify everything works",
             "tuitbot tick --dry-run — preview the bot (no posts)",
         ]);
-        return Ok(());
+        bail!("Setup incomplete: authentication failed. Config was saved successfully — run the steps above to finish.");
     }
 
     // Step B: Validate
@@ -312,4 +318,20 @@ async fn chain_post_config(config: &Config, config_path_str: &str) -> Result<()>
     }
 
     Ok(())
+}
+
+/// Discard any unread bytes in the terminal input buffer.
+///
+/// Prevents leftover input from prior prompts (e.g. trailing newlines)
+/// from being consumed by the next `dialoguer::Confirm`, which would
+/// cause it to auto-accept the default without waiting for user input.
+fn flush_stdin() {
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        // SAFETY: tcflush is a standard POSIX call that discards queued input.
+        unsafe {
+            libc::tcflush(std::io::stdin().as_raw_fd(), libc::TCIFLUSH);
+        }
+    }
 }
