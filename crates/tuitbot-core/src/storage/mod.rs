@@ -176,6 +176,11 @@ mod tests {
         assert!(table_names.contains(&"source_contexts"));
         assert!(table_names.contains(&"content_nodes"));
         assert!(table_names.contains(&"draft_seeds"));
+        // Draft Studio tables
+        assert!(table_names.contains(&"content_revisions"));
+        assert!(table_names.contains(&"content_tags"));
+        assert!(table_names.contains(&"content_tag_assignments"));
+        assert!(table_names.contains(&"content_activity"));
     }
 
     #[tokio::test]
