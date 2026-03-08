@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 
 use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::context::retrieval::VaultCitation;
-use tuitbot_core::context::winning_dna;
 use tuitbot_core::storage;
 
 use crate::account::AccountContext;
 use crate::error::ApiError;
+use crate::routes::rag_helpers::resolve_composer_rag_context;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -31,54 +31,6 @@ async fn get_generator(
         .get_or_create_content_generator(account_id)
         .await
         .map_err(ApiError::BadRequest)
-}
-
-/// Resolve optional RAG context from the vault for composer assist handlers.
-///
-/// Loads the business profile's keyword set, queries winning ancestors and
-/// content seeds via `build_draft_context()`, and returns the full
-/// `DraftContext` including vault citations. Returns `None` (fail-open) on
-/// any error or when no relevant context exists.
-async fn resolve_composer_rag_context(
-    state: &AppState,
-    account_id: &str,
-    selected_node_ids: Option<&[i64]>,
-) -> Option<winning_dna::DraftContext> {
-    let config = match state.load_effective_config(account_id).await {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::warn!("composer RAG: failed to load config: {e}");
-            return None;
-        }
-    };
-
-    let keywords = config.business.draft_context_keywords();
-    if keywords.is_empty() {
-        return None;
-    }
-
-    let draft_context = match winning_dna::build_draft_context_with_selection(
-        &state.db,
-        account_id,
-        &keywords,
-        winning_dna::MAX_ANCESTORS,
-        winning_dna::RECENCY_HALF_LIFE_DAYS,
-        selected_node_ids,
-    )
-    .await
-    {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            tracing::warn!("composer RAG: failed to build draft context: {e}");
-            return None;
-        }
-    };
-
-    if draft_context.prompt_block.is_empty() {
-        None
-    } else {
-        Some(draft_context)
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -137,11 +89,15 @@ pub struct AssistReplyRequest {
     pub tweet_author: String,
     #[serde(default)]
     pub mention_product: bool,
+    #[serde(default)]
+    pub selected_node_ids: Option<Vec<i64>>,
 }
 
 #[derive(Serialize)]
 pub struct AssistReplyResponse {
     pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
 }
 
 pub async fn assist_reply(
@@ -150,14 +106,29 @@ pub async fn assist_reply(
     Json(body): Json<AssistReplyRequest>,
 ) -> Result<Json<AssistReplyResponse>, ApiError> {
     let gen = get_generator(&state, &ctx.account_id).await?;
+    let node_ids = body.selected_node_ids.as_deref();
+    let rag_context = resolve_composer_rag_context(&state, &ctx.account_id, node_ids).await;
+
+    let prompt_block = rag_context.as_ref().map(|c| c.prompt_block.as_str());
+    let citations = rag_context
+        .as_ref()
+        .map(|c| c.vault_citations.clone())
+        .unwrap_or_default();
 
     let output = gen
-        .generate_reply(&body.tweet_text, &body.tweet_author, body.mention_product)
+        .generate_reply_with_context(
+            &body.tweet_text,
+            &body.tweet_author,
+            body.mention_product,
+            None,
+            prompt_block,
+        )
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistReplyResponse {
         content: output.text,
+        vault_citations: citations,
     }))
 }
 
@@ -450,5 +421,28 @@ mod tests {
         let json = r#"{"draft": "hello"}"#;
         let req: AssistImproveRequest = serde_json::from_str(json).expect("deserialize");
         assert!(req.selected_node_ids.is_none());
+    }
+
+    #[test]
+    fn reply_request_selected_node_ids_is_optional() {
+        let json = r#"{"tweet_text": "hello", "tweet_author": "user"}"#;
+        let req: AssistReplyRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.tweet_text, "hello");
+        assert!(!req.mention_product);
+        assert!(req.selected_node_ids.is_none());
+
+        let json = r#"{"tweet_text": "hi", "tweet_author": "u", "selected_node_ids": [10, 20]}"#;
+        let req: AssistReplyRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.selected_node_ids.unwrap(), vec![10, 20]);
+    }
+
+    #[test]
+    fn reply_response_omits_empty_citations() {
+        let resp = AssistReplyResponse {
+            content: "Great point!".to_string(),
+            vault_citations: vec![],
+        };
+        let json = serde_json::to_string(&resp).expect("serialize");
+        assert!(!json.contains("vault_citations"));
     }
 }

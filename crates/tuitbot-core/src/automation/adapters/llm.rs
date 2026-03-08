@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use super::super::loop_helpers::{ContentLoopError, LoopError, ReplyGenerator, TweetGenerator};
+use super::super::loop_helpers::{
+    ContentLoopError, LoopError, ReplyGenerator, ReplyOutput, TweetGenerator,
+};
 use super::super::thread_loop::ThreadGenerator;
 use super::helpers::{llm_to_content_error, llm_to_loop_error};
 use crate::content::ContentGenerator;
@@ -69,6 +71,82 @@ impl ReplyGenerator for LlmReplyAdapter {
         )
         .await;
         Ok(output.text)
+    }
+}
+
+/// Vault-aware reply adapter that injects pre-built RAG context into replies.
+///
+/// The RAG prompt is built once at construction time (by the server/CLI wiring
+/// layer) and reused for every reply, avoiding per-tweet DB queries.
+pub struct VaultAwareLlmReplyAdapter {
+    generator: Arc<ContentGenerator>,
+    pool: DbPool,
+    /// Pre-built RAG prompt block to inject into every reply.
+    rag_prompt: Option<String>,
+    /// Pre-built vault citations corresponding to the RAG prompt.
+    vault_citations: Vec<crate::context::retrieval::VaultCitation>,
+}
+
+impl VaultAwareLlmReplyAdapter {
+    pub fn new(
+        generator: Arc<ContentGenerator>,
+        pool: DbPool,
+        rag_prompt: Option<String>,
+        vault_citations: Vec<crate::context::retrieval::VaultCitation>,
+    ) -> Self {
+        Self {
+            generator,
+            pool,
+            rag_prompt,
+            vault_citations,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ReplyGenerator for VaultAwareLlmReplyAdapter {
+    async fn generate_reply(
+        &self,
+        tweet_text: &str,
+        author: &str,
+        mention_product: bool,
+    ) -> Result<String, LoopError> {
+        let output = self
+            .generator
+            .generate_reply_with_context(
+                tweet_text,
+                author,
+                mention_product,
+                None,
+                self.rag_prompt.as_deref(),
+            )
+            .await
+            .map_err(llm_to_loop_error)?;
+        record_llm_usage(
+            &self.pool,
+            "reply",
+            &output.provider,
+            &output.model,
+            output.usage.input_tokens,
+            output.usage.output_tokens,
+        )
+        .await;
+        Ok(output.text)
+    }
+
+    async fn generate_reply_with_rag(
+        &self,
+        tweet_text: &str,
+        author: &str,
+        mention_product: bool,
+    ) -> Result<ReplyOutput, LoopError> {
+        let text = self
+            .generate_reply(tweet_text, author, mention_product)
+            .await?;
+        Ok(ReplyOutput {
+            text,
+            vault_citations: self.vault_citations.clone(),
+        })
     }
 }
 

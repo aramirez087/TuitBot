@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use crate::content::frameworks::ReplyArchetype;
+use crate::context::retrieval::VaultCitation;
 use crate::context::winning_dna;
 use crate::llm::LlmProvider;
 use crate::safety::{contains_banned_phrase, DedupChecker};
@@ -67,6 +68,11 @@ pub async fn execute(
     )
     .await
     .ok();
+
+    let vault_citations: Vec<VaultCitation> = rag_context
+        .as_ref()
+        .map(|ctx| ctx.vault_citations.clone())
+        .unwrap_or_default();
 
     let rag_prompt = rag_context
         .as_ref()
@@ -152,6 +158,7 @@ pub async fn execute(
             char_count,
             confidence: confidence.to_string(),
             risks,
+            vault_citations: vault_citations.clone(),
         });
     }
 

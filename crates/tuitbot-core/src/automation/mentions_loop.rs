@@ -249,13 +249,13 @@ impl MentionsLoop {
             };
         }
 
-        // Generate reply (always mention product for direct mentions)
-        let reply_text = match self
+        // Generate reply with vault context (always mention product for direct mentions)
+        let reply_output = match self
             .generator
-            .generate_reply(&mention.text, &mention.author_username, true)
+            .generate_reply_with_rag(&mention.text, &mention.author_username, true)
             .await
         {
-            Ok(text) => text,
+            Ok(output) => output,
             Err(e) => {
                 tracing::error!(
                     tweet_id = %mention.id,
@@ -268,6 +268,7 @@ impl MentionsLoop {
                 };
             }
         };
+        let reply_text = reply_output.text;
 
         tracing::info!(
             author = %mention.author_username,

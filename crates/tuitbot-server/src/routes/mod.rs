@@ -1,5 +1,7 @@
 //! Route modules for the tuitbot API server.
 
+pub(crate) mod rag_helpers;
+
 pub mod accounts;
 pub mod activity;
 pub mod analytics;
