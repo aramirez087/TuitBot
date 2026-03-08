@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.25](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.24...tuitbot-cli-v0.1.25) - 2026-03-08
+
+### Added
+
+- Session 10 — reply and autopilot vault integration
+- Session 8 — vault query and generation APIs
+- Session 7 — real loop-back and note state sync
+- Session 6 — provenance through drafts and posting
+- Session 5 — retrieval engine and context builder v2
+- Session 4 — markdown fragment indexing
+- Session 3 — content source runtime and lifecycle
+- Session 2 — vault domain and schema foundation
+
+### Fixed
+
+- honor --output json and --quiet across update, approve, and mcp setup
+
+### Other
+
+- Merge origin/main into epic/obsidian-vault-to-post-loop
+
 ## [0.1.24](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.23...tuitbot-cli-v0.1.24) - 2026-03-08
 
 ### Added
