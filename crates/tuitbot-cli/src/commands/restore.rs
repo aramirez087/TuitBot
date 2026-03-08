@@ -3,14 +3,14 @@
 use std::io::IsTerminal;
 use std::path::PathBuf;
 
-use tuitbot_core::startup::data_dir;
+use tuitbot_core::startup::resolve_db_path;
 use tuitbot_core::storage;
 
 use super::RestoreArgs;
 use crate::output::CliOutput;
 
 /// Execute the `tuitbot restore` command.
-pub async fn execute(args: RestoreArgs, out: CliOutput) -> anyhow::Result<()> {
+pub async fn execute(args: RestoreArgs, config_path: &str, out: CliOutput) -> anyhow::Result<()> {
     let backup_path = PathBuf::from(&args.backup_path);
 
     if !backup_path.exists() {
@@ -45,7 +45,7 @@ pub async fn execute(args: RestoreArgs, out: CliOutput) -> anyhow::Result<()> {
     }
 
     // Confirm unless --force.
-    let target = data_dir().join("tuitbot.db");
+    let target = resolve_db_path(config_path);
     if !args.force && std::io::stdin().is_terminal() {
         eprintln!("\nThis will replace the database at {}", target.display());
         eprintln!("A safety backup of the current database will be created first.");

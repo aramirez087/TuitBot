@@ -2,16 +2,19 @@
 
 use std::path::PathBuf;
 
-use tuitbot_core::startup::data_dir;
+use tuitbot_core::startup::{data_dir, resolve_db_path};
 use tuitbot_core::storage;
 
 use super::BackupArgs;
 use crate::output::CliOutput;
 
 /// Execute the `tuitbot backup` command.
-pub async fn execute(args: BackupArgs, out: CliOutput) -> anyhow::Result<()> {
-    let data = data_dir();
-    let db_path = data.join("tuitbot.db");
+pub async fn execute(args: BackupArgs, config_path: &str, out: CliOutput) -> anyhow::Result<()> {
+    let db_path = resolve_db_path(config_path);
+    let data = db_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(data_dir);
 
     if args.list {
         return list_backups(&data, out);

@@ -178,10 +178,10 @@ async fn run() -> anyhow::Result<()> {
         return commands::settings::execute(args, &cli.config, output_format).await;
     }
     if let Commands::Backup(args) = cli.command {
-        return commands::backup::execute(args, out).await;
+        return commands::backup::execute(args, &cli.config, out).await;
     }
     if let Commands::Restore(args) = cli.command {
-        return commands::restore::execute(args, out).await;
+        return commands::restore::execute(args, &cli.config, out).await;
     }
     if let Commands::Uninstall(args) = cli.command {
         return commands::uninstall::execute(args.force, args.data_only, out);
