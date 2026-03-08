@@ -9,6 +9,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::storage::DbPool;
+
 /// Metadata about a published piece of content, written back to the source file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LoopBackEntry {
@@ -17,6 +19,107 @@ pub struct LoopBackEntry {
     pub published_at: String,
     #[serde(rename = "type")]
     pub content_type: String,
+    /// Post status: "posted", "deleted", etc.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Thread URL when this entry is part of a thread.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_url: Option<String>,
+}
+
+/// Result of an `execute_loopback()` call.
+#[derive(Debug, PartialEq, Eq)]
+pub enum LoopBackResult {
+    /// Metadata was written to the source file.
+    Written,
+    /// The tweet_id was already present in the file — no write needed.
+    AlreadyPresent,
+    /// The source type does not support writes (e.g. google_drive, manual).
+    SourceNotWritable(String),
+    /// The content node was not found in the database.
+    NodeNotFound,
+    /// The source file does not exist on disk.
+    FileNotFound,
+}
+
+/// Execute provenance-driven loop-back: look up the source note for a content
+/// node and write publishing metadata into its YAML front-matter.
+///
+/// Returns `LoopBackResult` indicating the outcome. DB lookup failures are
+/// logged and mapped to result variants rather than propagated as errors.
+pub async fn execute_loopback(
+    pool: &DbPool,
+    node_id: i64,
+    tweet_id: &str,
+    url: &str,
+    content_type: &str,
+) -> LoopBackResult {
+    use crate::storage::watchtower::{get_content_node, get_source_context};
+
+    // 1. Look up the content node.
+    let node = match get_content_node(pool, node_id).await {
+        Ok(Some(n)) => n,
+        Ok(None) => return LoopBackResult::NodeNotFound,
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "Loopback: failed to get content node");
+            return LoopBackResult::NodeNotFound;
+        }
+    };
+
+    // 2. Look up the source context.
+    let source = match get_source_context(pool, node.source_id).await {
+        Ok(Some(s)) => s,
+        Ok(None) => return LoopBackResult::SourceNotWritable("source not found".into()),
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "Loopback: failed to get source context");
+            return LoopBackResult::SourceNotWritable("db error".into());
+        }
+    };
+
+    // 3. Gate on source type.
+    if source.source_type != "local_fs" {
+        return LoopBackResult::SourceNotWritable(source.source_type);
+    }
+
+    // 4. Resolve the base path from config_json.
+    let base_path = match serde_json::from_str::<serde_json::Value>(&source.config_json)
+        .ok()
+        .and_then(|v| v.get("path")?.as_str().map(String::from))
+    {
+        Some(p) => p,
+        None => return LoopBackResult::SourceNotWritable("no path in config".into()),
+    };
+
+    let expanded = crate::storage::expand_tilde(&base_path);
+    let full_path = std::path::PathBuf::from(expanded).join(&node.relative_path);
+
+    if !full_path.exists() {
+        return LoopBackResult::FileNotFound;
+    }
+
+    // 5. Build entry and write.
+    let entry = LoopBackEntry {
+        tweet_id: tweet_id.to_string(),
+        url: url.to_string(),
+        published_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        content_type: content_type.to_string(),
+        status: Some("posted".to_string()),
+        thread_url: None,
+    };
+
+    match write_metadata_to_file(&full_path, &entry) {
+        Ok(true) => LoopBackResult::Written,
+        Ok(false) => LoopBackResult::AlreadyPresent,
+        Err(e) => {
+            tracing::warn!(
+                node_id,
+                path = %full_path.display(),
+                error = %e,
+                "Loopback file write failed"
+            );
+            LoopBackResult::FileNotFound
+        }
+    }
 }
 
 /// Parsed YAML front-matter with a `tuitbot` key.
@@ -127,6 +230,8 @@ mod tests {
             url: "https://x.com/user/status/1234567890".to_string(),
             published_at: "2026-02-28T14:30:00Z".to_string(),
             content_type: "tweet".to_string(),
+            status: None,
+            thread_url: None,
         }
     }
 
@@ -236,6 +341,8 @@ mod tests {
             url: "https://x.com/user/status/9876543210".to_string(),
             published_at: "2026-03-01T10:00:00Z".to_string(),
             content_type: "thread".to_string(),
+            status: None,
+            thread_url: None,
         };
         write_metadata_to_file(&path, &entry_b).unwrap();
 

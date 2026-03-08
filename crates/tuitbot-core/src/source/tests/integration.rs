@@ -421,6 +421,8 @@ async fn e2e_loopback_writes_metadata_and_reingest_detects_change() {
         url: "https://x.com/user/status/tweet_999".to_string(),
         published_at: "2026-02-28T10:00:00Z".to_string(),
         content_type: "tweet".to_string(),
+        status: None,
+        thread_url: None,
     };
     let written =
         loopback::write_metadata_to_file(dir.path().join("launch.md").as_path(), &entry).unwrap();
@@ -780,6 +782,177 @@ async fn e2e_mixed_source_fragment_isolation() {
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].node_id, node.id);
     }
+}
+
+// ---------------------------------------------------------------------------
+// E2E: Provenance-driven loopback
+// ---------------------------------------------------------------------------
+
+/// E2E: Provenance-driven loopback writes metadata to source note and is idempotent.
+#[tokio::test]
+async fn e2e_provenance_driven_loopback_writes_to_source_note() {
+    use crate::automation::watchtower::{ingest_file, loopback};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    // Step 1: Create source with a real path in config_json.
+    let config = serde_json::json!({ "path": dir.path().to_str().unwrap() }).to_string();
+    let src_id = store::insert_source_context(&pool, "local_fs", &config)
+        .await
+        .unwrap();
+
+    // Step 2: Write and ingest a markdown file.
+    std::fs::write(
+        dir.path().join("ideas.md"),
+        "---\ntitle: Big Ideas\n---\nSome great ideas here.\n",
+    )
+    .unwrap();
+    ingest_file(&pool, src_id, dir.path(), "ideas.md", false)
+        .await
+        .unwrap();
+
+    // Get the node_id.
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node_id = nodes[0].id;
+
+    // Step 3: Execute loopback.
+    let result = loopback::execute_loopback(
+        &pool,
+        node_id,
+        "tweet_lb_001",
+        "https://x.com/i/status/tweet_lb_001",
+        "tweet",
+    )
+    .await;
+    assert_eq!(result, loopback::LoopBackResult::Written);
+
+    // Step 4: Verify the file has tuitbot metadata.
+    let content = std::fs::read_to_string(dir.path().join("ideas.md")).unwrap();
+    assert!(content.contains("tweet_lb_001"));
+    assert!(content.contains("Big Ideas") || content.contains("title"));
+    assert!(content.contains("Some great ideas here."));
+
+    // Step 5: Idempotent — second call returns AlreadyPresent.
+    let result2 = loopback::execute_loopback(
+        &pool,
+        node_id,
+        "tweet_lb_001",
+        "https://x.com/i/status/tweet_lb_001",
+        "tweet",
+    )
+    .await;
+    assert_eq!(result2, loopback::LoopBackResult::AlreadyPresent);
+
+    // Step 6: Re-ingest detects hash change.
+    let r = ingest_file(&pool, src_id, dir.path(), "ideas.md", false)
+        .await
+        .unwrap();
+    assert_eq!(r, store::UpsertResult::Updated);
+}
+
+/// E2E: Loopback skips non-local (google_drive) sources gracefully.
+#[tokio::test]
+async fn e2e_loopback_skips_non_local_sources() {
+    use crate::automation::watchtower::{ingest_content, loopback};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+
+    // Create a Google Drive source.
+    let src_id = store::ensure_google_drive_source(&pool, "drv_lb", r#"{"folder_id":"drv_lb"}"#)
+        .await
+        .unwrap();
+
+    // Ingest content into it.
+    ingest_content(
+        &pool,
+        src_id,
+        "gdrive://fileY/doc.md",
+        "Remote content.\n",
+        false,
+    )
+    .await
+    .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    let node_id = nodes[0].id;
+
+    // Loopback should return SourceNotWritable.
+    let result = loopback::execute_loopback(
+        &pool,
+        node_id,
+        "tweet_skip",
+        "https://x.com/i/status/tweet_skip",
+        "tweet",
+    )
+    .await;
+    assert!(matches!(
+        result,
+        loopback::LoopBackResult::SourceNotWritable(_)
+    ));
+}
+
+/// E2E: Loopback writes to multiple notes from same posting event.
+#[tokio::test]
+async fn e2e_loopback_multiple_nodes_from_same_post() {
+    use crate::automation::watchtower::{ingest_file, loopback};
+    use crate::storage::init_test_db;
+    use crate::storage::watchtower as store;
+
+    let pool = init_test_db().await.expect("init db");
+    let dir = tempfile::tempdir().unwrap();
+
+    let config = serde_json::json!({ "path": dir.path().to_str().unwrap() }).to_string();
+    let src_id = store::insert_source_context(&pool, "local_fs", &config)
+        .await
+        .unwrap();
+
+    // Create two notes.
+    std::fs::write(dir.path().join("note_a.md"), "Content from note A.\n").unwrap();
+    std::fs::write(dir.path().join("note_b.md"), "Content from note B.\n").unwrap();
+
+    ingest_file(&pool, src_id, dir.path(), "note_a.md", false)
+        .await
+        .unwrap();
+    ingest_file(&pool, src_id, dir.path(), "note_b.md", false)
+        .await
+        .unwrap();
+
+    let nodes = store::get_nodes_for_source(&pool, src_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 2);
+
+    // Execute loopback for both nodes with the same tweet_id.
+    for node in &nodes {
+        let result = loopback::execute_loopback(
+            &pool,
+            node.id,
+            "tweet_multi",
+            "https://x.com/i/status/tweet_multi",
+            "tweet",
+        )
+        .await;
+        assert_eq!(result, loopback::LoopBackResult::Written);
+    }
+
+    // Verify both files got metadata.
+    let a = std::fs::read_to_string(dir.path().join("note_a.md")).unwrap();
+    let b = std::fs::read_to_string(dir.path().join("note_b.md")).unwrap();
+    assert!(a.contains("tweet_multi"));
+    assert!(b.contains("tweet_multi"));
+    assert!(a.contains("Content from note A."));
+    assert!(b.contains("Content from note B."));
 }
 
 /// E2E: File with only front-matter and no body → no fragments created.

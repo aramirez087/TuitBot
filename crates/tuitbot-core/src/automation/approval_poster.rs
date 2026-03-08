@@ -104,6 +104,9 @@ pub async fn run_approval_poster(
                         // Propagate vault provenance to original_tweets record.
                         propagate_provenance(&pool, &item, &tweet_id).await;
 
+                        // Write loop-back metadata to source notes.
+                        execute_loopback_for_provenance(&pool, &item, &tweet_id).await;
+
                         // Log the action.
                         let _ = storage::action_log::log_action(
                             &pool,
@@ -269,6 +272,70 @@ async fn propagate_provenance(
                     error = %e,
                     "Failed to insert original_tweet for provenance tracking"
                 );
+            }
+        }
+    }
+}
+
+/// Write loop-back metadata to source notes referenced by provenance links.
+///
+/// Looks up provenance links for the approval queue item, deduplicates by
+/// `node_id`, and calls `execute_loopback()` for each unique node.
+async fn execute_loopback_for_provenance(
+    pool: &DbPool,
+    item: &storage::approval_queue::ApprovalItem,
+    tweet_id: &str,
+) {
+    use crate::automation::watchtower::loopback;
+    use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
+    use std::collections::HashSet;
+
+    let url = format!("https://x.com/i/status/{tweet_id}");
+    let content_type = &item.action_type;
+
+    // Collect unique node_ids from provenance links.
+    let links = match storage::provenance::get_links_for(
+        pool,
+        DEFAULT_ACCOUNT_ID,
+        "approval_queue",
+        item.id,
+    )
+    .await
+    {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::debug!(id = item.id, error = %e, "No provenance links for loopback");
+            return;
+        }
+    };
+
+    let mut seen = HashSet::new();
+    for link in &links {
+        if let Some(node_id) = link.node_id {
+            if seen.insert(node_id) {
+                let result =
+                    loopback::execute_loopback(pool, node_id, tweet_id, &url, content_type).await;
+                match &result {
+                    loopback::LoopBackResult::Written => {
+                        tracing::info!(
+                            node_id,
+                            tweet_id,
+                            "Loopback: wrote metadata to source note"
+                        );
+                    }
+                    loopback::LoopBackResult::AlreadyPresent => {
+                        tracing::debug!(node_id, tweet_id, "Loopback: already present");
+                    }
+                    loopback::LoopBackResult::SourceNotWritable(reason) => {
+                        tracing::debug!(node_id, reason, "Loopback: source not writable, skipping");
+                    }
+                    loopback::LoopBackResult::NodeNotFound => {
+                        tracing::debug!(node_id, "Loopback: node not found");
+                    }
+                    loopback::LoopBackResult::FileNotFound => {
+                        tracing::debug!(node_id, "Loopback: file not found on disk");
+                    }
+                }
             }
         }
     }
