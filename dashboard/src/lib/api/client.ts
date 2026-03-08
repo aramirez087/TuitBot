@@ -49,7 +49,12 @@ import type {
 	VaultSourceStatus,
 	VaultNoteItem,
 	VaultNoteDetail,
-	ProvenanceRef
+	ProvenanceRef,
+	DraftSummary,
+	AutosaveResponse,
+	ContentRevision,
+	ContentActivity,
+	ContentTag
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -515,6 +520,95 @@ export const api = {
 				`/api/content/drafts/${id}/publish`,
 				{ method: 'POST' }
 			)
+	},
+
+	draftStudio: {
+		list: (params?: {
+			status?: string;
+			tag?: number;
+			search?: string;
+			archived?: boolean;
+		}) => {
+			const query = new URLSearchParams();
+			if (params?.status) query.set('status', params.status);
+			if (params?.tag !== undefined) query.set('tag', params.tag.toString());
+			if (params?.search) query.set('search', params.search);
+			if (params?.archived !== undefined) query.set('archived', params.archived.toString());
+			const qs = query.toString();
+			return request<DraftSummary[]>(`/api/drafts${qs ? `?${qs}` : ''}`);
+		},
+		get: (id: number) => request<ScheduledContentItem>(`/api/drafts/${id}`),
+		create: (data?: {
+			content_type?: string;
+			content?: string;
+			title?: string;
+		}) =>
+			request<{ id: number; updated_at: string }>('/api/drafts', {
+				method: 'POST',
+				body: JSON.stringify(data ?? {})
+			}),
+		autosave: (
+			id: number,
+			data: { content: string; content_type: string; updated_at: string }
+		) =>
+			request<AutosaveResponse>(`/api/drafts/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify(data)
+			}),
+		updateMeta: (id: number, data: { title?: string; notes?: string }) =>
+			request<ScheduledContentItem>(`/api/drafts/${id}/meta`, {
+				method: 'PATCH',
+				body: JSON.stringify(data)
+			}),
+		schedule: (id: number, scheduledFor: string) =>
+			request<{ id: number; status: string; scheduled_for: string }>(
+				`/api/drafts/${id}/schedule`,
+				{
+					method: 'POST',
+					body: JSON.stringify({ scheduled_for: scheduledFor })
+				}
+			),
+		unschedule: (id: number) =>
+			request<{ id: number; status: string }>(`/api/drafts/${id}/unschedule`, {
+				method: 'POST'
+			}),
+		archive: (id: number) =>
+			request<{ id: number; archived_at: string }>(`/api/drafts/${id}/archive`, {
+				method: 'POST'
+			}),
+		restore: (id: number) =>
+			request<{ id: number }>(`/api/drafts/${id}/restore`, {
+				method: 'POST'
+			}),
+		duplicate: (id: number) =>
+			request<{ id: number }>(`/api/drafts/${id}/duplicate`, {
+				method: 'POST'
+			}),
+		revisions: (id: number) => request<ContentRevision[]>(`/api/drafts/${id}/revisions`),
+		createRevision: (id: number, triggerKind?: string) =>
+			request<{ id: number }>(`/api/drafts/${id}/revisions`, {
+				method: 'POST',
+				body: JSON.stringify({ trigger_kind: triggerKind ?? 'manual' })
+			}),
+		activity: (id: number) => request<ContentActivity[]>(`/api/drafts/${id}/activity`),
+		restoreRevision: (id: number, revisionId: number) =>
+			request<ScheduledContentItem>(`/api/drafts/${id}/revisions/${revisionId}/restore`, {
+				method: 'POST'
+			}),
+		tags: (id: number) => request<ContentTag[]>(`/api/drafts/${id}/tags`),
+		assignTag: (id: number, tagId: number) =>
+			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'POST' }),
+		unassignTag: (id: number, tagId: number) =>
+			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'DELETE' })
+	},
+
+	tags: {
+		list: () => request<ContentTag[]>('/api/tags'),
+		create: (name: string, color?: string) =>
+			request<{ id: number }>('/api/tags', {
+				method: 'POST',
+				body: JSON.stringify({ name, color: color ?? null })
+			})
 	},
 
 	mcp: {

@@ -6,11 +6,11 @@
 import { writable, derived } from 'svelte/store';
 import { persistGet, persistSet } from './persistence';
 
-export type HomeSurface = 'composer' | 'analytics';
+export type HomeSurface = 'drafts' | 'analytics';
 
 const PREF_KEY = 'home_surface';
 
-const _surface = writable<HomeSurface>('composer');
+const _surface = writable<HomeSurface>('drafts');
 const _loaded = writable(false);
 
 /** Read-only store with current home surface value. */
@@ -21,8 +21,13 @@ export const homeSurfaceReady = derived(_loaded, ($l) => $l);
 
 /** Load the persisted preference. Call once during app mount. */
 export async function loadHomeSurface(): Promise<void> {
-	const value = await persistGet<HomeSurface>(PREF_KEY, 'composer');
-	_surface.set(value);
+	let value = await persistGet<string>(PREF_KEY, 'drafts');
+	// Migrate legacy 'composer' preference to 'drafts'
+	if (value === 'composer') {
+		value = 'drafts';
+		await persistSet(PREF_KEY, value);
+	}
+	_surface.set(value as HomeSurface);
 	_loaded.set(true);
 }
 

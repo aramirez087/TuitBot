@@ -58,7 +58,7 @@
 		{ href: "/activity", label: "Activity", icon: Activity },
 		{ href: "/approval", label: "Approval", icon: CheckCircle },
 		{ href: "/content", label: "Content", icon: FileText },
-		{ href: "/drafts", label: "Drafts", icon: PenLine },
+		{ href: "/drafts", label: "Draft Studio", icon: PenLine },
 		{ href: "/discovery", label: "Discovery", icon: Search },
 		{ href: "/targets", label: "Targets", icon: Target },
 		{ href: "/strategy", label: "Strategy", icon: Compass },

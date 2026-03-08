@@ -23,8 +23,6 @@
 	import AddTweetDivider from './AddTweetDivider.svelte';
 	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
-	import ComposerPromptCard from '../home/ComposerPromptCard.svelte';
-	import ComposerTipsTray from '../home/ComposerTipsTray.svelte';
 	import ComposerToolbar from './ComposerToolbar.svelte';
 	import ComposerInsertBar from './ComposerInsertBar.svelte';
 	import CitationChips from './CitationChips.svelte';
@@ -34,7 +32,8 @@
 	import {
 		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
 		readAutoSave, restoreMedia, wasNavigationExit,
-		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS
+		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS,
+		DraftSaveManager, readDraftAutoSave, clearDraftAutoSave
 	} from '$lib/utils/composerAutosave';
 	import type { AttachedMedia } from './TweetEditor.svelte';
 
@@ -45,7 +44,12 @@
 		prefillTime = null,
 		prefillDate = null,
 		embedded = false,
-		canPublish = true
+		canPublish = true,
+		draftId = undefined,
+		initialContent = undefined,
+		onsyncstatus = undefined,
+		extraPaletteActions = [],
+		ondraftaction = undefined
 	}: {
 		schedule: ScheduleConfig | null;
 		onsubmit: (data: ComposeRequest) => void | Promise<void>;
@@ -54,6 +58,17 @@
 		prefillDate?: Date | null;
 		embedded?: boolean;
 		canPublish?: boolean;
+		draftId?: number;
+		initialContent?: {
+			mode: 'tweet' | 'thread';
+			tweetText: string;
+			threadBlocks: ThreadBlock[];
+			attachedMedia: AttachedMedia[];
+			updatedAt: string;
+		};
+		onsyncstatus?: (status: import('$lib/utils/composerAutosave').SyncStatus) => void;
+		extraPaletteActions?: import('../CommandPalette.svelte').PaletteAction[];
+		ondraftaction?: (actionId: string) => void;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
@@ -99,6 +114,7 @@
 
 	// Auto-save (logic extracted to composerAutosave.ts)
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let draftSaveManager: DraftSaveManager | null = null;
 	let initialized = $state(false);
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
@@ -135,10 +151,6 @@
 	);
 
 	const desktopInspectorOpen = $derived(inspectorOpen && !isMobile);
-
-	const showPromptCard = $derived(
-		embedded && !hasExistingContent && !promptDismissed
-	);
 
 	const threadBlockCount = $derived(
 		mode === 'thread' ? threadBlocks.filter((b) => b.text.trim().length > 0).length || threadBlocks.length : 1
@@ -207,19 +219,47 @@
 	}
 
 	function handleBeforeUnload() {
-		flushAutoSave();
-		markSessionActive();
+		if (draftSaveManager) {
+			draftSaveManager.flush();
+		} else {
+			flushAutoSave();
+			markSessionActive();
+		}
 	}
 
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
-		checkRecovery();
-		if (!showRecovery && !initialized) {
-			tweetText = '';
-			threadBlocks = [];
-			mode = 'tweet';
+
+		if (draftId !== undefined && initialContent) {
+			// Draft Studio mode: hydrate from server data
+			mode = initialContent.mode;
+			tweetText = initialContent.tweetText;
+			threadBlocks = initialContent.threadBlocks;
+			attachedMedia = initialContent.attachedMedia;
+
+			// Check for crash recovery data
+			const localData = readDraftAutoSave(draftId);
+			if (localData && localData.timestamp > new Date(initialContent.updatedAt).getTime()) {
+				recoveryData = localData;
+				showRecovery = true;
+			} else {
+				clearDraftAutoSave(draftId);
+			}
+
+			// Create save manager
+			const syncCallback = onsyncstatus ?? (() => {});
+			draftSaveManager = new DraftSaveManager(draftId, initialContent.updatedAt, syncCallback);
 			initialized = true;
+		} else {
+			checkRecovery();
+			if (!showRecovery && !initialized) {
+				tweetText = '';
+				threadBlocks = [];
+				mode = 'tweet';
+				initialized = true;
+			}
 		}
+
 		submitting = false;
 		submitError = null;
 		focusMode = false;
@@ -252,11 +292,15 @@
 
 	onDestroy(() => {
 		window.removeEventListener('beforeunload', handleBeforeUnload);
-		flushAutoSave();
-		if (undoTimer) clearTimeout(undoTimer);
 		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
-		// Signal that this was a normal teardown (navigation), not a crash
-		markSessionActive();
+		if (draftSaveManager) {
+			draftSaveManager.destroy();
+			draftSaveManager = null;
+		} else {
+			flushAutoSave();
+			markSessionActive();
+		}
+		if (undoTimer) clearTimeout(undoTimer);
 	});
 
 	function handleComposeEvent() {
@@ -300,10 +344,14 @@
 
 	// ── Autosave / Recovery ────────────────────────────────
 	function autoSave() {
-		if (autoSaveTimer) clearTimeout(autoSaveTimer);
-		autoSaveTimer = setTimeout(() => {
-			saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
-		}, AUTOSAVE_DEBOUNCE_MS);
+		if (draftSaveManager) {
+			draftSaveManager.save(mode, tweetText, threadBlocks, attachedMedia);
+		} else {
+			if (autoSaveTimer) clearTimeout(autoSaveTimer);
+			autoSaveTimer = setTimeout(() => {
+				saveAutoSave(mode, tweetText, threadBlocks, attachedMedia);
+			}, AUTOSAVE_DEBOUNCE_MS);
+		}
 	}
 
 	function clearAutoSave() {
@@ -340,7 +388,11 @@
 
 	function dismissRecovery() {
 		showRecovery = false;
-		clearAutoSave();
+		if (draftId !== undefined) {
+			clearDraftAutoSave(draftId);
+		} else {
+			clearAutoSave();
+		}
 		initialized = true;
 	}
 
@@ -361,8 +413,12 @@
 					snippet: c.snippet
 				}));
 			}
-			clearAutoSave();
-			clearSessionFlag();
+			if (draftSaveManager) {
+				await draftSaveManager.flush();
+			} else {
+				clearAutoSave();
+				clearSessionFlag();
+			}
 			await onsubmit(data);
 
 			// In embedded mode (full-page), reset state after submit since the component doesn't unmount
@@ -526,6 +582,8 @@
 			case 'add-card': case 'duplicate': case 'split': case 'merge':
 			case 'move-up': case 'move-down':
 				threadFlowRef?.handlePaletteAction(actionId); break;
+			default:
+				ondraftaction?.(actionId); break;
 		}
 	}
 
@@ -632,25 +690,6 @@
 		undoSnapshot = null;
 		showUndo = false;
 		if (undoTimer) clearTimeout(undoTimer);
-	}
-
-	async function dismissTips() {
-		tipsVisible = false;
-		await persistSet('home_tips_dismissed', true);
-	}
-
-	function handleUseExample(text: string) {
-		if (mode === 'tweet') {
-			tweetText = text;
-		} else {
-			const sorted = [...threadBlocks].sort((a, b) => a.order - b.order);
-			if (sorted.length > 0 && sorted[0].text.trim() === '') {
-				threadBlocks = threadBlocks.map((b) =>
-					b.id === sorted[0].id ? { ...b, text } : b
-				);
-			}
-		}
-		promptDismissed = true;
 	}
 
 	function openScheduleInInspector() {
@@ -829,6 +868,7 @@
 			{mode}
 			onclose={() => { paletteOpen = false; }}
 			onaction={handlePaletteAction}
+			extraActions={extraPaletteActions}
 		/>
 	{/if}
 {/snippet}
@@ -872,22 +912,7 @@
 			ontogglepreview={togglePreview}
 			onopenpalette={() => { paletteOpen = true; }}
 		/>
-		{#if tipsVisible}
-			<ComposerTipsTray
-				visible={tipsVisible}
-				{mode}
-				ondismiss={dismissTips}
-			/>
-		{/if}
 		{@render composeBody()}
-		{#if showPromptCard}
-			<ComposerPromptCard
-				visible={showPromptCard}
-				{mode}
-				ondismiss={() => { promptDismissed = true; }}
-				onuseexample={handleUseExample}
-			/>
-		{/if}
 	</div>
 {/if}
 

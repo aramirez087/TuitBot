@@ -2,6 +2,8 @@
 
 mod calendar;
 mod compose;
+mod draft_studio;
+mod draft_tags;
 mod drafts;
 mod list;
 mod scheduled;
@@ -15,6 +17,15 @@ use crate::state::AppState;
 // Re-export all handlers so route registration in lib.rs stays unchanged.
 pub use calendar::{calendar, schedule};
 pub use compose::{compose, compose_thread, compose_tweet};
+pub use draft_studio::{
+    archive_studio_draft, autosave_draft, create_draft_revision, create_studio_draft,
+    duplicate_studio_draft, get_studio_draft, list_draft_activity, list_draft_revisions,
+    list_studio_drafts, patch_draft_meta, restore_from_revision, restore_studio_draft,
+    schedule_studio_draft, unschedule_studio_draft,
+};
+pub use draft_tags::{
+    assign_draft_tag, create_account_tag, list_account_tags, list_draft_tags, unassign_draft_tag,
+};
 pub use drafts::{
     create_draft, delete_draft, edit_draft, list_drafts, publish_draft, schedule_draft,
 };

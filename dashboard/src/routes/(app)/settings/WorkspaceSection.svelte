@@ -9,7 +9,7 @@
 	} from '$lib/stores/homeSurface';
 	import { onMount, onDestroy } from 'svelte';
 
-	let current = $state<HomeSurface>('composer');
+	let current = $state<HomeSurface>('drafts');
 	let loaded = $state(false);
 
 	let unsub: (() => void) | null = null;
@@ -48,21 +48,21 @@
 			<div class="option-cards">
 				<button
 					class="option-card"
-					class:selected={current === 'composer'}
-					onclick={() => handleChange('composer')}
-					aria-pressed={current === 'composer'}
+					class:selected={current === 'drafts'}
+					onclick={() => handleChange('drafts')}
+					aria-pressed={current === 'drafts'}
 				>
-					<div class="option-radio" class:checked={current === 'composer'}>
-						{#if current === 'composer'}
+					<div class="option-radio" class:checked={current === 'drafts'}>
+						{#if current === 'drafts'}
 							<div class="radio-dot"></div>
 						{/if}
 					</div>
 					<div class="option-content">
 						<span class="option-label">
-							Composer home
+							Draft Studio
 							<span class="recommended-badge">Recommended</span>
 						</span>
-						<span class="option-desc">Jump straight into writing</span>
+						<span class="option-desc">Jump straight into your drafts</span>
 					</div>
 				</button>
 

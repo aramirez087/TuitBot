@@ -24,19 +24,21 @@
 		open,
 		mode,
 		onclose,
-		onaction
+		onaction,
+		extraActions = []
 	}: {
 		open: boolean;
 		mode: 'tweet' | 'thread';
 		onclose: () => void;
 		onaction: (actionId: string) => void;
+		extraActions?: PaletteAction[];
 	} = $props();
 
-	interface PaletteAction {
+	export interface PaletteAction {
 		id: string;
 		label: string;
 		icon: typeof Maximize2;
-		category: 'Mode' | 'Compose' | 'AI' | 'Thread';
+		category: 'Mode' | 'Compose' | 'AI' | 'Thread' | 'DraftStudio';
 		shortcut?: string;
 		when?: 'thread' | 'tweet' | 'always';
 	}
@@ -58,7 +60,8 @@
 		{ id: 'split', label: 'Split / add post', icon: Scissors, category: 'Thread', shortcut: 'cmd+enter', when: 'thread' },
 		{ id: 'merge', label: 'Merge posts', icon: Merge, category: 'Thread', shortcut: 'cmd+shift+m', when: 'thread' },
 		{ id: 'move-up', label: 'Move up', icon: ArrowUp, category: 'Thread', shortcut: 'alt+arrowup', when: 'thread' },
-		{ id: 'move-down', label: 'Move down', icon: ArrowDown, category: 'Thread', shortcut: 'alt+arrowdown', when: 'thread' }
+		{ id: 'move-down', label: 'Move down', icon: ArrowDown, category: 'Thread', shortcut: 'alt+arrowdown', when: 'thread' },
+		...extraActions
 	]);
 
 	let query = $state('');
@@ -79,7 +82,7 @@
 	});
 
 	// Group by category for display
-	const categoryOrder: PaletteAction['category'][] = ['Mode', 'Compose', 'AI', 'Thread'];
+	const categoryOrder: PaletteAction['category'][] = ['Mode', 'Compose', 'AI', 'Thread', 'DraftStudio'];
 
 	const groupedActions = $derived.by(() => {
 		const groups: { category: string; actions: PaletteAction[] }[] = [];
