@@ -8,7 +8,7 @@ import type { DraftSummary, ScheduledContentItem } from '$lib/api/types';
 let collection = $state<DraftSummary[]>([]);
 let archivedCollection = $state<DraftSummary[]>([]);
 let selectedId = $state<number | null>(null);
-let tab = $state<'active' | 'scheduled' | 'archive'>('active');
+let tab = $state<'active' | 'scheduled' | 'posted' | 'archive'>('active');
 let loading = $state(true);
 let archiveLoaded = $state(false);
 let error = $state<string | null>(null);
@@ -35,12 +35,18 @@ export const scheduledDrafts = $derived(
 	collection.filter((d) => d.status === 'scheduled').sort(byUpdatedDesc)
 );
 
+export const postedDrafts = $derived(
+	collection.filter((d) => d.status === 'posted').sort(byUpdatedDesc)
+);
+
 export const currentTabDrafts = $derived(
 	tab === 'active'
 		? activeDrafts
 		: tab === 'scheduled'
 			? scheduledDrafts
-			: [...archivedCollection].sort(byUpdatedDesc)
+			: tab === 'posted'
+				? postedDrafts
+				: [...archivedCollection].sort(byUpdatedDesc)
 );
 
 export const selectedDraft = $derived(
@@ -50,6 +56,7 @@ export const selectedDraft = $derived(
 export const tabCounts = $derived({
 	active: activeDrafts.length,
 	scheduled: scheduledDrafts.length,
+	posted: postedDrafts.length,
 	archive: archivedCollection.length
 });
 
@@ -61,7 +68,7 @@ export function getSelectedId(): number | null {
 	return selectedId;
 }
 
-export function getTab(): 'active' | 'scheduled' | 'archive' {
+export function getTab(): 'active' | 'scheduled' | 'posted' | 'archive' {
 	return tab;
 }
 
@@ -113,7 +120,7 @@ export function selectDraft(id: number | null): void {
 	history.replaceState(null, '', url.toString());
 }
 
-export function setTab(newTab: 'active' | 'scheduled' | 'archive'): void {
+export function setTab(newTab: 'active' | 'scheduled' | 'posted' | 'archive'): void {
 	tab = newTab;
 	if (newTab === 'archive' && !archiveLoaded) {
 		loadArchived();

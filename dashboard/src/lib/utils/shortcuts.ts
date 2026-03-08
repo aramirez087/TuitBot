@@ -6,7 +6,7 @@
 export interface ShortcutDef {
 	combo: string;
 	label: string;
-	category: 'Mode' | 'Compose' | 'AI' | 'Thread';
+	category: 'Mode' | 'Compose' | 'AI' | 'Thread' | 'DraftStudio';
 	when?: 'thread' | 'tweet' | 'always';
 }
 
@@ -91,6 +91,12 @@ export function formatCombo(combo: string): string {
 		case 'tab':
 			symbols.push('Tab');
 			break;
+		case 'backspace':
+			symbols.push(mac ? '⌫' : 'Bksp');
+			break;
+		case 'delete':
+			symbols.push('Del');
+			break;
 		default:
 			symbols.push(key.toUpperCase());
 			break;
@@ -118,5 +124,11 @@ export const SHORTCUT_CATALOG: ShortcutDef[] = [
 	{ combo: 'cmd+shift+s', label: 'Split below', category: 'Thread', when: 'thread' },
 	{ combo: 'cmd+shift+m', label: 'Merge posts', category: 'Thread', when: 'thread' },
 	{ combo: 'tab', label: 'Next post', category: 'Thread', when: 'thread' },
-	{ combo: 'shift+tab', label: 'Previous post', category: 'Thread', when: 'thread' }
+	{ combo: 'shift+tab', label: 'Previous post', category: 'Thread', when: 'thread' },
+	// Draft Studio — active in rail context
+	{ combo: 'n', label: 'New draft', category: 'DraftStudio', when: 'always' },
+	{ combo: 'backspace', label: 'Archive draft', category: 'DraftStudio', when: 'always' },
+	{ combo: 'd', label: 'Duplicate draft', category: 'DraftStudio', when: 'always' },
+	{ combo: 'r', label: 'Restore draft', category: 'DraftStudio', when: 'always' },
+	{ combo: 'escape', label: 'Jump to rail', category: 'DraftStudio', when: 'always' }
 ];

@@ -46,7 +46,9 @@
 		canPublish = true,
 		draftId = undefined,
 		initialContent = undefined,
-		onsyncstatus = undefined
+		onsyncstatus = undefined,
+		extraPaletteActions = [],
+		ondraftaction = undefined
 	}: {
 		schedule: ScheduleConfig | null;
 		onsubmit: (data: ComposeRequest) => void | Promise<void>;
@@ -64,6 +66,8 @@
 			updatedAt: string;
 		};
 		onsyncstatus?: (status: import('$lib/utils/composerAutosave').SyncStatus) => void;
+		extraPaletteActions?: import('../CommandPalette.svelte').PaletteAction[];
+		ondraftaction?: (actionId: string) => void;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
@@ -554,6 +558,8 @@
 			case 'add-card': case 'duplicate': case 'split': case 'merge':
 			case 'move-up': case 'move-down':
 				threadFlowRef?.handlePaletteAction(actionId); break;
+			default:
+				ondraftaction?.(actionId); break;
 		}
 	}
 
@@ -817,6 +823,7 @@
 			{mode}
 			onclose={() => { paletteOpen = false; }}
 			onaction={handlePaletteAction}
+			extraActions={extraPaletteActions}
 		/>
 	{/if}
 {/snippet}

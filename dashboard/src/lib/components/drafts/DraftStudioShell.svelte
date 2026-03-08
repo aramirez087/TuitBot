@@ -7,6 +7,8 @@
 	import type { ScheduledContentItem } from '$lib/api/types';
 	import type { SyncStatus } from '$lib/utils/composerAutosave';
 	import type { AttachedMedia } from '$lib/components/composer/TweetEditor.svelte';
+	import type { PaletteAction } from '$lib/components/CommandPalette.svelte';
+	import { Plus, Copy, Archive, ArrowLeft } from 'lucide-svelte';
 	import DraftRail from './DraftRail.svelte';
 	import DraftEmptyState from './DraftEmptyState.svelte';
 	import DraftSyncBadge from './DraftSyncBadge.svelte';
@@ -15,6 +17,8 @@
 	let loadingDraft = $state(false);
 	let syncStatus = $state<SyncStatus>('saved');
 	let conflictDraftId = $state<number | null>(null);
+	let railComponent: DraftRail | undefined = $state();
+	let composerZoneEl: HTMLDivElement | undefined = $state();
 
 	interface HydrationPayload {
 		mode: 'tweet' | 'thread';
@@ -26,6 +30,13 @@
 
 	let hydration = $state<HydrationPayload | null>(null);
 	let hydrationDraftId = $state<number | null>(null);
+
+	const draftStudioPaletteActions: PaletteAction[] = [
+		{ id: 'ds-new-draft', label: 'New draft', icon: Plus, category: 'DraftStudio', shortcut: 'n', when: 'always' },
+		{ id: 'ds-duplicate', label: 'Duplicate current draft', icon: Copy, category: 'DraftStudio', shortcut: 'd', when: 'always' },
+		{ id: 'ds-archive', label: 'Archive current draft', icon: Archive, category: 'DraftStudio', shortcut: 'backspace', when: 'always' },
+		{ id: 'ds-jump-rail', label: 'Jump to rail', icon: ArrowLeft, category: 'DraftStudio', shortcut: 'escape', when: 'always' }
+	];
 
 	onMount(() => {
 		studio.initFromUrl($page.url);
@@ -41,7 +52,6 @@
 		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 	});
 
-	// Fetch full draft content when selection changes
 	$effect(() => {
 		const id = studio.getSelectedId();
 		if (id === null) {
@@ -61,11 +71,11 @@
 	async function fetchDraft(id: number) {
 		try {
 			const draft = await api.draftStudio.get(id);
-			if (studio.getSelectedId() !== id) return; // selection changed
+			if (studio.getSelectedId() !== id) return;
 			studio.setFullDraft(draft);
 			hydration = parseServerDraft(draft);
 			hydrationDraftId = id;
-		} catch (e) {
+		} catch {
 			if (studio.getSelectedId() !== id) return;
 			studio.setFullDraft(null);
 			hydration = null;
@@ -112,6 +122,18 @@
 		studio.createDraft();
 	}
 
+	function handleArchive(id: number) {
+		studio.archiveDraft(id);
+	}
+
+	function handleDuplicate(id: number) {
+		studio.duplicateDraft(id);
+	}
+
+	function handleRestore(id: number) {
+		studio.restoreDraft(id);
+	}
+
 	function handleSyncStatus(status: SyncStatus) {
 		syncStatus = status;
 		if (status === 'conflict') {
@@ -124,7 +146,6 @@
 		if (id === null) return;
 
 		if (resolution === 'reload-server') {
-			// Re-fetch and re-hydrate by clearing hydration (triggers {#key} remount)
 			hydration = null;
 			hydrationDraftId = null;
 			loadingDraft = true;
@@ -132,22 +153,12 @@
 			conflictDraftId = null;
 			await fetchDraft(id);
 		}
-		// "use-mine" is handled inside the DraftSaveManager:
-		// The manager needs to re-fetch to get the new updated_at, then re-PATCH.
-		// We re-fetch the draft to get the latest updated_at and re-hydrate the manager.
 		if (resolution === 'use-mine') {
 			try {
 				const draft = await api.draftStudio.get(id);
 				if (studio.getSelectedId() !== id) return;
-				// Update the hydration's updatedAt so the ComposeWorkspace's manager
-				// can force-save with the new timestamp. We force a remount with new updatedAt.
 				if (hydration) {
 					hydration = { ...hydration, updatedAt: draft.updated_at };
-					// Force {#key} to remount is too aggressive here — the user would lose
-					// their local text. Instead, bump hydrationDraftId to trigger re-key.
-					// Actually, we can't do this without losing state. Instead, we'll
-					// just update the sync status. The DraftSaveManager in the ComposeWorkspace
-					// will retry on the next edit.
 					syncStatus = 'unsaved';
 					conflictDraftId = null;
 				}
@@ -158,14 +169,41 @@
 	}
 
 	function handleDraftSubmit() {
-		// For now, draft studio submit is a no-op placeholder.
 		// Schedule/publish flows are in Session 08.
+	}
+
+	function handleDraftAction(actionId: string) {
+		const id = studio.getSelectedId();
+		switch (actionId) {
+			case 'ds-new-draft':
+				handleCreate();
+				break;
+			case 'ds-duplicate':
+				if (id !== null) handleDuplicate(id);
+				break;
+			case 'ds-archive':
+				if (id !== null) handleArchive(id);
+				break;
+			case 'ds-jump-rail':
+				railComponent?.focus();
+				break;
+		}
+	}
+
+	function handleShellKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape' && composerZoneEl?.contains(document.activeElement)) {
+			e.preventDefault();
+			e.stopPropagation();
+			railComponent?.focus();
+		}
 	}
 </script>
 
-<div class="studio-shell">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="studio-shell" onkeydown={handleShellKeydown}>
 	<div class="rail-zone">
 		<DraftRail
+			bind:this={railComponent}
 			drafts={studio.currentTabDrafts}
 			selectedId={studio.getSelectedId()}
 			tab={studio.getTab()}
@@ -174,10 +212,13 @@
 			onselect={(id) => studio.selectDraft(id)}
 			ontabchange={(t) => studio.setTab(t)}
 			oncreate={handleCreate}
+			onarchive={handleArchive}
+			onduplicate={handleDuplicate}
+			onrestore={handleRestore}
 		/>
 	</div>
 
-	<div class="composer-zone">
+	<div class="composer-zone" bind:this={composerZoneEl}>
 		{#if studio.getError()}
 			<div class="error-banner">
 				<span>{studio.getError()}</span>
@@ -210,6 +251,8 @@
 						canPublish={false}
 						onsubmit={handleDraftSubmit}
 						onsyncstatus={handleSyncStatus}
+						extraPaletteActions={draftStudioPaletteActions}
+						ondraftaction={handleDraftAction}
 					/>
 				{/key}
 			{:else}
