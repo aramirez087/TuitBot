@@ -236,6 +236,20 @@ pub async fn init_settings(
             std::fs::set_permissions(&state.config_path, std::fs::Permissions::from_mode(0o600));
     }
 
+    // Migrate onboarding tokens to default account token path if they exist.
+    let onboarding_path = state.data_dir.join("onboarding_tokens.json");
+    if onboarding_path.exists() {
+        let target = accounts::account_token_path(&state.data_dir, DEFAULT_ACCOUNT_ID);
+        if let Some(parent) = target.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Err(e) = std::fs::rename(&onboarding_path, &target) {
+            tracing::warn!("Failed to migrate onboarding tokens: {e}");
+        } else {
+            tracing::info!("Migrated onboarding tokens to default account");
+        }
+    }
+
     let json = serde_json::to_value(&config)
         .map_err(|e| ApiError::BadRequest(format!("failed to serialize config: {e}")))?;
 

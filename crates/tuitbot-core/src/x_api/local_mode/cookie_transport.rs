@@ -366,6 +366,9 @@ impl CookieTransport {
             username,
             name,
             profile_image_url,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: Default::default(),
         })
     }

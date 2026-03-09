@@ -711,6 +711,43 @@ export const api = {
 			),
 	},
 
+	onboarding: {
+		startAuth: () =>
+			request<{ authorization_url: string; state: string }>(
+				'/api/onboarding/x-auth/start',
+				{ method: 'POST' }
+			),
+		completeAuth: (code: string, state: string) =>
+			request<{
+				status: string;
+				user: {
+					id: string;
+					username: string;
+					name: string;
+					profile_image_url: string | null;
+					description: string | null;
+					location: string | null;
+					url: string | null;
+				};
+			}>('/api/onboarding/x-auth/callback', {
+				method: 'POST',
+				body: JSON.stringify({ code, state })
+			}),
+		authStatus: () =>
+			request<{
+				connected: boolean;
+				user?: {
+					id: string;
+					username: string;
+					name: string;
+					profile_image_url: string | null;
+					description: string | null;
+					location: string | null;
+					url: string | null;
+				};
+			}>('/api/onboarding/x-auth/status')
+	},
+
 	vault: {
 		sources: () => request<{ sources: VaultSourceStatus[] }>('/api/vault/sources'),
 		searchNotes: (params: { q?: string; source_id?: number; limit?: number } = {}) => {

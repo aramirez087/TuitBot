@@ -16,6 +16,7 @@ pub mod ingest;
 pub mod lan;
 pub mod mcp;
 pub mod media;
+pub mod onboarding;
 pub mod replies;
 pub mod runtime;
 pub mod scraper_session;

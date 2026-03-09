@@ -239,6 +239,9 @@ mod tests {
             username: id.into(),
             name: "Test".into(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         }
     }

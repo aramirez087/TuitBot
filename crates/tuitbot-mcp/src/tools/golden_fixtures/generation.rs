@@ -39,6 +39,9 @@ impl SocialReadProvider for GoldenMockProvider {
             username: username.to_string(),
             name: "Mock User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics {
                 followers_count: 100,
                 following_count: 50,
@@ -69,6 +72,9 @@ impl SocialReadProvider for GoldenMockProvider {
                     username: "user1".to_string(),
                     name: "User 1".to_string(),
                     profile_image_url: None,
+                    description: None,
+                    location: None,
+                    url: None,
                     public_metrics: UserMetrics::default(),
                 }],
             }),
@@ -148,6 +154,9 @@ impl SocialReadProvider for GoldenMockProvider {
             username: "testuser".to_string(),
             name: "Test User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -164,6 +173,9 @@ impl SocialReadProvider for GoldenMockProvider {
                 username: "follower1".to_string(),
                 name: "Follower".to_string(),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {
@@ -194,6 +206,9 @@ impl SocialReadProvider for GoldenMockProvider {
             username: "iduser".to_string(),
             name: "ID User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -244,6 +259,9 @@ impl SocialReadProvider for GoldenMockProvider {
                     username: format!("user_{id}"),
                     name: format!("User {id}"),
                     profile_image_url: None,
+                    description: None,
+                    location: None,
+                    url: None,
                     public_metrics: UserMetrics::default(),
                 })
                 .collect(),

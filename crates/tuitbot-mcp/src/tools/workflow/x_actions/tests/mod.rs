@@ -104,6 +104,9 @@ impl XApiClient for MockXApiClient {
             username: "testuser".to_string(),
             name: "Test User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -132,6 +135,9 @@ impl XApiClient for MockXApiClient {
             username: username.to_string(),
             name: "Looked Up User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -224,6 +230,9 @@ impl XApiClient for MockXApiClient {
                 username: "follower1".to_string(),
                 name: "Follower One".to_string(),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {
@@ -245,6 +254,9 @@ impl XApiClient for MockXApiClient {
                 username: "following1".to_string(),
                 name: "Following One".to_string(),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {
@@ -260,6 +272,9 @@ impl XApiClient for MockXApiClient {
             username: "iduser".to_string(),
             name: "ID User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -322,6 +337,9 @@ impl XApiClient for MockXApiClient {
                 username: format!("user_{id}"),
                 name: format!("User {id}"),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             })
             .collect::<Vec<_>>();
@@ -347,6 +365,9 @@ impl XApiClient for MockXApiClient {
                 username: "liker1".to_string(),
                 name: "Liker One".to_string(),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {

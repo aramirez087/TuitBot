@@ -97,6 +97,9 @@ impl SocialReadProvider for MockProvider {
             username: username.to_string(),
             name: "Mock User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -194,6 +197,9 @@ impl SocialReadProvider for MockProvider {
             username: "testuser".to_string(),
             name: "Test User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -210,6 +216,9 @@ impl SocialReadProvider for MockProvider {
                 username: "follower1".to_string(),
                 name: "Follower".to_string(),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             }],
             meta: UsersMeta {
@@ -240,6 +249,9 @@ impl SocialReadProvider for MockProvider {
             username: "iduser".to_string(),
             name: "ID User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -288,6 +300,9 @@ impl SocialReadProvider for MockProvider {
                 username: format!("user_{id}"),
                 name: format!("User {id}"),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             })
             .collect::<Vec<_>>();

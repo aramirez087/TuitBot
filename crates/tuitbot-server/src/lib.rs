@@ -307,6 +307,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/runtime/status", get(routes::runtime::status))
         .route("/runtime/start", post(routes::runtime::start))
         .route("/runtime/stop", post(routes::runtime::stop))
+        // Onboarding OAuth (pre-account, auth-exempt)
+        .route(
+            "/onboarding/x-auth/start",
+            post(routes::onboarding::start_onboarding_auth),
+        )
+        .route(
+            "/onboarding/x-auth/callback",
+            post(routes::onboarding::complete_onboarding_auth),
+        )
+        .route(
+            "/onboarding/x-auth/status",
+            get(routes::onboarding::onboarding_auth_status),
+        )
         // Accounts
         .route(
             "/accounts",
