@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.28](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.27...tuitbot-cli-v0.1.28) - 2026-03-09
+
+### Added
+
+- Session 5 — progressive activation and capability gating
+- Session 3 — profile analysis pipeline with two-pass inference
+- Session 2 — unified entry and X auth bootstrap
+
+### Fixed
+
+- scraper discovery false success and MCP readonly token requirement
+- resolve 12 QA issues — validation hardening, CLI flag conflicts, scraper mode, MCP mutations
+
 ## [0.1.27](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.26...tuitbot-cli-v0.1.27) - 2026-03-09
 
 ### Fixed
