@@ -216,6 +216,16 @@
 				};
 			}
 
+			// Include X identity for account provisioning (if connected during onboarding).
+			if (data.x_user_id) {
+				config.x_profile = {
+					x_user_id: data.x_user_id,
+					x_username: data.x_username,
+					x_display_name: data.x_display_name,
+					x_avatar_url: data.x_avatar_url || null,
+				};
+			}
+
 			// Include claim for web mode (skip if instance already claimed).
 			if (showClaimStep && claimPassphrase.trim()) {
 				config.claim = { passphrase: claimPassphrase.trim() };
@@ -242,6 +252,13 @@
 			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : '';
+			// Config already exists (double-submit, browser back/forward).
+			// Provisioning already succeeded — redirect to home.
+			if (msg.toLowerCase().includes('already exists')) {
+				onboardingData.reset();
+				goto('/');
+				return;
+			}
 			if (msg.toLowerCase().includes('already claimed') && config.claim) {
 				// Instance was claimed between page load and submit (race condition).
 				// Retry without claim so the config is still created.
@@ -251,7 +268,14 @@
 					onboardingData.reset();
 					goto('/login');
 					return;
-				} catch {
+				} catch (retryErr) {
+					const retryMsg = retryErr instanceof Error ? retryErr.message : '';
+					// If retry also gets 409 (config already exists), redirect.
+					if (retryMsg.toLowerCase().includes('already exists')) {
+						onboardingData.reset();
+						goto('/login');
+						return;
+					}
 					// Retry also failed — show original error.
 				}
 			}

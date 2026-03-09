@@ -97,6 +97,13 @@ export async function initAccounts(): Promise<void> {
 	}
 }
 
+/** Update account fields locally (no API call). Used after init provisioning. */
+export function updateAccountLocally(id: string, fields: Partial<Account>): void {
+	accounts.update((list) =>
+		list.map((a) => (a.id === id ? { ...a, ...fields } : a))
+	);
+}
+
 /** Sync X profile data (avatar, display name) for the current account. */
 export async function syncCurrentProfile(): Promise<void> {
 	const id = getPersistedAccountId();

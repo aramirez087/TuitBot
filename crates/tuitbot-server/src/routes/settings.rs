@@ -29,6 +29,19 @@ struct ClaimRequest {
     passphrase: String,
 }
 
+/// X profile data passed from the frontend during onboarding init.
+///
+/// Populated from the OAuth callback response so we can write the user's
+/// X identity to the default account row atomically with config creation.
+#[derive(Deserialize)]
+struct XProfileData {
+    x_user_id: String,
+    x_username: String,
+    x_display_name: String,
+    #[serde(default)]
+    x_avatar_url: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Request / response types
 // ---------------------------------------------------------------------------
@@ -191,6 +204,14 @@ pub async fn init_settings(
         .transpose()
         .map_err(|e| ApiError::BadRequest(format!("invalid claim object: {e}")))?;
 
+    // Extract and remove `x_profile` before TOML conversion (it's not a config field).
+    let x_profile: Option<XProfileData> = body
+        .as_object_mut()
+        .and_then(|obj| obj.remove("x_profile"))
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| ApiError::BadRequest(format!("invalid x_profile object: {e}")))?;
+
     // Validate claim early — before any file I/O.
     if let Some(ref claim) = claim {
         if claim.passphrase.len() < 8 {
@@ -258,6 +279,26 @@ pub async fn init_settings(
             tracing::warn!("Failed to migrate onboarding tokens: {e}");
         } else {
             tracing::info!("Migrated onboarding tokens to default account");
+        }
+    }
+
+    // Populate the default account's X profile if provided.
+    if let Some(ref profile) = x_profile {
+        if let Err(e) = accounts::update_account(
+            &state.db,
+            DEFAULT_ACCOUNT_ID,
+            accounts::UpdateAccountParams {
+                x_user_id: Some(&profile.x_user_id),
+                x_username: Some(&profile.x_username),
+                x_display_name: Some(&profile.x_display_name),
+                x_avatar_url: profile.x_avatar_url.as_deref(),
+                ..Default::default()
+            },
+        )
+        .await
+        {
+            tracing::warn!("Failed to set X profile on default account during init: {e}");
+            // Non-fatal — syncCurrentProfile() will catch this later.
         }
     }
 

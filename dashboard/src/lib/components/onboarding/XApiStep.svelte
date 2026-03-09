@@ -82,7 +82,14 @@
 			try {
 				const status = await api.onboarding.authStatus();
 				if (status.connected && status.user) {
-					onboardingSession.setConnected(status.user as OnboardingXUser);
+					const user = status.user as OnboardingXUser;
+					onboardingSession.setConnected(user);
+					// Persist X identity in the onboarding data store so it's
+					// included in the init payload for account provisioning.
+					onboardingData.updateField('x_user_id', user.id);
+					onboardingData.updateField('x_username', user.username);
+					onboardingData.updateField('x_display_name', user.name);
+					onboardingData.updateField('x_avatar_url', user.profile_image_url ?? '');
 					if (pollTimer) {
 						clearInterval(pollTimer);
 						pollTimer = null;

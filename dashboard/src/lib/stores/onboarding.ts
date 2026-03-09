@@ -6,6 +6,11 @@ export interface OnboardingData {
 	provider_backend: string;
 	client_id: string;
 	client_secret: string;
+	// X Identity (populated from OAuth callback)
+	x_user_id: string;
+	x_username: string;
+	x_display_name: string;
+	x_avatar_url: string;
 	// Profile
 	account_type: 'individual' | 'business';
 	product_name: string;
@@ -39,6 +44,10 @@ function createOnboardingStore() {
 		provider_backend: '',
 		client_id: '',
 		client_secret: '',
+		x_user_id: '',
+		x_username: '',
+		x_display_name: '',
+		x_avatar_url: '',
 		account_type: 'individual',
 		product_name: '',
 		product_description: '',
@@ -98,6 +107,10 @@ function createOnboardingStore() {
 				provider_backend: '',
 				client_id: '',
 				client_secret: '',
+				x_user_id: '',
+				x_username: '',
+				x_display_name: '',
+				x_avatar_url: '',
 				account_type: 'individual',
 				product_name: '',
 				product_description: '',
