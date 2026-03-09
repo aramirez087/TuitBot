@@ -75,7 +75,7 @@ export function computeChecklistItems(tier: CapabilityTier): ChecklistItem[] {
 		{
 			id: 'xapi',
 			label: 'X credentials',
-			description: 'Connect to X for discovery and scoring',
+			description: 'Connect to X to discover and score conversations',
 			completed: rank >= 2,
 			href: '/settings#xapi',
 			tier: 2,
@@ -84,7 +84,7 @@ export function computeChecklistItems(tier: CapabilityTier): ChecklistItem[] {
 		{
 			id: 'llm',
 			label: 'LLM provider',
-			description: 'AI model for drafting replies and content',
+			description: 'Required for AI-generated drafts and replies',
 			completed: rank >= 3,
 			href: '/settings#llm',
 			tier: 3,
@@ -93,7 +93,7 @@ export function computeChecklistItems(tier: CapabilityTier): ChecklistItem[] {
 		{
 			id: 'posting',
 			label: 'Posting access',
-			description: 'OAuth tokens or browser session for publishing',
+			description: 'Authorize Tuitbot to post on your behalf',
 			completed: rank >= 4,
 			href: '/settings#xapi',
 			tier: 4,
@@ -102,7 +102,7 @@ export function computeChecklistItems(tier: CapabilityTier): ChecklistItem[] {
 		{
 			id: 'sources',
 			label: 'Knowledge vault',
-			description: 'Feed your notes into AI-generated content',
+			description: 'Improve AI drafts with your own notes and ideas',
 			completed: false, // always optional, never blocks tier
 			href: '/settings#sources',
 			tier: 5,

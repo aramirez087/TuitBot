@@ -27,7 +27,7 @@ Rust 1.75+ is only needed if building from source. Precompiled binaries are avai
 
 1. Download the latest `.dmg` (macOS), `.exe` (Windows), or `.AppImage` (Linux) from the [Releases](https://github.com/aramirez087/TuitBot/releases) page.
 2. Open the app and follow the **Onboarding Wizard**.
-3. The app will guide you through connecting your X account, choosing an AI provider, and setting up your business profile.
+3. The app will guide you through connecting your X account — your business profile is pre-filled from your X bio and recent posts. An LLM provider and content sources can be added later in Settings.
 
 The app runs quietly as a system tray icon, discovering conversations and drafting content for your review.
 
@@ -174,7 +174,7 @@ OAuth-based Google Drive connection flow in the browser. See the
 
 ## Progressive Enrichment (Optional)
 
-The quickstart gets you running fast with safe defaults. When you're ready for better results, enrich your profile in stages:
+The quickstart gets you running fast with safe defaults. The dashboard onboarding handles initial profile setup automatically if you connect your X account. When you're ready for better results, enrich your profile in stages:
 
 ```bash
 tuitbot settings enrich

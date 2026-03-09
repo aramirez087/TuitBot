@@ -49,10 +49,10 @@
 
 	let tierDescription = $derived(
 		hasLlmConfig && hasXCredentials
-			? 'You can discover content, generate AI drafts, and compose posts.'
+			? 'You can discover conversations, generate AI drafts, and compose replies.'
 			: hasXCredentials
-				? 'You can discover and explore content. Set up an LLM provider in Settings to enable AI drafts.'
-				: 'Dashboard access is available. Configure X credentials and LLM in Settings to unlock more features.'
+				? 'You can discover and explore conversations. Add an LLM provider in Settings to enable AI drafts.'
+				: 'Dashboard access is available. Configure X credentials and an LLM in Settings to unlock more features.'
 	);
 
 	// Deferred items
@@ -74,7 +74,7 @@
 <div class="step">
 	<h2 class="step-title">Review & Launch</h2>
 	<p class="step-description">
-		Review your configuration before starting Tuitbot.
+		Review your setup. You can change any of these in Settings later.
 	</p>
 
 	{#if deferredItems.length > 0}

@@ -4,6 +4,7 @@
 	import type { OnboardingXUser } from '$lib/stores/onboarding-session';
 	import { deploymentMode } from '$lib/stores/runtime';
 	import { api } from '$lib/api';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import {
 		ExternalLink,
 		Copy,
@@ -51,6 +52,9 @@
 
 	function setMode(mode: string) {
 		onboardingData.updateField('provider_backend', mode === 'x_api' ? '' : mode);
+		if (mode === 'scraper') {
+			trackFunnel('onboarding:scraper-selected');
+		}
 	}
 
 	function copyCallbackUrl() {
@@ -61,6 +65,9 @@
 
 	async function startXAuth() {
 		onboardingSession.setLoading(true);
+		trackFunnel('onboarding:x-auth-started', {
+			mode: selectedMode === 'scraper' ? 'scraper' : 'api',
+		});
 		try {
 			const result = await api.onboarding.startAuth();
 			onboardingSession.setAuthUrl(result.authorization_url, result.state);
@@ -72,6 +79,7 @@
 			startPolling();
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Failed to start auth';
+			trackFunnel('onboarding:x-auth-error', { error: msg });
 			onboardingSession.setError(msg);
 		}
 	}
@@ -84,6 +92,7 @@
 				if (status.connected && status.user) {
 					const user = status.user as OnboardingXUser;
 					onboardingSession.setConnected(user);
+					trackFunnel('onboarding:x-auth-success', { username: user.username });
 					// Persist X identity in the onboarding data store so it's
 					// included in the init payload for account provisioning.
 					onboardingData.updateField('x_user_id', user.id);
@@ -106,6 +115,7 @@
 				clearInterval(pollTimer);
 				pollTimer = null;
 				if (!$onboardingSession.x_connected) {
+					trackFunnel('onboarding:x-auth-error', { error: 'timeout' });
 					onboardingSession.setError(
 						'Connection timed out. Click "Connect with X" to try again.'
 					);

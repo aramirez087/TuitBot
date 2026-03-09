@@ -5,6 +5,7 @@
 	import { onboardingData } from '$lib/stores/onboarding';
 	import { authMode as authModeStore, claimSession } from '$lib/stores/auth';
 	import { connectWs } from '$lib/stores/websocket';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
 	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
 	import LlmStep from '$lib/components/onboarding/LlmStep.svelte';
@@ -15,7 +16,7 @@
 	import ValidationStep from '$lib/components/onboarding/ValidationStep.svelte';
 	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
-	import { Zap, ArrowLeft, ArrowRight, Loader2, SkipForward } from 'lucide-svelte';
+	import { Zap, ArrowLeft, ArrowRight, Loader2, SkipForward, RefreshCw } from 'lucide-svelte';
 
 	// Optional steps that can be skipped during progressive activation.
 	const OPTIONAL_STEPS = new Set(['LLM', 'Analyze', 'Language', 'Vault', 'Validate']);
@@ -61,6 +62,42 @@
 		$onboardingData.llm_provider === 'ollama' ||
 		($onboardingData.llm_api_key.trim().length > 0 && $onboardingData.llm_model.trim().length > 0)
 	);
+
+	// Check deployment mode on mount — redirect if already configured.
+	let unsupportedMode = $state('');
+	$effect(() => {
+		api.settings.configStatus().then((status: { configured?: boolean; deployment_mode?: string }) => {
+			if (status.configured) {
+				goto('/');
+				return;
+			}
+			const mode = status.deployment_mode;
+			if (mode && !['desktop', 'self_host', 'cloud'].includes(mode)) {
+				unsupportedMode = mode;
+			}
+		}).catch(() => {
+			// Server unavailable — let the user proceed; submit() will catch it.
+		});
+	});
+
+	// Track step transitions for funnel measurement.
+	let prevTrackedStep = $state(-1);
+	$effect(() => {
+		if (currentStep !== prevTrackedStep) {
+			if (currentStep === 0 && prevTrackedStep === -1) {
+				trackFunnel('onboarding:started', {
+					mode: isScraperMode ? 'scraper' : 'api',
+				});
+			}
+			if (currentStep > 0) {
+				trackFunnel('onboarding:step-entered', {
+					step: currentStepName,
+					index: currentStep,
+				});
+			}
+			prevTrackedStep = currentStep;
+		}
+	});
 
 	// Prevent navigation away during claim step if passphrase is generated but not submitted.
 	$effect(() => {
@@ -142,12 +179,18 @@
 		// Mark all remaining optional steps as skipped
 		const reviewIdx = steps.indexOf('Review');
 		if (reviewIdx < 0) return;
+		const skipped: string[] = [];
 		for (let i = currentStep; i < reviewIdx; i++) {
 			const stepName = steps[i];
 			if (OPTIONAL_STEPS.has(stepName)) {
 				skippedSteps = new Set([...skippedSteps, stepName]);
+				skipped.push(stepName);
 			}
 		}
+		trackFunnel('onboarding:step-skipped', {
+			from_step: currentStepName,
+			skipped,
+		});
 		currentStep = reviewIdx;
 		errorMsg = '';
 	}
@@ -157,8 +200,19 @@
 		errorMsg = '';
 		let config: Record<string, unknown> = {};
 
+		const data = $onboardingData;
+		const tierLabel = (data.llm_provider === 'ollama' || (data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0))
+			? (data.provider_backend === 'scraper' || data.client_id.trim().length > 0 ? 'generation_ready' : 'profile_ready')
+			: (data.provider_backend === 'scraper' || data.client_id.trim().length > 0 ? 'exploration_ready' : 'profile_ready');
+
+		trackFunnel('onboarding:submitted', {
+			has_x_auth: !!data.x_user_id,
+			has_llm: data.llm_provider === 'ollama' || (data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0),
+			has_vault: data.vault_path.length > 0 || data.connection_id !== null || data.folder_id.length > 0,
+			tier: tierLabel,
+		});
+
 		try {
-			const data = $onboardingData;
 			config = {
 				x_api: data.provider_backend === 'scraper'
 					? { provider_backend: 'scraper' }
@@ -244,6 +298,10 @@
 				connectWs();
 			}
 
+			trackFunnel('onboarding:completed', {
+				tier: tierLabel,
+				claimed: showClaimStep,
+			});
 			onboardingData.reset();
 			if (alreadyClaimed) {
 				goto('/login');
@@ -252,14 +310,22 @@
 			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : '';
+			// Network failure — server unreachable.
+			if (e instanceof TypeError && msg.includes('fetch')) {
+				errorMsg = "Can't reach the Tuitbot server. Check that it's running and try again.";
+				trackFunnel('onboarding:error', { error: 'network', step: 'submit' });
+				return;
+			}
 			// Config already exists (double-submit, browser back/forward).
 			// Provisioning already succeeded — redirect to home.
 			if (msg.toLowerCase().includes('already exists')) {
+				trackFunnel('onboarding:409-recovery', { reason: 'already_exists' });
 				onboardingData.reset();
 				goto('/');
 				return;
 			}
 			if (msg.toLowerCase().includes('already claimed') && config.claim) {
+				trackFunnel('onboarding:409-recovery', { reason: 'already_claimed' });
 				// Instance was claimed between page load and submit (race condition).
 				// Retry without claim so the config is still created.
 				try {
@@ -280,12 +346,29 @@
 				}
 			}
 			errorMsg = msg || 'Failed to create configuration';
+			trackFunnel('onboarding:error', { error: errorMsg, step: 'submit' });
 		} finally {
 			submitting = false;
 		}
 	}
 </script>
 
+{#if unsupportedMode}
+	<div class="onboarding">
+		<div class="onboarding-header">
+			<div class="logo">
+				<Zap size={20} strokeWidth={2.5} />
+				<span class="logo-text">Tuitbot</span>
+			</div>
+		</div>
+		<div class="onboarding-content">
+			<div class="unsupported-banner" role="alert">
+				<p>This deployment mode (<code>{unsupportedMode}</code>) is not supported for browser onboarding.</p>
+				<p>Use <code>tuitbot init</code> from the command line instead.</p>
+			</div>
+		</div>
+	</div>
+{:else}
 <div class="onboarding">
 	<div class="onboarding-header">
 		<div class="logo">
@@ -348,7 +431,13 @@
 		</div>
 
 		{#if errorMsg}
-			<div class="error-banner" role="alert">{errorMsg}</div>
+			<div class="error-banner" role="alert">
+				<span>{errorMsg}</span>
+				<button type="button" class="error-retry-btn" onclick={submit} disabled={submitting}>
+					<RefreshCw size={14} />
+					Retry
+				</button>
+			</div>
 		{/if}
 
 		<div class="actions">
@@ -402,6 +491,7 @@
 		</div>
 	</div>
 </div>
+{/if}
 
 <style>
 	.onboarding {
@@ -531,11 +621,66 @@
 	}
 
 	.error-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
 		padding: 12px 16px;
 		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 		border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
 		border-radius: 8px;
 		color: var(--color-danger);
+		font-size: 13px;
+	}
+
+	.error-retry-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 14px;
+		border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+		border-radius: 6px;
+		background: transparent;
+		color: var(--color-danger);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all 0.15s;
+	}
+
+	.error-retry-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+	}
+
+	.error-retry-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.unsupported-banner {
+		padding: 24px;
+		background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+		border: 1px solid color-mix(in srgb, var(--color-warning) 25%, var(--color-border));
+		border-radius: 10px;
+		text-align: center;
+	}
+
+	.unsupported-banner p {
+		margin: 0 0 8px;
+		font-size: 14px;
+		color: var(--color-text-muted);
+		line-height: 1.5;
+	}
+
+	.unsupported-banner p:last-child {
+		margin-bottom: 0;
+	}
+
+	.unsupported-banner code {
+		background: var(--color-surface);
+		padding: 2px 6px;
+		border-radius: 4px;
 		font-size: 13px;
 	}
 

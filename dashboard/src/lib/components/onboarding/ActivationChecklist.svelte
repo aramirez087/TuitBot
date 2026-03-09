@@ -8,6 +8,7 @@
 		currentTierActions,
 	} from '$lib/stores/capability';
 	import { capabilitiesLoaded } from '$lib/stores/runtime';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import {
 		CheckCircle2,
 		Circle,
@@ -26,14 +27,28 @@
 
 	let dismissed = $state(false);
 	let previousTier = $state('');
+	let viewTracked = $state(false);
 
-	// Reset dismissal when tier changes
+	// Reset dismissal when tier changes; track tier transitions.
 	$effect(() => {
 		const current = $capabilityTier;
 		if (previousTier && previousTier !== current) {
 			dismissed = false;
+			trackFunnel('activation:tier-changed', { from: previousTier, to: current });
 		}
 		previousTier = current;
+	});
+
+	// Track checklist view (once per mount, full mode only).
+	$effect(() => {
+		if (!compact && $capabilitiesLoaded && !isFullyActivated && !viewTracked) {
+			viewTracked = true;
+			trackFunnel('activation:checklist-viewed', {
+				tier: $capabilityTier,
+				completed: completedCount,
+				total: requiredCount,
+			});
+		}
 	});
 
 	let items = $derived(computeChecklistItems($capabilityTier));
@@ -49,7 +64,12 @@
 	let progressPercent = $derived(Math.round((completedCount / requiredCount) * 100));
 
 	function dismiss() {
+		trackFunnel('activation:checklist-dismissed', { tier: $capabilityTier });
 		dismissed = true;
+	}
+
+	function trackItemClick(itemId: string, completed: boolean) {
+		trackFunnel('activation:checklist-item-clicked', { item_id: itemId, completed });
 	}
 </script>
 
@@ -102,6 +122,7 @@
 								href={item.href}
 								class="checklist-item"
 								class:completed={item.completed}
+								onclick={() => trackItemClick(item.id, item.completed)}
 							>
 								<div class="item-check">
 									{#if item.completed}

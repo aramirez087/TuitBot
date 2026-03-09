@@ -2,6 +2,7 @@
 	import { onboardingData } from '$lib/stores/onboarding';
 	import { onboardingSession } from '$lib/stores/onboarding-session';
 	import type { Confidence, InferenceProvenance, InferredField } from '$lib/api/types';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import TagInput from '$lib/components/settings/TagInput.svelte';
 	import { User, Building2, CheckCircle2, AlertTriangle, Info } from 'lucide-svelte';
 
@@ -56,7 +57,33 @@
 
 	function fieldMeta(field: InferredField<unknown> | undefined) {
 		if (!field || !hasInference) return null;
-		return { color: confidenceColor(field.confidence), label: provenanceLabel(field.provenance) };
+		return {
+			color: confidenceColor(field.confidence),
+			label: provenanceLabel(field.provenance),
+			confidence: field.confidence,
+		};
+	}
+
+	// Track which fields have been edited (fire once per field).
+	const editedFields = new Set<string>();
+	function trackFieldEdit(fieldName: string) {
+		if (!editedFields.has(fieldName)) {
+			editedFields.add(fieldName);
+			trackFunnel('onboarding:profile-edited', { field: fieldName });
+		}
+	}
+
+	// Detect if all inferred fields are low confidence (manual entry mode).
+	let allLowConfidence = $derived(
+		hasInference &&
+		profile !== null &&
+		[profile.product_name, profile.product_description, profile.target_audience, profile.product_keywords, profile.industry_topics]
+			.filter(Boolean)
+			.every((f) => f!.confidence === 'low')
+	);
+
+	function isLowConfidence(meta: ReturnType<typeof fieldMeta>): boolean {
+		return meta !== null && meta.confidence === 'low';
 	}
 </script>
 
@@ -65,7 +92,9 @@
 		{hasInference ? 'Review Your Profile' : 'Your Profile'}
 	</h2>
 	<p class="step-description">
-		{#if hasInference}
+		{#if hasInference && allLowConfidence}
+			Tell us about your product or personal brand. We couldn't infer much from your profile.
+		{:else if hasInference}
 			We analyzed your X account and pre-filled these fields. Edit anything that doesn't look right.
 		{:else}
 			Tell Tuitbot about yourself so it can find relevant conversations and generate on-brand content.
@@ -130,8 +159,10 @@
 				id="pf-name"
 				type="text"
 				class="field-input"
+				class:low-confidence={isLowConfidence(nameMeta)}
 				placeholder={isBusiness ? 'e.g. Tuitbot' : 'e.g. Alex Rivera'}
 				bind:value={productName}
+				oninput={() => trackFieldEdit('product_name')}
 			/>
 		</div>
 
@@ -149,10 +180,12 @@
 				id="pf-desc"
 				type="text"
 				class="field-input"
+				class:low-confidence={isLowConfidence(descMeta)}
 				placeholder={isBusiness
 					? "A one-line description of what you're building"
 					: 'e.g. Frontend dev who writes about React and design systems'}
 				bind:value={productDescription}
+				oninput={() => trackFieldEdit('product_description')}
 			/>
 		</div>
 
@@ -170,8 +203,10 @@
 				id="pf-url"
 				type="url"
 				class="field-input"
+				class:low-confidence={isLowConfidence(urlMeta)}
 				placeholder={isBusiness ? 'https://yourproduct.com' : 'https://blog.example.com'}
 				bind:value={productUrl}
+				oninput={() => trackFieldEdit('product_url')}
 			/>
 		</div>
 
@@ -189,10 +224,12 @@
 				id="pf-audience"
 				type="text"
 				class="field-input"
+				class:low-confidence={isLowConfidence(audMeta)}
 				placeholder={isBusiness
 					? 'e.g. indie hackers, SaaS founders, developers'
 					: 'e.g. web developers, designers, tech Twitter'}
 				bind:value={targetAudience}
+				oninput={() => trackFieldEdit('target_audience')}
 			/>
 		</div>
 
@@ -419,9 +456,15 @@
 		transition: border-color 0.15s;
 	}
 
+	.field-input.low-confidence {
+		border-color: color-mix(in srgb, var(--color-warning, #eab308) 50%, var(--color-border));
+		border-style: dashed;
+	}
+
 	.field-input:focus {
 		outline: none;
 		border-color: var(--color-accent);
+		border-style: solid;
 	}
 
 	.field-input::placeholder {

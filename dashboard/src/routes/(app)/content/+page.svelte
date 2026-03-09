@@ -9,6 +9,7 @@
 	import ActivationChecklist from '$lib/components/onboarding/ActivationChecklist.svelte';
 	import { capabilityTier } from '$lib/stores/capability';
 	import { api } from '$lib/api';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import {
 		calendarItems,
 		schedule,
@@ -56,8 +57,12 @@
 	async function createDraftAndRedirect(date: Date | null, time: string | null, source: string) {
 		try {
 			const scheduledFor = date && time ? buildScheduledFor(date, time) : undefined;
+			const isFirst = $calendarItems.length === 0;
 			const result = await api.draftStudio.create({ content_type: 'tweet' });
 			console.info('[draft-studio]', { event: 'draft_created', id: result.id, source });
+			if (isFirst) {
+				trackFunnel('activation:first-draft-created', { source });
+			}
 			const params = new URLSearchParams({ id: String(result.id) });
 			if (scheduledFor) params.set('prefill_schedule', scheduledFor);
 			goto(`/drafts?${params.toString()}`);
