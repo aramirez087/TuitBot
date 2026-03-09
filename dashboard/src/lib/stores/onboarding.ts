@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import type { InferredProfile } from '$lib/api/types';
 
 export interface OnboardingData {
 	// X Access
@@ -67,6 +68,30 @@ function createOnboardingStore() {
 		set,
 		updateField: <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) => {
 			update((data) => ({ ...data, [key]: value }));
+		},
+		prefillFromInference: (profile: InferredProfile) => {
+			update((data) => {
+				const voiceMap: Record<string, string> = {
+					professional: 'balanced',
+					casual: 'bold',
+					formal: 'conservative',
+					witty: 'bold'
+				};
+				const inferredVoice = profile.brand_voice.value;
+				const mappedVoice = inferredVoice ? voiceMap[inferredVoice] ?? 'balanced' : data.brand_voice;
+
+				return {
+					...data,
+					account_type: profile.account_type.value,
+					product_name: data.product_name || profile.product_name.value,
+					product_description: data.product_description || profile.product_description.value,
+					product_url: data.product_url || profile.product_url.value || '',
+					target_audience: data.target_audience || profile.target_audience.value,
+					product_keywords: data.product_keywords.length > 0 ? data.product_keywords : profile.product_keywords.value,
+					industry_topics: data.industry_topics.length > 0 ? data.industry_topics : profile.industry_topics.value,
+					brand_voice: mappedVoice
+				};
+			});
 		},
 		reset: () => {
 			set({

@@ -7,8 +7,9 @@
 	import { connectWs } from '$lib/stores/websocket';
 	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
 	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
-	import BusinessStep from '$lib/components/onboarding/BusinessStep.svelte';
 	import LlmStep from '$lib/components/onboarding/LlmStep.svelte';
+	import ProfileAnalysisState from '$lib/components/onboarding/ProfileAnalysisState.svelte';
+	import PrefillProfileForm from '$lib/components/onboarding/PrefillProfileForm.svelte';
 	import LanguageBrandStep from '$lib/components/onboarding/LanguageBrandStep.svelte';
 	import SourcesStep from '$lib/components/onboarding/SourcesStep.svelte';
 	import ValidationStep from '$lib/components/onboarding/ValidationStep.svelte';
@@ -16,7 +17,16 @@
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
 	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
 
-	const BASE_STEPS = ['Welcome', 'X Access', 'Profile', 'LLM', 'Language', 'Vault', 'Validate', 'Review'];
+	// Step flow varies by mode:
+	// API mode: Welcome → X Access → LLM → Analyze → Profile → Language → Vault → Validate → Review [→ Secure]
+	// Scraper mode: Welcome → X Access → Profile → LLM → Language → Vault → Validate → Review [→ Secure]
+	let isScraperMode = $derived($onboardingData.provider_backend === 'scraper');
+	let baseSteps = $derived(
+		isScraperMode
+			? ['Welcome', 'X Access', 'Profile', 'LLM', 'Language', 'Vault', 'Validate', 'Review']
+			: ['Welcome', 'X Access', 'LLM', 'Analyze', 'Profile', 'Language', 'Vault', 'Validate', 'Review']
+	);
+
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');
@@ -30,9 +40,11 @@
 	let isTauri = $derived($authModeStore === 'tauri');
 	let alreadyClaimed = $derived($page.url.searchParams.get('claimed') === '1');
 	let showClaimStep = $derived(!isTauri);
-	let steps = $derived(showClaimStep ? [...BASE_STEPS, 'Secure'] : BASE_STEPS);
+	let steps = $derived(showClaimStep ? [...baseSteps, 'Secure'] : baseSteps);
+	let currentStepName = $derived(steps[currentStep] ?? '');
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
+	let isAnalyzeStep = $derived(currentStepName === 'Analyze');
 
 	// Prevent navigation away during claim step if passphrase is generated but not submitted.
 	$effect(() => {
@@ -45,13 +57,13 @@
 
 	function canAdvance(): boolean {
 		const data = $onboardingData;
-		switch (currentStep) {
-			case 0: // Welcome
+		switch (currentStepName) {
+			case 'Welcome':
 				return true;
-			case 1: // X Access
+			case 'X Access':
 				if (data.provider_backend === 'scraper') return true;
 				return data.client_id.trim().length > 0;
-			case 2: // Business
+			case 'Profile':
 				return (
 					data.product_name.trim().length > 0 &&
 					data.product_description.trim().length > 0 &&
@@ -59,18 +71,20 @@
 					data.product_keywords.length > 0 &&
 					data.industry_topics.length > 0
 				);
-			case 3: // LLM
+			case 'LLM':
 				if (data.llm_provider === 'ollama') return data.llm_model.trim().length > 0;
 				return data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0;
-			case 4: // Language & Brand
+			case 'Analyze':
+				return false;
+			case 'Language':
 				return true;
-			case 5: // Sources (optional)
+			case 'Vault':
 				return true;
-			case 6: // Validation
+			case 'Validate':
 				return true;
-			case 7: // Review
+			case 'Review':
 				return true;
-			case 8: // Secure — recovery acknowledgment or passphrase save
+			case 'Secure':
 				if (alreadyClaimed) return passphraseSaved;
 				return claimPassphrase.trim().length >= 8 && passphraseSaved;
 			default:
@@ -87,7 +101,12 @@
 
 	function back() {
 		if (currentStep > 0) {
-			currentStep--;
+			// When going back from Profile in API mode, skip the Analyze step
+			if (currentStepName === 'Profile' && !isScraperMode) {
+				currentStep -= 2;
+			} else {
+				currentStep--;
+			}
 			errorMsg = '';
 		}
 	}
@@ -209,40 +228,44 @@
 	<div class="onboarding-content">
 		<div class="progress">
 			{#each steps as step, i}
-				<div class="progress-step" class:active={i === currentStep} class:completed={i < currentStep}>
-					<div class="progress-dot">
-						{#if i < currentStep}
-							<span class="check-mark">&#10003;</span>
-						{:else}
-							{i + 1}
-						{/if}
+				{#if step !== 'Analyze'}
+					<div class="progress-step" class:active={i === currentStep || (step === 'Profile' && isAnalyzeStep)} class:completed={i < currentStep}>
+						<div class="progress-dot">
+							{#if i < currentStep}
+								<span class="check-mark">&#10003;</span>
+							{:else}
+								{i + 1}
+							{/if}
+						</div>
+						<span class="progress-label">{step}</span>
 					</div>
-					<span class="progress-label">{step}</span>
-				</div>
-				{#if i < steps.length - 1}
-					<div class="progress-line" class:filled={i < currentStep}></div>
+					{#if i < steps.length - 1 && steps[i + 1] !== 'Analyze'}
+						<div class="progress-line" class:filled={i < currentStep}></div>
+					{/if}
 				{/if}
 			{/each}
 		</div>
 
 		<div class="step-content">
-			{#if currentStep === 0}
+			{#if currentStepName === 'Welcome'}
 				<WelcomeStep />
-			{:else if currentStep === 1}
+			{:else if currentStepName === 'X Access'}
 				<XApiStep />
-			{:else if currentStep === 2}
-				<BusinessStep />
-			{:else if currentStep === 3}
+			{:else if currentStepName === 'LLM'}
 				<LlmStep />
-			{:else if currentStep === 4}
+			{:else if currentStepName === 'Analyze'}
+				<ProfileAnalysisState oncomplete={next} />
+			{:else if currentStepName === 'Profile'}
+				<PrefillProfileForm />
+			{:else if currentStepName === 'Language'}
 				<LanguageBrandStep />
-			{:else if currentStep === 5}
+			{:else if currentStepName === 'Vault'}
 				<SourcesStep />
-			{:else if currentStep === 6}
+			{:else if currentStepName === 'Validate'}
 				<ValidationStep />
-			{:else if currentStep === 7}
+			{:else if currentStepName === 'Review'}
 				<ReviewStep />
-			{:else if currentStep === 8 && showClaimStep}
+			{:else if currentStepName === 'Secure'}
 				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} {alreadyClaimed} />
 			{/if}
 		</div>
@@ -252,7 +275,7 @@
 		{/if}
 
 		<div class="actions">
-			{#if currentStep > 0}
+			{#if currentStep > 0 && !isAnalyzeStep}
 				<button class="btn btn-secondary" onclick={back} disabled={submitting}>
 					<ArrowLeft size={16} />
 					Back
@@ -261,7 +284,10 @@
 				<div></div>
 			{/if}
 
-			{#if !isLastStep}
+			{#if isAnalyzeStep}
+				<!-- Analyze step auto-advances; no button needed -->
+				<div></div>
+			{:else if !isLastStep}
 				<button
 					class="btn btn-primary"
 					onclick={next}
