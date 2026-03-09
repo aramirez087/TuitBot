@@ -111,6 +111,9 @@ mod tests {
                 username: "testbot".to_string(),
                 name: "Test Bot".to_string(),
                 profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
                 public_metrics: UserMetrics::default(),
             })
         }
@@ -214,6 +217,9 @@ mod tests {
             username: username.to_string(),
             name: username.to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics {
                 followers_count: followers,
                 following_count: 100,

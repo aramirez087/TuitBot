@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { ChevronLeft, ChevronRight, Plus, Calendar, LayoutGrid, Loader2 } from 'lucide-svelte';
 	import CalendarWeekView from '$lib/components/CalendarWeekView.svelte';
 	import CalendarMonthView from '$lib/components/CalendarMonthView.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import ActivationChecklist from '$lib/components/onboarding/ActivationChecklist.svelte';
+	import { capabilityTier } from '$lib/stores/capability';
 	import { api } from '$lib/api';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import {
 		calendarItems,
 		schedule,
@@ -55,8 +57,12 @@
 	async function createDraftAndRedirect(date: Date | null, time: string | null, source: string) {
 		try {
 			const scheduledFor = date && time ? buildScheduledFor(date, time) : undefined;
+			const isFirst = $calendarItems.length === 0;
 			const result = await api.draftStudio.create({ content_type: 'tweet' });
 			console.info('[draft-studio]', { event: 'draft_created', id: result.id, source });
+			if (isFirst) {
+				trackFunnel('activation:first-draft-created', { source });
+			}
 			const params = new URLSearchParams({ id: String(result.id) });
 			if (scheduledFor) params.set('prefill_schedule', scheduledFor);
 			goto(`/drafts?${params.toString()}`);
@@ -86,11 +92,6 @@
 		loadCalendar();
 		startAutoRefresh();
 
-		// Onboarding redirect: create a draft instead of opening compose modal
-		if ($page.url.searchParams.get('compose') === 'true') {
-			createDraftAndRedirect(new Date(), null, 'onboarding-redirect');
-		}
-
 		const handler = () => { loadSchedule(); loadCalendar(); };
 		window.addEventListener(ACCOUNT_SWITCHED_EVENT, handler);
 		return () => window.removeEventListener(ACCOUNT_SWITCHED_EVENT, handler);
@@ -104,6 +105,10 @@
 <svelte:head>
 	<title>Content Calendar — Tuitbot</title>
 </svelte:head>
+
+{#if $capabilityTier !== 'posting_ready'}
+	<ActivationChecklist compact />
+{/if}
 
 <div class="page-header">
 	<div class="header-left">

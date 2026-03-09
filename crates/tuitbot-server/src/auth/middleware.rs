@@ -54,6 +54,15 @@ const AUTH_EXEMPT_PATHS: &[&str] = &[
     // and must be exempt so <img>/<video> src attributes work without auth headers.
     "/media/file",
     "/api/media/file",
+    // Onboarding OAuth (pre-account, no auth configured yet).
+    "/onboarding/x-auth/start",
+    "/api/onboarding/x-auth/start",
+    "/onboarding/x-auth/callback",
+    "/api/onboarding/x-auth/callback",
+    "/onboarding/x-auth/status",
+    "/api/onboarding/x-auth/status",
+    "/onboarding/analyze-profile",
+    "/api/onboarding/analyze-profile",
 ];
 
 /// Axum middleware that enforces multi-strategy authentication.

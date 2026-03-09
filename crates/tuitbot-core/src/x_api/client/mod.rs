@@ -31,7 +31,8 @@ pub(crate) const TWEET_FIELDS: &str = "public_metrics,created_at,author_id,conve
 pub(crate) const EXPANSIONS: &str = "author_id";
 
 /// Standard user fields requested on every query.
-pub(crate) const USER_FIELDS: &str = "username,name,public_metrics,profile_image_url";
+pub(crate) const USER_FIELDS: &str =
+    "username,name,public_metrics,profile_image_url,description,location,url";
 
 /// HTTP client for the X API v2.
 ///

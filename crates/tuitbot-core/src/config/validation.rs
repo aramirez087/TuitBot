@@ -4,6 +4,96 @@ use super::Config;
 use crate::error::ConfigError;
 
 impl Config {
+    /// Validate the minimum configuration required for progressive activation.
+    ///
+    /// Only checks business profile fields and structural requirements.
+    /// Skips LLM API key, X API client_id, and other advanced fields that
+    /// can be configured later via Settings.
+    pub fn validate_minimum(&self) -> Result<(), Vec<ConfigError>> {
+        let mut errors = Vec::new();
+
+        // Business profile — required for tier 1
+        if self.business.product_name.is_empty() {
+            errors.push(ConfigError::MissingField {
+                field: "business.product_name".to_string(),
+            });
+        }
+
+        if self.business.product_description.trim().is_empty() {
+            errors.push(ConfigError::MissingField {
+                field: "business.product_description".to_string(),
+            });
+        }
+
+        if self.business.product_keywords.is_empty() && self.business.competitor_keywords.is_empty()
+        {
+            errors.push(ConfigError::MissingField {
+                field: "business.product_keywords or business.competitor_keywords".to_string(),
+            });
+        }
+
+        // Validate LLM provider value if present (but don't require it)
+        if !self.llm.provider.is_empty() {
+            match self.llm.provider.as_str() {
+                "openai" | "anthropic" | "ollama" => {}
+                _ => {
+                    errors.push(ConfigError::InvalidValue {
+                        field: "llm.provider".to_string(),
+                        message: "must be openai, anthropic, or ollama".to_string(),
+                    });
+                }
+            }
+        }
+
+        // Validate provider_backend value if present
+        let backend = self.x_api.provider_backend.as_str();
+        if !backend.is_empty() && backend != "x_api" && backend != "scraper" {
+            errors.push(ConfigError::InvalidValue {
+                field: "x_api.provider_backend".to_string(),
+                message: format!(
+                    "must be 'x_api' or 'scraper', got '{}'",
+                    self.x_api.provider_backend
+                ),
+            });
+        }
+
+        // Structural: db_path
+        let db_path_trimmed = self.storage.db_path.trim();
+        if db_path_trimmed.is_empty() {
+            errors.push(ConfigError::InvalidValue {
+                field: "storage.db_path".to_string(),
+                message: "must not be empty or whitespace-only".to_string(),
+            });
+        } else {
+            let expanded = crate::startup::expand_tilde(db_path_trimmed);
+            if expanded.is_dir() {
+                errors.push(ConfigError::InvalidValue {
+                    field: "storage.db_path".to_string(),
+                    message: format!("'{}' is a directory, must point to a file", db_path_trimmed),
+                });
+            }
+        }
+
+        // Validate content sources against deployment capabilities (if any)
+        for (i, source) in self.content_sources.sources.iter().enumerate() {
+            if !self.deployment_mode.allows_source_type(&source.source_type) {
+                errors.push(ConfigError::InvalidValue {
+                    field: format!("content_sources.sources[{}].source_type", i),
+                    message: format!(
+                        "source type '{}' is not available in {} deployment mode",
+                        source.source_type, self.deployment_mode
+                    ),
+                });
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     /// Validate the configuration, returning all errors found (not just the first).
     pub fn validate(&self) -> Result<(), Vec<ConfigError>> {
         let mut errors = Vec::new();

@@ -1,10 +1,16 @@
 import { writable } from 'svelte/store';
+import type { InferredProfile } from '$lib/api/types';
 
 export interface OnboardingData {
 	// X Access
 	provider_backend: string;
 	client_id: string;
 	client_secret: string;
+	// X Identity (populated from OAuth callback)
+	x_user_id: string;
+	x_username: string;
+	x_display_name: string;
+	x_avatar_url: string;
 	// Profile
 	account_type: 'individual' | 'business';
 	product_name: string;
@@ -38,6 +44,10 @@ function createOnboardingStore() {
 		provider_backend: '',
 		client_id: '',
 		client_secret: '',
+		x_user_id: '',
+		x_username: '',
+		x_display_name: '',
+		x_avatar_url: '',
 		account_type: 'individual',
 		product_name: '',
 		product_description: '',
@@ -68,11 +78,39 @@ function createOnboardingStore() {
 		updateField: <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) => {
 			update((data) => ({ ...data, [key]: value }));
 		},
+		prefillFromInference: (profile: InferredProfile) => {
+			update((data) => {
+				const voiceMap: Record<string, string> = {
+					professional: 'balanced',
+					casual: 'bold',
+					formal: 'conservative',
+					witty: 'bold'
+				};
+				const inferredVoice = profile.brand_voice.value;
+				const mappedVoice = inferredVoice ? voiceMap[inferredVoice] ?? 'balanced' : data.brand_voice;
+
+				return {
+					...data,
+					account_type: profile.account_type.value,
+					product_name: data.product_name || profile.product_name.value,
+					product_description: data.product_description || profile.product_description.value,
+					product_url: data.product_url || profile.product_url.value || '',
+					target_audience: data.target_audience || profile.target_audience.value,
+					product_keywords: data.product_keywords.length > 0 ? data.product_keywords : profile.product_keywords.value,
+					industry_topics: data.industry_topics.length > 0 ? data.industry_topics : profile.industry_topics.value,
+					brand_voice: mappedVoice
+				};
+			});
+		},
 		reset: () => {
 			set({
 				provider_backend: '',
 				client_id: '',
 				client_secret: '',
+				x_user_id: '',
+				x_username: '',
+				x_display_name: '',
+				x_avatar_url: '',
 				account_type: 'individual',
 				product_name: '',
 				product_description: '',
@@ -100,3 +138,12 @@ function createOnboardingStore() {
 }
 
 export const onboardingData = createOnboardingStore();
+
+/** Check if the minimum required fields for progressive activation are complete. */
+export function isMinimalComplete(data: OnboardingData): boolean {
+	return (
+		data.product_name.trim().length > 0 &&
+		data.product_description.trim().length > 0 &&
+		data.product_keywords.length > 0
+	);
+}

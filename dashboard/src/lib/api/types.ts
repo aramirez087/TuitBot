@@ -1,3 +1,49 @@
+// --- Profile inference types ---
+
+export type Confidence = 'high' | 'medium' | 'low';
+export type InferenceProvenance =
+	| 'bio'
+	| 'tweets'
+	| 'bio_and_tweets'
+	| 'profile_url'
+	| 'display_name'
+	| 'default';
+
+export interface InferredField<T> {
+	value: T;
+	confidence: Confidence;
+	provenance: InferenceProvenance;
+}
+
+export interface InferredProfile {
+	account_type: InferredField<'individual' | 'business'>;
+	product_name: InferredField<string>;
+	product_description: InferredField<string>;
+	product_url: InferredField<string | null>;
+	target_audience: InferredField<string>;
+	product_keywords: InferredField<string[]>;
+	industry_topics: InferredField<string[]>;
+	brand_voice: InferredField<string | null>;
+}
+
+export type AnalyzeProfileStatus = 'ok' | 'partial' | 'x_api_error' | 'llm_error';
+
+export interface AnalyzeProfileResponse {
+	status: AnalyzeProfileStatus;
+	profile?: InferredProfile;
+	warnings?: string[];
+	error?: string;
+}
+
+// --- Capability tier types ---
+
+export type CapabilityTier =
+	| 'unconfigured'
+	| 'profile_ready'
+	| 'exploration_ready'
+	| 'generation_ready'
+	| 'posting_ready';
+
 // --- Deployment types ---
 
 export type DeploymentModeValue = 'desktop' | 'self_host' | 'cloud';
@@ -18,6 +64,7 @@ export interface RuntimeStatus {
 	capabilities: DeploymentCapabilities;
 	provider_backend: string;
 	can_post: boolean;
+	capability_tier: CapabilityTier;
 }
 
 // --- Health & Analytics types ---
@@ -475,6 +522,7 @@ export interface ConfigStatus {
 	claimed: boolean;
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
+	capability_tier: CapabilityTier;
 }
 
 export interface SettingsValidationResult {

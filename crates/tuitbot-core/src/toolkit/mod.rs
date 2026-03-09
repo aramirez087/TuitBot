@@ -9,6 +9,7 @@
 
 pub mod engage;
 pub mod media;
+pub mod profile_inference;
 pub mod read;
 pub mod write;
 

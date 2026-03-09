@@ -61,6 +61,15 @@ pub struct User {
     /// Profile image URL.
     #[serde(default)]
     pub profile_image_url: Option<String>,
+    /// Bio / profile description.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Self-reported location string.
+    #[serde(default)]
+    pub location: Option<String>,
+    /// Profile URL (often a t.co shortened link).
+    #[serde(default)]
+    pub url: Option<String>,
     /// User engagement metrics.
     #[serde(default)]
     pub public_metrics: UserMetrics,
@@ -644,5 +653,41 @@ mod tests {
         let resp: UserResponse = serde_json::from_str(json).expect("deserialize");
         assert_eq!(resp.data.username, "testuser");
         assert_eq!(resp.data.public_metrics.followers_count, 1000);
+    }
+
+    #[test]
+    fn deserialize_user_with_profile_fields() {
+        let json = r#"{
+            "data": {
+                "id": "123",
+                "username": "testuser",
+                "name": "Test User",
+                "description": "Building cool stuff | Rust enthusiast",
+                "location": "San Francisco, CA",
+                "url": "https://t.co/abc123",
+                "profile_image_url": "https://pbs.twimg.com/profile_images/123/photo.jpg",
+                "public_metrics": {
+                    "followers_count": 1000,
+                    "following_count": 500,
+                    "tweet_count": 5000
+                }
+            }
+        }"#;
+        let resp: UserResponse = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(
+            resp.data.description.as_deref(),
+            Some("Building cool stuff | Rust enthusiast")
+        );
+        assert_eq!(resp.data.location.as_deref(), Some("San Francisco, CA"));
+        assert_eq!(resp.data.url.as_deref(), Some("https://t.co/abc123"));
+    }
+
+    #[test]
+    fn deserialize_user_without_profile_fields() {
+        let json = r#"{"data":{"id":"1","username":"u","name":"N"}}"#;
+        let resp: UserResponse = serde_json::from_str(json).expect("deserialize");
+        assert!(resp.data.description.is_none());
+        assert!(resp.data.location.is_none());
+        assert!(resp.data.url.is_none());
     }
 }

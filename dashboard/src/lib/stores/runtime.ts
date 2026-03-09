@@ -1,10 +1,11 @@
 import { writable, derived } from 'svelte/store';
-import { api, type DeploymentCapabilities, type DeploymentModeValue } from '$lib/api';
+import { api, type DeploymentCapabilities, type DeploymentModeValue, type CapabilityTier } from '$lib/api';
 
 interface RuntimeCapabilities {
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
 	can_post: boolean;
+	capability_tier: CapabilityTier;
 }
 
 const DESKTOP_DEFAULTS: RuntimeCapabilities = {
@@ -17,7 +18,8 @@ const DESKTOP_DEFAULTS: RuntimeCapabilities = {
 		file_picker_native: false,
 		preferred_source_default: 'local_fs'
 	},
-	can_post: false
+	can_post: false,
+	capability_tier: 'unconfigured'
 };
 
 const capabilitiesData = writable<RuntimeCapabilities | null>(null);
@@ -26,6 +28,7 @@ export const capabilities = derived(capabilitiesData, ($d) => $d?.capabilities ?
 export const deploymentMode = derived(capabilitiesData, ($d) => $d?.deployment_mode ?? 'desktop');
 export const capabilitiesLoaded = derived(capabilitiesData, ($d) => $d !== null);
 export const canPost = derived(capabilitiesData, ($d) => $d?.can_post ?? false);
+export const capabilityTier = derived(capabilitiesData, ($d): CapabilityTier => $d?.capability_tier ?? 'unconfigured');
 
 let fetching = false;
 let fetched = false;
@@ -45,7 +48,8 @@ export async function loadCapabilities(): Promise<void> {
 		capabilitiesData.set({
 			deployment_mode: status.deployment_mode,
 			capabilities: status.capabilities,
-			can_post: status.can_post
+			can_post: status.can_post,
+			capability_tier: status.capability_tier
 		});
 		fetched = true;
 	} catch {
@@ -55,7 +59,8 @@ export async function loadCapabilities(): Promise<void> {
 			capabilitiesData.set({
 				deployment_mode: configStatus.deployment_mode,
 				capabilities: configStatus.capabilities,
-				can_post: false
+				can_post: false,
+				capability_tier: configStatus.capability_tier
 			});
 			fetched = true;
 		} catch {

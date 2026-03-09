@@ -107,6 +107,9 @@ impl XApiClient for MockXApiClient {
             username: "testuser".to_string(),
             name: "Test User".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -135,6 +138,9 @@ impl XApiClient for MockXApiClient {
             username: username.to_string(),
             name: "Test".to_string(),
             profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
             public_metrics: UserMetrics::default(),
         })
     }
@@ -281,6 +287,9 @@ pub fn sample_user(id: &str, username: &str, followers: u64) -> User {
         username: username.to_string(),
         name: username.to_string(),
         profile_image_url: None,
+        description: None,
+        location: None,
+        url: None,
         public_metrics: UserMetrics {
             followers_count: followers,
             following_count: 100,

@@ -54,7 +54,8 @@ import type {
 	AutosaveResponse,
 	ContentRevision,
 	ContentActivity,
-	ContentTag
+	ContentTag,
+	AnalyzeProfileResponse
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -709,6 +710,53 @@ export const api = {
 				`/api/sources/${id}/reindex`,
 				{ method: 'POST' }
 			),
+	},
+
+	onboarding: {
+		startAuth: () =>
+			request<{ authorization_url: string; state: string }>(
+				'/api/onboarding/x-auth/start',
+				{ method: 'POST' }
+			),
+		completeAuth: (code: string, state: string) =>
+			request<{
+				status: string;
+				user: {
+					id: string;
+					username: string;
+					name: string;
+					profile_image_url: string | null;
+					description: string | null;
+					location: string | null;
+					url: string | null;
+				};
+			}>('/api/onboarding/x-auth/callback', {
+				method: 'POST',
+				body: JSON.stringify({ code, state })
+			}),
+		authStatus: () =>
+			request<{
+				connected: boolean;
+				user?: {
+					id: string;
+					username: string;
+					name: string;
+					profile_image_url: string | null;
+					description: string | null;
+					location: string | null;
+					url: string | null;
+				};
+			}>('/api/onboarding/x-auth/status'),
+		analyzeProfile: (llm?: {
+			provider: string;
+			api_key?: string;
+			model: string;
+			base_url?: string;
+		}) =>
+			request<AnalyzeProfileResponse>('/api/onboarding/analyze-profile', {
+				method: 'POST',
+				body: JSON.stringify({ llm: llm ?? null })
+			})
 	},
 
 	vault: {

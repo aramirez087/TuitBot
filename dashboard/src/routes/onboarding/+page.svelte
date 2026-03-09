@@ -5,21 +5,36 @@
 	import { onboardingData } from '$lib/stores/onboarding';
 	import { authMode as authModeStore, claimSession } from '$lib/stores/auth';
 	import { connectWs } from '$lib/stores/websocket';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
 	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
-	import BusinessStep from '$lib/components/onboarding/BusinessStep.svelte';
 	import LlmStep from '$lib/components/onboarding/LlmStep.svelte';
+	import ProfileAnalysisState from '$lib/components/onboarding/ProfileAnalysisState.svelte';
+	import PrefillProfileForm from '$lib/components/onboarding/PrefillProfileForm.svelte';
 	import LanguageBrandStep from '$lib/components/onboarding/LanguageBrandStep.svelte';
 	import SourcesStep from '$lib/components/onboarding/SourcesStep.svelte';
 	import ValidationStep from '$lib/components/onboarding/ValidationStep.svelte';
 	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
-	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
+	import { Zap, ArrowLeft, ArrowRight, Loader2, SkipForward, RefreshCw } from 'lucide-svelte';
 
-	const BASE_STEPS = ['Welcome', 'X Access', 'Profile', 'LLM', 'Language', 'Vault', 'Validate', 'Review'];
+	// Optional steps that can be skipped during progressive activation.
+	const OPTIONAL_STEPS = new Set(['LLM', 'Analyze', 'Language', 'Vault', 'Validate']);
+
+	// Step flow varies by mode:
+	// API mode: Welcome → X Access → LLM → Analyze → Profile → Language → Vault → Validate → Review [→ Secure]
+	// Scraper mode: Welcome → X Access → Profile → LLM → Language → Vault → Validate → Review [→ Secure]
+	let isScraperMode = $derived($onboardingData.provider_backend === 'scraper');
+	let baseSteps = $derived(
+		isScraperMode
+			? ['Welcome', 'X Access', 'Profile', 'LLM', 'Language', 'Vault', 'Validate', 'Review']
+			: ['Welcome', 'X Access', 'LLM', 'Analyze', 'Profile', 'Language', 'Vault', 'Validate', 'Review']
+	);
+
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');
+	let skippedSteps = $state(new Set<string>());
 
 	// Claim state — only used in web mode.
 	let claimPassphrase = $state('');
@@ -30,9 +45,59 @@
 	let isTauri = $derived($authModeStore === 'tauri');
 	let alreadyClaimed = $derived($page.url.searchParams.get('claimed') === '1');
 	let showClaimStep = $derived(!isTauri);
-	let steps = $derived(showClaimStep ? [...BASE_STEPS, 'Secure'] : BASE_STEPS);
+	let steps = $derived(showClaimStep ? [...baseSteps, 'Secure'] : baseSteps);
+	let currentStepName = $derived(steps[currentStep] ?? '');
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
+	let isAnalyzeStep = $derived(currentStepName === 'Analyze');
+
+	// Show "Skip to finish" after Profile step (where required steps end).
+	let canSkipToFinish = $derived(
+		currentStepName === 'Profile' ||
+		(OPTIONAL_STEPS.has(currentStepName) && currentStepName !== 'Analyze')
+	);
+
+	// Determine if LLM is configured (for display purposes).
+	let hasLlmConfig = $derived(
+		$onboardingData.llm_provider === 'ollama' ||
+		($onboardingData.llm_api_key.trim().length > 0 && $onboardingData.llm_model.trim().length > 0)
+	);
+
+	// Check deployment mode on mount — redirect if already configured.
+	let unsupportedMode = $state('');
+	$effect(() => {
+		api.settings.configStatus().then((status: { configured?: boolean; deployment_mode?: string }) => {
+			if (status.configured) {
+				goto('/');
+				return;
+			}
+			const mode = status.deployment_mode;
+			if (mode && !['desktop', 'self_host', 'cloud'].includes(mode)) {
+				unsupportedMode = mode;
+			}
+		}).catch(() => {
+			// Server unavailable — let the user proceed; submit() will catch it.
+		});
+	});
+
+	// Track step transitions for funnel measurement.
+	let prevTrackedStep = $state(-1);
+	$effect(() => {
+		if (currentStep !== prevTrackedStep) {
+			if (currentStep === 0 && prevTrackedStep === -1) {
+				trackFunnel('onboarding:started', {
+					mode: isScraperMode ? 'scraper' : 'api',
+				});
+			}
+			if (currentStep > 0) {
+				trackFunnel('onboarding:step-entered', {
+					step: currentStepName,
+					index: currentStep,
+				});
+			}
+			prevTrackedStep = currentStep;
+		}
+	});
 
 	// Prevent navigation away during claim step if passphrase is generated but not submitted.
 	$effect(() => {
@@ -45,13 +110,13 @@
 
 	function canAdvance(): boolean {
 		const data = $onboardingData;
-		switch (currentStep) {
-			case 0: // Welcome
+		switch (currentStepName) {
+			case 'Welcome':
 				return true;
-			case 1: // X Access
+			case 'X Access':
 				if (data.provider_backend === 'scraper') return true;
 				return data.client_id.trim().length > 0;
-			case 2: // Business
+			case 'Profile':
 				return (
 					data.product_name.trim().length > 0 &&
 					data.product_description.trim().length > 0 &&
@@ -59,18 +124,20 @@
 					data.product_keywords.length > 0 &&
 					data.industry_topics.length > 0
 				);
-			case 3: // LLM
-				if (data.llm_provider === 'ollama') return data.llm_model.trim().length > 0;
-				return data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0;
-			case 4: // Language & Brand
+			case 'LLM':
+				// Optional in progressive activation — always advanceable
 				return true;
-			case 5: // Sources (optional)
+			case 'Analyze':
+				return false;
+			case 'Language':
 				return true;
-			case 6: // Validation
+			case 'Vault':
 				return true;
-			case 7: // Review
+			case 'Validate':
 				return true;
-			case 8: // Secure — recovery acknowledgment or passphrase save
+			case 'Review':
+				return true;
+			case 'Secure':
 				if (alreadyClaimed) return passphraseSaved;
 				return claimPassphrase.trim().length >= 8 && passphraseSaved;
 			default:
@@ -80,6 +147,17 @@
 
 	function next() {
 		if (currentStep < steps.length - 1) {
+			// In API mode, skip Analyze step if LLM is not configured
+			if (currentStepName === 'LLM' && !isScraperMode && !hasLlmConfig) {
+				// Skip Analyze step — jump past it to Profile
+				const analyzeIdx = steps.indexOf('Analyze');
+				if (analyzeIdx >= 0) {
+					skippedSteps = new Set([...skippedSteps, 'Analyze']);
+					currentStep = analyzeIdx + 1;
+					errorMsg = '';
+					return;
+				}
+			}
 			currentStep++;
 			errorMsg = '';
 		}
@@ -87,9 +165,34 @@
 
 	function back() {
 		if (currentStep > 0) {
-			currentStep--;
+			// When going back from Profile in API mode, skip the Analyze step
+			if (currentStepName === 'Profile' && !isScraperMode) {
+				currentStep -= 2;
+			} else {
+				currentStep--;
+			}
 			errorMsg = '';
 		}
+	}
+
+	function skipToFinish() {
+		// Mark all remaining optional steps as skipped
+		const reviewIdx = steps.indexOf('Review');
+		if (reviewIdx < 0) return;
+		const skipped: string[] = [];
+		for (let i = currentStep; i < reviewIdx; i++) {
+			const stepName = steps[i];
+			if (OPTIONAL_STEPS.has(stepName)) {
+				skippedSteps = new Set([...skippedSteps, stepName]);
+				skipped.push(stepName);
+			}
+		}
+		trackFunnel('onboarding:step-skipped', {
+			from_step: currentStepName,
+			skipped,
+		});
+		currentStep = reviewIdx;
+		errorMsg = '';
 	}
 
 	async function submit() {
@@ -97,8 +200,19 @@
 		errorMsg = '';
 		let config: Record<string, unknown> = {};
 
+		const data = $onboardingData;
+		const tierLabel = (data.llm_provider === 'ollama' || (data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0))
+			? (data.provider_backend === 'scraper' || data.client_id.trim().length > 0 ? 'generation_ready' : 'profile_ready')
+			: (data.provider_backend === 'scraper' || data.client_id.trim().length > 0 ? 'exploration_ready' : 'profile_ready');
+
+		trackFunnel('onboarding:submitted', {
+			has_x_auth: !!data.x_user_id,
+			has_llm: data.llm_provider === 'ollama' || (data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0),
+			has_vault: data.vault_path.length > 0 || data.connection_id !== null || data.folder_id.length > 0,
+			tier: tierLabel,
+		});
+
 		try {
-			const data = $onboardingData;
 			config = {
 				x_api: data.provider_backend === 'scraper'
 					? { provider_backend: 'scraper' }
@@ -114,14 +228,18 @@
 					product_keywords: data.product_keywords,
 					industry_topics: data.industry_topics,
 				},
-				llm: {
+				approval_mode: data.approval_mode,
+			};
+
+			// Only include LLM section if provider and key are configured
+			if (data.llm_provider && (data.llm_provider === 'ollama' || data.llm_api_key)) {
+				config.llm = {
 					provider: data.llm_provider,
 					...(data.llm_api_key ? { api_key: data.llm_api_key } : {}),
 					model: data.llm_model,
 					...(data.llm_base_url ? { base_url: data.llm_base_url } : {}),
-				},
-				approval_mode: data.approval_mode,
-			};
+				};
+			}
 
 			if (data.source_type === 'google_drive' && (data.connection_id || data.folder_id)) {
 				config.content_sources = {
@@ -152,6 +270,16 @@
 				};
 			}
 
+			// Include X identity for account provisioning (if connected during onboarding).
+			if (data.x_user_id) {
+				config.x_profile = {
+					x_user_id: data.x_user_id,
+					x_username: data.x_username,
+					x_display_name: data.x_display_name,
+					x_avatar_url: data.x_avatar_url || null,
+				};
+			}
+
 			// Include claim for web mode (skip if instance already claimed).
 			if (showClaimStep && claimPassphrase.trim()) {
 				config.claim = { passphrase: claimPassphrase.trim() };
@@ -160,7 +288,7 @@
 			const result = await api.settings.init(config);
 
 			if (result.status === 'validation_failed' && result.errors) {
-				errorMsg = result.errors.map((e) => `${e.field}: ${e.message}`).join('; ');
+				errorMsg = result.errors.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join('; ');
 				return;
 			}
 
@@ -170,15 +298,34 @@
 				connectWs();
 			}
 
+			trackFunnel('onboarding:completed', {
+				tier: tierLabel,
+				claimed: showClaimStep,
+			});
 			onboardingData.reset();
 			if (alreadyClaimed) {
 				goto('/login');
 			} else {
-				goto('/content?compose=true');
+				goto('/');
 			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : '';
+			// Network failure — server unreachable.
+			if (e instanceof TypeError && msg.includes('fetch')) {
+				errorMsg = "Can't reach the Tuitbot server. Check that it's running and try again.";
+				trackFunnel('onboarding:error', { error: 'network', step: 'submit' });
+				return;
+			}
+			// Config already exists (double-submit, browser back/forward).
+			// Provisioning already succeeded — redirect to home.
+			if (msg.toLowerCase().includes('already exists')) {
+				trackFunnel('onboarding:409-recovery', { reason: 'already_exists' });
+				onboardingData.reset();
+				goto('/');
+				return;
+			}
 			if (msg.toLowerCase().includes('already claimed') && config.claim) {
+				trackFunnel('onboarding:409-recovery', { reason: 'already_claimed' });
 				// Instance was claimed between page load and submit (race condition).
 				// Retry without claim so the config is still created.
 				try {
@@ -187,17 +334,41 @@
 					onboardingData.reset();
 					goto('/login');
 					return;
-				} catch {
+				} catch (retryErr) {
+					const retryMsg = retryErr instanceof Error ? retryErr.message : '';
+					// If retry also gets 409 (config already exists), redirect.
+					if (retryMsg.toLowerCase().includes('already exists')) {
+						onboardingData.reset();
+						goto('/login');
+						return;
+					}
 					// Retry also failed — show original error.
 				}
 			}
 			errorMsg = msg || 'Failed to create configuration';
+			trackFunnel('onboarding:error', { error: errorMsg, step: 'submit' });
 		} finally {
 			submitting = false;
 		}
 	}
 </script>
 
+{#if unsupportedMode}
+	<div class="onboarding">
+		<div class="onboarding-header">
+			<div class="logo">
+				<Zap size={20} strokeWidth={2.5} />
+				<span class="logo-text">Tuitbot</span>
+			</div>
+		</div>
+		<div class="onboarding-content">
+			<div class="unsupported-banner" role="alert">
+				<p>This deployment mode (<code>{unsupportedMode}</code>) is not supported for browser onboarding.</p>
+				<p>Use <code>tuitbot init</code> from the command line instead.</p>
+			</div>
+		</div>
+	</div>
+{:else}
 <div class="onboarding">
 	<div class="onboarding-header">
 		<div class="logo">
@@ -209,50 +380,68 @@
 	<div class="onboarding-content">
 		<div class="progress">
 			{#each steps as step, i}
-				<div class="progress-step" class:active={i === currentStep} class:completed={i < currentStep}>
-					<div class="progress-dot">
-						{#if i < currentStep}
-							<span class="check-mark">&#10003;</span>
-						{:else}
-							{i + 1}
-						{/if}
+				{#if step !== 'Analyze'}
+					{@const isSkipped = skippedSteps.has(step)}
+					<div
+						class="progress-step"
+						class:active={i === currentStep || (step === 'Profile' && isAnalyzeStep)}
+						class:completed={i < currentStep && !isSkipped}
+						class:skipped={isSkipped && i < currentStep}
+					>
+						<div class="progress-dot">
+							{#if isSkipped && i < currentStep}
+								<span class="skip-mark">&mdash;</span>
+							{:else if i < currentStep}
+								<span class="check-mark">&#10003;</span>
+							{:else}
+								{i + 1}
+							{/if}
+						</div>
+						<span class="progress-label">{step}</span>
 					</div>
-					<span class="progress-label">{step}</span>
-				</div>
-				{#if i < steps.length - 1}
-					<div class="progress-line" class:filled={i < currentStep}></div>
+					{#if i < steps.length - 1 && steps[i + 1] !== 'Analyze'}
+						<div class="progress-line" class:filled={i < currentStep}></div>
+					{/if}
 				{/if}
 			{/each}
 		</div>
 
 		<div class="step-content">
-			{#if currentStep === 0}
+			{#if currentStepName === 'Welcome'}
 				<WelcomeStep />
-			{:else if currentStep === 1}
+			{:else if currentStepName === 'X Access'}
 				<XApiStep />
-			{:else if currentStep === 2}
-				<BusinessStep />
-			{:else if currentStep === 3}
+			{:else if currentStepName === 'LLM'}
 				<LlmStep />
-			{:else if currentStep === 4}
+			{:else if currentStepName === 'Analyze'}
+				<ProfileAnalysisState oncomplete={next} />
+			{:else if currentStepName === 'Profile'}
+				<PrefillProfileForm />
+			{:else if currentStepName === 'Language'}
 				<LanguageBrandStep />
-			{:else if currentStep === 5}
+			{:else if currentStepName === 'Vault'}
 				<SourcesStep />
-			{:else if currentStep === 6}
-				<ValidationStep />
-			{:else if currentStep === 7}
-				<ReviewStep />
-			{:else if currentStep === 8 && showClaimStep}
+			{:else if currentStepName === 'Validate'}
+				<ValidationStep {hasLlmConfig} />
+			{:else if currentStepName === 'Review'}
+				<ReviewStep {skippedSteps} />
+			{:else if currentStepName === 'Secure'}
 				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} {alreadyClaimed} />
 			{/if}
 		</div>
 
 		{#if errorMsg}
-			<div class="error-banner" role="alert">{errorMsg}</div>
+			<div class="error-banner" role="alert">
+				<span>{errorMsg}</span>
+				<button type="button" class="error-retry-btn" onclick={submit} disabled={submitting}>
+					<RefreshCw size={14} />
+					Retry
+				</button>
+			</div>
 		{/if}
 
 		<div class="actions">
-			{#if currentStep > 0}
+			{#if currentStep > 0 && !isAnalyzeStep}
 				<button class="btn btn-secondary" onclick={back} disabled={submitting}>
 					<ArrowLeft size={16} />
 					Back
@@ -261,15 +450,29 @@
 				<div></div>
 			{/if}
 
-			{#if !isLastStep}
-				<button
-					class="btn btn-primary"
-					onclick={next}
-					disabled={!canAdvance()}
-				>
-					{currentStep === 0 ? 'Get Started' : 'Next'}
-					<ArrowRight size={16} />
-				</button>
+			{#if isAnalyzeStep}
+				<!-- Analyze step auto-advances; no button needed -->
+				<div></div>
+			{:else if !isLastStep}
+				<div class="action-group">
+					{#if canSkipToFinish && canAdvance()}
+						<button
+							class="btn btn-ghost"
+							onclick={skipToFinish}
+						>
+							Skip optional steps
+							<SkipForward size={14} />
+						</button>
+					{/if}
+					<button
+						class="btn btn-primary"
+						onclick={next}
+						disabled={!canAdvance()}
+					>
+						{currentStep === 0 ? 'Get Started' : 'Next'}
+						<ArrowRight size={16} />
+					</button>
+				</div>
 			{:else}
 				<button
 					class="btn btn-primary"
@@ -288,6 +491,7 @@
 		</div>
 	</div>
 </div>
+{/if}
 
 <style>
 	.onboarding {
@@ -367,8 +571,20 @@
 		color: white;
 	}
 
+	.progress-step.skipped .progress-dot {
+		background: var(--color-surface);
+		border-color: var(--color-border);
+		color: var(--color-text-subtle);
+		border-style: dashed;
+	}
+
 	.check-mark {
 		font-size: 14px;
+	}
+
+	.skip-mark {
+		font-size: 14px;
+		font-weight: 700;
 	}
 
 	.progress-label {
@@ -380,6 +596,11 @@
 	.progress-step.active .progress-label {
 		color: var(--color-text);
 		font-weight: 500;
+	}
+
+	.progress-step.skipped .progress-label {
+		color: var(--color-text-subtle);
+		font-style: italic;
 	}
 
 	.progress-line {
@@ -400,11 +621,66 @@
 	}
 
 	.error-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
 		padding: 12px 16px;
 		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 		border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
 		border-radius: 8px;
 		color: var(--color-danger);
+		font-size: 13px;
+	}
+
+	.error-retry-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 14px;
+		border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+		border-radius: 6px;
+		background: transparent;
+		color: var(--color-danger);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		white-space: nowrap;
+		transition: all 0.15s;
+	}
+
+	.error-retry-btn:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+	}
+
+	.error-retry-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.unsupported-banner {
+		padding: 24px;
+		background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+		border: 1px solid color-mix(in srgb, var(--color-warning) 25%, var(--color-border));
+		border-radius: 10px;
+		text-align: center;
+	}
+
+	.unsupported-banner p {
+		margin: 0 0 8px;
+		font-size: 14px;
+		color: var(--color-text-muted);
+		line-height: 1.5;
+	}
+
+	.unsupported-banner p:last-child {
+		margin-bottom: 0;
+	}
+
+	.unsupported-banner code {
+		background: var(--color-surface);
+		padding: 2px 6px;
+		border-radius: 4px;
 		font-size: 13px;
 	}
 
@@ -414,6 +690,12 @@
 		align-items: center;
 		padding-top: 16px;
 		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.action-group {
+		display: flex;
+		align-items: center;
+		gap: 12px;
 	}
 
 	.btn {
@@ -462,6 +744,18 @@
 	.btn-secondary:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
+	}
+
+	.btn-ghost {
+		background: transparent;
+		color: var(--color-text-muted);
+		padding: 10px 14px;
+		font-size: 13px;
+	}
+
+	.btn-ghost:hover:not(:disabled) {
+		color: var(--color-text);
+		background: var(--color-surface);
 	}
 
 	.spinner {

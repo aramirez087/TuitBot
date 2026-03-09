@@ -8,30 +8,30 @@
 	</div>
 	<h1 class="welcome-title">Welcome to Tuitbot</h1>
 	<p class="welcome-subtitle">
-		Your autonomous growth co-pilot for X (Twitter). Tuitbot discovers relevant
-		conversations, builds relationships, and grows your account organically.
+		Tuitbot finds relevant conversations on X, helps you craft replies,
+		and schedules your content &mdash; all from your machine.
 	</p>
 	<div class="welcome-features">
 		<div class="feature">
 			<span class="feature-dot"></span>
-			<span>Discover and reply to relevant conversations</span>
+			<span>Find and reply to conversations in your niche</span>
 		</div>
 		<div class="feature">
 			<span class="feature-dot"></span>
-			<span>Post educational tweets and weekly threads</span>
+			<span>Draft tweets and threads with AI assistance</span>
 		</div>
 		<div class="feature">
 			<span class="feature-dot"></span>
-			<span>Track analytics to optimize your strategy</span>
+			<span>Schedule and track your content calendar</span>
 		</div>
 		<div class="feature">
 			<span class="feature-dot"></span>
-			<span>All data stays on your machine</span>
+			<span>Runs locally &mdash; your data stays with you</span>
 		</div>
 	</div>
 	<p class="welcome-hint">
-		This setup takes about 3 minutes. You'll need your X API credentials and
-		an LLM API key.
+		You only need your X credentials to get started.
+		LLM and content sources can be added later.
 	</p>
 </div>
 
