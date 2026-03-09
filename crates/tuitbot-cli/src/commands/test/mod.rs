@@ -428,7 +428,25 @@ fn check_llm_config(config: &Config) -> CheckResult {
 
 /// Check database file status.
 fn check_database(config: &Config) -> CheckResult {
-    let db_path = expand_tilde(&config.storage.db_path);
+    let trimmed = config.storage.db_path.trim();
+    if trimmed.is_empty() {
+        return CheckResult::fail(
+            "Database",
+            "storage.db_path must not be empty or whitespace-only",
+        );
+    }
+
+    let db_path = expand_tilde(trimmed);
+
+    if db_path.is_dir() {
+        return CheckResult::fail(
+            "Database",
+            format!(
+                "storage.db_path '{}' is a directory, must point to a file",
+                trimmed
+            ),
+        );
+    }
 
     if db_path.exists() {
         match std::fs::metadata(&db_path) {

@@ -340,3 +340,46 @@ fn check_database_existing_reports_size() {
 
     let _ = std::fs::remove_file(&tmp);
 }
+
+#[test]
+fn check_database_empty_path_fails() {
+    let mut config = tuitbot_core::config::Config::default();
+    config.storage.db_path = String::new();
+
+    let result = check_database(&config);
+    assert!(!result.passed);
+    assert!(
+        result.message.contains("empty"),
+        "expected 'empty' in message, got: {}",
+        result.message
+    );
+}
+
+#[test]
+fn check_database_whitespace_only_path_fails() {
+    let mut config = tuitbot_core::config::Config::default();
+    config.storage.db_path = "   ".to_string();
+
+    let result = check_database(&config);
+    assert!(!result.passed);
+    assert!(
+        result.message.contains("empty"),
+        "expected 'empty' in message, got: {}",
+        result.message
+    );
+}
+
+#[test]
+fn check_database_directory_path_fails() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut config = tuitbot_core::config::Config::default();
+    config.storage.db_path = tmp.path().display().to_string();
+
+    let result = check_database(&config);
+    assert!(!result.passed);
+    assert!(
+        result.message.contains("directory"),
+        "expected 'directory' in message, got: {}",
+        result.message
+    );
+}

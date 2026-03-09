@@ -42,7 +42,28 @@ pub type DbPool = sqlx::SqlitePool;
 /// configures WAL mode for concurrent read/write performance, runs embedded
 /// migrations, and returns a connection pool.
 pub async fn init_db(db_path: &str) -> Result<DbPool, StorageError> {
-    let expanded = expand_tilde(db_path);
+    let trimmed = db_path.trim();
+    if trimmed.is_empty() {
+        return Err(StorageError::Connection {
+            source: sqlx::Error::Configuration(
+                "storage.db_path must not be empty or whitespace-only".into(),
+            ),
+        });
+    }
+
+    let expanded = expand_tilde(trimmed);
+
+    if std::path::Path::new(&expanded).is_dir() {
+        return Err(StorageError::Connection {
+            source: sqlx::Error::Configuration(
+                format!(
+                    "storage.db_path '{}' is a directory, must point to a file",
+                    trimmed
+                )
+                .into(),
+            ),
+        });
+    }
 
     // Create parent directories if needed
     if let Some(parent) = std::path::Path::new(&expanded).parent() {
