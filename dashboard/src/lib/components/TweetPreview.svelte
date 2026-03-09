@@ -1,5 +1,5 @@
 <script lang="ts">
-	import MediaCropPreview from './composer/MediaCropPreview.svelte';
+	import MediaCropPreview from "./composer/MediaCropPreview.svelte";
 
 	let {
 		text,
@@ -7,7 +7,8 @@
 		localPreviews,
 		index,
 		total,
-		handle = '@you'
+		handle = "@you",
+		avatarUrl = null,
 	}: {
 		text: string;
 		mediaPaths: string[];
@@ -15,16 +16,21 @@
 		index: number;
 		total: number;
 		handle?: string;
+		avatarUrl?: string | null;
 	} = $props();
 
-	const displayText = $derived(text.trim() || '');
+	const displayText = $derived(text.trim() || "");
 	const hasMedia = $derived(mediaPaths.length > 0);
 	const showConnector = $derived(index < total - 1);
 </script>
 
 <article class="tweet-preview" aria-label="Tweet {index + 1} of {total}">
 	<div class="preview-gutter">
-		<div class="avatar-placeholder" aria-hidden="true"></div>
+		{#if avatarUrl}
+			<img class="avatar-img" src={avatarUrl} alt="" aria-hidden="true" />
+		{:else}
+			<div class="avatar-placeholder" aria-hidden="true"></div>
+		{/if}
 		{#if showConnector}
 			<div class="thread-connector" aria-hidden="true"></div>
 		{/if}
@@ -60,13 +66,21 @@
 		width: 36px;
 	}
 
-	.avatar-placeholder {
+	.avatar-placeholder,
+	.avatar-img {
 		width: 36px;
 		height: 36px;
 		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.avatar-placeholder {
 		background: var(--color-surface-active);
 		border: 1px solid var(--color-border-subtle);
-		flex-shrink: 0;
+	}
+
+	.avatar-img {
+		object-fit: cover;
 	}
 
 	.thread-connector {
@@ -125,7 +139,8 @@
 			width: 28px;
 		}
 
-		.avatar-placeholder {
+		.avatar-placeholder,
+		.avatar-img {
 			width: 28px;
 			height: 28px;
 		}

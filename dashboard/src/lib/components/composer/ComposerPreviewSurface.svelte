@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { X } from 'lucide-svelte';
-	import { focusTrap } from '$lib/actions/focusTrap';
-	import TweetPreview from '../TweetPreview.svelte';
+	import { onMount } from "svelte";
+	import { X } from "lucide-svelte";
+	import { focusTrap } from "$lib/actions/focusTrap";
+	import TweetPreview from "../TweetPreview.svelte";
 
 	let {
 		mode,
@@ -11,23 +11,25 @@
 		tweetMediaPaths,
 		tweetLocalPreviews,
 		handle,
-		onclose
+		avatarUrl = null,
+		onclose,
 	}: {
-		mode: 'tweet' | 'thread';
+		mode: "tweet" | "thread";
 		tweetText: string;
 		blocks: Array<{ id: string; text: string; media_paths: string[] }>;
 		tweetMediaPaths: string[];
 		tweetLocalPreviews: Map<string, string>;
 		handle: string;
+		avatarUrl?: string | null;
 		onclose: () => void;
 	} = $props();
 
 	const hasTweetContent = $derived(
-		tweetText.trim().length > 0 || tweetMediaPaths.length > 0
+		tweetText.trim().length > 0 || tweetMediaPaths.length > 0,
 	);
 
 	const visibleBlocks = $derived(
-		blocks.filter((b) => b.text.trim().length > 0)
+		blocks.filter((b) => b.text.trim().length > 0),
 	);
 
 	let closeBtn: HTMLButtonElement | undefined = $state();
@@ -73,7 +75,7 @@
 			</button>
 		</header>
 		<div class="preview-scroll">
-			{#if mode === 'tweet'}
+			{#if mode === "tweet"}
 				{#if hasTweetContent}
 					<TweetPreview
 						text={tweetText}
@@ -82,24 +84,28 @@
 						index={0}
 						total={1}
 						{handle}
+						{avatarUrl}
 					/>
 				{:else}
-					<div class="preview-empty">Nothing to preview — start writing</div>
+					<div class="preview-empty">
+						Nothing to preview — start writing
+					</div>
 				{/if}
+			{:else if visibleBlocks.length > 0}
+				{#each visibleBlocks as block, i (block.id)}
+					<TweetPreview
+						text={block.text}
+						mediaPaths={block.media_paths}
+						index={i}
+						total={visibleBlocks.length}
+						{handle}
+						{avatarUrl}
+					/>
+				{/each}
 			{:else}
-				{#if visibleBlocks.length > 0}
-					{#each visibleBlocks as block, i (block.id)}
-						<TweetPreview
-							text={block.text}
-							mediaPaths={block.media_paths}
-							index={i}
-							total={visibleBlocks.length}
-							{handle}
-						/>
-					{/each}
-				{:else}
-					<div class="preview-empty">Nothing to preview — start writing</div>
-				{/if}
+				<div class="preview-empty">
+					Nothing to preview — start writing
+				</div>
 			{/if}
 		</div>
 	</div>

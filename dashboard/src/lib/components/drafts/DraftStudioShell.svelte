@@ -68,7 +68,23 @@
 
 	onMount(() => {
 		studio.initFromUrl($page.url);
-		studio.loadDrafts();
+
+		const isNewDraft = $page.url.searchParams.get("new") === "true";
+		const hasExplicitId = $page.url.searchParams.has("id");
+
+		studio.loadDrafts().then(() => {
+			// Auto-select the most recently modified draft if none specified
+			if (
+				!isNewDraft &&
+				!hasExplicitId &&
+				studio.getSelectedId() === null
+			) {
+				const active = studio.getActiveDrafts();
+				if (active.length > 0) {
+					studio.selectDraft(active[0].id);
+				}
+			}
+		});
 		studio.loadTags();
 
 		// Handle ?new=true param (from Cmd+N or external redirect)
@@ -474,8 +490,7 @@
 
 	<!-- Main Composer Area -->
 	<div class="composer-zone" bind:this={composerZoneEl}>
-		<!-- Composer header bar -->
-		<div class="composer-bar">
+		{#snippet headerLeftControls()}
 			<button
 				class="drafts-toggle-btn"
 				type="button"
@@ -492,27 +507,23 @@
 				{/if}
 			</button>
 
-			{#if studio.getSelectedId() !== null}
-				<DraftSyncBadge
-					status={syncStatus}
-					onresolveconflict={handleConflictResolution}
-				/>
-			{/if}
+			<button
+				class="bar-action"
+				type="button"
+				onclick={() => studio.createDraft()}
+				title="New draft"
+			>
+				<Plus size={14} />
+				<span>New</span>
+			</button>
+		{/snippet}
 
-			<div class="bar-spacer"></div>
-
-			{#if studio.getSelectedId() !== null}
-				<button
-					class="bar-action"
-					type="button"
-					onclick={() => studio.createDraft()}
-					title="New draft"
-				>
-					<Plus size={14} />
-					<span>New</span>
-				</button>
-			{/if}
-		</div>
+		<!-- Standalone bar only visible when no draft is actively loaded -->
+		{#if studio.getSelectedId() === null || (loadingDraft && !hydration)}
+			<div class="composer-bar">
+				{@render headerLeftControls()}
+			</div>
+		{/if}
 
 		{#if studio.getError()}
 			<div class="error-banner">
@@ -544,6 +555,7 @@
 						onsyncstatus={handleSyncStatus}
 						extraPaletteActions={draftStudioPaletteActions}
 						ondraftaction={handleDraftAction}
+						headerLeft={headerLeftControls}
 					/>
 				{/key}
 			{:else}
@@ -708,10 +720,6 @@
 		font-size: 10px;
 		font-weight: 700;
 		line-height: 1;
-	}
-
-	.bar-spacer {
-		flex: 1;
 	}
 
 	.bar-action {

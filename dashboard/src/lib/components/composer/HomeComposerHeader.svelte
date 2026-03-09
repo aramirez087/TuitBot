@@ -2,12 +2,12 @@
 	import {
 		Send,
 		Clock,
-		Eye,
-		EyeOff,
+		ScanEye,
 		PanelRight,
 		Search,
 		Loader2,
 	} from "lucide-svelte";
+	import type { Snippet } from "svelte";
 
 	let {
 		canSubmit,
@@ -21,6 +21,7 @@
 		displayName = null,
 		mode = "tweet",
 		blockCount = 1,
+		headerLeft,
 		onsubmit,
 		onpublishnow,
 		onschedule,
@@ -39,6 +40,7 @@
 		displayName?: string | null;
 		mode?: "tweet" | "thread";
 		blockCount?: number;
+		headerLeft?: Snippet;
 		onsubmit: () => void;
 		onpublishnow?: () => void;
 		onschedule?: () => void;
@@ -48,7 +50,13 @@
 	} = $props();
 </script>
 
-<header class="home-header">
+<header class="home-header" class:has-left={!!headerLeft}>
+	{#if headerLeft}
+		<div class="header-left">
+			{@render headerLeft()}
+		</div>
+	{/if}
+
 	<div class="header-right">
 		{#if selectedTime}
 			<div class="button-group">
@@ -121,9 +129,9 @@
 					: "Open preview (\u2318\u21E7P)"}
 			>
 				{#if previewVisible}
-					<Eye size={15} />
+					<ScanEye size={15} class="active-icon" />
 				{:else}
-					<EyeOff size={15} />
+					<ScanEye size={15} />
 				{/if}
 			</button>
 
@@ -163,6 +171,18 @@
 		flex-shrink: 0;
 		border-bottom: 1px solid
 			color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
+	}
+
+	.home-header.has-left {
+		justify-content: space-between;
+	}
+
+	.header-left {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+		flex-shrink: 1;
 	}
 
 	.header-right {
@@ -263,12 +283,8 @@
 		color: var(--color-text);
 	}
 
-	.icon-btn.active {
+	.icon-btn.active .active-icon {
 		color: var(--color-accent);
-	}
-
-	.icon-btn.active:hover {
-		color: var(--color-accent-hover);
 	}
 
 	:global(.spin-icon) {

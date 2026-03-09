@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy, flushSync } from "svelte";
+	import type { Snippet } from "svelte";
 	import {
 		api,
 		type ScheduleConfig,
@@ -60,6 +61,7 @@
 		onsyncstatus = undefined,
 		extraPaletteActions = [],
 		ondraftaction = undefined,
+		headerLeft = undefined,
 	}: {
 		schedule: ScheduleConfig | null;
 		onsubmit: (data: ComposeRequest) => void | Promise<void>;
@@ -81,6 +83,7 @@
 		) => void;
 		extraPaletteActions?: import("../CommandPalette.svelte").PaletteAction[];
 		ondraftaction?: (actionId: string) => void;
+		headerLeft?: Snippet;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
@@ -1207,6 +1210,7 @@
 			previewVisible={previewMode}
 			{mode}
 			blockCount={threadBlockCount}
+			{headerLeft}
 			onsubmit={handleSubmit}
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
@@ -1228,6 +1232,7 @@
 		handle={$currentAccount?.x_username
 			? `@${$currentAccount.x_username}`
 			: "@you"}
+		avatarUrl={$currentAccount?.x_avatar_url ?? null}
 		onclose={() => {
 			previewMode = false;
 		}}
