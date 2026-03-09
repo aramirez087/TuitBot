@@ -192,6 +192,8 @@ impl DiscoveryLoop {
         let mut all_results = Vec::new();
         let mut summary = DiscoverySummary::default();
         let mut total_processed = 0usize;
+        let mut last_error: Option<LoopError> = None;
+        let mut any_success = false;
 
         for keyword in &self.keywords {
             if let Some(max) = limit {
@@ -203,6 +205,7 @@ impl DiscoveryLoop {
             let remaining = limit.map(|max| max.saturating_sub(total_processed));
             match self.search_and_process(keyword, remaining).await {
                 Ok((results, iter_summary)) => {
+                    any_success = true;
                     summary.tweets_found += iter_summary.tweets_found;
                     summary.qualifying += iter_summary.qualifying;
                     summary.replied += iter_summary.replied;
@@ -213,7 +216,16 @@ impl DiscoveryLoop {
                 }
                 Err(e) => {
                     tracing::warn!(keyword = %keyword, error = %e, "Search failed for keyword");
+                    last_error = Some(e);
                 }
+            }
+        }
+
+        // If every keyword failed, surface the last error instead of
+        // reporting a misleading empty success.
+        if !any_success {
+            if let Some(err) = last_error {
+                return Err(err);
             }
         }
 

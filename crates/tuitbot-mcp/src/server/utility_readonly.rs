@@ -177,6 +177,17 @@ impl UtilityReadonlyMcpServer {
     /// Check utility profile health by verifying X client connectivity via get_me.
     #[tool]
     async fn health_check(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        if !self.state.x_available {
+            let result = serde_json::json!({
+                "status": "degraded",
+                "x_client": false,
+                "available_tools": ["get_config", "score_tweet"],
+                "message": "X API tokens not configured. Run `tuitbot auth` to authenticate. Config and scoring tools are available."
+            });
+            return Ok(CallToolResult::success(vec![Content::text(
+                result.to_string(),
+            )]));
+        }
         let r = toolkit::read::get_me(self.state.x_client.as_ref()).await;
         toolkit_error_to_result(r.map(|u| {
             serde_json::json!({

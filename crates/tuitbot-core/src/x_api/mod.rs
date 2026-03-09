@@ -8,6 +8,7 @@ pub mod auth;
 pub mod client;
 pub mod local_mode;
 pub mod media;
+pub mod null_client;
 pub mod scopes;
 pub mod tier;
 pub mod types;
@@ -15,6 +16,7 @@ pub mod types;
 pub use client::XApiHttpClient;
 pub use local_mode::session::ScraperSession;
 pub use local_mode::LocalModeXClient;
+pub use null_client::NullXApiClient;
 pub use types::*;
 
 use std::path::Path;

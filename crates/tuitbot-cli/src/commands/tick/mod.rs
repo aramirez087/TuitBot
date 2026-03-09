@@ -248,7 +248,7 @@ pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow:
     let is_composer = config.mode == OperatingMode::Composer;
 
     // --- Analytics (runs in both modes) ---
-    let analytics_outcome = run_analytics(&deps, &filter, &mut errors).await;
+    let analytics_outcome = run_analytics(&deps, &filter, config, &mut errors).await;
 
     // --- Discovery (dry_run in composer mode) ---
     let discovery_outcome = if is_composer {
@@ -265,7 +265,7 @@ pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow:
             reason: "disabled in composer mode".to_string(),
         }
     } else {
-        run_mentions(&deps, &filter, &mut errors).await
+        run_mentions(&deps, &filter, config, &mut errors).await
     };
 
     // --- Target (autopilot only) ---
@@ -274,7 +274,7 @@ pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow:
             reason: "disabled in composer mode".to_string(),
         }
     } else {
-        run_target(&deps, &filter, &mut errors).await
+        run_target(&deps, &filter, config, &mut errors).await
     };
 
     // --- Content (autopilot only) ---
@@ -347,6 +347,7 @@ pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow:
 async fn run_analytics(
     deps: &RuntimeDeps,
     filter: &LoopFilter,
+    config: &Config,
     errors: &mut Vec<LoopErrorJson>,
 ) -> LoopOutcome {
     if !filter.analytics {
@@ -356,9 +357,12 @@ async fn run_analytics(
     }
 
     if !deps.capabilities.mentions {
-        return LoopOutcome::Skipped {
-            reason: "requires Basic/Pro tier".to_string(),
+        let reason = if config.x_api.provider_backend == "scraper" {
+            "analytics not supported in scraper mode".to_string()
+        } else {
+            "requires Basic/Pro tier".to_string()
         };
+        return LoopOutcome::Skipped { reason };
     }
 
     let analytics_loop = AnalyticsLoop::new(
@@ -398,9 +402,12 @@ async fn run_discovery(
     }
 
     if !deps.capabilities.discovery {
-        return LoopOutcome::Skipped {
-            reason: "requires Basic/Pro tier".to_string(),
+        let reason = if config.x_api.provider_backend == "scraper" {
+            "search not supported in scraper mode".to_string()
+        } else {
+            "requires Basic/Pro tier".to_string()
         };
+        return LoopOutcome::Skipped { reason };
     }
 
     if deps.keywords.is_empty() {
@@ -446,6 +453,7 @@ async fn run_discovery(
 async fn run_mentions(
     deps: &RuntimeDeps,
     filter: &LoopFilter,
+    config: &Config,
     errors: &mut Vec<LoopErrorJson>,
 ) -> LoopOutcome {
     if !filter.mentions {
@@ -455,9 +463,12 @@ async fn run_mentions(
     }
 
     if !deps.capabilities.mentions {
-        return LoopOutcome::Skipped {
-            reason: "requires Basic/Pro tier".to_string(),
+        let reason = if config.x_api.provider_backend == "scraper" {
+            "mentions not supported in scraper mode".to_string()
+        } else {
+            "requires Basic/Pro tier".to_string()
         };
+        return LoopOutcome::Skipped { reason };
     }
 
     let mentions_loop = MentionsLoop::new(
@@ -507,6 +518,7 @@ async fn run_mentions(
 async fn run_target(
     deps: &RuntimeDeps,
     filter: &LoopFilter,
+    config: &Config,
     errors: &mut Vec<LoopErrorJson>,
 ) -> LoopOutcome {
     if !filter.target {
@@ -516,9 +528,12 @@ async fn run_target(
     }
 
     if !deps.capabilities.mentions {
-        return LoopOutcome::Skipped {
-            reason: "requires Basic/Pro tier".to_string(),
+        let reason = if config.x_api.provider_backend == "scraper" {
+            "target monitoring not supported in scraper mode".to_string()
+        } else {
+            "requires Basic/Pro tier".to_string()
         };
+        return LoopOutcome::Skipped { reason };
     }
 
     if deps.target_loop_config.accounts.is_empty() {

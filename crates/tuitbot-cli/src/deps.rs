@@ -253,15 +253,15 @@ impl RuntimeDeps {
             "Local mode X client created"
         );
 
-        // 3. Synthetic tier: Basic capabilities minus mentions.
-        let tier = ApiTier::Basic;
+        // 3. Synthetic tier: scraper has no search/discovery API access.
+        let tier = ApiTier::Free;
         let capabilities = TierCapabilities {
             mentions: false,
-            discovery: true,
+            discovery: false,
             posting: config.x_api.scraper_allow_mutations,
-            search: true,
+            search: false,
         };
-        tracing::info!(tier = %tier, "Scraper mode capabilities: discovery=true, mentions=false, posting={}", capabilities.posting);
+        tracing::info!(tier = %tier, "Scraper mode capabilities: discovery=false, search=false, mentions=false, posting={}", capabilities.posting);
 
         // 4. Initialize database.
         let pool = storage::init_db(&config.storage.db_path)

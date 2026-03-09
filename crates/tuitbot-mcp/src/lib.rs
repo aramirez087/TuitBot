@@ -30,7 +30,7 @@ use tuitbot_core::config::Config;
 use tuitbot_core::llm;
 use tuitbot_core::startup;
 use tuitbot_core::storage;
-use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
+use tuitbot_core::x_api::{NullXApiClient, XApiClient, XApiHttpClient};
 
 use server::{
     AdminMcpServer, ApiReadonlyMcpServer, ReadonlyMcpServer, UtilityReadonlyMcpServer,
@@ -194,41 +194,63 @@ async fn run_admin_server(config: Config) -> anyhow::Result<()> {
 // ── Shared init for read-only profiles ──────────────────────────────────
 
 /// Initialize shared readonly state: load tokens, create X client, verify get_me.
+///
+/// Gracefully degrades when tokens are missing, expired, or `get_me()` fails.
+/// Non-X tools (config, scoring) remain functional in degraded mode.
 async fn init_readonly_state(
     config: Config,
     profile: Profile,
 ) -> anyhow::Result<SharedReadonlyState> {
-    // Load X API tokens (required for readonly profiles)
-    let tokens = startup::load_tokens_from_file().map_err(|e| {
-        anyhow::anyhow!(
-            "{profile} profile requires X API tokens but they are not available: {e}. \
-             Run `tuitbot auth` to authenticate."
-        )
-    })?;
-
-    if tokens.is_expired() {
-        anyhow::bail!(
-            "{profile} profile requires valid X API tokens but they are expired. \
-             Run `tuitbot auth` to re-authenticate."
-        );
-    }
-
-    let client = XApiHttpClient::new(tokens.access_token);
-
-    // Verify connectivity and get authenticated user ID
-    let user = client.get_me().await.map_err(|e| {
-        anyhow::anyhow!(
-            "{profile} profile requires a working X API client but get_me() failed: {e}. \
-             Check your network connection or re-authenticate with `tuitbot auth`."
-        )
-    })?;
-
-    tracing::info!(
-        username = %user.username,
-        user_id = %user.id,
-        profile = %profile,
-        "X API client initialized ({profile} profile)"
-    );
+    let (x_client, authenticated_user_id, x_available): (Box<dyn XApiClient>, String, bool) =
+        match startup::load_tokens_from_file() {
+            Ok(tokens) if !tokens.is_expired() => {
+                let client = XApiHttpClient::new(tokens.access_token);
+                match client.get_me().await {
+                    Ok(user) => {
+                        tracing::info!(
+                            username = %user.username,
+                            user_id = %user.id,
+                            profile = %profile,
+                            "X API client initialized ({profile} profile)"
+                        );
+                        (Box::new(client) as Box<dyn XApiClient>, user.id, true)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "X API get_me() failed: {e}. X tools will return errors. \
+                             Non-X tools (get_config, score_tweet) are still available."
+                        );
+                        (
+                            Box::new(client) as Box<dyn XApiClient>,
+                            String::new(),
+                            false,
+                        )
+                    }
+                }
+            }
+            Ok(_) => {
+                tracing::warn!(
+                    "X API tokens expired for {profile} profile. X tools will be unavailable. \
+                     Run `tuitbot auth` to re-authenticate."
+                );
+                (
+                    Box::new(NullXApiClient) as Box<dyn XApiClient>,
+                    String::new(),
+                    false,
+                )
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "X API tokens not available for {profile} profile: {e}. \
+                     Non-X tools (get_config, score_tweet) are still available."
+                );
+                (
+                    Box::new(NullXApiClient) as Box<dyn XApiClient>,
+                    String::new(),
+                    false,
+                )
+            }
+        };
 
     // Log provider backend selection.
     let backend = provider::parse_backend(&config.x_api.provider_backend);
@@ -247,8 +269,9 @@ async fn init_readonly_state(
 
     Ok(Arc::new(ReadonlyState {
         config,
-        x_client: Box::new(client),
-        authenticated_user_id: user.id,
+        x_client,
+        authenticated_user_id,
+        x_available,
     }))
 }
 

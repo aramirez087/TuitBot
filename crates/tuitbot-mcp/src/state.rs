@@ -99,16 +99,18 @@ pub type SharedState = Arc<AppState>;
 
 /// Lightweight state for readonly / api-readonly profiles (no DB, no LLM).
 ///
-/// The X client is non-optional: a readonly profile with no X client has
-/// zero usable tools, so the server fails fast if tokens are missing.
+/// The X client is always present but may be a [`NullXApiClient`] when tokens
+/// are missing or expired. Check `x_available` to know whether X tools will work.
 /// No idempotency store — read-only profiles perform no mutations.
 pub struct ReadonlyState {
     /// Loaded configuration.
     pub config: Config,
-    /// X API client (required for readonly profiles).
+    /// X API client (may be a no-op `NullXApiClient` if tokens are unavailable).
     pub x_client: Box<dyn XApiClient>,
-    /// Authenticated user ID from X API (from get_me on startup).
+    /// Authenticated user ID from X API (empty if X client is unavailable).
     pub authenticated_user_id: String,
+    /// Whether the X API client is authenticated and functional.
+    pub x_available: bool,
 }
 
 /// Thread-safe reference to shared readonly-profile state.

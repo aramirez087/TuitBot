@@ -195,6 +195,17 @@ impl ReadonlyMcpServer {
     /// Check readonly profile health by verifying X client connectivity via get_me.
     #[tool]
     async fn health_check(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        if !self.state.x_available {
+            let result = serde_json::json!({
+                "status": "degraded",
+                "x_client": false,
+                "available_tools": ["get_config", "score_tweet"],
+                "message": "X API tokens not configured. Run `tuitbot auth` to authenticate. Config and scoring tools are available."
+            });
+            return Ok(CallToolResult::success(vec![Content::text(
+                result.to_string(),
+            )]));
+        }
         let provider = RetryingProvider::new(
             XApiProvider::new(self.state.x_client.as_ref()),
             RetryPolicy::default(),
