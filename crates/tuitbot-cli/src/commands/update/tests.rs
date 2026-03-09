@@ -60,6 +60,7 @@ fn parse_version_invalid_tag() {
     assert!(parse_version_from_tag("not-a-version").is_none());
     assert!(parse_version_from_tag("").is_none());
     assert!(parse_version_from_tag("tuitbot-cli-vgarbage").is_none());
+    assert!(parse_version_from_tag("tuitbot-server-v0.1.0").is_none());
 }
 
 // ---------------------------------------------------------------------------
@@ -518,6 +519,37 @@ fn latest_release_with_server_asset_picks_newest() {
 
     assert_eq!(version, Version::new(0, 1, 16));
     assert_eq!(release.tag_name, "tuitbot-cli-v0.1.16");
+}
+
+#[test]
+fn latest_release_with_server_asset_recognizes_server_tags() {
+    use super::version::latest_release_with_server_asset;
+
+    let releases = vec![
+        release_with_assets(
+            "tuitbot-cli-v0.1.26",
+            &[
+                "SHA256SUMS",
+                "tuitbot-server-x86_64-unknown-linux-gnu.tar.gz",
+            ],
+        ),
+        release_with_assets(
+            "tuitbot-server-v0.1.27",
+            &[
+                "SHA256SUMS",
+                "tuitbot-server-x86_64-unknown-linux-gnu.tar.gz",
+            ],
+        ),
+    ];
+
+    let (release, version) = latest_release_with_server_asset(
+        &releases,
+        "tuitbot-server-x86_64-unknown-linux-gnu.tar.gz",
+    )
+    .expect("should find a release");
+
+    assert_eq!(version, Version::new(0, 1, 27));
+    assert_eq!(release.tag_name, "tuitbot-server-v0.1.27");
 }
 
 #[test]

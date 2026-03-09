@@ -2,15 +2,31 @@ use semver::Version;
 
 use super::github::{has_update_assets, GitHubRelease};
 
+fn parse_version_with_prefixes(tag: &str, prefixes: &[&str]) -> Option<Version> {
+    for prefix in prefixes {
+        let candidate = if prefix.is_empty() {
+            tag
+        } else if let Some(stripped) = tag.strip_prefix(prefix) {
+            stripped
+        } else {
+            continue;
+        };
+
+        if let Ok(version) = Version::parse(candidate) {
+            return Some(version);
+        }
+    }
+
+    None
+}
+
 /// Extract a semver `Version` from a tag like `tuitbot-cli-v0.2.0`.
 pub(super) fn parse_version_from_tag(tag: &str) -> Option<Version> {
-    // Try stripping known prefixes
-    let version_str = tag
-        .strip_prefix("tuitbot-cli-v")
-        .or_else(|| tag.strip_prefix("v"))
-        .unwrap_or(tag);
+    parse_version_with_prefixes(tag, &["tuitbot-cli-v", "v", ""])
+}
 
-    Version::parse(version_str).ok()
+fn parse_server_release_version_from_tag(tag: &str) -> Option<Version> {
+    parse_version_with_prefixes(tag, &["tuitbot-server-v", "tuitbot-cli-v", "v", ""])
 }
 
 /// Returns true if `latest` is strictly newer than `current`.
@@ -57,6 +73,6 @@ pub(super) fn latest_release_with_server_asset<'a>(
         .iter()
         .filter(|r| !r.draft && !r.prerelease)
         .filter(|r| has_update_assets(r, server_asset_name))
-        .filter_map(|r| parse_version_from_tag(&r.tag_name).map(|v| (r, v)))
+        .filter_map(|r| parse_server_release_version_from_tag(&r.tag_name).map(|v| (r, v)))
         .max_by(|(_, a), (_, b)| a.cmp(b))
 }

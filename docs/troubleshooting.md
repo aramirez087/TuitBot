@@ -6,7 +6,12 @@ Expected when the commit is not a merged release PR and no publishable delta exi
 
 ## Build/publish asset jobs are skipped
 
-These jobs run only when `tuitbot-cli` was released in that run.
+These jobs run only when the workflow can resolve an asset-bearing release target:
+
+- a `tuitbot-cli` release from `release-plz`
+- a `tuitbot-server` release from `release-plz`
+- or an explicit `release_tag` input on a manual run
+- or a tagged release commit recoverable from the current merge commit during a rerun/backfill
 
 ## crates.io publish fails with email verification error
 

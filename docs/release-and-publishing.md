@@ -4,9 +4,10 @@
 
 Workflow: `.github/workflows/release.yml`
 
-1. Every push to `main` runs release jobs.
-2. `release-plz release-pr` maintains/updates release PRs.
-3. Merging release PR publishes crates and creates release tags.
+1. Every push to `main` updates the release PR via `release-plz release-pr`.
+2. A manual run of `.github/workflows/release.yml` on `main` publishes crates and creates release tags.
+3. Manual runs also accept an optional `release_tag` input so you can backfill assets for an existing `tuitbot-cli-v...` or `tuitbot-server-v...` tag.
+4. If no `release_tag` input is provided, a rerun on the release PR merge commit can still recover the tagged release from the merge parents and backfill missing assets.
 
 ## Tags
 
@@ -16,16 +17,18 @@ Workflow: `.github/workflows/release.yml`
 
 ## GitHub releases and binary assets
 
-CLI releases produce GitHub release assets for both `tuitbot` and `tuitbot-server`:
+Releases that include `tuitbot-cli` or `tuitbot-server` publish GitHub release assets:
 
 | Binary | Platforms |
 |--------|-----------|
 | `tuitbot` (CLI) | linux x86_64, macOS Intel, macOS Apple Silicon, windows x86_64 |
 | `tuitbot-server` | linux x86_64, macOS Intel, macOS Apple Silicon, windows x86_64 |
 
-Each release also includes a `SHA256SUMS` checksum manifest covering all archives.
+When both packages are released together, assets are attached to the CLI release tag. When only `tuitbot-server` is released, the workflow creates or reuses the server release tag for asset uploads.
 
-`tuitbot update` uses these assets to self-update the CLI and, if `tuitbot-server` is found on `PATH`, updates it from the same release.
+Each asset-publishing release also includes a `SHA256SUMS` checksum manifest covering all archives.
+
+`tuitbot update` uses the CLI-tagged assets to self-update the CLI and, if `tuitbot-server` is found on `PATH`, updates it from the best release that ships a server binary for the current platform.
 
 ## Required repository secrets
 

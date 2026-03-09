@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing CLI or server release tag to backfill assets for
+        required: false
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,7 +24,8 @@ jobs:
       contents: write
     outputs:
       releases_created: ${{ steps.release-plz.outputs.releases_created }}
-      cli_released: ${{ steps.release-meta.outputs.cli_released || 'false' }}
+      asset_release_ready: ${{ steps.release-meta.outputs.asset_release_ready || 'false' }}
+      release_package: ${{ steps.release-meta.outputs.package }}
       release_tag: ${{ steps.release-meta.outputs.tag }}
       release_version: ${{ steps.release-meta.outputs.version }}
     steps:
@@ -55,22 +61,93 @@ jobs:
 
       - name: Resolve released tag metadata
         id: release-meta
-        if: steps.release-plz.outputs.releases_created == 'true'
         env:
-          RELEASES_JSON: ${{ steps.release-plz.outputs.releases }}
+          RELEASES_JSON: ${{ steps.release-plz.outputs.releases || '[]' }}
+          GITHUB_SHA: ${{ github.sha }}
+          BACKFILL_RELEASE_TAG: ${{ inputs.release_tag || '' }}
         run: |
           set -euo pipefail
-          tag="$(echo "$RELEASES_JSON" | jq -r '.[] | select(.package_name == "tuitbot-cli") | .tag' | head -n1)"
-          version="$(echo "$RELEASES_JSON" | jq -r '.[] | select(.package_name == "tuitbot-cli") | .version' | head -n1)"
+          package=""
+          tag=""
+          version=""
+          selected_release=""
 
-          if [ -z "$tag" ] || [ "$tag" = "null" ] || [ -z "$version" ] || [ "$version" = "null" ]; then
-            echo "No tuitbot-cli release in this run; skipping CLI asset publication."
+          if [ -n "$BACKFILL_RELEASE_TAG" ]; then
+            case "$BACKFILL_RELEASE_TAG" in
+              tuitbot-cli-v*)
+                package="tuitbot-cli"
+                tag="$BACKFILL_RELEASE_TAG"
+                version="${BACKFILL_RELEASE_TAG#tuitbot-cli-v}"
+                ;;
+              tuitbot-server-v*)
+                package="tuitbot-server"
+                tag="$BACKFILL_RELEASE_TAG"
+                version="${BACKFILL_RELEASE_TAG#tuitbot-server-v}"
+                ;;
+              *)
+                echo "::error::Unsupported backfill release tag: $BACKFILL_RELEASE_TAG"
+                exit 1
+                ;;
+            esac
+            echo "Using workflow_dispatch backfill tag $tag."
+          else
+            selected_release="$(echo "$RELEASES_JSON" | jq -r '
+              map(select(.package_name == "tuitbot-cli" or .package_name == "tuitbot-server"))
+              | sort_by(if .package_name == "tuitbot-cli" then 0 else 1 end)
+              | .[0]?
+              | if . == null then empty else "\(.package_name)\t\(.tag)\t\(.version)" end
+            ')"
+          fi
+
+          if [ -n "$selected_release" ]; then
+            IFS=$'\t' read -r package tag version <<< "$selected_release"
+            echo "Using release-plz metadata for $package ($tag)."
+          elif [ -z "$tag" ]; then
+            echo "No asset-bearing release reported by release-plz; checking tagged merge parents for a rerun/backfill target."
+            parents="$(git rev-list --parents -n 1 "$GITHUB_SHA" | cut -d' ' -f2-)"
+            asset_tags="$(
+              {
+                git tag --points-at "$GITHUB_SHA"
+                for commit in $parents; do
+                  git tag --points-at "$commit"
+                done
+              } | sort -u | grep -E '^(tuitbot-cli|tuitbot-server)-v' || true
+            )"
+
+            while IFS= read -r candidate; do
+              case "$candidate" in
+                tuitbot-cli-v*)
+                  package="tuitbot-cli"
+                  tag="$candidate"
+                  version="${candidate#tuitbot-cli-v}"
+                  break
+                  ;;
+              esac
+            done <<< "$asset_tags"
+
+            if [ -z "$tag" ]; then
+              while IFS= read -r candidate; do
+                case "$candidate" in
+                  tuitbot-server-v*)
+                    package="tuitbot-server"
+                    tag="$candidate"
+                    version="${candidate#tuitbot-server-v}"
+                    break
+                    ;;
+                esac
+              done <<< "$asset_tags"
+            fi
+          fi
+
+          if [ -z "$tag" ] || [ -z "$version" ]; then
+            echo "No tuitbot-cli or tuitbot-server release found for asset publication."
             echo "release-plz output: $RELEASES_JSON"
-            echo "cli_released=false" >> "$GITHUB_OUTPUT"
+            echo "asset_release_ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "cli_released=true" >> "$GITHUB_OUTPUT"
+          echo "asset_release_ready=true" >> "$GITHUB_OUTPUT"
+          echo "package=$package" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -116,7 +193,7 @@ jobs:
   build-assets:
     name: Build release asset (${{ matrix.target }})
     needs: release
-    if: github.event_name == 'workflow_dispatch' && needs.release.outputs.cli_released == 'true'
+    if: github.event_name == 'workflow_dispatch' && needs.release.outputs.asset_release_ready == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -142,7 +219,7 @@ jobs:
       - name: Checkout release commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.release.outputs.release_tag }}
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -277,7 +354,7 @@ jobs:
     needs:
       - release
       - build-assets
-    if: ${{ !cancelled() && needs.release.outputs.cli_released == 'true' }}
+    if: ${{ !cancelled() && needs.release.outputs.asset_release_ready == 'true' }}
     permissions:
       contents: write
     steps:
@@ -333,6 +410,23 @@ jobs:
           set -euo pipefail
           cd dist
           sha256sum tuitbot-* > SHA256SUMS
+
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "GitHub release already exists for $TAG."
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "$TAG" \
+              --notes "Automated release asset publication." \
+              --repo "$GH_REPO"
+          fi
 
       - name: Upload assets to GitHub release
         env:
