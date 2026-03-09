@@ -60,8 +60,17 @@
 	aria-label="Post preview"
 	use:focusTrap
 >
-	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-	<div class="preview-backdrop" onclick={handleBackdropClick}></div>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="preview-backdrop"
+		role="button"
+		tabindex="-1"
+		onclick={handleBackdropClick}
+		onkeydown={(e) => {
+			if (e.key === "Enter" || e.key === " ")
+				handleBackdropClick(e as any);
+		}}
+	></div>
 	<div class="preview-container">
 		<header class="preview-header">
 			<h2 class="preview-title">Preview</h2>

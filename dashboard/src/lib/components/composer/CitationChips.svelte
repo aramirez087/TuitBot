@@ -1,13 +1,19 @@
 <script lang="ts">
-	import type { VaultCitation } from '$lib/api/types';
-	import { X, FileText, ChevronDown, ChevronUp, ExternalLink } from 'lucide-svelte';
-	import { buildObsidianUri, openExternalUrl } from '$lib/utils/obsidianUri';
+	import type { VaultCitation } from "$lib/api/types";
+	import {
+		X,
+		FileText,
+		ChevronDown,
+		ChevronUp,
+		ExternalLink,
+	} from "lucide-svelte";
+	import { buildObsidianUri, openExternalUrl } from "$lib/utils/obsidianUri";
 
 	let {
 		citations,
 		onremove,
 		vaultPath = null,
-		isDesktop = false
+		isDesktop = false,
 	}: {
 		citations: VaultCitation[];
 		onremove?: (chunkId: number) => void;
@@ -22,15 +28,16 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent, chunkId: number) {
-		if (e.key === 'Enter' || e.key === ' ') {
+		if (e.key === "Enter" || e.key === " ") {
 			e.preventDefault();
 			toggleExpand(chunkId);
 		}
 	}
 
 	function chipLabel(c: VaultCitation): string {
-		const title = c.source_title || c.source_path.split('/').pop() || 'Note';
-		const heading = c.heading_path.split(' > ').pop() || '';
+		const title =
+			c.source_title || c.source_path.split("/").pop() || "Note";
+		const heading = c.heading_path.split(" > ").pop() || "";
 		return heading && heading !== title ? `${title} › ${heading}` : title;
 	}
 
@@ -73,7 +80,8 @@
 							{#if obsidianUriFor(cit)}
 								<button
 									class="chip-action chip-open"
-									onclick={(e) => handleOpenInObsidian(e, cit)}
+									onclick={(e) =>
+										handleOpenInObsidian(e, cit)}
 									aria-label="Open in Obsidian"
 									title="Open in Obsidian"
 								>
@@ -84,7 +92,9 @@
 								<button
 									class="chip-action chip-remove"
 									onclick={() => onremove?.(cit.chunk_id)}
-									aria-label="Remove citation from {chipLabel(cit)}"
+									aria-label="Remove citation from {chipLabel(
+										cit,
+									)}"
 								>
 									<X size={10} />
 								</button>
@@ -93,7 +103,9 @@
 					{/if}
 					{#if expandedId === cit.chunk_id}
 						<div class="chip-detail">
-							<div class="chip-detail-path">{cit.heading_path}</div>
+							<div class="chip-detail-path">
+								{cit.heading_path}
+							</div>
 							<div class="chip-detail-snippet">{cit.snippet}</div>
 						</div>
 					{/if}
@@ -112,7 +124,8 @@
 		padding: 6px 8px;
 		border-radius: 6px;
 		background: color-mix(in srgb, var(--color-accent) 5%, transparent);
-		border: 1px solid color-mix(in srgb, var(--color-accent) 12%, transparent);
+		border: 1px solid
+			color-mix(in srgb, var(--color-accent) 12%, transparent);
 	}
 
 	.citation-label {
@@ -161,7 +174,8 @@
 		align-items: center;
 		gap: 4px;
 		padding: 2px 6px;
-		border: 1px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
+		border: 1px solid
+			color-mix(in srgb, var(--color-accent) 20%, transparent);
 		border-radius: 4px;
 		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 		color: var(--color-text-muted);
@@ -235,8 +249,11 @@
 		font-style: italic;
 		overflow: hidden;
 		display: -webkit-box;
+		display: box;
 		-webkit-line-clamp: 3;
+		line-clamp: 3;
 		-webkit-box-orient: vertical;
+		box-orient: vertical;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

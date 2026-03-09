@@ -129,7 +129,7 @@
 					: "Open preview (\u2318\u21E7P)"}
 			>
 				{#if previewVisible}
-					<ScanEye size={15} class="active-icon" />
+					<ScanEye size={15} />
 				{:else}
 					<ScanEye size={15} />
 				{/if}
@@ -283,8 +283,12 @@
 		color: var(--color-text);
 	}
 
-	.icon-btn.active .active-icon {
+	.icon-btn.active {
 		color: var(--color-accent);
+	}
+
+	.icon-btn.active:hover {
+		color: var(--color-accent-hover);
 	}
 
 	:global(.spin-icon) {

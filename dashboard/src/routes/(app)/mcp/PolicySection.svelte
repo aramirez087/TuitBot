@@ -9,19 +9,27 @@
 		Layers,
 		ChevronDown,
 		ChevronUp,
-		Power
-	} from 'lucide-svelte';
-	import { policy, updatePolicy, templates, loadTemplates, applyTemplate } from '$lib/stores/mcp';
-	import type { McpPolicyRule, McpPolicyTemplate } from '$lib/api';
+		Power,
+	} from "lucide-svelte";
+	import {
+		policy,
+		updatePolicy,
+		templates,
+		loadTemplates,
+		applyTemplate,
+	} from "$lib/stores/mcp";
+	import type { McpPolicyRule, McpPolicyTemplate } from "$lib/api";
 
-	let confirmDialog = $state<{ action: string; message: string; onConfirm: () => void } | null>(
-		null
-	);
+	let confirmDialog = $state<{
+		action: string;
+		message: string;
+		onConfirm: () => void;
+	} | null>(null);
 	let pendingUpdate = $state(false);
 	let expandedRule = $state<string | null>(null);
 	let templateLoading = $state(false);
 
-	import { onMount } from 'svelte';
+	import { onMount } from "svelte";
 	onMount(() => {
 		loadTemplates();
 	});
@@ -41,13 +49,13 @@
 
 		if (!newValue) {
 			confirmDialog = {
-				action: 'Disable Policy Enforcement',
+				action: "Disable Policy Enforcement",
 				message:
-					'This will allow all MCP mutations without policy checks. Mutations will not be rate-limited, blocked, or routed to approval.',
+					"This will allow all MCP mutations without policy checks. Mutations will not be rate-limited, blocked, or routed to approval.",
 				onConfirm: async () => {
 					confirmDialog = null;
 					await doUpdate({ enforce_for_mutations: false });
-				}
+				},
 			};
 			return;
 		}
@@ -65,45 +73,47 @@
 		await doUpdate({ blocked_tools: updated });
 	}
 
-	let newBlockedTool = $state('');
+	let newBlockedTool = $state("");
 	async function addBlockedTool() {
 		if (!$policy || !newBlockedTool.trim()) return;
 		const tool = newBlockedTool.trim();
 		if ($policy.blocked_tools.includes(tool)) return;
 		const updated = [...$policy.blocked_tools, tool];
-		newBlockedTool = '';
+		newBlockedTool = "";
 		await doUpdate({ blocked_tools: updated });
 	}
 
 	async function removeApprovalTool(tool: string) {
 		if (!$policy) return;
 		confirmDialog = {
-			action: 'Remove Approval Requirement',
+			action: "Remove Approval Requirement",
 			message: `"${tool}" will no longer require approval before execution. It will execute immediately when called by MCP agents.`,
 			onConfirm: async () => {
 				confirmDialog = null;
-				const updated = $policy!.require_approval_for.filter((t) => t !== tool);
+				const updated = $policy!.require_approval_for.filter(
+					(t) => t !== tool,
+				);
 				await doUpdate({ require_approval_for: updated });
-			}
+			},
 		};
 	}
 
-	let newApprovalTool = $state('');
+	let newApprovalTool = $state("");
 	async function addApprovalTool() {
 		if (!$policy || !newApprovalTool.trim()) return;
 		const tool = newApprovalTool.trim();
 		if ($policy.require_approval_for.includes(tool)) return;
 		const updated = [...$policy.require_approval_for, tool];
-		newApprovalTool = '';
+		newApprovalTool = "";
 		await doUpdate({ require_approval_for: updated });
 	}
 
 	async function handleApplyTemplate(name: string) {
-		if (name === 'growth_aggressive') {
+		if (name === "growth_aggressive") {
 			confirmDialog = {
-				action: 'Apply Growth Aggressive Template',
+				action: "Apply Growth Aggressive Template",
 				message:
-					'This template allows most mutations without approval and raises rate limits significantly. Only use for established accounts.',
+					"This template allows most mutations without approval and raises rate limits significantly. Only use for established accounts.",
 				onConfirm: async () => {
 					confirmDialog = null;
 					templateLoading = true;
@@ -112,7 +122,7 @@
 					} finally {
 						templateLoading = false;
 					}
-				}
+				},
 			};
 			return;
 		}
@@ -127,27 +137,27 @@
 	async function toggleRule(rule: McpPolicyRule) {
 		if (!$policy) return;
 		const updated = $policy.rules.map((r) =>
-			r.id === rule.id ? { ...r, enabled: !r.enabled } : r
+			r.id === rule.id ? { ...r, enabled: !r.enabled } : r,
 		);
 		await doUpdate({ rules: updated });
 	}
 
-	function actionLabel(action: McpPolicyRule['action']): string {
-		if (typeof action === 'string') return action;
-		if (action.type === 'allow') return 'Allow';
-		if (action.type === 'deny') return 'Deny';
-		if (action.type === 'require_approval') return 'Require Approval';
-		if (action.type === 'dry_run') return 'Dry Run';
+	function actionLabel(action: McpPolicyRule["action"]): string {
+		if (typeof action === "string") return action;
+		if (action.type === "allow") return "Allow";
+		if (action.type === "deny") return "Deny";
+		if (action.type === "require_approval") return "Require Approval";
+		if (action.type === "dry_run") return "Dry Run";
 		return String(action.type);
 	}
 
-	function actionClass(action: McpPolicyRule['action']): string {
-		if (typeof action === 'string') return action;
-		if (action.type === 'allow') return 'allow';
-		if (action.type === 'deny') return 'deny';
-		if (action.type === 'require_approval') return 'approval';
-		if (action.type === 'dry_run') return 'dry-run';
-		return '';
+	function actionClass(action: McpPolicyRule["action"]): string {
+		if (typeof action === "string") return action;
+		if (action.type === "allow") return "allow";
+		if (action.type === "deny") return "deny";
+		if (action.type === "require_approval") return "approval";
+		if (action.type === "dry_run") return "dry-run";
+		return "";
 	}
 </script>
 
@@ -158,7 +168,9 @@
 			<Layers size={16} />
 			Policy Template
 		</h2>
-		<span class="section-hint">Select a pre-built policy profile as a baseline.</span>
+		<span class="section-hint"
+			>Select a pre-built policy profile as a baseline.</span
+		>
 		{#if $policy.template}
 			<div class="current-template">
 				Active: <strong>{$policy.template}</strong>
@@ -172,7 +184,9 @@
 					disabled={templateLoading}
 					onclick={() => handleApplyTemplate(tpl.name)}
 				>
-					<div class="template-name">{tpl.name.replace(/_/g, ' ')}</div>
+					<div class="template-name">
+						{tpl.name.replace(/_/g, " ")}
+					</div>
 					<div class="template-desc">{tpl.description}</div>
 					<div class="template-meta">
 						{tpl.rules.length} rules, {tpl.rate_limits.length} rate limits
@@ -210,9 +224,12 @@
 				</div>
 				<span class="policy-hint">
 					{#if $policy.enforce_for_mutations}
-						Mutations are checked against rate limits, block lists, and approval requirements.
+						Mutations are checked against rate limits, block lists,
+						and approval requirements.
 					{:else}
-						<span class="warning-text">All mutations execute without policy checks.</span>
+						<span class="warning-text"
+							>All mutations execute without policy checks.</span
+						>
 					{/if}
 				</span>
 			</div>
@@ -227,7 +244,11 @@
 						disabled={pendingUpdate}
 					>
 						<FlaskConical size={14} />
-						<span>{$policy.dry_run_mutations ? 'Active' : 'Off'}</span>
+						<span
+							>{$policy.dry_run_mutations
+								? "Active"
+								: "Off"}</span
+						>
 					</button>
 				</div>
 				<span class="policy-hint">
@@ -243,15 +264,25 @@
 				<div class="policy-header">
 					<span class="policy-label">Rate Limit</span>
 					<span class="rate-badge">
-						{$policy.rate_limit.used} / {$policy.rate_limit.max} per hour
+						{$policy.rate_limit.used} / {$policy.rate_limit.max} per
+						hour
 					</span>
 				</div>
 				<div class="rate-bar">
 					<div
 						class="rate-fill"
-						class:warning={$policy.rate_limit.used / $policy.rate_limit.max > 0.75}
-						class:danger={$policy.rate_limit.used / $policy.rate_limit.max > 0.9}
-						style="width: {Math.min(($policy.rate_limit.used / Math.max($policy.rate_limit.max, 1)) * 100, 100)}%"
+						class:warning={$policy.rate_limit.used /
+							$policy.rate_limit.max >
+							0.75}
+						class:danger={$policy.rate_limit.used /
+							$policy.rate_limit.max >
+							0.9}
+						style="width: {Math.min(
+							($policy.rate_limit.used /
+								Math.max($policy.rate_limit.max, 1)) *
+								100,
+							100,
+						)}%"
 					></div>
 				</div>
 			</div>
@@ -259,13 +290,17 @@
 			<div class="policy-item">
 				<div class="policy-header">
 					<span class="policy-label">Operating Mode</span>
-					<span class="mode-badge" class:composer={$policy.mode === 'composer'}>
+					<span
+						class="mode-badge"
+						class:composer={$policy.mode === "composer"}
+					>
 						{$policy.mode}
 					</span>
 				</div>
 				<span class="policy-hint">
-					{#if $policy.mode === 'composer'}
-						Read-only + posting queue. All mutations route to approval.
+					{#if $policy.mode === "composer"}
+						Read-only + posting queue. All mutations route to
+						approval.
 					{:else}
 						Full automation with policy-based gating.
 					{/if}
@@ -281,15 +316,24 @@
 				<ListChecks size={16} />
 				Policy Rules
 			</h2>
-			<span class="section-hint">Rules are evaluated by priority (lowest first). First match wins.</span>
+			<span class="section-hint"
+				>Rules are evaluated by priority (lowest first). First match
+				wins.</span
+			>
 			<div class="rule-list">
 				{#each $policy.rules as rule}
 					<div class="rule-item" class:disabled={!rule.enabled}>
 						<div class="rule-header">
 							<div class="rule-info">
-								<span class="rule-priority">P{rule.priority}</span>
+								<span class="rule-priority"
+									>P{rule.priority}</span
+								>
 								<span class="rule-label">{rule.label}</span>
-								<span class="policy-badge {actionClass(rule.action)}">
+								<span
+									class="policy-badge {actionClass(
+										rule.action,
+									)}"
+								>
 									{actionLabel(rule.action)}
 								</span>
 							</div>
@@ -304,7 +348,11 @@
 								</button>
 								<button
 									class="expand-btn"
-									onclick={() => (expandedRule = expandedRule === rule.id ? null : rule.id)}
+									onclick={() =>
+										(expandedRule =
+											expandedRule === rule.id
+												? null
+												: rule.id)}
 								>
 									{#if expandedRule === rule.id}
 										<ChevronUp size={14} />
@@ -323,19 +371,33 @@
 								{#if rule.conditions.tools && rule.conditions.tools.length > 0}
 									<div class="detail-row">
 										<span class="detail-label">Tools:</span>
-										<span>{rule.conditions.tools.join(', ')}</span>
+										<span
+											>{rule.conditions.tools.join(
+												", ",
+											)}</span
+										>
 									</div>
 								{/if}
 								{#if rule.conditions.categories && rule.conditions.categories.length > 0}
 									<div class="detail-row">
-										<span class="detail-label">Categories:</span>
-										<span>{rule.conditions.categories.join(', ')}</span>
+										<span class="detail-label"
+											>Categories:</span
+										>
+										<span
+											>{rule.conditions.categories.join(
+												", ",
+											)}</span
+										>
 									</div>
 								{/if}
 								{#if rule.conditions.modes && rule.conditions.modes.length > 0}
 									<div class="detail-row">
 										<span class="detail-label">Modes:</span>
-										<span>{rule.conditions.modes.join(', ')}</span>
+										<span
+											>{rule.conditions.modes.join(
+												", ",
+											)}</span
+										>
 									</div>
 								{/if}
 							</div>
@@ -352,15 +414,26 @@
 			<ListChecks size={16} />
 			Approval Requirements
 		</h2>
-		<span class="section-hint">Tools listed here must be approved before execution.</span>
+		<span class="section-hint"
+			>Tools listed here must be approved before execution.</span
+		>
 		<div class="tag-list">
 			{#each $policy.require_approval_for as tool}
 				<span class="tag">
 					{tool}
-					<button class="tag-remove" onclick={() => removeApprovalTool(tool)}>×</button>
+					<button
+						class="tag-remove"
+						onclick={() => removeApprovalTool(tool)}>×</button
+					>
 				</span>
 			{/each}
-			<form class="tag-input-form" onsubmit={(e) => { e.preventDefault(); addApprovalTool(); }}>
+			<form
+				class="tag-input-form"
+				onsubmit={(e) => {
+					e.preventDefault();
+					addApprovalTool();
+				}}
+			>
 				<input
 					type="text"
 					class="tag-input"
@@ -377,18 +450,29 @@
 			<Ban size={16} />
 			Blocked Tools
 		</h2>
-		<span class="section-hint">These tools are completely blocked from execution.</span>
+		<span class="section-hint"
+			>These tools are completely blocked from execution.</span
+		>
 		<div class="tag-list">
 			{#each $policy.blocked_tools as tool}
 				<span class="tag danger">
 					{tool}
-					<button class="tag-remove" onclick={() => removeBlockedTool(tool)}>×</button>
+					<button
+						class="tag-remove"
+						onclick={() => removeBlockedTool(tool)}>×</button
+					>
 				</span>
 			{/each}
 			{#if $policy.blocked_tools.length === 0}
 				<span class="empty-hint">No tools blocked</span>
 			{/if}
-			<form class="tag-input-form" onsubmit={(e) => { e.preventDefault(); addBlockedTool(); }}>
+			<form
+				class="tag-input-form"
+				onsubmit={(e) => {
+					e.preventDefault();
+					addBlockedTool();
+				}}
+			>
 				<input
 					type="text"
 					class="tag-input"
@@ -402,15 +486,35 @@
 
 <!-- Confirm Dialog -->
 {#if confirmDialog}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="dialog-overlay" onclick={() => (confirmDialog = null)}>
-		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-		<div class="dialog" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="dialog-overlay"
+		role="button"
+		tabindex="-1"
+		onclick={() => (confirmDialog = null)}
+		onkeydown={(e) => {
+			if (e.key === "Escape") confirmDialog = null;
+		}}
+	>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="dialog"
+			role="dialog"
+			aria-modal="true"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
+		>
 			<h3>{confirmDialog.action}</h3>
 			<p>{confirmDialog.message}</p>
 			<div class="dialog-actions">
-				<button class="btn-cancel" onclick={() => (confirmDialog = null)}>Cancel</button>
-				<button class="btn-confirm" onclick={confirmDialog.onConfirm}>Confirm</button>
+				<button
+					class="btn-cancel"
+					onclick={() => (confirmDialog = null)}>Cancel</button
+				>
+				<button class="btn-confirm" onclick={confirmDialog.onConfirm}
+					>Confirm</button
+				>
 			</div>
 		</div>
 	</div>
