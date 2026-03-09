@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.29](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.28...tuitbot-cli-v0.1.29) - 2026-03-09
+
+### Added
+
+- Implement database path validation and add SQLite magic header checks for backup files.
+
+### Other
+
+- use temporary directory for database path in `check_database_directory_path_fails` test.
+
 ## [0.1.28](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.27...tuitbot-cli-v0.1.28) - 2026-03-09
 
 ### Added
