@@ -320,6 +320,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/onboarding/x-auth/status",
             get(routes::onboarding::onboarding_auth_status),
         )
+        .route(
+            "/onboarding/analyze-profile",
+            post(routes::onboarding::analyze_profile),
+        )
         // Accounts
         .route(
             "/accounts",

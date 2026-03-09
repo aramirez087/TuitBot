@@ -1,13 +1,14 @@
-//! Onboarding-specific OAuth endpoints for pre-account X sign-in.
+//! Onboarding-specific endpoints for pre-account X sign-in and profile analysis.
 //!
 //! These endpoints let users authenticate with X during onboarding,
 //! before any account or config exists. Tokens are stored temporarily
 //! at `{data_dir}/onboarding_tokens.json` and migrated to the default
 //! account's token path when `POST /api/settings/init` completes.
 //!
-//! - `POST /api/onboarding/x-auth/start`    — start OAuth PKCE flow
-//! - `POST /api/onboarding/x-auth/callback`  — exchange code for tokens
-//! - `GET  /api/onboarding/x-auth/status`    — check connection status
+//! - `POST /api/onboarding/x-auth/start`       — start OAuth PKCE flow
+//! - `POST /api/onboarding/x-auth/callback`     — exchange code for tokens
+//! - `GET  /api/onboarding/x-auth/status`       — check connection status
+//! - `POST /api/onboarding/analyze-profile`     — analyze X profile for prefill
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -210,6 +211,138 @@ pub async fn onboarding_auth_status(
         }))),
         Err(_) => Ok(Json(json!({ "connected": false }))),
     }
+}
+
+/// Request body for profile analysis.
+#[derive(Deserialize)]
+pub struct AnalyzeProfileRequest {
+    /// Optional LLM config for enrichment. If absent, heuristic-only.
+    pub llm: Option<LlmConfigInput>,
+}
+
+/// LLM configuration passed from the frontend during onboarding.
+#[derive(Deserialize)]
+pub struct LlmConfigInput {
+    pub provider: String,
+    pub api_key: Option<String>,
+    pub model: String,
+    pub base_url: Option<String>,
+}
+
+/// `POST /api/onboarding/analyze-profile` — analyze X profile for onboarding prefill.
+///
+/// Loads the onboarding tokens, fetches the user's profile and recent tweets,
+/// then runs a two-pass inference pipeline (heuristics + optional LLM) to
+/// produce normalized `InferredProfile` suggestions.
+pub async fn analyze_profile(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<AnalyzeProfileRequest>,
+) -> Result<Json<Value>, ApiError> {
+    use tuitbot_core::config::LlmConfig;
+    use tuitbot_core::llm::factory::create_provider;
+    use tuitbot_core::toolkit::profile_inference::{
+        enrich_with_llm, extract_heuristics, ProfileInput,
+    };
+
+    // 1. Load onboarding tokens.
+    let token_path = onboarding_token_path(&state.data_dir);
+    if !token_path.exists() {
+        return Ok(Json(json!({
+            "status": "x_api_error",
+            "error": "Not connected. Complete X sign-in first."
+        })));
+    }
+
+    let tokens = match auth::load_tokens(&token_path) {
+        Ok(Some(t)) if t.expires_at > chrono::Utc::now() => t,
+        Ok(Some(_)) => {
+            return Ok(Json(json!({
+                "status": "x_api_error",
+                "error": "X tokens expired. Please re-authenticate."
+            })));
+        }
+        _ => {
+            return Ok(Json(json!({
+                "status": "x_api_error",
+                "error": "Failed to load onboarding tokens."
+            })));
+        }
+    };
+
+    // 2. Create X API client and fetch profile + tweets.
+    let client = XApiHttpClient::new(tokens.access_token.clone());
+
+    let user = match client.get_me().await {
+        Ok(u) => u,
+        Err(e) => {
+            return Ok(Json(json!({
+                "status": "x_api_error",
+                "error": format!("Failed to fetch profile: {e}")
+            })));
+        }
+    };
+
+    let tweets = match client.get_user_tweets(&user.id, 50, None).await {
+        Ok(resp) => resp.data,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to fetch tweets for profile analysis, continuing with profile-only");
+            Vec::new()
+        }
+    };
+
+    let mut warnings: Vec<String> = Vec::new();
+
+    if tweets.is_empty() {
+        warnings.push("No recent tweets found. Analysis relies on profile data only.".into());
+    }
+
+    // 3. Run heuristic extraction.
+    let input = ProfileInput {
+        user: user.clone(),
+        tweets,
+    };
+    let mut profile = extract_heuristics(&input);
+
+    // 4. Optionally enrich with LLM.
+    let mut status = "partial";
+
+    if let Some(llm_input) = body.llm {
+        let llm_config = LlmConfig {
+            provider: llm_input.provider,
+            api_key: llm_input.api_key,
+            model: llm_input.model,
+            base_url: llm_input.base_url,
+        };
+
+        match create_provider(&llm_config) {
+            Ok(provider) => match enrich_with_llm(profile.clone(), &input, provider.as_ref()).await
+            {
+                Ok(enriched) => {
+                    profile = enriched;
+                    status = "ok";
+                }
+                Err(e) => {
+                    warnings.push(format!(
+                        "LLM enrichment failed: {e}. Using heuristics only."
+                    ));
+                }
+            },
+            Err(e) => {
+                warnings.push(format!(
+                    "LLM provider configuration error: {e}. Using heuristics only."
+                ));
+            }
+        }
+    } else {
+        warnings
+            .push("No LLM configured. Using heuristic analysis only (limited accuracy).".into());
+    }
+
+    Ok(Json(json!({
+        "status": status,
+        "profile": profile,
+        "warnings": warnings,
+    })))
 }
 
 #[cfg(test)]

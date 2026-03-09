@@ -54,7 +54,8 @@ import type {
 	AutosaveResponse,
 	ContentRevision,
 	ContentActivity,
-	ContentTag
+	ContentTag,
+	AnalyzeProfileResponse
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -745,7 +746,17 @@ export const api = {
 					location: string | null;
 					url: string | null;
 				};
-			}>('/api/onboarding/x-auth/status')
+			}>('/api/onboarding/x-auth/status'),
+		analyzeProfile: (llm?: {
+			provider: string;
+			api_key?: string;
+			model: string;
+			base_url?: string;
+		}) =>
+			request<AnalyzeProfileResponse>('/api/onboarding/analyze-profile', {
+				method: 'POST',
+				body: JSON.stringify({ llm: llm ?? null })
+			})
 	},
 
 	vault: {

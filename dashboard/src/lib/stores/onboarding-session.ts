@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import type { InferredProfile } from '$lib/api/types';
 
 export interface OnboardingXUser {
 	id: string;
@@ -23,6 +24,12 @@ export interface OnboardingSession {
 	auth_error: string;
 	/** Whether an auth operation is in progress. */
 	auth_loading: boolean;
+	/** Profile analysis results from the server. */
+	inferred_profile: InferredProfile | null;
+	/** Whether profile analysis is in progress. */
+	analyzing: boolean;
+	/** Warnings from partial analysis. */
+	analysis_warnings: string[];
 }
 
 function createOnboardingSession() {
@@ -32,7 +39,10 @@ function createOnboardingSession() {
 		oauth_state: '',
 		auth_url: '',
 		auth_error: '',
-		auth_loading: false
+		auth_loading: false,
+		inferred_profile: null,
+		analyzing: false,
+		analysis_warnings: []
 	};
 
 	const { subscribe, update, set } = writable<OnboardingSession>(initial);
@@ -63,6 +73,17 @@ function createOnboardingSession() {
 		},
 		setLoading: (loading: boolean) => {
 			update((s) => ({ ...s, auth_loading: loading }));
+		},
+		setAnalyzing: (analyzing: boolean) => {
+			update((s) => ({ ...s, analyzing }));
+		},
+		setInferredProfile: (profile: InferredProfile, warnings: string[]) => {
+			update((s) => ({
+				...s,
+				inferred_profile: profile,
+				analysis_warnings: warnings,
+				analyzing: false
+			}));
 		},
 		reset: () => set(initial)
 	};

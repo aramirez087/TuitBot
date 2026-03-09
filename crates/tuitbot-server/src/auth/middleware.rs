@@ -61,6 +61,8 @@ const AUTH_EXEMPT_PATHS: &[&str] = &[
     "/api/onboarding/x-auth/callback",
     "/onboarding/x-auth/status",
     "/api/onboarding/x-auth/status",
+    "/onboarding/analyze-profile",
+    "/api/onboarding/analyze-profile",
 ];
 
 /// Axum middleware that enforces multi-strategy authentication.
