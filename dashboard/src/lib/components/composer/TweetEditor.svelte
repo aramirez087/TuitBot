@@ -351,10 +351,6 @@
 		outline: none;
 	}
 
-	.compose-input.over-limit {
-		box-shadow: inset 2px 0 0 var(--color-danger);
-	}
-
 	.char-ring-row {
 		display: flex;
 		justify-content: flex-end;

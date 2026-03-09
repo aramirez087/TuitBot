@@ -2,6 +2,7 @@
 	import { page } from "$app/stores";
 	import { onMount } from "svelte";
 	import { ACCOUNT_SWITCHED_EVENT } from "$lib/stores/accounts";
+	import { canPost } from "$lib/stores/runtime";
 	import * as studio from "$lib/stores/draftStudio.svelte";
 	import { api, type ThreadBlock } from "$lib/api";
 	import type { ScheduledContentItem } from "$lib/api/types";
@@ -27,6 +28,9 @@
 	let activePanel = $state<"details" | "history">("details");
 	let prefillSchedule = $state<string | null>(null);
 	let drawerOpen = $state(false);
+	let approvalMode = $state(true);
+
+	const publishEnabled = $derived($canPost && !approvalMode);
 
 	interface HydrationPayload {
 		mode: "tweet" | "thread";
@@ -68,6 +72,11 @@
 
 	onMount(() => {
 		studio.initFromUrl($page.url);
+
+		// Fetch approval mode to determine if direct publishing is allowed
+		api.assist.mode().then((res) => {
+			approvalMode = res.approval_mode;
+		}).catch(() => { /* default to approval_mode=true (safe fallback) */ });
 
 		const isNewDraft = $page.url.searchParams.get("new") === "true";
 		const hasExplicitId = $page.url.searchParams.has("id");
@@ -550,7 +559,7 @@
 						initialContent={hydration}
 						embedded={true}
 						schedule={null}
-						canPublish={false}
+						canPublish={publishEnabled}
 						onsubmit={handleDraftSubmit}
 						onsyncstatus={handleSyncStatus}
 						extraPaletteActions={draftStudioPaletteActions}

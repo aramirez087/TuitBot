@@ -4,6 +4,7 @@ import { api, type DeploymentCapabilities, type DeploymentModeValue } from '$lib
 interface RuntimeCapabilities {
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
+	can_post: boolean;
 }
 
 const DESKTOP_DEFAULTS: RuntimeCapabilities = {
@@ -15,7 +16,8 @@ const DESKTOP_DEFAULTS: RuntimeCapabilities = {
 		inline_ingest: true,
 		file_picker_native: false,
 		preferred_source_default: 'local_fs'
-	}
+	},
+	can_post: false
 };
 
 const capabilitiesData = writable<RuntimeCapabilities | null>(null);
@@ -23,6 +25,7 @@ const capabilitiesData = writable<RuntimeCapabilities | null>(null);
 export const capabilities = derived(capabilitiesData, ($d) => $d?.capabilities ?? null);
 export const deploymentMode = derived(capabilitiesData, ($d) => $d?.deployment_mode ?? 'desktop');
 export const capabilitiesLoaded = derived(capabilitiesData, ($d) => $d !== null);
+export const canPost = derived(capabilitiesData, ($d) => $d?.can_post ?? false);
 
 let fetching = false;
 let fetched = false;
@@ -41,7 +44,8 @@ export async function loadCapabilities(): Promise<void> {
 		const status = await api.runtime.status();
 		capabilitiesData.set({
 			deployment_mode: status.deployment_mode,
-			capabilities: status.capabilities
+			capabilities: status.capabilities,
+			can_post: status.can_post
 		});
 		fetched = true;
 	} catch {
@@ -50,7 +54,8 @@ export async function loadCapabilities(): Promise<void> {
 			const configStatus = await api.settings.configStatus();
 			capabilitiesData.set({
 				deployment_mode: configStatus.deployment_mode,
-				capabilities: configStatus.capabilities
+				capabilities: configStatus.capabilities,
+				can_post: false
 			});
 			fetched = true;
 		} catch {
