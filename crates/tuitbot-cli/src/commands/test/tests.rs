@@ -371,8 +371,9 @@ fn check_database_whitespace_only_path_fails() {
 
 #[test]
 fn check_database_directory_path_fails() {
+    let tmp = tempfile::tempdir().unwrap();
     let mut config = tuitbot_core::config::Config::default();
-    config.storage.db_path = "/tmp".to_string();
+    config.storage.db_path = tmp.path().display().to_string();
 
     let result = check_database(&config);
     assert!(!result.passed);
