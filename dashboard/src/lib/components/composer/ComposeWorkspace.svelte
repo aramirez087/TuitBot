@@ -1,41 +1,51 @@
 <script lang="ts">
-	import { onMount, onDestroy, flushSync } from 'svelte';
+	import { onMount, onDestroy, flushSync } from "svelte";
 	import {
 		api,
 		type ScheduleConfig,
 		type ComposeRequest,
-		type ThreadBlock
-	} from '$lib/api';
-	import type { VaultCitation } from '$lib/api/types';
-	import { tweetWeightedLen } from '$lib/utils/tweetLength';
-	import { matchEvent } from '$lib/utils/shortcuts';
-	import { buildComposeRequest, topicWithCue } from '$lib/utils/composeHandlers';
-	import ThreadFlowLane from './ThreadFlowLane.svelte';
-	import CommandPalette from '../CommandPalette.svelte';
-	import ComposerShell from './ComposerShell.svelte';
-	import ComposerHeaderBar from './ComposerHeaderBar.svelte';
-	import HomeComposerHeader from './HomeComposerHeader.svelte';
-	import ComposerCanvas from './ComposerCanvas.svelte';
-	import ComposerInspector from './ComposerInspector.svelte';
-	import InspectorContent from './InspectorContent.svelte';
-	import RecoveryBanner from './RecoveryBanner.svelte';
-	import TweetEditor from './TweetEditor.svelte';
-	import AddTweetDivider from './AddTweetDivider.svelte';
-	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
-	import VoiceContextPanel from './VoiceContextPanel.svelte';
-	import ComposerToolbar from './ComposerToolbar.svelte';
-	import ComposerInsertBar from './ComposerInsertBar.svelte';
-	import CitationChips from './CitationChips.svelte';
-	import { currentAccount } from '$lib/stores/accounts';
-	import { deploymentMode } from '$lib/stores/runtime';
-	import { persistGet, persistSet } from '$lib/stores/persistence';
+		type ThreadBlock,
+	} from "$lib/api";
+	import type { VaultCitation } from "$lib/api/types";
+	import { tweetWeightedLen } from "$lib/utils/tweetLength";
+	import { matchEvent } from "$lib/utils/shortcuts";
 	import {
-		saveAutoSave, clearAutoSave as clearAutoSaveStorage,
-		readAutoSave, restoreMedia, wasNavigationExit,
-		markSessionActive, clearSessionFlag, AUTOSAVE_DEBOUNCE_MS,
-		DraftSaveManager, readDraftAutoSave, clearDraftAutoSave
-	} from '$lib/utils/composerAutosave';
-	import type { AttachedMedia } from './TweetEditor.svelte';
+		buildComposeRequest,
+		topicWithCue,
+	} from "$lib/utils/composeHandlers";
+	import ThreadFlowLane from "./ThreadFlowLane.svelte";
+	import CommandPalette from "../CommandPalette.svelte";
+	import ComposerShell from "./ComposerShell.svelte";
+	import ComposerHeaderBar from "./ComposerHeaderBar.svelte";
+	import HomeComposerHeader from "./HomeComposerHeader.svelte";
+	import ComposerCanvas from "./ComposerCanvas.svelte";
+	import ComposerInspector from "./ComposerInspector.svelte";
+	import InspectorContent from "./InspectorContent.svelte";
+	import RecoveryBanner from "./RecoveryBanner.svelte";
+	import TweetEditor from "./TweetEditor.svelte";
+	import AddTweetDivider from "./AddTweetDivider.svelte";
+	import ComposerPreviewSurface from "./ComposerPreviewSurface.svelte";
+	import VoiceContextPanel from "./VoiceContextPanel.svelte";
+	import ComposerToolbar from "./ComposerToolbar.svelte";
+	import ComposerInsertBar from "./ComposerInsertBar.svelte";
+	import CitationChips from "./CitationChips.svelte";
+	import { currentAccount } from "$lib/stores/accounts";
+	import { deploymentMode } from "$lib/stores/runtime";
+	import { persistGet, persistSet } from "$lib/stores/persistence";
+	import {
+		saveAutoSave,
+		clearAutoSave as clearAutoSaveStorage,
+		readAutoSave,
+		restoreMedia,
+		wasNavigationExit,
+		markSessionActive,
+		clearSessionFlag,
+		AUTOSAVE_DEBOUNCE_MS,
+		DraftSaveManager,
+		readDraftAutoSave,
+		clearDraftAutoSave,
+	} from "$lib/utils/composerAutosave";
+	import type { AttachedMedia } from "./TweetEditor.svelte";
 
 	let {
 		schedule,
@@ -49,7 +59,7 @@
 		initialContent = undefined,
 		onsyncstatus = undefined,
 		extraPaletteActions = [],
-		ondraftaction = undefined
+		ondraftaction = undefined,
 	}: {
 		schedule: ScheduleConfig | null;
 		onsubmit: (data: ComposeRequest) => void | Promise<void>;
@@ -60,20 +70,22 @@
 		canPublish?: boolean;
 		draftId?: number;
 		initialContent?: {
-			mode: 'tweet' | 'thread';
+			mode: "tweet" | "thread";
 			tweetText: string;
 			threadBlocks: ThreadBlock[];
 			attachedMedia: AttachedMedia[];
 			updatedAt: string;
 		};
-		onsyncstatus?: (status: import('$lib/utils/composerAutosave').SyncStatus) => void;
-		extraPaletteActions?: import('../CommandPalette.svelte').PaletteAction[];
+		onsyncstatus?: (
+			status: import("$lib/utils/composerAutosave").SyncStatus,
+		) => void;
+		extraPaletteActions?: import("../CommandPalette.svelte").PaletteAction[];
 		ondraftaction?: (actionId: string) => void;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
-	let mode = $state<'tweet' | 'thread'>('tweet');
-	let tweetText = $state('');
+	let mode = $state<"tweet" | "thread">("tweet");
+	let tweetText = $state("");
 	let threadBlocks = $state<ThreadBlock[]>([]);
 	let threadValid = $state(false);
 	let selectedTime = $state<string | null>(null);
@@ -85,18 +97,18 @@
 	let threadFlowRef: ThreadFlowLane | undefined = $state();
 	let tweetEditorRef: TweetEditor | undefined = $state();
 	let voicePanelRef: VoiceContextPanel | undefined = $state();
-	let notesPanelMode = $state<'notes' | 'vault' | null>(null);
+	let notesPanelMode = $state<"notes" | "vault" | null>(null);
 	let vaultCitations = $state<VaultCitation[]>([]);
 	let assisting = $state(false);
-	let voiceCue = $state('');
+	let voiceCue = $state("");
 	let previewMode = $state(false);
 	let inspectorOpen = $state(loadInspectorState());
 	let isMobile = $state(false);
-	let statusAnnouncement = $state('');
+	let statusAnnouncement = $state("");
 
 	// Desktop vault path for Obsidian deep-links
 	let localVaultPath = $state<string | null>(null);
-	const isDesktop = $derived($deploymentMode === 'desktop');
+	const isDesktop = $derived($deploymentMode === "desktop");
 
 	// Home-surface state (only active when embedded)
 	let tipsVisible = $state(false);
@@ -104,12 +116,15 @@
 
 	// Undo state for notes generation
 	let undoSnapshot = $state<{
-		mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[];
-		media?: AttachedMedia[]; selectedTime?: string | null;
+		mode: "tweet" | "thread";
+		text: string;
+		blocks: ThreadBlock[];
+		media?: AttachedMedia[];
+		selectedTime?: string | null;
 		citations?: VaultCitation[];
 	} | null>(null);
 	let showUndo = $state(false);
-	let undoMessage = $state('Content replaced.');
+	let undoMessage = $state("Content replaced.");
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// Auto-save (logic extracted to composerAutosave.ts)
@@ -118,8 +133,15 @@
 	let initialized = $state(false);
 	let showRecovery = $state(false);
 	let recoveryData = $state<{
-		mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number;
-		tweetMedia?: Array<{ path: string; mediaType: string; altText?: string }>;
+		mode: string;
+		tweetText: string;
+		blocks: ThreadBlock[];
+		timestamp: number;
+		tweetMedia?: Array<{
+			path: string;
+			mediaType: string;
+			altText?: string;
+		}>;
 	} | null>(null);
 
 	// Toolbar state
@@ -129,45 +151,58 @@
 	const TWEET_MAX = 280;
 	const tweetChars = $derived(tweetWeightedLen(tweetText));
 	const tweetOverLimit = $derived(tweetChars > TWEET_MAX);
-	const canSubmitTweet = $derived(tweetText.trim().length > 0 && !tweetOverLimit);
-	const canSubmit = $derived(mode === 'tweet' ? canSubmitTweet : threadValid);
+	const canSubmitTweet = $derived(
+		tweetText.trim().length > 0 && !tweetOverLimit,
+	);
+	const canSubmit = $derived(mode === "tweet" ? canSubmitTweet : threadValid);
 
 	const sortedPreviewBlocks = $derived(
-		[...threadBlocks].sort((a, b) => a.order - b.order).filter((b) => b.text.trim().length > 0)
+		[...threadBlocks]
+			.sort((a, b) => a.order - b.order)
+			.filter((b) => b.text.trim().length > 0),
 	);
 
 	const hasExistingContent = $derived(
-		mode === 'tweet' ? tweetText.trim().length > 0 : threadBlocks.some((b) => b.text.trim().length > 0)
+		mode === "tweet"
+			? tweetText.trim().length > 0
+			: threadBlocks.some((b) => b.text.trim().length > 0),
 	);
 
 	const tweetMediaPreviewMap = $derived(
-		new Map(attachedMedia.map((m) => [m.path, m.previewUrl]))
+		new Map(attachedMedia.map((m) => [m.path, m.previewUrl])),
 	);
 
 	const hasPreviewContent = $derived(
-		mode === 'thread'
+		mode === "thread"
 			? sortedPreviewBlocks.length > 0
-			: tweetText.trim().length > 0
+			: tweetText.trim().length > 0,
 	);
 
 	const desktopInspectorOpen = $derived(inspectorOpen && !isMobile);
 
 	const threadBlockCount = $derived(
-		mode === 'thread' ? threadBlocks.filter((b) => b.text.trim().length > 0).length || threadBlocks.length : 1
+		mode === "thread"
+			? threadBlocks.filter((b) => b.text.trim().length > 0).length ||
+					threadBlocks.length
+			: 1,
 	);
 
 	// ── Inspector persistence ──────────────────────────────
 	function loadInspectorState(): boolean {
 		try {
-			const saved = localStorage.getItem('tuitbot:inspector:open');
-			return saved === null ? true : saved === 'true';
+			const saved = localStorage.getItem("tuitbot:inspector:open");
+			return saved === null ? true : saved === "true";
 		} catch {
 			return true;
 		}
 	}
 
 	function persistInspectorState(v: boolean) {
-		try { localStorage.setItem('tuitbot:inspector:open', String(v)); } catch { /* quota */ }
+		try {
+			localStorage.setItem("tuitbot:inspector:open", String(v));
+		} catch {
+			/* quota */
+		}
 	}
 
 	function toggleInspector() {
@@ -181,24 +216,34 @@
 
 	// ── Lifecycle ──────────────────────────────────────────
 	$effect(() => {
-		const mql = window.matchMedia('(max-width: 768px)');
+		const mql = window.matchMedia("(max-width: 768px)");
 		isMobile = mql.matches;
-		const handler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
-		mql.addEventListener('change', handler);
-		return () => mql.removeEventListener('change', handler);
+		const handler = (e: MediaQueryListEvent) => {
+			isMobile = e.matches;
+		};
+		mql.addEventListener("change", handler);
+		return () => mql.removeEventListener("change", handler);
 	});
 
-	$effect(() => { void mode; void tweetText; void threadBlocks; void attachedMedia; if (initialized) autoSave(); });
+	$effect(() => {
+		void mode;
+		void tweetText;
+		void threadBlocks;
+		void attachedMedia;
+		if (initialized) autoSave();
+	});
 
 	// Auto-collapse: thread → tweet when only 1 block remains
 	$effect(() => {
-		if (mode === 'thread' && threadBlocks.length <= 1 && initialized) {
+		if (mode === "thread" && threadBlocks.length <= 1 && initialized) {
 			const surviving = threadBlocks[0];
-			tweetText = surviving?.text ?? '';
+			tweetText = surviving?.text ?? "";
 			threadBlocks = [];
-			mode = 'tweet';
+			mode = "tweet";
 			requestAnimationFrame(() => {
-				const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
+				const textarea = document.querySelector(
+					".compose-input",
+				) as HTMLTextAreaElement | null;
 				textarea?.focus();
 			});
 		}
@@ -207,8 +252,14 @@
 	// Announce mode switches to screen readers (skip initial render)
 	let modeInitialized = false;
 	$effect(() => {
-		if (!modeInitialized) { modeInitialized = true; return; }
-		statusAnnouncement = mode === 'tweet' ? 'Switched to tweet mode' : 'Switched to thread mode';
+		if (!modeInitialized) {
+			modeInitialized = true;
+			return;
+		}
+		statusAnnouncement =
+			mode === "tweet"
+				? "Switched to tweet mode"
+				: "Switched to thread mode";
 	});
 
 	function flushAutoSave() {
@@ -239,7 +290,11 @@
 
 			// Check for crash recovery data
 			const localData = readDraftAutoSave(draftId);
-			if (localData && localData.timestamp > new Date(initialContent.updatedAt).getTime()) {
+			if (
+				localData &&
+				localData.timestamp >
+					new Date(initialContent.updatedAt).getTime()
+			) {
 				recoveryData = localData;
 				showRecovery = true;
 			} else {
@@ -248,14 +303,18 @@
 
 			// Create save manager
 			const syncCallback = onsyncstatus ?? (() => {});
-			draftSaveManager = new DraftSaveManager(draftId, initialContent.updatedAt, syncCallback);
+			draftSaveManager = new DraftSaveManager(
+				draftId,
+				initialContent.updatedAt,
+				syncCallback,
+			);
 			initialized = true;
 		} else {
 			checkRecovery();
 			if (!showRecovery && !initialized) {
-				tweetText = '';
+				tweetText = "";
 				threadBlocks = [];
-				mode = 'tweet';
+				mode = "tweet";
 				initialized = true;
 			}
 		}
@@ -266,33 +325,41 @@
 		paletteOpen = false;
 		notesPanelMode = null;
 		vaultCitations = [];
-		voiceCue = '';
+		voiceCue = "";
 		undoSnapshot = null;
 		showUndo = false;
 		previewMode = false;
 		inspectorOpen = loadInspectorState();
 
-		window.addEventListener('beforeunload', handleBeforeUnload);
+		window.addEventListener("beforeunload", handleBeforeUnload);
 
 		// Load vault path for Obsidian deep-links (desktop only)
-		if ($deploymentMode === 'desktop') {
+		if ($deploymentMode === "desktop") {
 			try {
 				const res = await api.vault.sources();
-				const localSrc = res.sources.find((s) => s.source_type === 'local_fs');
+				const localSrc = res.sources.find(
+					(s) => s.source_type === "local_fs",
+				);
 				if (localSrc?.path) localVaultPath = localSrc.path;
-			} catch { /* vault path is best-effort */ }
+			} catch {
+				/* vault path is best-effort */
+			}
 		}
 
 		if (embedded) {
-			const tipsDismissed = await persistGet('home_tips_dismissed', false);
+			const tipsDismissed = await persistGet(
+				"home_tips_dismissed",
+				false,
+			);
 			tipsVisible = !tipsDismissed;
-			window.addEventListener('tuitbot:compose', handleComposeEvent);
+			window.addEventListener("tuitbot:compose", handleComposeEvent);
 		}
 	});
 
 	onDestroy(() => {
-		window.removeEventListener('beforeunload', handleBeforeUnload);
-		if (embedded) window.removeEventListener('tuitbot:compose', handleComposeEvent);
+		window.removeEventListener("beforeunload", handleBeforeUnload);
+		if (embedded)
+			window.removeEventListener("tuitbot:compose", handleComposeEvent);
 		if (draftSaveManager) {
 			draftSaveManager.destroy();
 			draftSaveManager = null;
@@ -304,39 +371,56 @@
 	});
 
 	function handleComposeEvent() {
-		const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
+		const textarea = document.querySelector(
+			".compose-input",
+		) as HTMLTextAreaElement | null;
 		textarea?.focus();
 	}
 
-	function switchMode(newMode: 'tweet' | 'thread') {
+	function switchMode(newMode: "tweet" | "thread") {
 		if (newMode === mode) return;
-		if (newMode === 'thread' && tweetText.trim()) {
+		if (newMode === "thread" && tweetText.trim()) {
 			const hasThreadContent = threadBlocks.some((b) => b.text.trim());
 			if (!hasThreadContent) {
 				threadBlocks = [
-					{ id: crypto.randomUUID(), text: tweetText, media_paths: [], order: 0 },
-					{ id: crypto.randomUUID(), text: '', media_paths: [], order: 1 }
+					{
+						id: crypto.randomUUID(),
+						text: tweetText,
+						media_paths: [],
+						order: 0,
+					},
+					{
+						id: crypto.randomUUID(),
+						text: "",
+						media_paths: [],
+						order: 1,
+					},
 				];
-				tweetText = '';
+				tweetText = "";
 			}
 		}
 		mode = newMode;
 	}
 
 	function switchToThread() {
-		if (mode !== 'tweet') return;
+		if (mode !== "tweet") return;
 		const mediaPaths = attachedMedia.map((m) => m.path);
 		threadBlocks = [
-			{ id: crypto.randomUUID(), text: tweetText, media_paths: mediaPaths, order: 0 },
-			{ id: crypto.randomUUID(), text: '', media_paths: [], order: 1 }
+			{
+				id: crypto.randomUUID(),
+				text: tweetText,
+				media_paths: mediaPaths,
+				order: 0,
+			},
+			{ id: crypto.randomUUID(), text: "", media_paths: [], order: 1 },
 		];
 		const focusId = threadBlocks[1].id;
-		tweetText = '';
+		tweetText = "";
 		attachedMedia = [];
-		mode = 'thread';
+		mode = "thread";
 		requestAnimationFrame(() => {
 			const textarea = document.querySelector(
-				`[data-block-id="${focusId}"] textarea`
+				`[data-block-id="${focusId}"] textarea`,
 			) as HTMLTextAreaElement | null;
 			textarea?.focus();
 		});
@@ -360,8 +444,8 @@
 	}
 
 	function restoreDraft(data: NonNullable<typeof recoveryData>) {
-		mode = (data.mode as 'tweet' | 'thread') ?? 'tweet';
-		tweetText = data.tweetText || '';
+		mode = (data.mode as "tweet" | "thread") ?? "tweet";
+		tweetText = data.tweetText || "";
 		threadBlocks = data.blocks || [];
 		attachedMedia = restoreMedia(data.tweetMedia);
 	}
@@ -399,10 +483,16 @@
 	// ── Handlers ───────────────────────────────────────────
 	async function handleSubmit() {
 		if (!canSubmit || submitting) return;
-		submitting = true; submitError = null;
+		submitting = true;
+		submitError = null;
 		try {
 			const data = buildComposeRequest({
-				mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia
+				mode,
+				tweetText,
+				threadBlocks,
+				selectedTime,
+				targetDate,
+				attachedMedia,
 			});
 			if (vaultCitations.length > 0) {
 				data.provenance = vaultCitations.map((c) => ({
@@ -410,7 +500,7 @@
 					chunk_id: c.chunk_id,
 					source_path: c.source_path,
 					heading_path: c.heading_path,
-					snippet: c.snippet
+					snippet: c.snippet,
 				}));
 			}
 			if (draftSaveManager) {
@@ -425,14 +515,20 @@
 			if (embedded) {
 				// Snapshot current state so user can undo the clear
 				undoSnapshot = {
-					mode, text: tweetText, blocks: [...threadBlocks],
-					media: [...attachedMedia], selectedTime
+					mode,
+					text: tweetText,
+					blocks: [...threadBlocks],
+					media: [...attachedMedia],
+					selectedTime,
 				};
-				undoMessage = canPublish && !selectedTime ? 'Published.' : 'Saved to calendar.';
+				undoMessage =
+					canPublish && !selectedTime
+						? "Published."
+						: "Saved to calendar.";
 
-				tweetText = '';
+				tweetText = "";
 				threadBlocks = [];
-				mode = 'tweet';
+				mode = "tweet";
 				selectedTime = null;
 				// Don't revoke media URLs yet — undo may need them
 				attachedMedia = [];
@@ -441,7 +537,7 @@
 				focusMode = false;
 				notesPanelMode = null;
 				vaultCitations = [];
-				voiceCue = '';
+				voiceCue = "";
 				previewMode = false;
 
 				showUndo = true;
@@ -450,13 +546,14 @@
 					showUndo = false;
 					// Revoke media URLs now that undo window has closed
 					if (undoSnapshot?.media) {
-						for (const m of undoSnapshot.media) URL.revokeObjectURL(m.previewUrl);
+						for (const m of undoSnapshot.media)
+							URL.revokeObjectURL(m.previewUrl);
 					}
 					undoSnapshot = null;
 				}, 10000);
 			}
 		} catch (e) {
-			submitError = e instanceof Error ? e.message : 'Failed to submit';
+			submitError = e instanceof Error ? e.message : "Failed to submit";
 			submitting = false;
 		}
 	}
@@ -470,38 +567,48 @@
 		focusMode = !focusMode;
 	}
 
-
 	async function handleImagePaste() {
 		try {
-			const { readImage } = await import('@tauri-apps/plugin-clipboard-manager');
+			const { readImage } = await import(
+				"@tauri-apps/plugin-clipboard-manager"
+			);
 			const img = await readImage();
 			const { width: w, height: h } = await img.size();
 			const rgba = await img.rgba();
 
-			const canvas = document.createElement('canvas');
+			const canvas = document.createElement("canvas");
 			canvas.width = w;
 			canvas.height = h;
-			const ctx = canvas.getContext('2d');
+			const ctx = canvas.getContext("2d");
 			if (!ctx) return;
-			ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), w, h), 0, 0);
+			ctx.putImageData(
+				new ImageData(new Uint8ClampedArray(rgba), w, h),
+				0,
+				0,
+			);
 			const blob: Blob | null = await new Promise((resolve) =>
-				canvas.toBlob(resolve, 'image/png')
+				canvas.toBlob(resolve, "image/png"),
 			);
 			if (!blob) return;
 
-			const file = new File([blob], 'pasted-image.png', { type: 'image/png' });
+			const file = new File([blob], "pasted-image.png", {
+				type: "image/png",
+			});
 			const result = await api.media.upload(file);
 
-			if (mode === 'thread') {
+			if (mode === "thread") {
 				threadFlowRef?.addMediaToFocusedBlock(result.path);
 			} else {
 				flushSync(() => {
-					attachedMedia = [...attachedMedia, {
-						path: result.path,
-						file,
-						previewUrl: api.media.fileUrl(result.path),
-						mediaType: result.media_type
-					}];
+					attachedMedia = [
+						...attachedMedia,
+						{
+							path: result.path,
+							file,
+							previewUrl: api.media.fileUrl(result.path),
+							mediaType: result.media_type,
+						},
+					];
 				});
 			}
 			return;
@@ -510,10 +617,12 @@
 		}
 
 		try {
-			const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+			const { readText } = await import(
+				"@tauri-apps/plugin-clipboard-manager"
+			);
 			const text = await readText();
 			if (text) {
-				document.execCommand('insertText', false, text);
+				document.execCommand("insertText", false, text);
 			}
 		} catch {
 			// No text in clipboard either
@@ -521,42 +630,77 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-
 		if (paletteOpen) return;
 
 		// When preview overlay is open, only allow Escape and toggle
 		if (previewMode) {
-			if (e.key === 'Escape') { e.preventDefault(); previewMode = false; return; }
-			if (matchEvent(e, 'cmd+shift+p')) { e.preventDefault(); togglePreview(); return; }
+			if (e.key === "Escape") {
+				e.preventDefault();
+				previewMode = false;
+				return;
+			}
+			if (matchEvent(e, "cmd+shift+p")) {
+				e.preventDefault();
+				togglePreview();
+				return;
+			}
 			return;
 		}
 
-		if (matchEvent(e, 'cmd+k')) { e.preventDefault(); paletteOpen = true; return; }
-		if (matchEvent(e, 'cmd+shift+f')) {
+		if (matchEvent(e, "cmd+k")) {
+			e.preventDefault();
+			paletteOpen = true;
+			return;
+		}
+		if (matchEvent(e, "cmd+shift+f")) {
 			e.preventDefault();
 			if (!embedded) toggleFocusMode();
 			return;
 		}
-		if (matchEvent(e, 'cmd+shift+enter')) { e.preventDefault(); handleSubmit(); return; }
-		if (matchEvent(e, 'cmd+enter')) {
-			if (mode === 'tweet') {
+		if (matchEvent(e, "cmd+shift+enter")) {
+			e.preventDefault();
+			handleSubmit();
+			return;
+		}
+		if (matchEvent(e, "cmd+enter")) {
+			if (mode === "tweet") {
 				e.preventDefault();
 				if (tweetText.trim()) switchToThread();
 			}
 			// In thread mode: let event propagate to ThreadFlowLane's card handler for split
 			return;
 		}
-		if (matchEvent(e, 'cmd+v')) {
+		if (matchEvent(e, "cmd+v")) {
 			e.preventDefault();
 			handleImagePaste();
 			return;
 		}
-		if (matchEvent(e, 'cmd+shift+j')) { e.preventDefault(); handleInlineAssist(); return; }
-		if (matchEvent(e, 'cmd+shift+n')) { e.preventDefault(); switchMode('tweet'); return; }
-		if (matchEvent(e, 'cmd+shift+t')) { e.preventDefault(); switchMode('thread'); return; }
-		if (matchEvent(e, 'cmd+i')) { e.preventDefault(); toggleInspector(); return; }
-		if (matchEvent(e, 'cmd+shift+p')) { e.preventDefault(); togglePreview(); return; }
-		if (e.key === 'Escape') {
+		if (matchEvent(e, "cmd+shift+j")) {
+			e.preventDefault();
+			handleInlineAssist();
+			return;
+		}
+		if (matchEvent(e, "cmd+shift+n")) {
+			e.preventDefault();
+			switchMode("tweet");
+			return;
+		}
+		if (matchEvent(e, "cmd+shift+t")) {
+			e.preventDefault();
+			switchMode("thread");
+			return;
+		}
+		if (matchEvent(e, "cmd+i")) {
+			e.preventDefault();
+			toggleInspector();
+			return;
+		}
+		if (matchEvent(e, "cmd+shift+p")) {
+			e.preventDefault();
+			togglePreview();
+			return;
+		}
+		if (e.key === "Escape") {
 			if (notesPanelMode) notesPanelMode = null;
 			else if (isMobile && inspectorOpen) inspectorOpen = false;
 			else if (!embedded && focusMode) focusMode = false;
@@ -568,63 +712,110 @@
 	function handlePaletteAction(actionId: string) {
 		paletteOpen = false;
 		switch (actionId) {
-			case 'focus-mode': toggleFocusMode(); break;
-			case 'mode-tweet': switchMode('tweet'); break;
-			case 'mode-thread': switchMode('thread'); break;
-			case 'submit': handleSubmit(); break;
-			case 'ai-improve': handleInlineAssist(); break;
-			case 'ai-from-notes': notesPanelMode = 'notes'; if (!inspectorOpen) inspectorOpen = true; break;
-			case 'ai-from-vault': notesPanelMode = 'vault'; if (!inspectorOpen) inspectorOpen = true; break;
-			case 'ai-generate': handleAiAssist(); break;
-			case 'toggle-inspector': toggleInspector(); break;
-			case 'toggle-preview': togglePreview(); break;
-			case 'attach-media': tweetEditorRef?.triggerFileSelect(); break;
-			case 'add-card': case 'duplicate': case 'split': case 'merge':
-			case 'move-up': case 'move-down':
-				threadFlowRef?.handlePaletteAction(actionId); break;
+			case "focus-mode":
+				toggleFocusMode();
+				break;
+			case "mode-tweet":
+				switchMode("tweet");
+				break;
+			case "mode-thread":
+				switchMode("thread");
+				break;
+			case "submit":
+				handleSubmit();
+				break;
+			case "ai-improve":
+				handleInlineAssist();
+				break;
+			case "ai-from-notes":
+				notesPanelMode = "notes";
+				if (!inspectorOpen) inspectorOpen = true;
+				break;
+			case "ai-from-vault":
+				notesPanelMode = "vault";
+				if (!inspectorOpen) inspectorOpen = true;
+				break;
+			case "ai-generate":
+				handleAiAssist();
+				break;
+			case "toggle-inspector":
+				toggleInspector();
+				break;
+			case "toggle-preview":
+				togglePreview();
+				break;
+			case "attach-media":
+				tweetEditorRef?.triggerFileSelect();
+				break;
+			case "add-card":
+			case "duplicate":
+			case "split":
+			case "merge":
+			case "move-up":
+			case "move-down":
+				threadFlowRef?.handlePaletteAction(actionId);
+				break;
 			default:
-				ondraftaction?.(actionId); break;
+				ondraftaction?.(actionId);
+				break;
 		}
 	}
 
 	async function handleInlineAssist() {
-		if (mode === 'tweet') {
-			const textarea = document.querySelector('.compose-input') as HTMLTextAreaElement | null;
+		if (mode === "tweet") {
+			const textarea = document.querySelector(
+				".compose-input",
+			) as HTMLTextAreaElement | null;
 			if (!textarea) return;
 			const start = textarea.selectionStart;
 			const end = textarea.selectionEnd;
-			const selectedText = start !== end ? tweetText.slice(start, end) : tweetText;
+			const selectedText =
+				start !== end ? tweetText.slice(start, end) : tweetText;
 			if (!selectedText.trim()) return;
 
 			// Snapshot before replacement for undo
 			undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
-			undoMessage = 'Content replaced.';
+			undoMessage = "Content replaced.";
 
-			assisting = true; submitError = null;
+			assisting = true;
+			submitError = null;
 			try {
-				const result = await api.assist.improve(selectedText, voiceCue || undefined);
+				const result = await api.assist.improve(
+					selectedText,
+					voiceCue || undefined,
+				);
 				if (start !== end) {
-					tweetText = tweetText.slice(0, start) + result.content + tweetText.slice(end);
+					tweetText =
+						tweetText.slice(0, start) +
+						result.content +
+						tweetText.slice(end);
 				} else {
 					tweetText = result.content;
 				}
 				voicePanelRef?.saveCueToHistory();
 				showUndo = true;
 				if (undoTimer) clearTimeout(undoTimer);
-				undoTimer = setTimeout(() => { showUndo = false; }, 10000);
+				undoTimer = setTimeout(() => {
+					showUndo = false;
+				}, 10000);
 			} catch (e) {
-				submitError = e instanceof Error ? e.message : 'AI assist failed';
+				submitError =
+					e instanceof Error ? e.message : "AI assist failed";
 				undoSnapshot = null;
-			} finally { assisting = false; }
+			} finally {
+				assisting = false;
+			}
 		} else {
 			// Thread mode: snapshot all blocks before delegating
 			undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks] };
-			undoMessage = 'Content replaced.';
+			undoMessage = "Content replaced.";
 			try {
 				await threadFlowRef?.handleInlineAssist(voiceCue || undefined);
 				showUndo = true;
 				if (undoTimer) clearTimeout(undoTimer);
-				undoTimer = setTimeout(() => { showUndo = false; }, 10000);
+				undoTimer = setTimeout(() => {
+					showUndo = false;
+				}, 10000);
 			} catch {
 				undoSnapshot = null;
 			}
@@ -633,18 +824,28 @@
 
 	async function handleGenerateFromNotes(notesInput: string) {
 		submitError = null;
-		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks], citations: [...vaultCitations] };
-		undoMessage = 'Content replaced.';
+		undoSnapshot = {
+			mode,
+			text: tweetText,
+			blocks: [...threadBlocks],
+			citations: [...vaultCitations],
+		};
+		undoMessage = "Content replaced.";
 
-		if (mode === 'thread') {
-			const result = await api.assist.thread(topicWithCue(voiceCue, notesInput));
+		if (mode === "thread") {
+			const result = await api.assist.thread(
+				topicWithCue(voiceCue, notesInput),
+			);
 			threadBlocks = result.tweets.map((text, i) => ({
-				id: crypto.randomUUID(), text, media_paths: [], order: i
+				id: crypto.randomUUID(),
+				text,
+				media_paths: [],
+				order: i,
 			}));
 		} else {
 			const context = voiceCue
 				? `${voiceCue}. Expand these rough notes into a polished tweet`
-				: 'Expand these rough notes into a polished tweet';
+				: "Expand these rough notes into a polished tweet";
 			const result = await api.assist.improve(notesInput, context);
 			tweetText = result.content;
 		}
@@ -653,22 +854,44 @@
 		notesPanelMode = null;
 		showUndo = true;
 		if (undoTimer) clearTimeout(undoTimer);
-		undoTimer = setTimeout(() => { showUndo = false; }, 10000);
+		undoTimer = setTimeout(() => {
+			showUndo = false;
+		}, 10000);
 	}
 
 	async function handleGenerateFromVault(selectedNodeIds: number[]) {
 		submitError = null;
-		undoSnapshot = { mode, text: tweetText, blocks: [...threadBlocks], citations: [...vaultCitations] };
-		undoMessage = 'Content replaced.';
+		undoSnapshot = {
+			mode,
+			text: tweetText,
+			blocks: [...threadBlocks],
+			citations: [...vaultCitations],
+		};
+		undoMessage = "Content replaced.";
 
-		if (mode === 'thread') {
-			const result = await api.assist.thread(topicWithCue(voiceCue, tweetText || 'Generate thread from vault'), selectedNodeIds);
+		if (mode === "thread") {
+			const result = await api.assist.thread(
+				topicWithCue(
+					voiceCue,
+					tweetText || "Generate thread from vault",
+				),
+				selectedNodeIds,
+			);
 			threadBlocks = result.tweets.map((text, i) => ({
-				id: crypto.randomUUID(), text, media_paths: [], order: i
+				id: crypto.randomUUID(),
+				text,
+				media_paths: [],
+				order: i,
 			}));
 			if (result.vault_citations) vaultCitations = result.vault_citations;
 		} else {
-			const result = await api.assist.tweet(topicWithCue(voiceCue, tweetText || 'Generate tweet from vault'), selectedNodeIds);
+			const result = await api.assist.tweet(
+				topicWithCue(
+					voiceCue,
+					tweetText || "Generate tweet from vault",
+				),
+				selectedNodeIds,
+			);
 			tweetText = result.content;
 			if (result.vault_citations) vaultCitations = result.vault_citations;
 		}
@@ -676,7 +899,9 @@
 		notesPanelMode = null;
 		showUndo = true;
 		if (undoTimer) clearTimeout(undoTimer);
-		undoTimer = setTimeout(() => { showUndo = false; }, 10000);
+		undoTimer = setTimeout(() => {
+			showUndo = false;
+		}, 10000);
 	}
 
 	function handleUndo() {
@@ -685,7 +910,8 @@
 		tweetText = undoSnapshot.text;
 		threadBlocks = undoSnapshot.blocks;
 		if (undoSnapshot.media) attachedMedia = undoSnapshot.media;
-		if (undoSnapshot.selectedTime !== undefined) selectedTime = undoSnapshot.selectedTime;
+		if (undoSnapshot.selectedTime !== undefined)
+			selectedTime = undoSnapshot.selectedTime;
 		vaultCitations = undoSnapshot.citations ?? [];
 		undoSnapshot = null;
 		showUndo = false;
@@ -702,21 +928,23 @@
 	function handleInsertText(text: string) {
 		// Find the currently focused textarea and insert text at cursor
 		const textarea = document.activeElement as HTMLTextAreaElement | null;
-		if (!textarea || textarea.tagName !== 'TEXTAREA') {
+		if (!textarea || textarea.tagName !== "TEXTAREA") {
 			// Fallback: try the main compose input or first thread textarea
-			const fallback = document.querySelector('.compose-input, .flow-textarea') as HTMLTextAreaElement | null;
+			const fallback = document.querySelector(
+				".compose-input, .flow-textarea",
+			) as HTMLTextAreaElement | null;
 			if (fallback) {
 				fallback.focus();
 				const pos = fallback.selectionStart ?? fallback.value.length;
 				const before = fallback.value.slice(0, pos);
 				const after = fallback.value.slice(pos);
 				const newVal = before + text + after;
-				if (mode === 'tweet') {
+				if (mode === "tweet") {
 					tweetText = newVal;
 				}
 				// For thread mode the textarea dispatches its own input event
 				fallback.value = newVal;
-				fallback.dispatchEvent(new Event('input', { bubbles: true }));
+				fallback.dispatchEvent(new Event("input", { bubbles: true }));
 				const newPos = pos + text.length;
 				fallback.setSelectionRange(newPos, newPos);
 			}
@@ -726,44 +954,58 @@
 		const before = textarea.value.slice(0, pos);
 		const after = textarea.value.slice(pos);
 		const newVal = before + text + after;
-		if (mode === 'tweet') {
+		if (mode === "tweet") {
 			tweetText = newVal;
 		}
 		textarea.value = newVal;
-		textarea.dispatchEvent(new Event('input', { bubbles: true }));
+		textarea.dispatchEvent(new Event("input", { bubbles: true }));
 		const newPos = pos + text.length;
 		textarea.setSelectionRange(newPos, newPos);
 		textarea.focus();
 	}
 
 	async function handleAiAssist() {
-		assisting = true; submitError = null;
+		assisting = true;
+		submitError = null;
 		try {
-			if (mode === 'tweet') {
+			if (mode === "tweet") {
 				if (tweetText.trim()) {
-					const result = await api.assist.improve(tweetText, voiceCue || undefined);
+					const result = await api.assist.improve(
+						tweetText,
+						voiceCue || undefined,
+					);
 					tweetText = result.content;
 				} else {
-					const result = await api.assist.tweet(topicWithCue(voiceCue, 'general'));
+					const result = await api.assist.tweet(
+						topicWithCue(voiceCue, "general"),
+					);
 					tweetText = result.content;
 				}
 			} else {
-				const result = await api.assist.thread(topicWithCue(voiceCue, 'general'));
+				const result = await api.assist.thread(
+					topicWithCue(voiceCue, "general"),
+				);
 				threadBlocks = result.tweets.map((text, i) => ({
-					id: crypto.randomUUID(), text, media_paths: [], order: i
+					id: crypto.randomUUID(),
+					text,
+					media_paths: [],
+					order: i,
 				}));
 			}
 			voicePanelRef?.saveCueToHistory();
 		} catch (e) {
-			submitError = e instanceof Error ? e.message : 'AI assist failed';
-		} finally { assisting = false; }
+			submitError = e instanceof Error ? e.message : "AI assist failed";
+		} finally {
+			assisting = false;
+		}
 	}
-
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{statusAnnouncement}</div>
+<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+	{statusAnnouncement}
+</div>
 
 {#snippet composeBody()}
 	{#if showRecovery}
@@ -771,42 +1013,65 @@
 	{/if}
 
 	<ComposerCanvas
-		{canSubmit} {submitting} {selectedTime} {submitError} {canPublish}
+		{canSubmit}
+		{submitting}
+		{selectedTime}
+		{submitError}
+		{canPublish}
 		inspectorOpen={desktopInspectorOpen}
 		{embedded}
 		onsubmit={handleSubmit}
 	>
 		{#snippet children()}
-			{#if mode === 'tweet'}
+			{#if mode === "tweet"}
 				<TweetEditor
 					bind:this={tweetEditorRef}
 					text={tweetText}
-					onchange={(t) => { tweetText = t; }}
+					onchange={(t) => {
+						tweetText = t;
+					}}
 					{attachedMedia}
-					onmediachange={(m) => { attachedMedia = m; }}
-					onerror={(msg) => { submitError = msg; }}
+					onmediachange={(m) => {
+						attachedMedia = m;
+					}}
+					onerror={(msg) => {
+						submitError = msg;
+					}}
 					avatarUrl={$currentAccount?.x_avatar_url ?? null}
+					displayName={$currentAccount?.x_display_name ?? null}
+					handle={$currentAccount?.x_username ?? null}
 				/>
-				<AddTweetDivider onclick={switchToThread} disabled={!tweetText.trim()} />
+				<AddTweetDivider
+					onclick={switchToThread}
+					disabled={!tweetText.trim()}
+				/>
 			{:else}
 				<ThreadFlowLane
 					bind:this={threadFlowRef}
 					blocks={threadBlocks}
 					avatarUrl={$currentAccount?.x_avatar_url ?? null}
-					onchange={(b) => { threadBlocks = b; }}
-					onvalidchange={(v) => { threadValid = v; }}
+					displayName={$currentAccount?.x_display_name ?? null}
+					handle={$currentAccount?.x_username ?? null}
+					onchange={(b) => {
+						threadBlocks = b;
+					}}
+					onvalidchange={(v) => {
+						threadValid = v;
+					}}
 				/>
 			{/if}
 
 			<ComposerInsertBar oninsert={handleInsertText} />
 
-			{#if vaultCitations.length > 0 && notesPanelMode !== 'vault'}
+			{#if vaultCitations.length > 0 && notesPanelMode !== "vault"}
 				<CitationChips
 					citations={vaultCitations}
 					vaultPath={localVaultPath}
 					{isDesktop}
 					onremove={(chunkId) => {
-						vaultCitations = vaultCitations.filter((c) => c.chunk_id !== chunkId);
+						vaultCitations = vaultCitations.filter(
+							(c) => c.chunk_id !== chunkId,
+						);
 					}}
 				/>
 			{/if}
@@ -821,17 +1086,34 @@
 
 		{#snippet inspector()}
 			<InspectorContent
-				{schedule} {selectedTime} {targetDate} {voiceCue}
-				{assisting} {hasExistingContent} {notesPanelMode} {showUndo} {mode}
-				bind:voicePanelRef={voicePanelRef}
-				onselect={(time) => { selectedTime = time; }}
-				oncuechange={(c) => { voiceCue = c; }}
+				{schedule}
+				{selectedTime}
+				{targetDate}
+				{voiceCue}
+				{assisting}
+				{hasExistingContent}
+				{notesPanelMode}
+				{showUndo}
+				{mode}
+				bind:voicePanelRef
+				onselect={(time) => {
+					selectedTime = time;
+				}}
+				oncuechange={(c) => {
+					voiceCue = c;
+				}}
 				onaiassist={handleAiAssist}
-				onopenotes={() => { notesPanelMode = 'notes'; }}
-				onopenvault={() => { notesPanelMode = 'vault'; }}
+				onopenotes={() => {
+					notesPanelMode = "notes";
+				}}
+				onopenvault={() => {
+					notesPanelMode = "vault";
+				}}
 				ongenerate={handleGenerateFromNotes}
 				ongeneratefromvault={handleGenerateFromVault}
-				onclosenotes={() => { notesPanelMode = null; }}
+				onclosenotes={() => {
+					notesPanelMode = null;
+				}}
 				onundo={handleUndo}
 			/>
 		{/snippet}
@@ -841,21 +1123,40 @@
 		<ComposerInspector
 			open={inspectorOpen}
 			mobile={true}
-			onclose={() => { inspectorOpen = false; }}
+			onclose={() => {
+				inspectorOpen = false;
+			}}
 		>
 			{#snippet children()}
 				<InspectorContent
-					{schedule} {selectedTime} {targetDate} {voiceCue}
-					{assisting} {hasExistingContent} {notesPanelMode} {showUndo} {mode}
-					bind:voicePanelRef={voicePanelRef}
-					onselect={(time) => { selectedTime = time; }}
-					oncuechange={(c) => { voiceCue = c; }}
+					{schedule}
+					{selectedTime}
+					{targetDate}
+					{voiceCue}
+					{assisting}
+					{hasExistingContent}
+					{notesPanelMode}
+					{showUndo}
+					{mode}
+					bind:voicePanelRef
+					onselect={(time) => {
+						selectedTime = time;
+					}}
+					oncuechange={(c) => {
+						voiceCue = c;
+					}}
 					onaiassist={handleAiAssist}
-					onopenotes={() => { notesPanelMode = 'notes'; }}
-					onopenvault={() => { notesPanelMode = 'vault'; }}
+					onopenotes={() => {
+						notesPanelMode = "notes";
+					}}
+					onopenvault={() => {
+						notesPanelMode = "vault";
+					}}
 					ongenerate={handleGenerateFromNotes}
 					ongeneratefromvault={handleGenerateFromVault}
-					onclosenotes={() => { notesPanelMode = null; }}
+					onclosenotes={() => {
+						notesPanelMode = null;
+					}}
 					onundo={handleUndo}
 				/>
 			{/snippet}
@@ -866,7 +1167,9 @@
 		<CommandPalette
 			open={paletteOpen}
 			{mode}
-			onclose={() => { paletteOpen = false; }}
+			onclose={() => {
+				paletteOpen = false;
+			}}
 			onaction={handlePaletteAction}
 			extraActions={extraPaletteActions}
 		/>
@@ -883,7 +1186,7 @@
 		{#snippet children()}
 			<ComposerHeaderBar
 				{focusMode}
-				inspectorOpen={inspectorOpen}
+				{inspectorOpen}
 				previewVisible={previewMode}
 				ontogglefocus={toggleFocusMode}
 				ontoggleinspector={toggleInspector}
@@ -902,15 +1205,14 @@
 			{inspectorOpen}
 			{canPublish}
 			previewVisible={previewMode}
-			handle={$currentAccount?.x_username ?? null}
-			avatarUrl={$currentAccount?.x_avatar_url ?? null}
-			displayName={$currentAccount?.x_display_name ?? null}
 			{mode}
 			blockCount={threadBlockCount}
 			onsubmit={handleSubmit}
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
-			onopenpalette={() => { paletteOpen = true; }}
+			onopenpalette={() => {
+				paletteOpen = true;
+			}}
 		/>
 		{@render composeBody()}
 	</div>
@@ -923,8 +1225,12 @@
 		blocks={sortedPreviewBlocks}
 		tweetMediaPaths={attachedMedia.map((m) => m.path)}
 		tweetLocalPreviews={tweetMediaPreviewMap}
-		handle={$currentAccount?.x_username ? `@${$currentAccount.x_username}` : '@you'}
-		onclose={() => { previewMode = false; }}
+		handle={$currentAccount?.x_username
+			? `@${$currentAccount.x_username}`
+			: "@you"}
+		onclose={() => {
+			previewMode = false;
+		}}
 	/>
 {/if}
 

@@ -22,6 +22,8 @@
 		index,
 		total,
 		avatarUrl = null,
+		displayName = null,
+		handle = null,
 		focused = false,
 		assisting = false,
 		dragging = false,
@@ -47,6 +49,8 @@
 		index: number;
 		total: number;
 		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 		focused?: boolean;
 		assisting?: boolean;
 		dragging?: boolean;
@@ -144,6 +148,14 @@
 
 	<!-- Main content area -->
 	<div class="card-body">
+		{#if displayName || handle}
+			<div class="card-identity">
+				{#if displayName}<span class="card-display-name"
+						>{displayName}</span
+					>{/if}
+				{#if handle}<span class="card-handle">@{handle}</span>{/if}
+			</div>
+		{/if}
 		<div class="card-writing-area" class:over-limit={overLimit}>
 			<textarea
 				bind:this={textareaEl}
@@ -333,6 +345,30 @@
 	.card-body {
 		flex: 1;
 		min-width: 0;
+	}
+
+	.card-identity {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		padding-top: 2px;
+		margin-bottom: 1px;
+	}
+
+	.card-display-name {
+		font-size: 14px;
+		font-weight: 700;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 200px;
+	}
+
+	.card-handle {
+		font-size: 13px;
+		color: var(--color-text-muted);
+		white-space: nowrap;
 	}
 
 	.card-writing-area {

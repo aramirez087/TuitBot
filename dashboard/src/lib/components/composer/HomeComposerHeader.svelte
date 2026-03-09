@@ -6,8 +6,8 @@
 		EyeOff,
 		PanelRight,
 		Search,
-		Loader2
-	} from 'lucide-svelte';
+		Loader2,
+	} from "lucide-svelte";
 
 	let {
 		canSubmit,
@@ -19,7 +19,7 @@
 		handle = null,
 		avatarUrl = null,
 		displayName = null,
-		mode = 'tweet',
+		mode = "tweet",
 		blockCount = 1,
 		onsubmit,
 		onpublishnow,
@@ -37,7 +37,7 @@
 		handle?: string | null;
 		avatarUrl?: string | null;
 		displayName?: string | null;
-		mode?: 'tweet' | 'thread';
+		mode?: "tweet" | "thread";
 		blockCount?: number;
 		onsubmit: () => void;
 		onpublishnow?: () => void;
@@ -49,18 +49,6 @@
 </script>
 
 <header class="home-header">
-	<div class="header-left">
-		{#if avatarUrl}
-			<img src={avatarUrl} alt="" class="header-avatar" />
-		{/if}
-		{#if displayName}
-			<span class="header-name">{displayName}</span>
-		{/if}
-		{#if handle}
-			<span class="header-handle">@{handle}</span>
-		{/if}
-	</div>
-
 	<div class="header-right">
 		{#if selectedTime}
 			<div class="button-group">
@@ -69,14 +57,14 @@
 					onclick={onsubmit}
 					disabled={!canSubmit || submitting}
 					title="Schedule post"
-					aria-label={submitting ? 'Scheduling' : 'Schedule post'}
+					aria-label={submitting ? "Scheduling" : "Schedule post"}
 				>
 					{#if submitting}
 						<Loader2 size={14} class="spin-icon" />
 					{:else}
 						<Clock size={14} />
 					{/if}
-					<span>{submitting ? 'Scheduling\u2026' : 'Schedule'}</span>
+					<span>{submitting ? "Scheduling\u2026" : "Schedule"}</span>
 				</button>
 				{#if canPublish}
 					<button
@@ -96,14 +84,14 @@
 				onclick={onsubmit}
 				disabled={!canSubmit || submitting}
 				title="Publish now"
-				aria-label={submitting ? 'Posting' : 'Publish now'}
+				aria-label={submitting ? "Posting" : "Publish now"}
 			>
 				{#if submitting}
 					<Loader2 size={14} class="spin-icon" />
 				{:else}
 					<Send size={14} />
 				{/if}
-				<span>{submitting ? 'Posting\u2026' : 'Publish'}</span>
+				<span>{submitting ? "Posting\u2026" : "Publish"}</span>
 			</button>
 		{:else}
 			<button
@@ -111,14 +99,14 @@
 				onclick={onsubmit}
 				disabled={!canSubmit || submitting}
 				title="Connect X API credentials to publish directly"
-				aria-label={submitting ? 'Saving' : 'Save to calendar'}
+				aria-label={submitting ? "Saving" : "Save to calendar"}
 			>
 				{#if submitting}
 					<Loader2 size={14} class="spin-icon" />
 				{:else}
 					<Clock size={14} />
 				{/if}
-				<span>{submitting ? 'Saving\u2026' : 'Save to Calendar'}</span>
+				<span>{submitting ? "Saving\u2026" : "Save to Calendar"}</span>
 			</button>
 		{/if}
 
@@ -127,8 +115,10 @@
 				class="icon-btn"
 				class:active={previewVisible}
 				onclick={ontogglepreview}
-				aria-label={previewVisible ? 'Close preview' : 'Open preview'}
-				title={previewVisible ? 'Close preview (\u2318\u21E7P)' : 'Open preview (\u2318\u21E7P)'}
+				aria-label={previewVisible ? "Close preview" : "Open preview"}
+				title={previewVisible
+					? "Close preview (\u2318\u21E7P)"
+					: "Open preview (\u2318\u21E7P)"}
 			>
 				{#if previewVisible}
 					<Eye size={15} />
@@ -141,8 +131,12 @@
 				class="icon-btn"
 				class:active={inspectorOpen}
 				onclick={ontoggleinspector}
-				aria-label={inspectorOpen ? 'Close inspector' : 'Open inspector'}
-				title={inspectorOpen ? 'Close inspector (\u2318I)' : 'Open inspector (\u2318I)'}
+				aria-label={inspectorOpen
+					? "Close inspector"
+					: "Open inspector"}
+				title={inspectorOpen
+					? "Close inspector (\u2318I)"
+					: "Open inspector (\u2318I)"}
 			>
 				<PanelRight size={15} />
 			</button>
@@ -163,46 +157,12 @@
 	.home-header {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 12px;
-		padding: 10px 20px;
+		padding: 8px 16px;
 		flex-shrink: 0;
-		border-bottom: 1px solid color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
-	}
-
-	.header-left {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		min-width: 0;
-	}
-
-	.header-avatar {
-		width: 24px;
-		height: 24px;
-		border-radius: 50%;
-		object-fit: cover;
-		flex-shrink: 0;
-	}
-
-	.header-name {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--color-text);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 200px;
-	}
-
-	.header-handle {
-		font-size: 13px;
-		font-family: var(--font-mono);
-		color: var(--color-text-muted);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 140px;
+		border-bottom: 1px solid
+			color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
 	}
 
 	.header-right {
@@ -255,7 +215,8 @@
 
 	.publish-now-btn {
 		background: transparent;
-		border: 1.5px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+		border: 1.5px solid
+			color-mix(in srgb, var(--color-accent) 50%, transparent);
 		color: var(--color-accent);
 		padding: 0 10px;
 	}
@@ -315,8 +276,12 @@
 	}
 
 	@keyframes spin {
-		from { transform: rotate(0deg); }
-		to { transform: rotate(360deg); }
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -342,12 +307,6 @@
 	@media (max-width: 640px) {
 		.home-header {
 			gap: 8px;
-		}
-
-		.header-avatar,
-		.header-name,
-		.header-handle {
-			display: none;
 		}
 
 		.icon-tools {

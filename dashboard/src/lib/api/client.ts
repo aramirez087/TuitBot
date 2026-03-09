@@ -580,6 +580,10 @@ export const api = {
 			request<{ id: number }>(`/api/drafts/${id}/restore`, {
 				method: 'POST'
 			}),
+		delete: (id: number) =>
+			request<{ id: number }>(`/api/drafts/${id}`, {
+				method: 'DELETE'
+			}),
 		duplicate: (id: number) =>
 			request<{ id: number }>(`/api/drafts/${id}/duplicate`, {
 				method: 'POST'

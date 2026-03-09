@@ -24,16 +24,15 @@
 		Moon,
 		Download,
 		Search,
-		PenLine,
 		Shield,
 	} from "lucide-svelte";
 
 	let collapsed = $state(false);
 	let updating = $state(false);
-	let serverVersion = $state('');
+	let serverVersion = $state("");
 
 	onMount(async () => {
-		collapsed = await persistGet('sidebar_collapsed', false);
+		collapsed = await persistGet("sidebar_collapsed", false);
 		try {
 			const health = await api.health();
 			serverVersion = health.version;
@@ -44,7 +43,7 @@
 
 	function toggleCollapsed() {
 		collapsed = !collapsed;
-		persistSet('sidebar_collapsed', collapsed);
+		persistSet("sidebar_collapsed", collapsed);
 	}
 
 	async function handleUpdate() {
@@ -58,7 +57,6 @@
 		{ href: "/activity", label: "Activity", icon: Activity },
 		{ href: "/approval", label: "Approval", icon: CheckCircle },
 		{ href: "/content", label: "Content", icon: FileText },
-		{ href: "/drafts", label: "Draft Studio", icon: PenLine },
 		{ href: "/discovery", label: "Discovery", icon: Search },
 		{ href: "/targets", label: "Targets", icon: Target },
 		{ href: "/strategy", label: "Strategy", icon: Compass },
@@ -101,7 +99,7 @@
 				<item.icon size={18} />
 				{#if !collapsed}
 					<span>{item.label}</span>
-					{#if item.href === '/approval' && $pendingCount > 0}
+					{#if item.href === "/approval" && $pendingCount > 0}
 						<span class="nav-badge">{$pendingCount}</span>
 					{/if}
 				{/if}
@@ -119,7 +117,9 @@
 			>
 				<Download size={14} />
 				{#if !collapsed}
-					<span>{updating ? 'Installing...' : 'Update Available'}</span>
+					<span
+						>{updating ? "Installing..." : "Update Available"}</span
+					>
 				{/if}
 			</button>
 		{/if}

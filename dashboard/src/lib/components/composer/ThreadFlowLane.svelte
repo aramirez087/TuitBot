@@ -10,12 +10,16 @@
 	let {
 		blocks: externalBlocks = [],
 		avatarUrl = null,
+		displayName = null,
+		handle = null,
 		onchange,
 		onvalidchange,
 		onfocusindexchange,
 	}: {
 		blocks?: ThreadBlock[];
 		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
 		onfocusindexchange?: (index: number) => void;
@@ -180,8 +184,17 @@
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
-	function handleMediaTransfer(targetBlockId: string, mediaPath: string, sourceBlockId: string) {
-		const result = threadOps.moveMediaBetweenBlocks(blocks, sourceBlockId, targetBlockId, mediaPath);
+	function handleMediaTransfer(
+		targetBlockId: string,
+		mediaPath: string,
+		sourceBlockId: string,
+	) {
+		const result = threadOps.moveMediaBetweenBlocks(
+			blocks,
+			sourceBlockId,
+			targetBlockId,
+			mediaPath,
+		);
 		if (result) onchange(result);
 	}
 
@@ -426,7 +439,12 @@
 	}
 </script>
 
-<div class="flow-lane" class:has-multiple={sortedBlocks.length > 1} role="list" aria-label="Thread editor">
+<div
+	class="flow-lane"
+	class:has-multiple={sortedBlocks.length > 1}
+	role="list"
+	aria-label="Thread editor"
+>
 	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
 		{reorderAnnouncement}
 	</div>
@@ -443,6 +461,8 @@
 				index={i}
 				total={sortedBlocks.length}
 				{avatarUrl}
+				{displayName}
+				{handle}
 				focused={focusedBlockId === block.id}
 				assisting={assistingBlockId === block.id}
 				dragging={draggingBlockId === block.id}
@@ -460,7 +480,9 @@
 				onremove={() => removeBlock(block.id)}
 				onaddafter={() => addBlockAfter(block.id)}
 				onmoveup={i > 0 ? () => moveBlock(block.id, i - 1) : undefined}
-				onmovedown={i < sortedBlocks.length - 1 ? () => moveBlock(block.id, i + 1) : undefined}
+				onmovedown={i < sortedBlocks.length - 1
+					? () => moveBlock(block.id, i + 1)
+					: undefined}
 				ondragstart={(e) => handleDragStart(e, block.id)}
 				ondragend={handleDragEnd}
 				ondragover={(e) => handleCardDragOver(e, block.id)}
@@ -470,7 +492,6 @@
 			/>
 		</div>
 	{/each}
-
 </div>
 
 {#if mergeError}<div class="merge-error" role="alert">{mergeError}</div>{/if}
@@ -496,7 +517,6 @@
 		z-index: 1;
 		padding-bottom: 16px;
 	}
-
 
 	.sr-only {
 		position: absolute;
@@ -537,6 +557,5 @@
 		.flow-lane {
 			padding-left: 0;
 		}
-
 	}
 </style>

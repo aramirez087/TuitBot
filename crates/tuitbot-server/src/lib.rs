@@ -96,7 +96,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route(
             "/drafts/{id}",
-            get(routes::content::get_studio_draft).patch(routes::content::autosave_draft),
+            get(routes::content::get_studio_draft)
+                .patch(routes::content::autosave_draft)
+                .delete(routes::content::delete_draft),
         )
         .route(
             "/drafts/{id}/meta",

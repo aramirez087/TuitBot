@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { Plus, Loader2, Undo2 } from 'lucide-svelte';
-	import type { DraftSummary, ContentTag } from '$lib/api/types';
-	import DraftRailItem from './DraftRailItem.svelte';
-	import DraftFilterBar from './DraftFilterBar.svelte';
+	import { Plus, Loader2 } from "lucide-svelte";
+	import type { DraftSummary, ContentTag } from "$lib/api/types";
+	import DraftRailItem from "./DraftRailItem.svelte";
+	import DraftFilterBar from "./DraftFilterBar.svelte";
 
-	type TabKey = 'active' | 'scheduled' | 'posted' | 'archive';
+	type TabKey = "active" | "scheduled" | "posted" | "archive";
 
 	let {
 		drafts,
@@ -12,24 +12,29 @@
 		tab,
 		tabCounts,
 		loading,
-		searchQuery = '',
-		sortBy = 'updated',
+		searchQuery = "",
+		sortBy = "updated",
 		tagFilter = null,
 		accountTags = [],
 		onselect,
 		ontabchange,
 		oncreate,
-		onarchive,
+		ondelete,
 		onduplicate,
 		onrestore,
 		onsearch,
 		onsort,
-		ontagfilter
+		ontagfilter,
 	}: {
 		drafts: DraftSummary[];
 		selectedId: number | null;
 		tab: TabKey;
-		tabCounts: { active: number; scheduled: number; posted: number; archive: number };
+		tabCounts: {
+			active: number;
+			scheduled: number;
+			posted: number;
+			archive: number;
+		};
 		loading: boolean;
 		searchQuery?: string;
 		sortBy?: string;
@@ -38,7 +43,7 @@
 		onselect: (id: number) => void;
 		ontabchange: (tab: TabKey) => void;
 		oncreate: () => void;
-		onarchive: (id: number) => void;
+		ondelete: (id: number) => void;
 		onduplicate: (id: number) => void;
 		onrestore: (id: number) => void;
 		onsearch?: (q: string) => void;
@@ -49,18 +54,12 @@
 	let filterBarComponent: DraftFilterBar | undefined = $state();
 
 	const tabs: Array<{ key: TabKey; label: string }> = [
-		{ key: 'active', label: 'Drafts' },
-		{ key: 'scheduled', label: 'Scheduled' },
-		{ key: 'posted', label: 'Posted' },
-		{ key: 'archive', label: 'Archive' }
+		{ key: "active", label: "Drafts" },
+		{ key: "scheduled", label: "Scheduled" },
+		{ key: "posted", label: "Posted" },
 	];
 
 	let focusedIndex = $state(0);
-	let lastArchived = $state<{
-		id: number;
-		title: string;
-		timeout: ReturnType<typeof setTimeout>;
-	} | null>(null);
 	let listEl: HTMLDivElement | undefined = $state();
 	let itemEls: DraftRailItem[] = $state([]);
 	let newDraftBtnEl: HTMLButtonElement | undefined = $state();
@@ -85,98 +84,99 @@
 		focusedIndex = 0;
 	});
 
-	// Clear undo toast on tab change
-	$effect(() => {
-		void tab;
-		clearUndoToast();
-	});
-
-	function clearUndoToast() {
-		if (lastArchived) {
-			clearTimeout(lastArchived.timeout);
-			lastArchived = null;
-		}
-	}
-
-	function handleArchiveFocused() {
+	function handleDeleteFocused() {
 		const draft = drafts[focusedIndex];
 		if (!draft) return;
-		handleArchiveItem(draft.id);
+		handleDeleteItem(draft.id);
 	}
 
-	function handleArchiveItem(id: number) {
+	function handleDeleteItem(id: number) {
 		const draft = drafts.find((d) => d.id === id);
 		if (!draft) return;
-		const title = draft.title ?? draft.content_preview?.trim() ?? 'Untitled draft';
-
-		clearUndoToast();
-		onarchive(id);
-
-		const timeout = setTimeout(() => {
-			lastArchived = null;
-		}, 5000);
-		lastArchived = { id, title, timeout };
-	}
-
-	function handleUndo() {
-		if (!lastArchived) return;
-		onrestore(lastArchived.id);
-		clearUndoToast();
+		const title =
+			draft.title ?? draft.content_preview?.trim() ?? "Untitled draft";
+		const confirmed = window.confirm(
+			`Delete "${title}"? This cannot be undone.`,
+		);
+		if (confirmed) ondelete(id);
 	}
 
 	function handleListKeydown(e: KeyboardEvent) {
 		// Ignore if focus is inside a button (action buttons handle their own events)
 		const target = e.target as HTMLElement;
-		if (target.tagName === 'BUTTON' && target.closest('[data-rail-actions]')) return;
+		if (
+			target.tagName === "BUTTON" &&
+			target.closest("[data-rail-actions]")
+		)
+			return;
 
 		switch (e.key) {
-			case 'ArrowDown':
+			case "ArrowDown":
 				e.preventDefault();
 				focusedIndex = Math.min(focusedIndex + 1, drafts.length - 1);
 				itemEls[focusedIndex]?.focus?.();
 				break;
-			case 'ArrowUp':
+			case "ArrowUp":
 				e.preventDefault();
 				focusedIndex = Math.max(focusedIndex - 1, 0);
 				itemEls[focusedIndex]?.focus?.();
 				break;
-			case 'Enter':
+			case "Enter":
 				e.preventDefault();
 				if (drafts[focusedIndex]) onselect(drafts[focusedIndex].id);
 				break;
-			case 'n':
-			case 'N':
+			case "n":
+			case "N":
 				if (!e.metaKey && !e.ctrlKey && !e.altKey) {
 					e.preventDefault();
 					oncreate();
 				}
 				break;
-			case 'Backspace':
-			case 'Delete':
-				if (tab !== 'archive' && tab !== 'posted') {
+			case "Backspace":
+			case "Delete":
+				if (tab !== "posted") {
 					e.preventDefault();
-					handleArchiveFocused();
+					handleDeleteFocused();
 				}
 				break;
-			case 'd':
-			case 'D':
-				if (!e.metaKey && !e.ctrlKey && !e.altKey && drafts[focusedIndex]) {
+			case "d":
+			case "D":
+				if (
+					!e.metaKey &&
+					!e.ctrlKey &&
+					!e.altKey &&
+					drafts[focusedIndex]
+				) {
 					e.preventDefault();
 					onduplicate(drafts[focusedIndex].id);
 				}
 				break;
-			case 'r':
-			case 'R':
-				if (tab === 'archive' && !e.metaKey && !e.ctrlKey && !e.altKey && drafts[focusedIndex]) {
+			case "r":
+			case "R":
+				if (
+					tab === "archive" &&
+					!e.metaKey &&
+					!e.ctrlKey &&
+					!e.altKey &&
+					drafts[focusedIndex]
+				) {
 					e.preventDefault();
 					onrestore(drafts[focusedIndex].id);
 				}
 				break;
-			case '1': ontabchange('active'); break;
-			case '2': ontabchange('scheduled'); break;
-			case '3': ontabchange('posted'); break;
-			case '4': ontabchange('archive'); break;
-			case '/':
+			case "1":
+				ontabchange("active");
+				break;
+			case "2":
+				ontabchange("scheduled");
+				break;
+			case "3":
+				ontabchange("posted");
+				break;
+			case "4":
+				ontabchange("archive");
+				break;
+			case "/":
 				if (!e.metaKey && !e.ctrlKey && !e.altKey) {
 					e.preventDefault();
 					filterBarComponent?.focusSearch();
@@ -194,13 +194,11 @@
 	}
 
 	const emptyMessage = $derived(
-		tab === 'archive'
-			? 'No archived drafts'
-			: tab === 'scheduled'
-				? 'No scheduled drafts'
-				: tab === 'posted'
-					? 'Posted drafts appear here'
-					: 'No drafts yet'
+		tab === "scheduled"
+			? "No scheduled drafts"
+			: tab === "posted"
+				? "Posted drafts appear here"
+				: "No drafts yet",
 	);
 </script>
 
@@ -239,7 +237,7 @@
 		class="rail-list"
 		role="listbox"
 		tabindex="-1"
-		aria-label="{tabs.find(t => t.key === tab)?.label ?? 'Drafts'} list"
+		aria-label="{tabs.find((t) => t.key === tab)?.label ?? 'Drafts'} list"
 		bind:this={listEl}
 		onkeydown={handleListKeydown}
 	>
@@ -259,8 +257,11 @@
 					focused={focusedIndex === i}
 					tabindex={focusedIndex === i ? 0 : -1}
 					{tab}
-					onselect={() => { focusedIndex = i; onselect(draft.id); }}
-					onarchive={() => handleArchiveItem(draft.id)}
+					onselect={() => {
+						focusedIndex = i;
+						onselect(draft.id);
+					}}
+					ondelete={() => handleDeleteItem(draft.id)}
 					onduplicate={() => onduplicate(draft.id)}
 					onrestore={() => onrestore(draft.id)}
 					bind:this={itemEls[i]}
@@ -268,16 +269,6 @@
 			{/each}
 		{/if}
 	</div>
-
-	{#if lastArchived}
-		<div class="undo-toast" role="status" aria-live="polite">
-			<span class="undo-text">Draft archived</span>
-			<button class="undo-btn" type="button" onclick={handleUndo}>
-				<Undo2 size={13} />
-				Undo
-			</button>
-		</div>
-	{/if}
 
 	<div class="rail-footer">
 		<button
@@ -372,41 +363,6 @@
 		color: var(--color-text-subtle);
 	}
 
-	.undo-toast {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 8px;
-		padding: 8px 12px;
-		background: var(--color-surface-active);
-		border-top: 1px solid var(--color-border-subtle);
-		flex-shrink: 0;
-	}
-
-	.undo-text {
-		font-size: 12px;
-		color: var(--color-text-muted);
-	}
-
-	.undo-btn {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		border: none;
-		background: transparent;
-		color: var(--color-accent);
-		font-size: 12px;
-		font-weight: 500;
-		cursor: pointer;
-		padding: 4px 8px;
-		border-radius: 4px;
-		transition: background 0.1s ease;
-	}
-
-	.undo-btn:hover {
-		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-	}
-
 	.rail-footer {
 		flex-shrink: 0;
 		padding: 12px;
@@ -435,7 +391,11 @@
 	}
 
 	@keyframes spin {
-		from { transform: rotate(0deg); }
-		to { transform: rotate(360deg); }
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>

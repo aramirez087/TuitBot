@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { api } from '$lib/api';
-	import { tweetWeightedLen } from '$lib/utils/tweetLength';
-	import { X, Film, Users, Captions } from 'lucide-svelte';
-	import MediaAltBadge from './MediaAltBadge.svelte';
-	import CharRing from './CharRing.svelte';
+	import { api } from "$lib/api";
+	import { tweetWeightedLen } from "$lib/utils/tweetLength";
+	import { X, Film, Users, Captions } from "lucide-svelte";
+	import MediaAltBadge from "./MediaAltBadge.svelte";
+	import CharRing from "./CharRing.svelte";
 
 	export interface AttachedMedia {
 		path: string;
@@ -19,7 +19,9 @@
 		attachedMedia,
 		onmediachange,
 		onerror,
-		avatarUrl = null
+		avatarUrl = null,
+		displayName = null,
+		handle = null,
 	}: {
 		text: string;
 		onchange: (text: string) => void;
@@ -27,12 +29,15 @@
 		onmediachange: (media: AttachedMedia[]) => void;
 		onerror: (msg: string) => void;
 		avatarUrl?: string | null;
+		displayName?: string | null;
+		handle?: string | null;
 	} = $props();
 
 	let uploading = $state(false);
 	let fileInput: HTMLInputElement | undefined = $state();
 
-	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
+	const ACCEPTED_TYPES =
+		"image/jpeg,image/png,image/webp,image/gif,video/mp4";
 	const MAX_IMAGES = 4;
 	const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 	const MAX_GIF_SIZE = 15 * 1024 * 1024;
@@ -44,39 +49,46 @@
 	const mediaCount = $derived(attachedMedia.length);
 
 	const hasGifOrVideo = $derived(
-		attachedMedia.some((m) => m.mediaType === 'image/gif' || m.mediaType === 'video/mp4')
+		attachedMedia.some(
+			(m) => m.mediaType === "image/gif" || m.mediaType === "video/mp4",
+		),
 	);
-	const canAttachMore = $derived(!hasGifOrVideo && attachedMedia.length < MAX_IMAGES);
+	const canAttachMore = $derived(
+		!hasGifOrVideo && attachedMedia.length < MAX_IMAGES,
+	);
 
 	function getMaxSize(type: string): number {
-		if (type === 'video/mp4') return MAX_VIDEO_SIZE;
-		if (type === 'image/gif') return MAX_GIF_SIZE;
+		if (type === "video/mp4") return MAX_VIDEO_SIZE;
+		if (type === "image/gif") return MAX_GIF_SIZE;
 		return MAX_IMAGE_SIZE;
 	}
 
 	async function processFiles(files: FileList | File[]) {
 		for (const file of files) {
-			const accepted = ACCEPTED_TYPES.split(',');
+			const accepted = ACCEPTED_TYPES.split(",");
 			if (!accepted.includes(file.type)) {
-				onerror(`Unsupported file type: ${file.type || 'unknown'}`);
+				onerror(`Unsupported file type: ${file.type || "unknown"}`);
 				break;
 			}
 			if (!canAttachMore && !hasGifOrVideo) {
 				onerror(`Maximum ${MAX_IMAGES} images allowed per tweet.`);
 				break;
 			}
-			const isGifOrVideo = file.type === 'image/gif' || file.type === 'video/mp4';
+			const isGifOrVideo =
+				file.type === "image/gif" || file.type === "video/mp4";
 			if (isGifOrVideo && attachedMedia.length > 0) {
-				onerror('GIF/video cannot be combined with other media.');
+				onerror("GIF/video cannot be combined with other media.");
 				break;
 			}
 			if (!isGifOrVideo && hasGifOrVideo) {
-				onerror('Cannot add images when GIF/video is attached.');
+				onerror("Cannot add images when GIF/video is attached.");
 				break;
 			}
 			const maxSize = getMaxSize(file.type);
 			if (file.size > maxSize) {
-				onerror(`File "${file.name}" exceeds maximum size of ${Math.round(maxSize / 1024 / 1024)}MB.`);
+				onerror(
+					`File "${file.name}" exceeds maximum size of ${Math.round(maxSize / 1024 / 1024)}MB.`,
+				);
 				break;
 			}
 			uploading = true;
@@ -88,11 +100,15 @@
 						path: result.path,
 						file,
 						previewUrl: api.media.fileUrl(result.path),
-						mediaType: result.media_type
-					}
+						mediaType: result.media_type,
+					},
 				]);
 			} catch (err) {
-				onerror(err instanceof Error ? err.message : 'Failed to upload media');
+				onerror(
+					err instanceof Error
+						? err.message
+						: "Failed to upload media",
+				);
 				break;
 			} finally {
 				uploading = false;
@@ -105,7 +121,7 @@
 		const files = input.files;
 		if (!files || files.length === 0) return;
 		await processFiles(files);
-		input.value = '';
+		input.value = "";
 	}
 
 	function handleDrop(e: DragEvent) {
@@ -128,7 +144,7 @@
 		}
 
 		// If text was pasted, let native handling work
-		if (e.clipboardData?.getData('text/plain')) return;
+		if (e.clipboardData?.getData("text/plain")) return;
 
 		// WKWebView fallback: clipboardData is empty for images.
 		// In Tauri, image paste is handled by ComposeWorkspace's Cmd+V handler
@@ -142,27 +158,36 @@
 	export function triggerFileSelect() {
 		fileInput?.click();
 	}
-
 </script>
 
 <div class="tweet-compose" class:has-avatar={!!avatarUrl}>
 	{#if avatarUrl}
 		<img src={avatarUrl} alt="" class="compose-avatar" />
 	{/if}
-	<textarea
-		class="compose-input"
-		class:over-limit={tweetOverLimit}
-		placeholder="What's on your mind?"
-		value={text}
-		oninput={(e) => onchange(e.currentTarget.value)}
-		ondrop={handleDrop}
-		ondragover={handleDragOver}
-		onpaste={handlePaste}
-		rows={4}
-		aria-label="Tweet content"
-	></textarea>
-	<div class="char-ring-row">
-		<CharRing current={tweetChars} max={TWEET_MAX} />
+	<div class="compose-main">
+		{#if displayName || handle}
+			<div class="compose-identity">
+				{#if displayName}<span class="compose-display-name"
+						>{displayName}</span
+					>{/if}
+				{#if handle}<span class="compose-handle">@{handle}</span>{/if}
+			</div>
+		{/if}
+		<textarea
+			class="compose-input"
+			class:over-limit={tweetOverLimit}
+			placeholder="What's on your mind?"
+			value={text}
+			oninput={(e) => onchange(e.currentTarget.value)}
+			ondrop={handleDrop}
+			ondragover={handleDragOver}
+			onpaste={handlePaste}
+			rows={4}
+			aria-label="Tweet content"
+		></textarea>
+		<div class="char-ring-row">
+			<CharRing current={tweetChars} max={TWEET_MAX} />
+		</div>
 	</div>
 </div>
 
@@ -176,23 +201,36 @@
 	>
 		{#each attachedMedia as media, i}
 			<div class="media-thumb">
-				{#if media.mediaType === 'video/mp4'}
-					<video src={media.previewUrl} class="thumb-img" muted></video>
+				{#if media.mediaType === "video/mp4"}
+					<video src={media.previewUrl} class="thumb-img" muted
+					></video>
 					<span class="media-badge"><Film size={12} /> Video</span>
 				{:else}
-					<img src={media.previewUrl} alt="Attached media" class="thumb-img" />
-					{#if media.mediaType === 'image/gif'}
+					<img
+						src={media.previewUrl}
+						alt="Attached media"
+						class="thumb-img"
+					/>
+					{#if media.mediaType === "image/gif"}
 						<span class="media-badge">GIF</span>
 					{/if}
 				{/if}
-				<button class="remove-media-btn" onclick={() => removeMedia(i)} aria-label="Remove media">
+				<button
+					class="remove-media-btn"
+					onclick={() => removeMedia(i)}
+					aria-label="Remove media"
+				>
 					<X size={14} />
 				</button>
-				{#if media.mediaType !== 'video/mp4'}
+				{#if media.mediaType !== "video/mp4"}
 					<MediaAltBadge
-						altText={media.altText ?? ''}
+						altText={media.altText ?? ""}
 						onchange={(alt) => {
-							onmediachange(attachedMedia.map((m, j) => j === i ? { ...m, altText: alt } : m));
+							onmediachange(
+								attachedMedia.map((m, j) =>
+									j === i ? { ...m, altText: alt } : m,
+								),
+							);
 						}}
 					/>
 				{/if}
@@ -200,16 +238,20 @@
 		{/each}
 	</div>
 	<div class="media-links">
-		<button class="media-link disabled" title="Coming soon" aria-label="Tag people (coming soon)">
+		<button
+			class="media-link disabled"
+			title="Coming soon"
+			aria-label="Tag people (coming soon)"
+		>
 			<Users size={12} />
 			<span>Tag People</span>
 		</button>
-		{#if attachedMedia.some((m) => m.mediaType !== 'video/mp4')}
+		{#if attachedMedia.some((m) => m.mediaType !== "video/mp4")}
 			<button
 				class="media-link"
 				onclick={() => {
 					const badge = document.querySelector<HTMLButtonElement>(
-						'.media-preview-grid [aria-label^="Add alt text"], .media-preview-grid [aria-label^="Edit alt text"]'
+						'.media-preview-grid [aria-label^="Add alt text"], .media-preview-grid [aria-label^="Edit alt text"]',
 					);
 					badge?.click();
 				}}
@@ -241,6 +283,35 @@
 		display: flex;
 		gap: 12px;
 		align-items: flex-start;
+	}
+
+	.compose-main {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.compose-identity {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		padding-top: 2px;
+		margin-bottom: 1px;
+	}
+
+	.compose-display-name {
+		font-size: 14px;
+		font-weight: 700;
+		color: var(--color-text);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 200px;
+	}
+
+	.compose-handle {
+		font-size: 13px;
+		color: var(--color-text-muted);
+		white-space: nowrap;
 	}
 
 	.compose-avatar {
@@ -299,13 +370,19 @@
 		border: 1px solid var(--color-border-subtle);
 	}
 
-	.media-preview-grid.single { grid-template-columns: 1fr; }
-	.media-preview-grid.double { grid-template-columns: 1fr 1fr; }
+	.media-preview-grid.single {
+		grid-template-columns: 1fr;
+	}
+	.media-preview-grid.double {
+		grid-template-columns: 1fr 1fr;
+	}
 	.media-preview-grid.triple {
 		grid-template-columns: 1fr 1fr;
 		grid-template-rows: 1fr 1fr;
 	}
-	.media-preview-grid.triple .media-thumb:first-child { grid-row: 1 / 3; }
+	.media-preview-grid.triple .media-thumb:first-child {
+		grid-row: 1 / 3;
+	}
 	.media-preview-grid.quad {
 		grid-template-columns: 1fr 1fr;
 		grid-template-rows: 1fr 1fr;
@@ -318,8 +395,12 @@
 		background: var(--color-surface-active);
 	}
 
-	.media-preview-grid.single .media-thumb { aspect-ratio: 16 / 9; }
-	.media-preview-grid.double .media-thumb { aspect-ratio: 1; }
+	.media-preview-grid.single .media-thumb {
+		aspect-ratio: 16 / 9;
+	}
+	.media-preview-grid.double .media-thumb {
+		aspect-ratio: 1;
+	}
 
 	.thumb-img {
 		width: 100%;
