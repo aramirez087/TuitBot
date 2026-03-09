@@ -7,6 +7,7 @@
 //!
 //! CLI flag overrides are applied by the binary crate after loading.
 
+pub mod capability;
 mod defaults;
 mod enrichment;
 mod env_overrides;
@@ -20,6 +21,7 @@ mod tests;
 #[cfg(test)]
 mod tests_backend;
 
+pub use capability::{compute_tier, CapabilityTier};
 pub use enrichment::{EnrichmentStage, ProfileCompleteness};
 pub use merge::{
     effective_config, merge_overrides, split_patch_by_scope, validate_override_keys,

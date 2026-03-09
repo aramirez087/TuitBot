@@ -29,11 +29,18 @@ pub async fn status(
     // Determine if direct posting is possible for this account.
     let can_post = crate::routes::content::can_post_for(&state, &ctx.account_id).await;
 
-    // Load provider_backend from effective config (per-account, not global).
-    let provider_backend = match state.load_effective_config(&ctx.account_id).await {
-        Ok(config) => config.x_api.provider_backend,
-        Err(_) => String::new(),
-    };
+    // Load provider_backend and compute capability tier from effective config.
+    let (provider_backend, capability_tier) =
+        match state.load_effective_config(&ctx.account_id).await {
+            Ok(config) => {
+                let tier = tuitbot_core::config::compute_tier(&config, can_post);
+                (config.x_api.provider_backend, tier)
+            }
+            Err(_) => (
+                String::new(),
+                tuitbot_core::config::CapabilityTier::Unconfigured,
+            ),
+        };
 
     Ok(Json(json!({
         "running": running,
@@ -42,6 +49,7 @@ pub async fn status(
         "capabilities": capabilities,
         "provider_backend": provider_backend,
         "can_post": can_post,
+        "capability_tier": capability_tier,
     })))
 }
 

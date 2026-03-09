@@ -35,6 +35,15 @@ export interface AnalyzeProfileResponse {
 	error?: string;
 }
 
+// --- Capability tier types ---
+
+export type CapabilityTier =
+	| 'unconfigured'
+	| 'profile_ready'
+	| 'exploration_ready'
+	| 'generation_ready'
+	| 'posting_ready';
+
 // --- Deployment types ---
 
 export type DeploymentModeValue = 'desktop' | 'self_host' | 'cloud';
@@ -55,6 +64,7 @@ export interface RuntimeStatus {
 	capabilities: DeploymentCapabilities;
 	provider_backend: string;
 	can_post: boolean;
+	capability_tier: CapabilityTier;
 }
 
 // --- Health & Analytics types ---
@@ -512,6 +522,7 @@ export interface ConfigStatus {
 	claimed: boolean;
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
+	capability_tier: CapabilityTier;
 }
 
 export interface SettingsValidationResult {

@@ -125,3 +125,12 @@ function createOnboardingStore() {
 }
 
 export const onboardingData = createOnboardingStore();
+
+/** Check if the minimum required fields for progressive activation are complete. */
+export function isMinimalComplete(data: OnboardingData): boolean {
+	return (
+		data.product_name.trim().length > 0 &&
+		data.product_description.trim().length > 0 &&
+		data.product_keywords.length > 0
+	);
+}

@@ -141,11 +141,22 @@ pub async fn config_status(State(state): State<Arc<AppState>>) -> Json<Value> {
     let configured = state.config_path.exists();
     let claimed = passphrase::is_claimed(&state.data_dir);
     let capabilities = state.deployment_mode.capabilities();
+
+    // Compute capability tier from config if it exists.
+    let capability_tier = if configured {
+        Config::load(Some(&state.config_path.to_string_lossy()))
+            .map(|config| tuitbot_core::config::compute_tier(&config, false))
+            .unwrap_or(tuitbot_core::config::CapabilityTier::Unconfigured)
+    } else {
+        tuitbot_core::config::CapabilityTier::Unconfigured
+    };
+
     Json(serde_json::json!({
         "configured": configured,
         "claimed": claimed,
         "deployment_mode": state.deployment_mode,
         "capabilities": capabilities,
+        "capability_tier": capability_tier,
     }))
 }
 
@@ -203,7 +214,7 @@ pub async fn init_settings(
     let config: Config = toml::from_str(&toml_str)
         .map_err(|e| ApiError::BadRequest(format!("invalid config: {e}")))?;
 
-    if let Err(errors) = config.validate() {
+    if let Err(errors) = config.validate_minimum() {
         let items = config_errors_to_response(errors);
         return Ok((
             StatusCode::OK,

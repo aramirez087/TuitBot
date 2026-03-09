@@ -15,7 +15,10 @@
 	import ValidationStep from '$lib/components/onboarding/ValidationStep.svelte';
 	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
-	import { Zap, ArrowLeft, ArrowRight, Loader2 } from 'lucide-svelte';
+	import { Zap, ArrowLeft, ArrowRight, Loader2, SkipForward } from 'lucide-svelte';
+
+	// Optional steps that can be skipped during progressive activation.
+	const OPTIONAL_STEPS = new Set(['LLM', 'Analyze', 'Language', 'Vault', 'Validate']);
 
 	// Step flow varies by mode:
 	// API mode: Welcome → X Access → LLM → Analyze → Profile → Language → Vault → Validate → Review [→ Secure]
@@ -30,6 +33,7 @@
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');
+	let skippedSteps = $state(new Set<string>());
 
 	// Claim state — only used in web mode.
 	let claimPassphrase = $state('');
@@ -45,6 +49,18 @@
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
 	let isAnalyzeStep = $derived(currentStepName === 'Analyze');
+
+	// Show "Skip to finish" after Profile step (where required steps end).
+	let canSkipToFinish = $derived(
+		currentStepName === 'Profile' ||
+		(OPTIONAL_STEPS.has(currentStepName) && currentStepName !== 'Analyze')
+	);
+
+	// Determine if LLM is configured (for display purposes).
+	let hasLlmConfig = $derived(
+		$onboardingData.llm_provider === 'ollama' ||
+		($onboardingData.llm_api_key.trim().length > 0 && $onboardingData.llm_model.trim().length > 0)
+	);
 
 	// Prevent navigation away during claim step if passphrase is generated but not submitted.
 	$effect(() => {
@@ -72,8 +88,8 @@
 					data.industry_topics.length > 0
 				);
 			case 'LLM':
-				if (data.llm_provider === 'ollama') return data.llm_model.trim().length > 0;
-				return data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0;
+				// Optional in progressive activation — always advanceable
+				return true;
 			case 'Analyze':
 				return false;
 			case 'Language':
@@ -94,6 +110,17 @@
 
 	function next() {
 		if (currentStep < steps.length - 1) {
+			// In API mode, skip Analyze step if LLM is not configured
+			if (currentStepName === 'LLM' && !isScraperMode && !hasLlmConfig) {
+				// Skip Analyze step — jump past it to Profile
+				const analyzeIdx = steps.indexOf('Analyze');
+				if (analyzeIdx >= 0) {
+					skippedSteps = new Set([...skippedSteps, 'Analyze']);
+					currentStep = analyzeIdx + 1;
+					errorMsg = '';
+					return;
+				}
+			}
 			currentStep++;
 			errorMsg = '';
 		}
@@ -109,6 +136,20 @@
 			}
 			errorMsg = '';
 		}
+	}
+
+	function skipToFinish() {
+		// Mark all remaining optional steps as skipped
+		const reviewIdx = steps.indexOf('Review');
+		if (reviewIdx < 0) return;
+		for (let i = currentStep; i < reviewIdx; i++) {
+			const stepName = steps[i];
+			if (OPTIONAL_STEPS.has(stepName)) {
+				skippedSteps = new Set([...skippedSteps, stepName]);
+			}
+		}
+		currentStep = reviewIdx;
+		errorMsg = '';
 	}
 
 	async function submit() {
@@ -133,14 +174,18 @@
 					product_keywords: data.product_keywords,
 					industry_topics: data.industry_topics,
 				},
-				llm: {
+				approval_mode: data.approval_mode,
+			};
+
+			// Only include LLM section if provider and key are configured
+			if (data.llm_provider && (data.llm_provider === 'ollama' || data.llm_api_key)) {
+				config.llm = {
 					provider: data.llm_provider,
 					...(data.llm_api_key ? { api_key: data.llm_api_key } : {}),
 					model: data.llm_model,
 					...(data.llm_base_url ? { base_url: data.llm_base_url } : {}),
-				},
-				approval_mode: data.approval_mode,
-			};
+				};
+			}
 
 			if (data.source_type === 'google_drive' && (data.connection_id || data.folder_id)) {
 				config.content_sources = {
@@ -179,7 +224,7 @@
 			const result = await api.settings.init(config);
 
 			if (result.status === 'validation_failed' && result.errors) {
-				errorMsg = result.errors.map((e) => `${e.field}: ${e.message}`).join('; ');
+				errorMsg = result.errors.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join('; ');
 				return;
 			}
 
@@ -229,9 +274,17 @@
 		<div class="progress">
 			{#each steps as step, i}
 				{#if step !== 'Analyze'}
-					<div class="progress-step" class:active={i === currentStep || (step === 'Profile' && isAnalyzeStep)} class:completed={i < currentStep}>
+					{@const isSkipped = skippedSteps.has(step)}
+					<div
+						class="progress-step"
+						class:active={i === currentStep || (step === 'Profile' && isAnalyzeStep)}
+						class:completed={i < currentStep && !isSkipped}
+						class:skipped={isSkipped && i < currentStep}
+					>
 						<div class="progress-dot">
-							{#if i < currentStep}
+							{#if isSkipped && i < currentStep}
+								<span class="skip-mark">&mdash;</span>
+							{:else if i < currentStep}
 								<span class="check-mark">&#10003;</span>
 							{:else}
 								{i + 1}
@@ -262,9 +315,9 @@
 			{:else if currentStepName === 'Vault'}
 				<SourcesStep />
 			{:else if currentStepName === 'Validate'}
-				<ValidationStep />
+				<ValidationStep {hasLlmConfig} />
 			{:else if currentStepName === 'Review'}
-				<ReviewStep />
+				<ReviewStep {skippedSteps} />
 			{:else if currentStepName === 'Secure'}
 				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} {alreadyClaimed} />
 			{/if}
@@ -288,14 +341,25 @@
 				<!-- Analyze step auto-advances; no button needed -->
 				<div></div>
 			{:else if !isLastStep}
-				<button
-					class="btn btn-primary"
-					onclick={next}
-					disabled={!canAdvance()}
-				>
-					{currentStep === 0 ? 'Get Started' : 'Next'}
-					<ArrowRight size={16} />
-				</button>
+				<div class="action-group">
+					{#if canSkipToFinish && canAdvance()}
+						<button
+							class="btn btn-ghost"
+							onclick={skipToFinish}
+						>
+							Skip optional steps
+							<SkipForward size={14} />
+						</button>
+					{/if}
+					<button
+						class="btn btn-primary"
+						onclick={next}
+						disabled={!canAdvance()}
+					>
+						{currentStep === 0 ? 'Get Started' : 'Next'}
+						<ArrowRight size={16} />
+					</button>
+				</div>
 			{:else}
 				<button
 					class="btn btn-primary"
@@ -393,8 +457,20 @@
 		color: white;
 	}
 
+	.progress-step.skipped .progress-dot {
+		background: var(--color-surface);
+		border-color: var(--color-border);
+		color: var(--color-text-subtle);
+		border-style: dashed;
+	}
+
 	.check-mark {
 		font-size: 14px;
+	}
+
+	.skip-mark {
+		font-size: 14px;
+		font-weight: 700;
 	}
 
 	.progress-label {
@@ -406,6 +482,11 @@
 	.progress-step.active .progress-label {
 		color: var(--color-text);
 		font-weight: 500;
+	}
+
+	.progress-step.skipped .progress-label {
+		color: var(--color-text-subtle);
+		font-style: italic;
 	}
 
 	.progress-line {
@@ -440,6 +521,12 @@
 		align-items: center;
 		padding-top: 16px;
 		border-top: 1px solid var(--color-border-subtle);
+	}
+
+	.action-group {
+		display: flex;
+		align-items: center;
+		gap: 12px;
 	}
 
 	.btn {
@@ -488,6 +575,18 @@
 	.btn-secondary:focus-visible {
 		outline: 2px solid var(--color-accent);
 		outline-offset: 2px;
+	}
+
+	.btn-ghost {
+		background: transparent;
+		color: var(--color-text-muted);
+		padding: 10px 14px;
+		font-size: 13px;
+	}
+
+	.btn-ghost:hover:not(:disabled) {
+		color: var(--color-text);
+		background: var(--color-surface);
 	}
 
 	.spinner {
