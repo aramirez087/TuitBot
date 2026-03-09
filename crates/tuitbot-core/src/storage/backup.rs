@@ -113,6 +113,44 @@ pub async fn validate_backup(backup_path: &Path) -> Result<ValidationResult, Sto
         });
     }
 
+    // Quick check: verify the file starts with the SQLite magic header.
+    // This avoids confusing duplicated low-level SQLite errors for
+    // plain-text files, empty files, or other non-database inputs.
+    match std::fs::read(backup_path) {
+        Ok(bytes) if bytes.len() < 16 => {
+            return Ok(ValidationResult {
+                valid: false,
+                tables: vec![],
+                messages: vec![format!(
+                    "File is too small to be a SQLite database: {}",
+                    backup_path.display()
+                )],
+            });
+        }
+        Ok(bytes) if !bytes.starts_with(b"SQLite format 3\0") => {
+            return Ok(ValidationResult {
+                valid: false,
+                tables: vec![],
+                messages: vec![format!(
+                    "File is not a valid SQLite database: {}",
+                    backup_path.display()
+                )],
+            });
+        }
+        Err(e) => {
+            return Ok(ValidationResult {
+                valid: false,
+                tables: vec![],
+                messages: vec![format!(
+                    "Cannot read backup file {}: {}",
+                    backup_path.display(),
+                    e
+                )],
+            });
+        }
+        Ok(_) => {} // Valid header, proceed with full validation
+    }
+
     let path_str = backup_path.to_string_lossy();
     let options = SqliteConnectOptions::new()
         .filename(&*path_str)
