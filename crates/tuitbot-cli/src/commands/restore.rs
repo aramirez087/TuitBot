@@ -17,6 +17,18 @@ pub async fn execute(args: RestoreArgs, config_path: &str, out: CliOutput) -> an
         anyhow::bail!("Backup file not found: {}", backup_path.display());
     }
 
+    if backup_path.is_dir() {
+        anyhow::bail!(
+            "Backup path is a directory, expected a file: {}",
+            backup_path.display()
+        );
+    }
+
+    // Check readability
+    if let Err(e) = std::fs::File::open(&backup_path) {
+        anyhow::bail!("Cannot read backup file {}: {}", backup_path.display(), e);
+    }
+
     // Validate.
     out.info(&format!("Validating backup: {}", backup_path.display()));
     let validation = storage::backup::validate_backup(&backup_path).await?;

@@ -17,6 +17,18 @@ fn with_locked_env(test: impl FnOnce()) {
     test();
 }
 
+/// Create a minimal config that passes all validation checks.
+fn valid_test_config() -> Config {
+    let mut config = Config::default();
+    config.business.product_name = "TestProduct".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.business.product_description = "A test product".to_string();
+    config.business.industry_topics = vec!["testing".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.x_api.client_id = "test-id".to_string();
+    config
+}
+
 struct ScopedEnvVar {
     key: &'static str,
     previous: Option<OsString>,
@@ -166,11 +178,7 @@ fn validate_threshold_over_100() {
 
 #[test]
 fn validate_threshold_boundary_values() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
 
     config.scoring.threshold = 0;
     assert!(config.validate().is_ok());
@@ -199,12 +207,8 @@ fn validate_returns_multiple_errors() {
 
 #[test]
 fn validate_valid_config_passes() {
-    let mut config = Config::default();
-    config.business.product_name = "TestProduct".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
+    let mut config = valid_test_config();
     config.llm.model = "llama2".to_string();
-    config.x_api.client_id = "test-id".to_string();
     assert!(config.validate().is_ok());
 }
 
@@ -247,22 +251,14 @@ fn split_csv_trims_and_filters() {
 
 #[test]
 fn validate_preferred_times_valid() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.schedule.preferred_times = vec!["09:15".to_string(), "12:30".to_string()];
     assert!(config.validate().is_ok());
 }
 
 #[test]
 fn validate_preferred_times_auto() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.schedule.preferred_times = vec!["auto".to_string()];
     assert!(config.validate().is_ok());
 }
@@ -451,6 +447,7 @@ fn quickstart_minimal_config_validates() {
         "MyApp".to_string(),
         vec!["rust cli".to_string(), "developer tools".to_string()],
     );
+    config.business.product_description = "A developer tool".to_string();
     config.llm.provider = "ollama".to_string();
     config.x_api.client_id = "test-client-id".to_string();
     assert!(config.validate().is_ok());
@@ -920,11 +917,7 @@ fn validate_local_fs_source_rejected_in_cloud_mode() {
 
 #[test]
 fn validate_google_drive_source_allowed_in_cloud_mode() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.deployment_mode = DeploymentMode::Cloud;
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
@@ -944,11 +937,7 @@ fn validate_google_drive_source_allowed_in_cloud_mode() {
 
 #[test]
 fn validate_local_fs_source_allowed_in_desktop_mode() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.deployment_mode = DeploymentMode::Desktop;
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "local_fs".to_string(),
@@ -1264,6 +1253,8 @@ poll_interval_seconds = 300
     let mut valid_config = config;
     valid_config.business.product_name = "Test".to_string();
     valid_config.business.product_keywords = vec!["test".to_string()];
+    valid_config.business.product_description = "A test product".to_string();
+    valid_config.business.industry_topics = vec!["testing".to_string()];
     valid_config.llm.provider = "ollama".to_string();
     valid_config.x_api.client_id = "test-id".to_string();
     assert!(valid_config.validate().is_ok());
@@ -1272,11 +1263,7 @@ poll_interval_seconds = 300
 #[test]
 fn legacy_local_fs_config_unaffected_by_deployment_mode() {
     // Desktop mode with local_fs validates OK.
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.deployment_mode = DeploymentMode::Desktop;
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "local_fs".to_string(),
@@ -1302,11 +1289,7 @@ fn legacy_local_fs_config_unaffected_by_deployment_mode() {
 fn legacy_sa_key_only_config_still_valid() {
     // A Google Drive source with only service_account_key (no connection_id)
     // passes validation in all deployment modes that allow google_drive.
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
         path: None,
@@ -1337,11 +1320,7 @@ fn legacy_sa_key_only_config_still_valid() {
 
 #[test]
 fn empty_content_sources_valid() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     // Explicitly empty sources
     config.content_sources.sources = vec![];
     assert!(config.validate().is_ok());
@@ -1350,11 +1329,7 @@ fn empty_content_sources_valid() {
 #[test]
 fn connection_id_without_sa_key_valid() {
     // A Google Drive source with only connection_id (no service_account_key).
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
         path: None,
@@ -1375,11 +1350,7 @@ fn connection_id_without_sa_key_valid() {
 fn google_drive_source_no_auth_warns() {
     // A Google Drive source with NEITHER connection_id NOR service_account_key
     // triggers a non-blocking validation warning (logged, not an error).
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "google_drive".to_string(),
         path: None,
@@ -1596,11 +1567,7 @@ fn validate_enabled_local_fs_without_path() {
 
 #[test]
 fn validate_disabled_source_skips_path_check() {
-    let mut config = Config::default();
-    config.business.product_name = "Test".to_string();
-    config.business.product_keywords = vec!["test".to_string()];
-    config.llm.provider = "ollama".to_string();
-    config.x_api.client_id = "test-id".to_string();
+    let mut config = valid_test_config();
     config.content_sources.sources.push(ContentSourceEntry {
         source_type: "local_fs".to_string(),
         path: None,

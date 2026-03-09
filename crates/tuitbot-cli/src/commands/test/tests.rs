@@ -179,6 +179,8 @@ fn check_business_profile_valid() {
     let mut config = tuitbot_core::config::Config::default();
     config.business.product_name = "TestApp".to_string();
     config.business.product_keywords = vec!["rust".to_string(), "cli".to_string()];
+    config.business.product_description = "A test application".to_string();
+    config.business.industry_topics = vec!["testing".to_string()];
 
     let result = check_business_profile(&config);
     assert!(result.passed);
@@ -218,6 +220,8 @@ fn check_business_profile_competitor_keywords_count() {
     config.business.product_name = "App".to_string();
     config.business.product_keywords = vec!["rust".to_string()];
     config.business.competitor_keywords = vec!["golang".to_string(), "deno".to_string()];
+    config.business.product_description = "A test app".to_string();
+    config.business.industry_topics = vec!["dev tools".to_string()];
 
     let result = check_business_profile(&config);
     assert!(result.passed);

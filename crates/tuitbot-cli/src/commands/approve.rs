@@ -58,6 +58,16 @@ pub async fn execute(config: &Config, args: ApproveArgs, out: CliOutput) -> anyh
     let is_non_interactive =
         args.list || args.approve.is_some() || args.reject.is_some() || args.approve_all;
 
+    let action_count = args.list as u8
+        + args.approve.is_some() as u8
+        + args.reject.is_some() as u8
+        + args.approve_all as u8;
+    if action_count > 1 {
+        anyhow::bail!(
+            "Conflicting flags: --list, --approve, --reject, and --approve-all are mutually exclusive."
+        );
+    }
+
     if !config.approval_mode && !is_non_interactive {
         if out.is_json() {
             out.json(&serde_json::json!({
@@ -108,6 +118,11 @@ pub async fn execute(config: &Config, args: ApproveArgs, out: CliOutput) -> anyh
     }
 
     if let Some(id) = args.approve {
+        let exists = storage::approval_queue::get_by_id(&pool, id).await?;
+        if exists.is_none() {
+            pool.close().await;
+            anyhow::bail!("Item #{id} not found in the approval queue.");
+        }
         storage::approval_queue::update_status(&pool, id, "approved").await?;
         if out.is_json() {
             let result = ApproveActionResult {
@@ -123,6 +138,11 @@ pub async fn execute(config: &Config, args: ApproveArgs, out: CliOutput) -> anyh
     }
 
     if let Some(id) = args.reject {
+        let exists = storage::approval_queue::get_by_id(&pool, id).await?;
+        if exists.is_none() {
+            pool.close().await;
+            anyhow::bail!("Item #{id} not found in the approval queue.");
+        }
         storage::approval_queue::update_status(&pool, id, "rejected").await?;
         if out.is_json() {
             let result = ApproveActionResult {

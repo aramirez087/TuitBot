@@ -27,7 +27,9 @@ fn valid_config_body() -> serde_json::Value {
         },
         "business": {
             "product_name": "TestBot",
-            "product_keywords": ["rust", "testing"]
+            "product_keywords": ["rust", "testing"],
+            "product_description": "A test bot",
+            "industry_topics": ["testing"]
         }
     })
 }

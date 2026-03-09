@@ -58,6 +58,13 @@ pub async fn execute(
     advanced: bool,
     out: CliOutput,
 ) -> Result<()> {
+    if non_interactive && advanced {
+        bail!(
+            "--non-interactive and --advanced are mutually exclusive.\n\
+             Use --non-interactive to copy the template config, or --advanced for the full wizard."
+        );
+    }
+
     let dir = data_dir();
     let config_path: PathBuf = dir.join("config.toml");
 

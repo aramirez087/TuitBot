@@ -63,7 +63,7 @@ claude mcp add -s user -e TUITBOT_X_API__CLIENT_ID=your_client_id tuitbot -- tui
 | **Write** (default) | _(none)_ | 112 | Full growth co-pilot: reads, writes, DMs, analytics, content gen |
 | **Admin** | `--profile admin` | 139 | Superset of Write — adds Ads API, Compliance, Stream Rules |
 | **API read-only** | `--profile api-readonly` | 45 | X API reads + DM reads, no mutations |
-| **Read-only** | `--profile readonly` | 14 | Minimal safe surface — config and health tools only |
+| **Read-only** | `--profile readonly` | 14 | Read-only X tools + config and health — no mutations |
 
 **Example Claude Code config (Write — default):**
 

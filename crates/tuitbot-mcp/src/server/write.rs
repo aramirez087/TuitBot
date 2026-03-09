@@ -426,16 +426,16 @@ impl WriteMcpServer {
             "scheduled_for": req.scheduled_for,
         })
         .to_string();
-        match workflow::policy_gate::check_policy(&self.state, "compose_tweet", &params, start)
-            .await
-        {
-            workflow::policy_gate::GateResult::EarlyReturn(r) => {
-                return Ok(CallToolResult::success(vec![Content::text(r)]));
-            }
-            workflow::policy_gate::GateResult::Proceed => {}
-        }
+        let ticket =
+            match workflow::policy_gate::run_gateway(&self.state, "compose_tweet", &params, start)
+                .await
+            {
+                workflow::policy_gate::GatewayResult::Proceed(t) => t,
+                workflow::policy_gate::GatewayResult::EarlyReturn(r) => {
+                    return Ok(CallToolResult::success(vec![Content::text(r)]));
+                }
+            };
         let content_type = req.content_type.as_deref().unwrap_or("tweet");
-        let config = &self.state.config;
         let result = if let Some(scheduled_for) = &req.scheduled_for {
             match tuitbot_core::storage::scheduled_content::insert(
                 &self.state.pool,
@@ -446,30 +446,30 @@ impl WriteMcpServer {
             .await
             {
                 Ok(id) => {
-                    let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                        &self.state.pool,
-                        "compose_tweet",
-                        &self.state.config.mcp_policy.rate_limits,
-                    )
-                    .await;
-                    let elapsed = start.elapsed().as_millis() as u64;
-                    let meta = ToolMeta::new(elapsed)
-                        .with_workflow(config.mode.to_string(), config.effective_approval_mode());
-                    ToolResponse::success(serde_json::json!({
+                    let result_data = serde_json::json!({
                         "scheduled_item_id": id,
                         "content_type": content_type,
                         "scheduled_for": scheduled_for,
-                    }))
-                    .with_meta(meta)
-                    .to_json()
+                    });
+                    let meta = workflow::policy_gate::complete_gateway_success(
+                        &self.state,
+                        &ticket,
+                        &result_data,
+                        start,
+                    )
+                    .await;
+                    ToolResponse::success(result_data).with_meta(meta).to_json()
                 }
                 Err(e) => {
-                    let elapsed = start.elapsed().as_millis() as u64;
-                    let meta = ToolMeta::new(elapsed)
-                        .with_workflow(config.mode.to_string(), config.effective_approval_mode());
-                    ToolResponse::db_error(format!("Error scheduling content: {e}"))
-                        .with_meta(meta)
-                        .to_json()
+                    let msg = format!("Error scheduling content: {e}");
+                    let meta = workflow::policy_gate::complete_gateway_failure(
+                        &self.state,
+                        &ticket,
+                        &msg,
+                        start,
+                    )
+                    .await;
+                    ToolResponse::db_error(msg).with_meta(meta).to_json()
                 }
             }
         } else {
@@ -482,29 +482,29 @@ impl WriteMcpServer {
             .await
             {
                 Ok(id) => {
-                    let _ = tuitbot_core::mcp_policy::McpPolicyEvaluator::record_mutation(
-                        &self.state.pool,
-                        "compose_tweet",
-                        &self.state.config.mcp_policy.rate_limits,
-                    )
-                    .await;
-                    let elapsed = start.elapsed().as_millis() as u64;
-                    let meta = ToolMeta::new(elapsed)
-                        .with_workflow(config.mode.to_string(), config.effective_approval_mode());
-                    ToolResponse::success(serde_json::json!({
+                    let result_data = serde_json::json!({
                         "draft_id": id,
                         "content_type": content_type,
-                    }))
-                    .with_meta(meta)
-                    .to_json()
+                    });
+                    let meta = workflow::policy_gate::complete_gateway_success(
+                        &self.state,
+                        &ticket,
+                        &result_data,
+                        start,
+                    )
+                    .await;
+                    ToolResponse::success(result_data).with_meta(meta).to_json()
                 }
                 Err(e) => {
-                    let elapsed = start.elapsed().as_millis() as u64;
-                    let meta = ToolMeta::new(elapsed)
-                        .with_workflow(config.mode.to_string(), config.effective_approval_mode());
-                    ToolResponse::db_error(format!("Error creating draft: {e}"))
-                        .with_meta(meta)
-                        .to_json()
+                    let msg = format!("Error creating draft: {e}");
+                    let meta = workflow::policy_gate::complete_gateway_failure(
+                        &self.state,
+                        &ticket,
+                        &msg,
+                        start,
+                    )
+                    .await;
+                    ToolResponse::db_error(msg).with_meta(meta).to_json()
                 }
             }
         };

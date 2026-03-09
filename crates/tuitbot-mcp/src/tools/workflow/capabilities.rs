@@ -229,8 +229,11 @@ pub async fn get_capabilities(
 
     // 2. Derive capabilities from tier.
     let tier_lower = tier_str.to_lowercase();
-    let can_post_tweets = true;
-    let can_reply = tier_lower != "free";
+    let can_post_tweets = x_available
+        && (config.x_api.provider_backend != "scraper" || config.x_api.scraper_allow_mutations);
+    let can_reply = x_available
+        && tier_lower != "free"
+        && (config.x_api.provider_backend != "scraper" || config.x_api.scraper_allow_mutations);
     let can_search = tier_lower == "basic" || tier_lower == "pro";
     let can_discover = can_search;
 
@@ -580,7 +583,7 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
         assert_eq!(parsed["success"], true);
         assert_eq!(parsed["data"]["tier"], "unknown");
-        assert_eq!(parsed["data"]["can_post_tweets"], true);
+        assert_eq!(parsed["data"]["can_post_tweets"], false); // x_available=false
         assert_eq!(parsed["data"]["llm_available"], true);
     }
 

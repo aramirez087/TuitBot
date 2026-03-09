@@ -22,6 +22,18 @@ impl Config {
             });
         }
 
+        if self.business.product_description.trim().is_empty() {
+            errors.push(ConfigError::MissingField {
+                field: "business.product_description".to_string(),
+            });
+        }
+
+        if self.business.industry_topics.is_empty() {
+            errors.push(ConfigError::MissingField {
+                field: "business.industry_topics".to_string(),
+            });
+        }
+
         // Validate LLM provider
         if !self.llm.provider.is_empty() {
             match self.llm.provider.as_str() {
@@ -276,6 +288,23 @@ impl Config {
             errors.push(ConfigError::MissingField {
                 field: "x_api.client_id".to_string(),
             });
+        }
+
+        // Validate storage.db_path is not empty/whitespace and not a directory
+        let db_path_trimmed = self.storage.db_path.trim();
+        if db_path_trimmed.is_empty() {
+            errors.push(ConfigError::InvalidValue {
+                field: "storage.db_path".to_string(),
+                message: "must not be empty or whitespace-only".to_string(),
+            });
+        } else {
+            let expanded = crate::startup::expand_tilde(db_path_trimmed);
+            if expanded.is_dir() {
+                errors.push(ConfigError::InvalidValue {
+                    field: "storage.db_path".to_string(),
+                    message: format!("'{}' is a directory, must point to a file", db_path_trimmed),
+                });
+            }
         }
 
         // Validate content sources against deployment capabilities

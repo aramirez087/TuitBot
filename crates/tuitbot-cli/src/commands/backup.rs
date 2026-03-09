@@ -10,6 +10,13 @@ use crate::output::CliOutput;
 
 /// Execute the `tuitbot backup` command.
 pub async fn execute(args: BackupArgs, config_path: &str, out: CliOutput) -> anyhow::Result<()> {
+    if args.list && (args.prune.is_some() || args.output_dir.is_some()) {
+        anyhow::bail!(
+            "--list is mutually exclusive with --prune and --output-dir.\n\
+             Use --list alone to view backups."
+        );
+    }
+
     let db_path = resolve_db_path(config_path);
     let data = db_path
         .parent()

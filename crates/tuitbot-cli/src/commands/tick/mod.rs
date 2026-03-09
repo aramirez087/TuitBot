@@ -71,6 +71,7 @@ struct LoopErrorJson {
 }
 
 /// Which loops to run, resolved from CLI args + tier capabilities.
+#[derive(Debug)]
 struct LoopFilter {
     analytics: bool,
     discovery: bool,
@@ -81,24 +82,55 @@ struct LoopFilter {
 }
 
 impl LoopFilter {
-    fn from_args(args: &TickArgs) -> Self {
+    const VALID_NAMES: &'static [&'static str] = &[
+        "analytics",
+        "discovery",
+        "mentions",
+        "target",
+        "content",
+        "thread",
+    ];
+
+    fn from_args(args: &TickArgs) -> Result<Self, anyhow::Error> {
         match &args.loops {
-            Some(names) => Self {
-                analytics: names.iter().any(|n| n == "analytics"),
-                discovery: names.iter().any(|n| n == "discovery"),
-                mentions: names.iter().any(|n| n == "mentions"),
-                target: names.iter().any(|n| n == "target"),
-                content: names.iter().any(|n| n == "content"),
-                thread: names.iter().any(|n| n == "thread"),
-            },
-            None => Self {
+            Some(names) => {
+                let names: Vec<&str> = names
+                    .iter()
+                    .map(|n| n.trim())
+                    .filter(|n| !n.is_empty())
+                    .collect();
+                if names.is_empty() {
+                    anyhow::bail!(
+                        "--loops cannot be empty. Valid values: {}",
+                        Self::VALID_NAMES.join(", ")
+                    );
+                }
+                for name in &names {
+                    if !Self::VALID_NAMES.contains(name) {
+                        anyhow::bail!(
+                            "unknown loop '{}'; valid values: {}",
+                            name,
+                            Self::VALID_NAMES.join(", ")
+                        );
+                    }
+                }
+                Ok(Self {
+                    analytics: names.contains(&"analytics"),
+                    discovery: names.contains(&"discovery"),
+                    mentions: names.contains(&"mentions"),
+                    target: names.contains(&"target"),
+                    content: names.contains(&"content"),
+                    thread: names.contains(&"thread"),
+                })
+            }
+            None => Ok(Self {
                 analytics: true,
                 discovery: true,
                 mentions: true,
                 target: true,
                 content: true,
                 thread: true,
-            },
+            }),
         }
     }
 }
@@ -110,7 +142,7 @@ impl LoopFilter {
 /// Execute the `tuitbot tick` command.
 pub async fn execute(config: &Config, args: TickArgs, out: CliOutput) -> anyhow::Result<()> {
     let start = Instant::now();
-    let filter = LoopFilter::from_args(&args);
+    let filter = LoopFilter::from_args(&args)?;
 
     // 1. Acquire process lock.
     let lock_path = dirs::home_dir()

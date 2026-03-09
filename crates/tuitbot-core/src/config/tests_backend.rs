@@ -47,6 +47,8 @@ fn scraper_config() -> Config {
     let mut config = Config::default();
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
+    config.business.product_description = "A test product".to_string();
+    config.business.industry_topics = vec!["testing".to_string()];
     config.llm.provider = "ollama".to_string();
     config.x_api.provider_backend = "scraper".to_string();
     config
@@ -57,6 +59,8 @@ fn x_api_config() -> Config {
     let mut config = Config::default();
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
+    config.business.product_description = "A test product".to_string();
+    config.business.industry_topics = vec!["testing".to_string()];
     config.llm.provider = "ollama".to_string();
     config.x_api.client_id = "test-client-id".to_string();
     config.x_api.provider_backend = "x_api".to_string();

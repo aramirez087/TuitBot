@@ -1416,7 +1416,9 @@ async fn settings_init_with_connection_id() {
         },
         "business": {
             "product_name": "InitBot",
-            "product_keywords": ["test"]
+            "product_keywords": ["test"],
+            "product_description": "A test bot",
+            "industry_topics": ["testing"]
         },
         "llm": {
             "provider": "ollama",

@@ -357,8 +357,18 @@ fn render_quickstart_minimal_is_valid_toml() {
     assert!(config.business.target_audience.is_empty());
     assert!(config.business.industry_topics.is_empty());
 
-    // Config should pass validation
-    assert!(config.validate().is_ok());
+    // Minimal quickstart omits product_description and industry_topics,
+    // which are now required — validation should flag them.
+    let errors = config.validate().unwrap_err();
+    let fields: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            tuitbot_core::error::ConfigError::MissingField { field } => Some(field.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(fields.contains(&"business.product_description"));
+    assert!(fields.contains(&"business.industry_topics"));
 }
 
 #[test]
@@ -449,8 +459,18 @@ fn quickstart_wizard_result_renders_valid_toml() {
     assert!(config.business.target_audience.is_empty());
     assert!(config.business.industry_topics.is_empty());
 
-    // Config should pass validation
-    assert!(config.validate().is_ok());
+    // Quickstart omits product_description and industry_topics,
+    // which are now required — validation should flag them.
+    let errors = config.validate().unwrap_err();
+    let fields: Vec<&str> = errors
+        .iter()
+        .filter_map(|e| match e {
+            tuitbot_core::error::ConfigError::MissingField { field } => Some(field.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(fields.contains(&"business.product_description"));
+    assert!(fields.contains(&"business.industry_topics"));
 }
 
 #[test]

@@ -18,6 +18,15 @@ use tuitbot_core::startup::{
 /// Determines the auth mode from the CLI flag or config, runs the
 /// appropriate PKCE flow, saves tokens, and verifies credentials.
 pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Result<()> {
+    // Short-circuit: scraper mode does not require X API auth.
+    if config.x_api.provider_backend == "scraper" {
+        eprintln!(
+            "Local No-Key Mode (scraper backend) does not require X API authentication.\n\
+             Authentication is only needed for the official X API backend."
+        );
+        return Ok(());
+    }
+
     // 1. Validate client_id.
     if config.x_api.client_id.is_empty() {
         anyhow::bail!(

@@ -85,7 +85,7 @@ fn collect_checks(config: &Config, config_path: &str) -> Vec<CheckResult> {
         check_config(config, config_path),
         check_business_profile(config),
     ];
-    checks.extend(check_auth());
+    checks.extend(check_auth(config));
     checks.push(check_llm_config(config));
     checks.push(check_database(config));
     checks
@@ -152,7 +152,27 @@ pub async fn run_checks(config: &Config, config_path: &str) -> bool {
 /// if any check fails.
 pub async fn execute(config: &Config, config_path: &str, out: CliOutput) -> anyhow::Result<()> {
     if out.is_json() {
-        let auth = evaluate_auth(load_tokens_from_file());
+        let auth = if config.x_api.provider_backend == "scraper" {
+            AuthEvaluation {
+                checks: vec![CheckResult::ok(
+                    "X API auth",
+                    "skipped (Local No-Key Mode — scraper backend)",
+                )],
+                details: AuthDetails {
+                    token_valid: false,
+                    expires_at: None,
+                    expires_in_seconds: None,
+                    has_refresh_token: false,
+                    scopes_tracked: false,
+                    granted_scopes: vec![],
+                    missing_scopes: vec![],
+                    degraded_features: vec![],
+                    fix_action: None,
+                },
+            }
+        } else {
+            evaluate_auth(load_tokens_from_file())
+        };
         let mut checks = collect_checks_with_auth(config, config_path, auth.checks);
         checks.push(check_llm_connectivity(config).await);
         let output = build_test_output(checks, Some(auth.details));
@@ -196,6 +216,14 @@ fn check_business_profile(config: &Config) -> CheckResult {
         );
     }
 
+    if config.business.product_description.trim().is_empty() {
+        return CheckResult::fail("Business profile", "product_description is empty");
+    }
+
+    if config.business.industry_topics.is_empty() {
+        return CheckResult::fail("Business profile", "no industry_topics configured");
+    }
+
     CheckResult::ok(
         "Business profile",
         format!("product_name: \"{name}\", {keyword_count} keywords, {topic_count} topics"),
@@ -203,7 +231,13 @@ fn check_business_profile(config: &Config) -> CheckResult {
 }
 
 /// Check that OAuth tokens exist and are valid.
-fn check_auth() -> Vec<CheckResult> {
+fn check_auth(config: &Config) -> Vec<CheckResult> {
+    if config.x_api.provider_backend == "scraper" {
+        return vec![CheckResult::ok(
+            "X API auth",
+            "skipped (Local No-Key Mode — scraper backend)",
+        )];
+    }
     evaluate_auth(load_tokens_from_file()).checks
 }
 

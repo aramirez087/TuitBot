@@ -17,7 +17,7 @@ fn tick_args(loops: Option<Vec<&str>>) -> TickArgs {
 #[test]
 fn loop_filter_default_all_enabled() {
     let args = tick_args(None);
-    let filter = LoopFilter::from_args(&args);
+    let filter = LoopFilter::from_args(&args).unwrap();
 
     assert!(filter.analytics);
     assert!(filter.discovery);
@@ -30,7 +30,7 @@ fn loop_filter_default_all_enabled() {
 #[test]
 fn loop_filter_specific_loops() {
     let args = tick_args(Some(vec!["discovery", "mentions"]));
-    let filter = LoopFilter::from_args(&args);
+    let filter = LoopFilter::from_args(&args).unwrap();
 
     assert!(!filter.analytics);
     assert!(filter.discovery);
@@ -41,22 +41,29 @@ fn loop_filter_specific_loops() {
 }
 
 #[test]
-fn loop_filter_empty_vec_all_disabled() {
+fn loop_filter_empty_vec_errors() {
     let args = tick_args(Some(vec![]));
-    let filter = LoopFilter::from_args(&args);
+    let err = LoopFilter::from_args(&args).unwrap_err();
+    assert!(
+        err.to_string().contains("--loops cannot be empty"),
+        "expected empty error, got: {err}"
+    );
+}
 
-    assert!(!filter.analytics);
-    assert!(!filter.discovery);
-    assert!(!filter.mentions);
-    assert!(!filter.target);
-    assert!(!filter.content);
-    assert!(!filter.thread);
+#[test]
+fn loop_filter_unknown_name_errors() {
+    let args = tick_args(Some(vec!["discovery", "bogus"]));
+    let err = LoopFilter::from_args(&args).unwrap_err();
+    assert!(
+        err.to_string().contains("unknown loop 'bogus'"),
+        "expected unknown loop error, got: {err}"
+    );
 }
 
 #[test]
 fn loop_filter_single_loop() {
     let args = tick_args(Some(vec!["analytics"]));
-    let filter = LoopFilter::from_args(&args);
+    let filter = LoopFilter::from_args(&args).unwrap();
 
     assert!(filter.analytics);
     assert!(!filter.discovery);

@@ -40,6 +40,20 @@ pub async fn execute(args: SettingsArgs, config_path: &str, output: OutputFormat
         )
     })?;
 
+    if args.show && args.set.is_some() {
+        bail!(
+            "--show and --set are mutually exclusive.\n\
+             Use --show to view configuration, or --set to change a value."
+        );
+    }
+
+    if args.show && args.category.is_some() {
+        bail!(
+            "--show does not support category filtering.\n\
+             Use `tuitbot settings --show` to view the full configuration."
+        );
+    }
+
     if args.show {
         if output.is_json() {
             show::show_config_json(&config)?;
