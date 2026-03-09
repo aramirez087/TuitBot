@@ -1,10 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { Users, User, RefreshCw, Pencil, Trash2, Plus, Check, X, Loader2, ShieldCheck, AlertCircle } from 'lucide-svelte';
-	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
-	import CredentialCard from './CredentialCard.svelte';
-	import { api } from '$lib/api';
-	import type { AccountAuthStatus } from '$lib/api';
+	import { onMount } from "svelte";
+	import {
+		Users,
+		User,
+		RefreshCw,
+		Pencil,
+		Trash2,
+		Plus,
+		Check,
+		X,
+		Loader2,
+		ShieldCheck,
+		AlertCircle,
+	} from "lucide-svelte";
+	import SettingsSection from "$lib/components/settings/SettingsSection.svelte";
+	import CredentialCard from "./CredentialCard.svelte";
+	import { api } from "$lib/api";
+	import type { AccountAuthStatus } from "$lib/api";
 	import {
 		accounts,
 		currentAccountId,
@@ -12,28 +24,28 @@
 		renameAccount,
 		archiveAccount,
 		syncAccountProfile,
-		type Account
-	} from '$lib/stores/accounts';
+		type Account,
+	} from "$lib/stores/accounts";
 
-	const DEFAULT_ACCOUNT_ID = '00000000-0000-0000-0000-000000000000';
-	const ARCHIVE_PHRASE = 'ARCHIVE';
+	const DEFAULT_ACCOUNT_ID = "00000000-0000-0000-0000-000000000000";
+	const ARCHIVE_PHRASE = "ARCHIVE";
 
 	// --- Create state ---
-	let newLabel = $state('');
+	let newLabel = $state("");
 	let creating = $state(false);
-	let createError = $state('');
+	let createError = $state("");
 
 	// --- Rename state ---
 	let editingId = $state<string | null>(null);
-	let editLabel = $state('');
+	let editLabel = $state("");
 	let renaming = $state(false);
-	let renameError = $state('');
+	let renameError = $state("");
 
 	// --- Archive state ---
 	let archivingId = $state<string | null>(null);
-	let confirmArchiveText = $state('');
+	let confirmArchiveText = $state("");
 	let archiving = $state(false);
-	let archiveError = $state('');
+	let archiveError = $state("");
 
 	// --- Sync state ---
 	let syncingId = $state<string | null>(null);
@@ -43,7 +55,7 @@
 	let statusesLoading = $state(true);
 
 	const activeAccounts = $derived(
-		$accounts.filter((a: Account) => a.status === 'active')
+		$accounts.filter((a: Account) => a.status === "active"),
 	);
 
 	onMount(() => {
@@ -72,13 +84,14 @@
 		const label = newLabel.trim();
 		if (!label || creating) return;
 		creating = true;
-		createError = '';
+		createError = "";
 		try {
 			await createAccount(label);
-			newLabel = '';
+			newLabel = "";
 			await loadAuthStatuses();
 		} catch (e) {
-			createError = e instanceof Error ? e.message : 'Failed to create account';
+			createError =
+				e instanceof Error ? e.message : "Failed to create account";
 		} finally {
 			creating = false;
 		}
@@ -89,13 +102,13 @@
 	function startRename(account: Account) {
 		editingId = account.id;
 		editLabel = account.label;
-		renameError = '';
+		renameError = "";
 	}
 
 	function cancelRename() {
 		editingId = null;
-		editLabel = '';
-		renameError = '';
+		editLabel = "";
+		renameError = "";
 	}
 
 	async function handleRename() {
@@ -103,48 +116,51 @@
 		const label = editLabel.trim();
 		if (!label) return;
 		renaming = true;
-		renameError = '';
+		renameError = "";
 		try {
 			await renameAccount(editingId, label);
 			editingId = null;
-			editLabel = '';
+			editLabel = "";
 		} catch (e) {
-			renameError = e instanceof Error ? e.message : 'Failed to rename account';
+			renameError =
+				e instanceof Error ? e.message : "Failed to rename account";
 		} finally {
 			renaming = false;
 		}
 	}
 
 	function handleRenameKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') handleRename();
-		if (e.key === 'Escape') cancelRename();
+		if (e.key === "Enter") handleRename();
+		if (e.key === "Escape") cancelRename();
 	}
 
 	// --- Archive ---
 
 	function startArchive(id: string) {
 		archivingId = id;
-		confirmArchiveText = '';
-		archiveError = '';
+		confirmArchiveText = "";
+		archiveError = "";
 	}
 
 	function cancelArchive() {
 		archivingId = null;
-		confirmArchiveText = '';
-		archiveError = '';
+		confirmArchiveText = "";
+		archiveError = "";
 	}
 
 	async function handleArchive() {
-		if (!archivingId || archiving || confirmArchiveText !== ARCHIVE_PHRASE) return;
+		if (!archivingId || archiving || confirmArchiveText !== ARCHIVE_PHRASE)
+			return;
 		archiving = true;
-		archiveError = '';
+		archiveError = "";
 		try {
 			await archiveAccount(archivingId);
 			archivingId = null;
-			confirmArchiveText = '';
+			confirmArchiveText = "";
 			await loadAuthStatuses();
 		} catch (e) {
-			archiveError = e instanceof Error ? e.message : 'Failed to archive account';
+			archiveError =
+				e instanceof Error ? e.message : "Failed to archive account";
 		} finally {
 			archiving = false;
 		}
@@ -174,10 +190,19 @@
 		return id === $currentAccountId;
 	}
 
-	function credentialLabel(status: AccountAuthStatus | undefined): { text: string; color: string } {
-		if (!status || !status.has_credentials) return { text: 'No credentials', color: 'warning' };
-		if (status.oauth_expired) return { text: 'Token expired', color: 'warning' };
-		return { text: 'Linked', color: 'success' };
+	function credentialLabel(status: AccountAuthStatus | undefined): {
+		text: string;
+		color: string;
+	} {
+		if (!status || !status.has_credentials)
+			return { text: "No credentials", color: "warning" };
+		if (status.oauth_expired)
+			return { text: "Token expired", color: "warning" };
+		return { text: "Linked", color: "success" };
+	}
+
+	function focus(node: HTMLElement) {
+		node.focus();
 	}
 </script>
 
@@ -192,11 +217,18 @@
 		{#each activeAccounts as account (account.id)}
 			{@const status = authStatuses.get(account.id)}
 			{@const cred = credentialLabel(status)}
-			<div class="account-row" class:editing={editingId === account.id} class:archiving-row={archivingId === account.id}>
+			<div
+				class="account-row"
+				class:editing={editingId === account.id}
+				class:archiving-row={archivingId === account.id}
+			>
 				<!-- Avatar -->
 				<div class="account-avatar">
 					{#if account.x_avatar_url}
-						<img src={account.x_avatar_url} alt={account.x_username ?? account.label} />
+						<img
+							src={account.x_avatar_url}
+							alt={account.x_username ?? account.label}
+						/>
 					{:else}
 						<User size={18} />
 					{/if}
@@ -212,16 +244,26 @@
 								bind:value={editLabel}
 								onkeydown={handleRenameKeydown}
 								disabled={renaming}
-								autofocus
+								use:focus
 							/>
-							<button class="icon-btn confirm" onclick={handleRename} disabled={renaming || !editLabel.trim()} title="Save">
+							<button
+								class="icon-btn confirm"
+								onclick={handleRename}
+								disabled={renaming || !editLabel.trim()}
+								title="Save"
+							>
 								{#if renaming}
 									<Loader2 size={14} class="spinning" />
 								{:else}
 									<Check size={14} />
 								{/if}
 							</button>
-							<button class="icon-btn cancel" onclick={cancelRename} disabled={renaming} title="Cancel">
+							<button
+								class="icon-btn cancel"
+								onclick={cancelRename}
+								disabled={renaming}
+								title="Cancel"
+							>
 								<X size={14} />
 							</button>
 						</div>
@@ -231,10 +273,14 @@
 					{:else}
 						<div class="account-identity">
 							<span class="account-name">
-								{account.x_username ? `@${account.x_username}` : account.label}
+								{account.x_username
+									? `@${account.x_username}`
+									: account.label}
 							</span>
 							{#if account.x_username && account.label !== account.x_username}
-								<span class="account-label-tag">{account.label}</span>
+								<span class="account-label-tag"
+									>{account.label}</span
+								>
 							{/if}
 						</div>
 						<div class="account-meta">
@@ -246,7 +292,7 @@
 							{/if}
 							{#if !statusesLoading}
 								<span class="badge badge-{cred.color}">
-									{#if cred.color === 'success'}
+									{#if cred.color === "success"}
 										<ShieldCheck size={10} />
 									{:else}
 										<AlertCircle size={10} />
@@ -267,7 +313,12 @@
 							disabled={syncingId === account.id}
 							title="Sync X profile"
 						>
-							<RefreshCw size={14} class={syncingId === account.id ? 'spinning' : ''} />
+							<RefreshCw
+								size={14}
+								class={syncingId === account.id
+									? "spinning"
+									: ""}
+							/>
 						</button>
 						<button
 							class="icon-btn"
@@ -307,7 +358,8 @@
 							<button
 								class="archive-btn"
 								onclick={handleArchive}
-								disabled={confirmArchiveText !== ARCHIVE_PHRASE || archiving}
+								disabled={confirmArchiveText !==
+									ARCHIVE_PHRASE || archiving}
 							>
 								{#if archiving}
 									<Loader2 size={14} class="spinning" />
@@ -316,7 +368,11 @@
 								{/if}
 								Archive
 							</button>
-							<button class="icon-btn cancel" onclick={cancelArchive} disabled={archiving}>
+							<button
+								class="icon-btn cancel"
+								onclick={cancelArchive}
+								disabled={archiving}
+							>
 								<X size={14} />
 							</button>
 						</div>
@@ -338,7 +394,9 @@
 				placeholder="Account label (e.g. My Brand)"
 				bind:value={newLabel}
 				disabled={creating}
-				onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleCreate(); }}
+				onkeydown={(e: KeyboardEvent) => {
+					if (e.key === "Enter") handleCreate();
+				}}
 			/>
 			<button
 				class="create-btn"
@@ -515,7 +573,9 @@
 		background: transparent;
 		color: var(--color-text-muted);
 		cursor: pointer;
-		transition: background 0.15s, color 0.15s;
+		transition:
+			background 0.15s,
+			color 0.15s;
 	}
 
 	.icon-btn:hover:not(:disabled) {
@@ -580,8 +640,13 @@
 
 	.archive-prompt code {
 		padding: 1px 5px;
-		background: color-mix(in srgb, var(--color-danger) 10%, var(--color-base));
-		border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--color-danger) 10%,
+			var(--color-base)
+		);
+		border: 1px solid
+			color-mix(in srgb, var(--color-danger) 25%, transparent);
 		border-radius: 3px;
 		font-size: 11px;
 		font-family: var(--font-mono, ui-monospace, monospace);
@@ -725,7 +790,11 @@
 	}
 
 	@keyframes spin {
-		from { transform: rotate(0deg); }
-		to { transform: rotate(360deg); }
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { X, UserPlus } from 'lucide-svelte';
+	import { X, UserPlus } from "lucide-svelte";
 
 	interface Props {
 		open: boolean;
@@ -11,14 +11,14 @@
 
 	let { open, submitting, error, onclose, onsubmit }: Props = $props();
 
-	let username = $state('');
+	let username = $state("");
 
-	const cleanUsername = $derived(username.trim().replace(/^@/, ''));
+	const cleanUsername = $derived(username.trim().replace(/^@/, ""));
 	const canSubmit = $derived(cleanUsername.length > 0 && !submitting);
 
 	$effect(() => {
 		if (open) {
-			username = '';
+			username = "";
 		}
 	});
 
@@ -28,7 +28,7 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && canSubmit) {
+		if (e.key === "Enter" && canSubmit) {
 			e.preventDefault();
 			handleSubmit();
 		}
@@ -41,7 +41,7 @@
 	}
 
 	function handleWindowKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
+		if (e.key === "Escape") {
 			onclose();
 		}
 	}
@@ -50,8 +50,17 @@
 <svelte:window onkeydown={handleWindowKeydown} />
 
 {#if open}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="backdrop" onclick={handleBackdropClick}>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="backdrop"
+		role="button"
+		tabindex="-1"
+		onclick={handleBackdropClick}
+		onkeydown={(e) => {
+			if (e.key === "Escape" || e.key === "Enter" || e.key === " ")
+				handleBackdropClick(e as any);
+		}}
+	>
 		<div class="modal">
 			<div class="modal-header">
 				<h2>Add Target Account</h2>
@@ -61,7 +70,8 @@
 			</div>
 
 			<div class="modal-body">
-				<label class="field-label" for="target-username">Username</label>
+				<label class="field-label" for="target-username">Username</label
+				>
 				<div class="input-row">
 					<span class="at-prefix">@</span>
 					<input
@@ -75,7 +85,8 @@
 					/>
 				</div>
 				<p class="field-hint">
-					Enter the X username of the account you want to monitor and engage with.
+					Enter the X username of the account you want to monitor and
+					engage with.
 				</p>
 
 				{#if error}
@@ -85,9 +96,13 @@
 
 			<div class="modal-footer">
 				<button class="cancel-btn" onclick={onclose}>Cancel</button>
-				<button class="submit-btn" onclick={handleSubmit} disabled={!canSubmit}>
+				<button
+					class="submit-btn"
+					onclick={handleSubmit}
+					disabled={!canSubmit}
+				>
 					<UserPlus size={14} />
-					{submitting ? 'Adding...' : 'Add Target'}
+					{submitting ? "Adding..." : "Add Target"}
 				</button>
 			</div>
 		</div>
@@ -172,7 +187,8 @@
 
 	.input-row:focus-within {
 		border-color: var(--color-accent);
-		box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+		box-shadow: 0 0 0 2px
+			color-mix(in srgb, var(--color-accent) 20%, transparent);
 	}
 
 	.at-prefix {

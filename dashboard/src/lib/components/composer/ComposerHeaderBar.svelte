@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { X, Maximize2, Minimize2, PanelRight, Eye, EyeOff } from 'lucide-svelte';
+	import {
+		X,
+		Maximize2,
+		Minimize2,
+		PanelRight,
+		ScanEye,
+	} from "lucide-svelte";
 
 	let {
 		focusMode,
@@ -8,7 +14,7 @@
 		ontogglefocus,
 		ontoggleinspector,
 		ontogglepreview,
-		onclose
+		onclose,
 	}: {
 		focusMode: boolean;
 		inspectorOpen?: boolean;
@@ -36,13 +42,15 @@
 			class="header-btn"
 			class:active={previewVisible}
 			onclick={ontogglepreview}
-			aria-label={previewVisible ? 'Close preview' : 'Open preview'}
-			title={previewVisible ? 'Close preview (\u2318\u21E7P)' : 'Open preview (\u2318\u21E7P)'}
+			aria-label={previewVisible ? "Close preview" : "Open preview"}
+			title={previewVisible
+				? "Close preview (\u2318\u21E7P)"
+				: "Open preview (\u2318\u21E7P)"}
 		>
 			{#if previewVisible}
-				<Eye size={14} />
+				<ScanEye size={14} />
 			{:else}
-				<EyeOff size={14} />
+				<ScanEye size={14} />
 			{/if}
 		</button>
 	{/if}
@@ -52,8 +60,10 @@
 			class="header-btn"
 			class:active={inspectorOpen}
 			onclick={ontoggleinspector}
-			aria-label={inspectorOpen ? 'Close inspector' : 'Open inspector'}
-			title={inspectorOpen ? 'Close inspector (\u2318I)' : 'Open inspector (\u2318I)'}
+			aria-label={inspectorOpen ? "Close inspector" : "Open inspector"}
+			title={inspectorOpen
+				? "Close inspector (\u2318I)"
+				: "Open inspector (\u2318I)"}
 		>
 			<PanelRight size={14} />
 		</button>
@@ -62,8 +72,10 @@
 	<button
 		class="header-btn focus-btn"
 		onclick={ontogglefocus}
-		aria-label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
-		title={focusMode ? 'Exit focus mode (\u2318\u21E7F)' : 'Focus mode (\u2318\u21E7F)'}
+		aria-label={focusMode ? "Exit focus mode" : "Enter focus mode"}
+		title={focusMode
+			? "Exit focus mode (\u2318\u21E7F)"
+			: "Focus mode (\u2318\u21E7F)"}
 	>
 		{#if focusMode}
 			<Minimize2 size={14} />

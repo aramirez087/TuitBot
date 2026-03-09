@@ -9,7 +9,7 @@
 		max?: number;
 	} = $props();
 
-	const RADIUS = 6;
+	const RADIUS = 11;
 	const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 	const WARN_THRESHOLD = 260;
 	const progress = $derived(Math.min(current / max, 1.15));
@@ -26,8 +26,10 @@
 			? "var(--color-danger)"
 			: warning
 				? "var(--color-warning)"
-				: "var(--color-text-subtle)",
+				: "var(--color-accent)",
 	);
+
+	const trackOpacity = $derived(overLimit || warning ? "0.2" : "0.15");
 </script>
 
 <div
@@ -38,34 +40,39 @@
 	aria-live="polite"
 	aria-label={tooltip}
 >
-	<svg width="16" height="16" viewBox="0 0 16 16" class="ring-svg">
+	<svg width="28" height="28" viewBox="0 0 28 28" class="ring-svg">
 		<!-- Track -->
 		<circle
-			cx="8"
-			cy="8"
+			cx="14"
+			cy="14"
 			r={RADIUS}
 			fill="none"
 			stroke="var(--color-border-subtle)"
-			stroke-width="1.5"
-			opacity="0.35"
+			stroke-width="2"
+			opacity={trackOpacity}
 		/>
 		<!-- Progress arc -->
 		<circle
-			cx="8"
-			cy="8"
+			cx="14"
+			cy="14"
 			r={RADIUS}
 			fill="none"
 			stroke={strokeColor}
-			stroke-width="1.5"
+			stroke-width="2"
 			stroke-dasharray={CIRCUMFERENCE}
 			stroke-dashoffset={offset}
 			stroke-linecap="round"
-			transform="rotate(-90 8 8)"
+			transform="rotate(-90 14 14)"
 			class="ring-progress"
 		/>
 	</svg>
 	{#if showCount}
-		<span class="ring-count" class:over={overLimit} class:warning style:color={strokeColor}>
+		<span
+			class="ring-count"
+			class:over={overLimit}
+			class:warning
+			style:color={strokeColor}
+		>
 			{remaining}
 		</span>
 	{/if}
@@ -78,8 +85,8 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 16px;
-		height: 16px;
+		width: 28px;
+		height: 28px;
 		opacity: 0;
 		transition: opacity 0.2s ease;
 		flex-shrink: 0;
@@ -110,15 +117,16 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 7px;
+		font-size: 9px;
 		font-family: var(--font-mono);
-		font-weight: 600;
+		font-weight: 700;
 		line-height: 1;
 		pointer-events: none;
+		letter-spacing: -0.02em;
 	}
 
 	.ring-count.over {
-		font-weight: 700;
+		font-size: 9px;
 	}
 
 	/* CSS tooltip */

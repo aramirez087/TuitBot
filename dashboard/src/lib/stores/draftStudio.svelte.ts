@@ -304,6 +304,20 @@ export async function restoreDraft(id: number): Promise<void> {
 	}
 }
 
+export async function deleteDraft(id: number): Promise<void> {
+	try {
+		await api.draftStudio.delete(id);
+		collection = collection.filter((d) => d.id !== id);
+		archivedCollection = archivedCollection.filter((d) => d.id !== id);
+		if (selectedId === id) {
+			const remaining = currentTabDrafts.filter((d) => d.id !== id);
+			selectDraft(remaining[0]?.id ?? null);
+		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to delete draft';
+	}
+}
+
 export async function scheduleDraft(id: number, scheduledFor: string): Promise<boolean> {
 	try {
 		const result = await api.draftStudio.schedule(id, scheduledFor);

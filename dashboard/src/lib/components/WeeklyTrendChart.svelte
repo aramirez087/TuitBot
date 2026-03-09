@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy } from "svelte";
 	import {
 		Chart,
 		LineController,
@@ -8,11 +8,19 @@
 		LinearScale,
 		CategoryScale,
 		Tooltip,
-		Legend
-	} from 'chart.js';
-	import type { StrategyReport } from '$lib/api';
+		Legend,
+	} from "chart.js";
+	import type { StrategyReport } from "$lib/api";
 
-	Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend);
+	Chart.register(
+		LineController,
+		LineElement,
+		PointElement,
+		LinearScale,
+		CategoryScale,
+		Tooltip,
+		Legend,
+	);
 
 	interface Props {
 		reports: StrategyReport[];
@@ -20,57 +28,65 @@
 
 	let { reports }: Props = $props();
 
-	let canvas: HTMLCanvasElement;
+	let canvas = $state<HTMLCanvasElement | undefined>();
 	let chart: Chart | null = null;
 
 	function buildChart(data: StrategyReport[]) {
 		const reversed = [...data].reverse();
 		const labels = reversed.map((r) => {
 			const d = new Date(r.week_start);
-			return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+			return d.toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+			});
 		});
 
 		const accentColor =
 			getComputedStyle(document.documentElement)
-				.getPropertyValue('--color-accent')
-				.trim() || '#58a6ff';
+				.getPropertyValue("--color-accent")
+				.trim() || "#58a6ff";
 		const successColor =
 			getComputedStyle(document.documentElement)
-				.getPropertyValue('--color-success')
-				.trim() || '#3fb950';
-		const warnColor = '#d29922';
+				.getPropertyValue("--color-success")
+				.trim() || "#3fb950";
+		const warnColor = "#d29922";
 
 		const datasets = [
 			{
-				label: 'Follower Delta',
+				label: "Follower Delta",
 				data: reversed.map((r) => r.follower_delta),
 				borderColor: successColor,
-				backgroundColor: successColor + '20',
+				backgroundColor: successColor + "20",
 				borderWidth: 2,
 				pointRadius: 3,
-				tension: 0.3
+				tension: 0.3,
 			},
 			{
-				label: 'Avg Engagement',
+				label: "Avg Engagement",
 				data: reversed.map((r) => {
-					const scores = [r.avg_reply_score, r.avg_tweet_score].filter((s) => s > 0);
-					return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+					const scores = [
+						r.avg_reply_score,
+						r.avg_tweet_score,
+					].filter((s) => s > 0);
+					return scores.length > 0
+						? scores.reduce((a, b) => a + b, 0) / scores.length
+						: 0;
 				}),
 				borderColor: accentColor,
-				backgroundColor: accentColor + '20',
+				backgroundColor: accentColor + "20",
 				borderWidth: 2,
 				pointRadius: 3,
-				tension: 0.3
+				tension: 0.3,
 			},
 			{
-				label: 'Acceptance Rate (%)',
+				label: "Acceptance Rate (%)",
 				data: reversed.map((r) => r.reply_acceptance_rate * 100),
 				borderColor: warnColor,
-				backgroundColor: warnColor + '20',
+				backgroundColor: warnColor + "20",
 				borderWidth: 2,
 				pointRadius: 3,
-				tension: 0.3
-			}
+				tension: 0.3,
+			},
 		];
 
 		if (chart) {
@@ -80,42 +96,42 @@
 			return;
 		}
 
-		chart = new Chart(canvas, {
-			type: 'line',
+		chart = new Chart(canvas as HTMLCanvasElement, {
+			type: "line",
 			data: { labels, datasets },
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				interaction: { mode: 'index', intersect: false },
+				interaction: { mode: "index", intersect: false },
 				plugins: {
 					tooltip: {
-						backgroundColor: '#161b22',
-						titleColor: '#e6edf3',
-						bodyColor: '#8b949e',
-						borderColor: '#30363d',
+						backgroundColor: "#161b22",
+						titleColor: "#e6edf3",
+						bodyColor: "#8b949e",
+						borderColor: "#30363d",
 						borderWidth: 1,
-						padding: 10
+						padding: 10,
 					},
 					legend: {
 						labels: {
-							color: '#8b949e',
+							color: "#8b949e",
 							boxWidth: 12,
 							padding: 16,
-							font: { size: 11 }
-						}
-					}
+							font: { size: 11 },
+						},
+					},
 				},
 				scales: {
 					x: {
-						grid: { color: '#21262d' },
-						ticks: { color: '#6e7681', maxTicksLimit: 8 }
+						grid: { color: "#21262d" },
+						ticks: { color: "#6e7681", maxTicksLimit: 8 },
 					},
 					y: {
-						grid: { color: '#21262d' },
-						ticks: { color: '#6e7681' }
-					}
-				}
-			}
+						grid: { color: "#21262d" },
+						ticks: { color: "#6e7681" },
+					},
+				},
+			},
 		});
 	}
 
@@ -160,20 +176,37 @@
 					{#each reports as report}
 						<tr>
 							<td>{report.week_start}</td>
-							<td class:positive={report.follower_delta > 0} class:negative={report.follower_delta < 0}>
-								{report.follower_delta > 0 ? '+' : ''}{report.follower_delta}
+							<td
+								class:positive={report.follower_delta > 0}
+								class:negative={report.follower_delta < 0}
+							>
+								{report.follower_delta > 0
+									? "+"
+									: ""}{report.follower_delta}
 							</td>
 							<td>{report.replies_sent}</td>
 							<td>{report.tweets_posted}</td>
 							<td>
 								{(() => {
-									const scores = [report.avg_reply_score, report.avg_tweet_score].filter((s) => s > 0);
+									const scores = [
+										report.avg_reply_score,
+										report.avg_tweet_score,
+									].filter((s) => s > 0);
 									return scores.length > 0
-										? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-										: '0.0';
+										? (
+												scores.reduce(
+													(a, b) => a + b,
+													0,
+												) / scores.length
+											).toFixed(1)
+										: "0.0";
 								})()}
 							</td>
-							<td>{(report.reply_acceptance_rate * 100).toFixed(0)}%</td>
+							<td
+								>{(report.reply_acceptance_rate * 100).toFixed(
+									0,
+								)}%</td
+							>
 						</tr>
 					{/each}
 				</tbody>

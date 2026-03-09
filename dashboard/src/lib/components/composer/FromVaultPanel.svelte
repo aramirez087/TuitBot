@@ -1,8 +1,14 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
-	import type { VaultNoteItem, VaultNoteDetail } from '$lib/api/types';
-	import { X, Search, ChevronRight, ChevronDown, FileText } from 'lucide-svelte';
+	import { onMount } from "svelte";
+	import { api } from "$lib/api";
+	import type { VaultNoteItem, VaultNoteDetail } from "$lib/api/types";
+	import {
+		X,
+		Search,
+		ChevronRight,
+		ChevronDown,
+		FileText,
+	} from "lucide-svelte";
 
 	let {
 		mode,
@@ -10,9 +16,9 @@
 		ongenerate,
 		onclose,
 		onundo,
-		showUndo = false
+		showUndo = false,
 	}: {
-		mode: 'tweet' | 'thread';
+		mode: "tweet" | "thread";
 		hasExistingContent?: boolean;
 		ongenerate: (selectedNodeIds: number[]) => Promise<void>;
 		onclose: () => void;
@@ -22,11 +28,13 @@
 
 	const MAX_SELECTIONS = 3;
 
-	let searchQuery = $state('');
+	let searchQuery = $state("");
 	let notes = $state<VaultNoteItem[]>([]);
 	let expandedNote = $state<VaultNoteDetail | null>(null);
 	let expandedNodeId = $state<number | null>(null);
-	let selectedChunks = $state<Map<number, { nodeId: number; heading: string }>>(new Map());
+	let selectedChunks = $state<
+		Map<number, { nodeId: number; heading: string }>
+	>(new Map());
 	let loading = $state(false);
 	let expanding = $state(false);
 	let generating = $state(false);
@@ -43,10 +51,13 @@
 		loading = true;
 		error = null;
 		try {
-			const result = await api.vault.searchNotes({ q: q || undefined, limit: 20 });
+			const result = await api.vault.searchNotes({
+				q: q || undefined,
+				limit: 20,
+			});
 			notes = result.notes;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Search failed';
+			error = e instanceof Error ? e.message : "Search failed";
 		} finally {
 			loading = false;
 		}
@@ -71,7 +82,7 @@
 			expandedNote = detail;
 			expandedNodeId = nodeId;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load note';
+			error = e instanceof Error ? e.message : "Failed to load note";
 		} finally {
 			expanding = false;
 		}
@@ -99,10 +110,12 @@
 		error = null;
 		confirmReplace = false;
 		try {
-			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
+			const nodeIds = [
+				...new Set([...selectedChunks.values()].map((v) => v.nodeId)),
+			];
 			await ongenerate(nodeIds);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Generation failed';
+			error = e instanceof Error ? e.message : "Generation failed";
 		} finally {
 			generating = false;
 		}
@@ -113,11 +126,15 @@
 	}
 
 	function noteTitle(note: VaultNoteItem): string {
-		return note.title || note.relative_path.split('/').pop()?.replace(/\.md$/, '') || 'Untitled';
+		return (
+			note.title ||
+			note.relative_path.split("/").pop()?.replace(/\.md$/, "") ||
+			"Untitled"
+		);
 	}
 
 	function handleNoteKeydown(e: KeyboardEvent, nodeId: number) {
-		if (e.key === 'Enter' || e.key === ' ') {
+		if (e.key === "Enter" || e.key === " ") {
 			e.preventDefault();
 			toggleNote(nodeId);
 		}
@@ -134,14 +151,18 @@
 		} catch {
 			// sources endpoint failed — still try loading notes
 		}
-		await searchNotes('');
+		await searchNotes("");
 	});
 </script>
 
 <div class="vault-panel">
 	<div class="vault-header">
 		<span class="vault-label">From Vault</span>
-		<button class="vault-close" onclick={onclose} aria-label="Close vault panel">
+		<button
+			class="vault-close"
+			onclick={onclose}
+			aria-label="Close vault panel"
+		>
 			<X size={12} />
 		</button>
 	</div>
@@ -150,7 +171,9 @@
 		<div class="vault-empty-state">
 			<FileText size={20} />
 			<p>No vault sources configured.</p>
-			<p class="vault-empty-hint">Add content sources in Settings to use vault search.</p>
+			<p class="vault-empty-hint">
+				Add content sources in Settings to use vault search.
+			</p>
 		</div>
 	{:else}
 		<div class="vault-search-wrap">
@@ -177,7 +200,9 @@
 				</div>
 			{:else if notes.length === 0}
 				<div class="vault-no-results">
-					{searchQuery ? 'No notes match your search.' : 'No notes in vault yet.'}
+					{searchQuery
+						? "No notes match your search."
+						: "No notes in vault yet."}
 				</div>
 			{:else}
 				{#each notes as note (note.node_id)}
@@ -186,7 +211,8 @@
 							class="vault-note-row"
 							class:expanded={expandedNodeId === note.node_id}
 							onclick={() => toggleNote(note.node_id)}
-							onkeydown={(e) => handleNoteKeydown(e, note.node_id)}
+							onkeydown={(e) =>
+								handleNoteKeydown(e, note.node_id)}
 							aria-expanded={expandedNodeId === note.node_id}
 						>
 							{#if expandedNodeId === note.node_id}
@@ -194,22 +220,37 @@
 							{:else}
 								<ChevronRight size={12} />
 							{/if}
-							<span class="vault-note-title">{noteTitle(note)}</span>
+							<span class="vault-note-title"
+								>{noteTitle(note)}</span
+							>
 							{#if note.chunk_count > 0}
-								<span class="vault-chunk-badge">{note.chunk_count}</span>
+								<span class="vault-chunk-badge"
+									>{note.chunk_count}</span
+								>
 							{/if}
 						</button>
 
 						{#if expandedNodeId === note.node_id && expandedNote}
-							<div class="vault-chunks" role="group" aria-label="Note sections">
+							<div
+								class="vault-chunks"
+								role="group"
+								aria-label="Note sections"
+							>
 								{#if expanding}
-									<div class="vault-chunk-loading">Loading...</div>
+									<div class="vault-chunk-loading">
+										Loading...
+									</div>
 								{:else if expandedNote.chunks.length === 0}
-									<div class="vault-chunk-empty">No indexed sections.</div>
+									<div class="vault-chunk-empty">
+										No indexed sections.
+									</div>
 								{:else}
 									{#each expandedNote.chunks as chunk (chunk.chunk_id)}
-										{@const isSelected = selectedChunks.has(chunk.chunk_id)}
-										{@const isDisabled = atLimit && !isSelected}
+										{@const isSelected = selectedChunks.has(
+											chunk.chunk_id,
+										)}
+										{@const isDisabled =
+											atLimit && !isSelected}
 										<label
 											class="vault-chunk-row"
 											class:selected={isSelected}
@@ -219,12 +260,23 @@
 												type="checkbox"
 												checked={isSelected}
 												disabled={isDisabled}
-												onchange={() => toggleChunk(chunk.chunk_id, note.node_id, chunk.heading_path)}
+												onchange={() =>
+													toggleChunk(
+														chunk.chunk_id,
+														note.node_id,
+														chunk.heading_path,
+													)}
 												class="vault-chunk-cb"
 											/>
 											<div class="vault-chunk-info">
-												<span class="vault-chunk-heading">{chunk.heading_path}</span>
-												<span class="vault-chunk-snippet">{chunk.snippet}</span>
+												<span
+													class="vault-chunk-heading"
+													>{chunk.heading_path}</span
+												>
+												<span
+													class="vault-chunk-snippet"
+													>{chunk.snippet}</span
+												>
 											</div>
 										</label>
 									{/each}
@@ -245,8 +297,14 @@
 				<div class="vault-replace-banner" role="alert">
 					<span>This will replace your current content.</span>
 					<div class="vault-replace-actions">
-						<button class="vault-replace-confirm" onclick={handleGenerate}>Replace</button>
-						<button class="vault-replace-cancel" onclick={cancelReplace}>Cancel</button>
+						<button
+							class="vault-replace-confirm"
+							onclick={handleGenerate}>Replace</button
+						>
+						<button
+							class="vault-replace-cancel"
+							onclick={cancelReplace}>Cancel</button
+						>
 					</div>
 				</div>
 			{:else}
@@ -256,15 +314,17 @@
 					disabled={selectionCount === 0 || generating}
 				>
 					{generating
-						? 'Generating...'
-						: mode === 'thread'
-							? 'Generate thread from vault'
-							: 'Generate tweet from vault'}
+						? "Generating..."
+						: mode === "thread"
+							? "Generate thread from vault"
+							: "Generate tweet from vault"}
 				</button>
 			{/if}
 
 			{#if showUndo && onundo}
-				<button class="vault-undo-btn" onclick={onundo}>Undo replacement</button>
+				<button class="vault-undo-btn" onclick={onundo}
+					>Undo replacement</button
+				>
 			{/if}
 		</div>
 	{/if}
@@ -382,8 +442,12 @@
 	}
 
 	@keyframes shimmer {
-		0% { background-position: 200% 0; }
-		100% { background-position: -200% 0; }
+		0% {
+			background-position: 200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
 	}
 
 	.vault-no-results {
@@ -442,7 +506,11 @@
 		height: 18px;
 		padding: 0 4px;
 		border-radius: 9px;
-		background: color-mix(in srgb, var(--color-text-subtle) 15%, transparent);
+		background: color-mix(
+			in srgb,
+			var(--color-text-subtle) 15%,
+			transparent
+		);
 		color: var(--color-text-subtle);
 		font-size: 10px;
 		font-weight: 600;
@@ -511,8 +579,11 @@
 		font-style: italic;
 		overflow: hidden;
 		display: -webkit-box;
+		display: box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
+		box-orient: vertical;
 		line-height: 1.4;
 	}
 
