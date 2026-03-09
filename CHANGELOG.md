@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.27](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.26...tuitbot-cli-v0.1.27) - 2026-03-09
+
+### Fixed
+
+- backfill server-only release assets
+
 ## [0.1.26](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.25...tuitbot-cli-v0.1.26) - 2026-03-08
 
 ### Fixed
