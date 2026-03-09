@@ -238,7 +238,7 @@
 			if (alreadyClaimed) {
 				goto('/login');
 			} else {
-				goto('/content?compose=true');
+				goto('/');
 			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : '';
