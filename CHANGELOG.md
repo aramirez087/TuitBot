@@ -7,12 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.31](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.30...tuitbot-cli-v0.1.31) - 2026-03-10
-
-### Fixed
-
-- `backup` and `restore` now reject empty, whitespace-only, and directory `storage.db_path` values with a clear config validation error instead of producing misleading downstream errors like "Database not found at ." (#93, #94, #95)
-
 ## [0.1.29](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.28...tuitbot-cli-v0.1.29) - 2026-03-09
 
 ### Added
@@ -441,4 +435,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - modularize the settings command by splitting its logic into dedicated sub-modules.
 - Remove extensive project scaffolding, update core automation loops and CLI commands, and introduce a new scheduling module.
 - Renaming to tuitbot
-
