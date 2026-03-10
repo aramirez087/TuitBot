@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.32](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.31...tuitbot-cli-v0.1.32) - 2026-03-10
+
+### Fixed
+
+- resolve QA issues #122, #119, #118 for approval queue and analytics
+
 ## [0.1.31](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.30...tuitbot-cli-v0.1.31) - 2026-03-10
 
 ### Fixed
