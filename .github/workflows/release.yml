@@ -16,9 +16,40 @@ env:
 permissions: {}
 
 jobs:
+  release-context:
+    name: Release context
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      is_release_pr_push: ${{ steps.detect.outputs.is_release_pr_push }}
+    steps:
+      - name: Detect merged release PR push
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          is_release_pr_push=false
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            prs="$(gh api "repos/$GH_REPO/commits/$GH_SHA/pulls" 2>/dev/null || echo '[]')"
+            if echo "$prs" | jq -e 'any(.[]?; any(.labels[]?; .name == "release"))' >/dev/null; then
+              is_release_pr_push=true
+            fi
+          fi
+
+          echo "is_release_pr_push=$is_release_pr_push" >> "$GITHUB_OUTPUT"
+
   release:
     name: Release (tag + GitHub Release)
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: release-context
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || needs.release-context.outputs.is_release_pr_push == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -153,7 +184,8 @@ jobs:
 
   release-pr:
     name: Release PR (next version)
-    if: github.event_name == 'push'
+    needs: release-context
+    if: github.event_name == 'push' && needs.release-context.outputs.is_release_pr_push != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -193,7 +225,7 @@ jobs:
   build-assets:
     name: Build release asset (${{ matrix.target }})
     needs: release
-    if: github.event_name == 'workflow_dispatch' && needs.release.outputs.asset_release_ready == 'true'
+    if: needs.release.outputs.asset_release_ready == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
