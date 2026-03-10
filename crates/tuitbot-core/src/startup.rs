@@ -532,13 +532,37 @@ pub fn expand_tilde(path: &str) -> PathBuf {
 /// Resolve the database path by loading the config file and reading `storage.db_path`.
 ///
 /// Falls back to `~/.tuitbot/tuitbot.db` if the config cannot be loaded.
-pub fn resolve_db_path(config_path: &str) -> PathBuf {
+/// Returns an error if the resolved `db_path` is empty, whitespace-only,
+/// or points to an existing directory.
+pub fn resolve_db_path(config_path: &str) -> Result<PathBuf, crate::error::ConfigError> {
     use crate::config::Config;
-    if let Ok(config) = Config::load(Some(config_path)) {
-        expand_tilde(&config.storage.db_path)
-    } else {
-        data_dir().join("tuitbot.db")
+    let config = match Config::load(Some(config_path)) {
+        Ok(c) => c,
+        Err(_) => return Ok(data_dir().join("tuitbot.db")),
+    };
+
+    validate_db_path(&config.storage.db_path)
+}
+
+/// Validate and expand a `storage.db_path` value.
+///
+/// Rejects empty, whitespace-only, and directory paths with a clear error.
+pub fn validate_db_path(raw: &str) -> Result<PathBuf, crate::error::ConfigError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(crate::error::ConfigError::InvalidValue {
+            field: "storage.db_path".to_string(),
+            message: "must not be empty or whitespace-only".to_string(),
+        });
     }
+    let expanded = expand_tilde(trimmed);
+    if expanded.is_dir() {
+        return Err(crate::error::ConfigError::InvalidValue {
+            field: "storage.db_path".to_string(),
+            message: format!("'{}' is a directory, must point to a file", trimmed),
+        });
+    }
+    Ok(expanded)
 }
 
 // ============================================================================

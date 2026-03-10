@@ -57,7 +57,7 @@ pub async fn execute(args: RestoreArgs, config_path: &str, out: CliOutput) -> an
     }
 
     // Confirm unless --force.
-    let target = resolve_db_path(config_path);
+    let target = resolve_db_path(config_path)?;
     if !args.force && std::io::stdin().is_terminal() {
         eprintln!("\nThis will replace the database at {}", target.display());
         eprintln!("A safety backup of the current database will be created first.");
