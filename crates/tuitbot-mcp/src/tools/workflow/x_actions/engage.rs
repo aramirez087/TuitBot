@@ -29,11 +29,24 @@ pub async fn like_tweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::like_tweet(client.as_ref(), user_id, tweet_id).await {
@@ -72,11 +85,24 @@ pub async fn follow_user(state: &SharedState, target_user_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::follow_user(client.as_ref(), user_id, target_user_id).await
@@ -116,11 +142,24 @@ pub async fn unfollow_user(state: &SharedState, target_user_id: &str) -> String 
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::unfollow_user(client.as_ref(), user_id, target_user_id)
@@ -161,11 +200,24 @@ pub async fn retweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::retweet(client.as_ref(), user_id, tweet_id).await {
@@ -204,11 +256,24 @@ pub async fn unlike_tweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::unlike_tweet(client.as_ref(), user_id, tweet_id).await {
@@ -247,11 +312,24 @@ pub async fn bookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::bookmark_tweet(client.as_ref(), user_id, tweet_id).await {
@@ -290,11 +368,24 @@ pub async fn unbookmark_tweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::unbookmark_tweet(client.as_ref(), user_id, tweet_id).await
@@ -334,11 +425,24 @@ pub async fn unretweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
     let user_id = match state.authenticated_user_id.as_deref() {
         Some(id) => id,
-        None => return no_user_id_response(start),
+        None => {
+            let _ = complete_gateway_failure(
+                state,
+                &ticket,
+                "Authenticated user ID not available",
+                start,
+            )
+            .await;
+            return no_user_id_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::engage::unretweet(client.as_ref(), user_id, tweet_id).await {

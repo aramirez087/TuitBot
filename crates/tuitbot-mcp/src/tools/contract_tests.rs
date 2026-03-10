@@ -219,7 +219,7 @@ mod tests {
     async fn contract_approve_all_empty() {
         let pool = storage::init_test_db().await.unwrap();
         let config = test_config();
-        let json = crate::tools::workflow::approval::approve_all(&pool, &config).await;
+        let json = crate::tools::workflow::approval::approve_all(&pool, &config, true).await;
         assert_success(&json, "approve_all");
         assert_has_meta(&json, "approve_all");
     }
