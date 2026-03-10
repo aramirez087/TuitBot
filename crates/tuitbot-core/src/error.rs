@@ -191,6 +191,15 @@ pub enum StorageError {
         #[source]
         source: sqlx::Error,
     },
+
+    /// An approval item has already been reviewed and cannot be re-reviewed.
+    #[error("item {id} has already been reviewed (current status: {current_status})")]
+    AlreadyReviewed {
+        /// The approval queue item ID.
+        id: i64,
+        /// The current status of the item.
+        current_status: String,
+    },
 }
 
 /// Errors from the tweet scoring engine.
@@ -317,6 +326,18 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "LLM API error (status 401): Invalid API key"
+        );
+    }
+
+    #[test]
+    fn storage_error_already_reviewed_message() {
+        let err = StorageError::AlreadyReviewed {
+            id: 42,
+            current_status: "approved".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "item 42 has already been reviewed (current status: approved)"
         );
     }
 

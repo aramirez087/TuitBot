@@ -1,6 +1,7 @@
 //! Tests for the approval queue storage module.
 
 use super::*;
+use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
 use crate::storage::init_test_db;
 
 #[tokio::test]
@@ -414,4 +415,91 @@ async fn edit_history_roundtrip() {
     assert_eq!(history[0].field, "generated_content");
     assert_eq!(history[0].old_value, "Original");
     assert_eq!(history[0].new_value, "Edited");
+}
+
+#[tokio::test]
+async fn re_review_approved_item_returns_error() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(&pool, "tweet", "", "", "Hello", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    update_status(&pool, id, "approved").await.expect("approve");
+
+    let err = update_status(&pool, id, "rejected")
+        .await
+        .expect_err("should fail");
+    match err {
+        crate::error::StorageError::AlreadyReviewed {
+            id: err_id,
+            current_status,
+        } => {
+            assert_eq!(err_id, id);
+            assert_eq!(current_status, "approved");
+        }
+        other => panic!("expected AlreadyReviewed, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn re_review_rejected_item_returns_error() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(&pool, "tweet", "", "", "Hello", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    update_status(&pool, id, "rejected").await.expect("reject");
+
+    let err = update_status(&pool, id, "approved")
+        .await
+        .expect_err("should fail");
+    match err {
+        crate::error::StorageError::AlreadyReviewed {
+            id: err_id,
+            current_status,
+        } => {
+            assert_eq!(err_id, id);
+            assert_eq!(current_status, "rejected");
+        }
+        other => panic!("expected AlreadyReviewed, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn mark_failed_sets_status() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(&pool, "tweet", "", "", "Hello", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    // Bypass pending guard with raw SQL to set status to approved.
+    sqlx::query("UPDATE approval_queue SET status = 'approved' WHERE id = ? AND account_id = ?")
+        .bind(id)
+        .bind(DEFAULT_ACCOUNT_ID)
+        .execute(&pool)
+        .await
+        .expect("raw approve");
+
+    mark_failed(&pool, id, "Posting failed: auth expired")
+        .await
+        .expect("mark failed");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("found");
+    assert_eq!(item.status, "failed");
+    assert!(item
+        .review_notes
+        .as_deref()
+        .unwrap()
+        .contains("auth expired"));
+
+    // Should not appear in next approved.
+    let next = get_next_approved(&pool).await.expect("next");
+    assert!(next.is_none());
+
+    // Stats should reflect failed count.
+    let stats = get_stats(&pool).await.expect("stats");
+    assert_eq!(stats.failed, 1);
 }

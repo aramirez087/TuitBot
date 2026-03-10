@@ -1,4 +1,5 @@
 use super::*;
+use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
 use crate::storage::init_test_db;
 
 #[tokio::test]
@@ -391,4 +392,28 @@ async fn get_scored_ancestors_filters_low_engagement() {
             .await
             .expect("query");
     assert!(ancestors.is_empty());
+}
+
+#[tokio::test]
+async fn malformed_snapshot_date_excluded() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert a valid snapshot.
+    upsert_follower_snapshot(&pool, 1000, 200, 500)
+        .await
+        .expect("upsert");
+
+    // Insert a row with a malformed snapshot_date via raw SQL.
+    sqlx::query(
+        "INSERT INTO follower_snapshots (account_id, snapshot_date, follower_count, following_count, tweet_count) \
+         VALUES (?, 'not-a-date', 999, 99, 9)",
+    )
+    .bind(DEFAULT_ACCOUNT_ID)
+    .execute(&pool)
+    .await
+    .expect("insert malformed");
+
+    let snapshots = get_follower_snapshots(&pool, 10).await.expect("get");
+    assert_eq!(snapshots.len(), 1);
+    assert_eq!(snapshots[0].follower_count, 1000);
 }

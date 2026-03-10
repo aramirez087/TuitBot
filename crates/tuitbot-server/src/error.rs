@@ -24,7 +24,14 @@ pub enum ApiError {
 
 impl From<tuitbot_core::error::StorageError> for ApiError {
     fn from(err: tuitbot_core::error::StorageError) -> Self {
-        Self::Storage(err)
+        match err {
+            tuitbot_core::error::StorageError::AlreadyReviewed { id, current_status } => {
+                Self::Conflict(format!(
+                    "item {id} has already been reviewed (current status: {current_status})"
+                ))
+            }
+            other => Self::Storage(other),
+        }
     }
 }
 

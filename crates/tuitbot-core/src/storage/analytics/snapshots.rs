@@ -65,6 +65,7 @@ pub async fn get_follower_snapshots_for(
         "SELECT snapshot_date, follower_count, following_count, tweet_count \
          FROM follower_snapshots \
          WHERE account_id = ? \
+         AND snapshot_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' \
          ORDER BY snapshot_date DESC \
          LIMIT ?",
     )
