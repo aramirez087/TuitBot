@@ -1,0 +1,56 @@
+name: Autofix QA Issues
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  autofix:
+    if: >
+      (github.event_name == 'issues' && github.event.label.name == 'autofix') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          label_trigger: "autofix"
+          trigger_phrase: "@claude"
+
+          prompt: |
+            You are fixing a QA bug report. The issue contains a detailed bug description
+            with summary, repro steps, and actual vs expected results.
+
+            ISSUE #${{ github.event.issue.number }}: ${{ github.event.issue.title }}
+
+            INSTRUCTIONS:
+            1. Read the issue carefully — understand what the bug is and where it likely lives.
+            2. Search the codebase to find the relevant code (the project uses a Rust workspace
+               under crates/: tuitbot-core, tuitbot-cli, tuitbot-mcp, tuitbot-server).
+            3. Implement the fix. Follow these rules:
+               - tuitbot-core uses `thiserror` for error types
+               - tuitbot-cli and tuitbot-server use `anyhow`
+               - tuitbot-server owns zero business logic — all domain logic in tuitbot-core
+               - Max 500 lines per .rs file
+               - Dependency layers: core/toolkit ← core/workflow ← core/automation (no upward imports)
+            4. Write or update tests to cover the fix.
+            5. Run the mandatory CI checklist and fix all failures:
+               - cargo fmt --all
+               - cargo fmt --all --check
+               - RUSTFLAGS="-D warnings" cargo test --workspace
+               - cargo clippy --workspace -- -D warnings
+            6. Create a commit with a clear message referencing the issue (e.g., "fix: ... (closes #N)").
+            7. Open a PR that links to the issue.
+
+          claude_args: |
+            --max-turns 30
