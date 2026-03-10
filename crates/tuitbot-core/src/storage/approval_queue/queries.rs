@@ -266,15 +266,19 @@ pub async fn pending_count(pool: &DbPool) -> Result<i64, StorageError> {
 }
 
 /// Update the status of an approval item for a specific account.
+///
+/// Only items with `status = 'pending'` can be reviewed. Returns
+/// `StorageError::AlreadyReviewed` if the item has already left pending.
 pub async fn update_status_for(
     pool: &DbPool,
     account_id: &str,
     id: i64,
     status: &str,
 ) -> Result<(), StorageError> {
-    sqlx::query(
+    let result = sqlx::query(
         "UPDATE approval_queue SET status = ?, \
-         reviewed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND account_id = ?",
+         reviewed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') \
+         WHERE id = ? AND account_id = ? AND status = 'pending'",
     )
     .bind(status)
     .bind(id)
@@ -282,6 +286,15 @@ pub async fn update_status_for(
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;
+
+    if result.rows_affected() == 0 {
+        if let Some(item) = get_by_id_for(pool, account_id, id).await? {
+            return Err(StorageError::AlreadyReviewed {
+                id,
+                current_status: item.status,
+            });
+        }
+    }
 
     Ok(())
 }
@@ -292,6 +305,9 @@ pub async fn update_status(pool: &DbPool, id: i64, status: &str) -> Result<(), S
 }
 
 /// Update the status of an approval item with review metadata for a specific account.
+///
+/// Only items with `status = 'pending'` can be reviewed. Returns
+/// `StorageError::AlreadyReviewed` if the item has already left pending.
 pub async fn update_status_with_review_for(
     pool: &DbPool,
     account_id: &str,
@@ -299,10 +315,11 @@ pub async fn update_status_with_review_for(
     status: &str,
     review: &ReviewAction,
 ) -> Result<(), StorageError> {
-    sqlx::query(
+    let result = sqlx::query(
         "UPDATE approval_queue SET status = ?, \
          reviewed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), \
-         reviewed_by = ?, review_notes = ? WHERE id = ? AND account_id = ?",
+         reviewed_by = ?, review_notes = ? \
+         WHERE id = ? AND account_id = ? AND status = 'pending'",
     )
     .bind(status)
     .bind(&review.actor)
@@ -312,6 +329,15 @@ pub async fn update_status_with_review_for(
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;
+
+    if result.rows_affected() == 0 {
+        if let Some(item) = get_by_id_for(pool, account_id, id).await? {
+            return Err(StorageError::AlreadyReviewed {
+                id,
+                current_status: item.status,
+            });
+        }
+    }
 
     Ok(())
 }
@@ -327,15 +353,19 @@ pub async fn update_status_with_review(
 }
 
 /// Update the content and status of an approval item for a specific account (for edit-then-approve).
+///
+/// Only items with `status = 'pending'` can be approved. Returns
+/// `StorageError::AlreadyReviewed` if the item has already left pending.
 pub async fn update_content_and_approve_for(
     pool: &DbPool,
     account_id: &str,
     id: i64,
     new_content: &str,
 ) -> Result<(), StorageError> {
-    sqlx::query(
+    let result = sqlx::query(
         "UPDATE approval_queue SET generated_content = ?, status = 'approved', \
-         reviewed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND account_id = ?",
+         reviewed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') \
+         WHERE id = ? AND account_id = ? AND status = 'pending'",
     )
     .bind(new_content)
     .bind(id)
@@ -343,6 +373,15 @@ pub async fn update_content_and_approve_for(
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;
+
+    if result.rows_affected() == 0 {
+        if let Some(item) = get_by_id_for(pool, account_id, id).await? {
+            return Err(StorageError::AlreadyReviewed {
+                id,
+                current_status: item.status,
+            });
+        }
+    }
 
     Ok(())
 }
@@ -380,11 +419,12 @@ pub async fn get_by_id(pool: &DbPool, id: i64) -> Result<Option<ApprovalItem>, S
 
 /// Get counts of items grouped by status for a specific account.
 pub async fn get_stats_for(pool: &DbPool, account_id: &str) -> Result<ApprovalStats, StorageError> {
-    let row: (i64, i64, i64) = sqlx::query_as(
+    let row: (i64, i64, i64, i64) = sqlx::query_as(
         "SELECT \
             COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0), \
             COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0), \
-            COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0) \
+            COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0), \
+            COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) \
          FROM approval_queue WHERE account_id = ?",
     )
     .bind(account_id)
@@ -396,6 +436,7 @@ pub async fn get_stats_for(pool: &DbPool, account_id: &str) -> Result<ApprovalSt
         pending: row.0,
         approved: row.1,
         rejected: row.2,
+        failed: row.3,
     })
 }
 
@@ -745,6 +786,32 @@ pub async fn mark_posted_for(
 /// Mark an approved item as posted, storing the returned tweet ID.
 pub async fn mark_posted(pool: &DbPool, id: i64, tweet_id: &str) -> Result<(), StorageError> {
     mark_posted_for(pool, DEFAULT_ACCOUNT_ID, id, tweet_id).await
+}
+
+/// Mark an approved item as failed for a specific account, storing the error message.
+pub async fn mark_failed_for(
+    pool: &DbPool,
+    account_id: &str,
+    id: i64,
+    error_message: &str,
+) -> Result<(), StorageError> {
+    sqlx::query(
+        "UPDATE approval_queue SET status = 'failed', review_notes = ? \
+         WHERE id = ? AND account_id = ? AND status = 'approved'",
+    )
+    .bind(error_message)
+    .bind(id)
+    .bind(account_id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(())
+}
+
+/// Mark an approved item as failed, storing the error message.
+pub async fn mark_failed(pool: &DbPool, id: i64, error_message: &str) -> Result<(), StorageError> {
+    mark_failed_for(pool, DEFAULT_ACCOUNT_ID, id, error_message).await
 }
 
 /// Expire old pending items for a specific account (older than the specified hours).

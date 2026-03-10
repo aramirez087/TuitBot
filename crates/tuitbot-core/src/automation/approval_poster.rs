@@ -123,6 +123,12 @@ pub async fn run_approval_poster(
                             error = %e,
                             "Failed to post approved item"
                         );
+                        let _ = storage::approval_queue::mark_failed(
+                            &pool,
+                            item.id,
+                            &format!("Posting failed: {e}"),
+                        )
+                        .await;
                         let _ = storage::action_log::log_action(
                             &pool,
                             &format!("{}_posted", item.action_type),

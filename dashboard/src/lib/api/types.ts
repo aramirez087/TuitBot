@@ -201,6 +201,7 @@ export interface ApprovalStats {
 	pending: number;
 	approved: number;
 	rejected: number;
+	failed: number;
 }
 
 // --- Content types ---

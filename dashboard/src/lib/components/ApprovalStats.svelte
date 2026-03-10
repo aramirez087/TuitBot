@@ -15,6 +15,10 @@
 		<span class="stat approved">{stats.approved} approved</span>
 		<span class="stat-separator">&middot;</span>
 		<span class="stat rejected">{stats.rejected} rejected</span>
+		{#if stats.failed > 0}
+			<span class="stat-separator">&middot;</span>
+			<span class="stat failed">{stats.failed} failed</span>
+		{/if}
 	</div>
 {/if}
 
@@ -40,6 +44,10 @@
 	}
 
 	.stat.rejected {
+		color: var(--color-danger);
+	}
+
+	.stat.failed {
 		color: var(--color-danger);
 	}
 

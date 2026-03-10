@@ -150,6 +150,7 @@ pub struct ApprovalStats {
     pub pending: i64,
     pub approved: i64,
     pub rejected: i64,
+    pub failed: i64,
 }
 
 /// Optional review metadata for approve/reject actions.
