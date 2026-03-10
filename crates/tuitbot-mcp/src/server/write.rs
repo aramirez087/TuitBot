@@ -232,8 +232,14 @@ impl WriteMcpServer {
         &self,
         Parameters(req): Parameters<ApprovalIdRequest>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result =
-            workflow::approval::approve_item(&self.state.pool, req.id, &self.state.config).await;
+        let x_available = self.state.x_client.is_some();
+        let result = workflow::approval::approve_item(
+            &self.state.pool,
+            req.id,
+            &self.state.config,
+            x_available,
+        )
+        .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
@@ -251,7 +257,10 @@ impl WriteMcpServer {
     /// Approve all pending items in the approval queue.
     #[tool]
     async fn approve_all(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = workflow::approval::approve_all(&self.state.pool, &self.state.config).await;
+        let x_available = self.state.x_client.is_some();
+        let result =
+            workflow::approval::approve_all(&self.state.pool, &self.state.config, x_available)
+                .await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 

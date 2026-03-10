@@ -166,6 +166,15 @@ pub async fn approve_item(
     let item = approval_queue::get_by_id_for(&state.db, &ctx.account_id, id).await?;
     let item = item.ok_or_else(|| ApiError::NotFound(format!("approval item {id} not found")))?;
 
+    // Verify X auth tokens exist before allowing approval.
+    let token_path =
+        tuitbot_core::storage::accounts::account_token_path(&state.data_dir, &ctx.account_id);
+    if !token_path.exists() {
+        return Err(ApiError::BadRequest(
+            "Cannot approve: X API not authenticated. Complete X auth setup first.".to_string(),
+        ));
+    }
+
     let review = body.map(|b| b.0).unwrap_or_default();
     approval_queue::update_status_with_review_for(
         &state.db,
@@ -279,6 +288,15 @@ pub async fn approve_all(
     body: Option<Json<BatchApproveRequest>>,
 ) -> Result<Json<Value>, ApiError> {
     require_approve(&ctx)?;
+
+    // Verify X auth tokens exist before allowing approval.
+    let token_path =
+        tuitbot_core::storage::accounts::account_token_path(&state.data_dir, &ctx.account_id);
+    if !token_path.exists() {
+        return Err(ApiError::BadRequest(
+            "Cannot approve: X API not authenticated. Complete X auth setup first.".to_string(),
+        ));
+    }
 
     let config = read_config(&state);
     let max_batch = config.max_batch_approve;

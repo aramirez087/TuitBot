@@ -9,7 +9,7 @@ use tuitbot_core::storage;
 use tuitbot_core::storage::approval_queue::ReviewAction;
 use tuitbot_core::storage::DbPool;
 
-use crate::tools::response::{ToolMeta, ToolResponse};
+use crate::tools::response::{ErrorCode, ToolMeta, ToolResponse};
 
 #[derive(Serialize)]
 struct ApprovalItemOut {
@@ -96,8 +96,23 @@ pub async fn get_pending_count(pool: &DbPool, config: &Config) -> String {
 }
 
 /// Approve a specific item by ID.
-pub async fn approve_item(pool: &DbPool, id: i64, config: &Config) -> String {
+///
+/// Rejects the approval if `x_available` is false, since the approved item
+/// cannot be executed without an X API client.
+pub async fn approve_item(pool: &DbPool, id: i64, config: &Config, x_available: bool) -> String {
     let start = Instant::now();
+
+    if !x_available {
+        let elapsed = start.elapsed().as_millis() as u64;
+        let meta = ToolMeta::new(elapsed)
+            .with_workflow(config.mode.to_string(), config.effective_approval_mode());
+        return ToolResponse::error(
+            ErrorCode::XNotConfigured,
+            "Cannot approve: X API client not available. Run `tuitbot auth` to authenticate.",
+        )
+        .with_meta(meta)
+        .to_json();
+    }
 
     let review = ReviewAction {
         actor: Some("mcp_agent".to_string()),
@@ -152,8 +167,23 @@ pub async fn reject_item(pool: &DbPool, id: i64, config: &Config) -> String {
 }
 
 /// Approve all pending items (clamped by max_batch_approve).
-pub async fn approve_all(pool: &DbPool, config: &Config) -> String {
+///
+/// Rejects the approval if `x_available` is false, since the approved items
+/// cannot be executed without an X API client.
+pub async fn approve_all(pool: &DbPool, config: &Config, x_available: bool) -> String {
     let start = Instant::now();
+
+    if !x_available {
+        let elapsed = start.elapsed().as_millis() as u64;
+        let meta = ToolMeta::new(elapsed)
+            .with_workflow(config.mode.to_string(), config.effective_approval_mode());
+        return ToolResponse::error(
+            ErrorCode::XNotConfigured,
+            "Cannot approve: X API client not available. Run `tuitbot auth` to authenticate.",
+        )
+        .with_meta(meta)
+        .to_json();
+    }
 
     let review = ReviewAction {
         actor: Some("mcp_agent".to_string()),

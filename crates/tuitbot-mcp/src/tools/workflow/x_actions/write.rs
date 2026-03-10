@@ -33,7 +33,11 @@ pub async fn post_tweet(state: &SharedState, text: &str, media_ids: Option<&[Str
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::write::post_tweet(client.as_ref(), text, media_ids).await {
@@ -71,7 +75,11 @@ pub async fn reply_to_tweet(
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::write::reply_to_tweet(
@@ -116,7 +124,11 @@ pub async fn quote_tweet(
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
 
     // media_ids not forwarded: quote_tweet trait method has no media variant.
@@ -149,7 +161,11 @@ pub async fn delete_tweet(state: &SharedState, tweet_id: &str) -> String {
     };
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::write::delete_tweet(client.as_ref(), tweet_id).await {
@@ -220,7 +236,11 @@ pub async fn post_thread(
 
     let client = match state.x_client.as_ref() {
         Some(c) => c,
-        None => return not_configured_response(start),
+        None => {
+            let _ = complete_gateway_failure(state, &ticket, "X API client not configured", start)
+                .await;
+            return not_configured_response(start);
+        }
     };
 
     match tuitbot_core::toolkit::write::post_thread(client.as_ref(), tweets, media_ids).await {
