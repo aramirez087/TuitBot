@@ -54,5 +54,7 @@ jobs:
             6. Create a commit with a clear message referencing the issue (e.g., "fix: ... (closes #N)").
             7. Open a PR that links to the issue.
 
+          show_full_output: true
+
           claude_args: |
             --max-turns 30
