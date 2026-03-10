@@ -58,3 +58,4 @@ jobs:
 
           claude_args: |
             --max-turns 30
+            --allowedTools Edit,Write,Bash,Read,Glob,Grep
