@@ -85,20 +85,25 @@
 	});
 
 	function handleDeleteFocused() {
-		const draft = drafts[focusedIndex];
-		if (!draft) return;
-		handleDeleteItem(draft.id);
+		const item = itemEls[focusedIndex];
+		if (!item) return;
+		if (item.isConfirmingDelete()) {
+			item.confirmDelete();
+		} else {
+			item.armDelete();
+		}
 	}
 
 	function handleDeleteItem(id: number) {
-		const draft = drafts.find((d) => d.id === id);
-		if (!draft) return;
-		const title =
-			draft.title ?? draft.content_preview?.trim() ?? "Untitled draft";
-		const confirmed = window.confirm(
-			`Delete "${title}"? This cannot be undone.`,
-		);
-		if (confirmed) ondelete(id);
+		const idx = drafts.findIndex((d) => d.id === id);
+		if (idx < 0) return;
+		const item = itemEls[idx];
+		if (!item) return;
+		if (item.isConfirmingDelete()) {
+			item.confirmDelete();
+		} else {
+			item.armDelete();
+		}
 	}
 
 	function handleListKeydown(e: KeyboardEvent) {
@@ -176,6 +181,14 @@
 			case "4":
 				ontabchange("archive");
 				break;
+			case "Escape": {
+				const item = itemEls[focusedIndex];
+				if (item?.isConfirmingDelete()) {
+					e.preventDefault();
+					item.cancelDelete();
+				}
+				break;
+			}
 			case "/":
 				if (!e.metaKey && !e.ctrlKey && !e.altKey) {
 					e.preventDefault();
