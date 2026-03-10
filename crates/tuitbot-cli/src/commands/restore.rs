@@ -56,7 +56,7 @@ pub async fn execute(args: RestoreArgs, config_path: &str, out: CliOutput) -> an
         return Ok(());
     }
 
-    // Confirm unless --force.
+    // Validate db_path early — fail fast before asking for confirmation.
     let target = resolve_db_path(config_path)?;
     if !args.force && std::io::stdin().is_terminal() {
         eprintln!("\nThis will replace the database at {}", target.display());
