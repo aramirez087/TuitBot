@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Copy, Trash2, RotateCcw } from "lucide-svelte";
+	import { Copy, Trash2, RotateCcw, Check } from "lucide-svelte";
 	import type { DraftSummary } from "$lib/api/types";
 
 	type TabKey = "active" | "scheduled" | "posted" | "archive";
@@ -51,6 +51,8 @@
 	);
 
 	let rootEl: HTMLDivElement | undefined = $state();
+	let confirmingDelete = $state(false);
+	let deleteTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	function stopProp(fn: () => void) {
 		return (e: MouseEvent) => {
@@ -58,6 +60,39 @@
 			fn();
 		};
 	}
+
+	export function armDelete() {
+		confirmingDelete = true;
+		clearTimeout(deleteTimeout);
+		deleteTimeout = setTimeout(cancelDelete, 2500);
+	}
+
+	export function confirmDelete() {
+		confirmingDelete = false;
+		clearTimeout(deleteTimeout);
+		ondelete();
+	}
+
+	export function cancelDelete() {
+		confirmingDelete = false;
+		clearTimeout(deleteTimeout);
+	}
+
+	export function isConfirmingDelete(): boolean {
+		return confirmingDelete;
+	}
+
+	// Cancel confirmation when focus leaves this item
+	$effect(() => {
+		if (!focused && confirmingDelete) {
+			cancelDelete();
+		}
+	});
+
+	// Cleanup timeout on destroy
+	$effect(() => {
+		return () => clearTimeout(deleteTimeout);
+	});
 
 	export function focus() {
 		rootEl?.focus();
@@ -119,25 +154,25 @@
 			</button>
 			<button
 				class="action-btn action-btn--danger"
-				title="Delete (Del)"
+				class:action-btn--confirm={confirmingDelete}
+				title={confirmingDelete ? "Click to confirm" : "Delete (Del)"}
 				type="button"
 				onclick={stopProp(() => {
-					const label =
-						draft.title ??
-						draft.content_preview?.trim() ??
-						"this draft";
-					const truncated =
-						label.length > 60 ? label.slice(0, 60) + "…" : label;
-					if (
-						window.confirm(
-							`Delete "${truncated}"? This cannot be undone.`,
-						)
-					) {
-						ondelete();
+					if (confirmingDelete) {
+						confirmDelete();
+					} else {
+						armDelete();
 					}
 				})}
+				onmouseleave={() => {
+					if (confirmingDelete) cancelDelete();
+				}}
 			>
-				<Trash2 size={12} />
+				{#if confirmingDelete}
+					<Check size={12} />
+				{:else}
+					<Trash2 size={12} />
+				{/if}
 			</button>
 		{/if}
 	</div>
@@ -249,5 +284,25 @@
 	.action-btn--danger:hover {
 		background: color-mix(in srgb, var(--color-danger) 15%, transparent);
 		color: var(--color-danger);
+	}
+
+	.action-btn--confirm {
+		background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+		color: var(--color-danger);
+		animation: confirm-pulse 0.8s ease-in-out infinite alternate;
+	}
+
+	.action-btn--confirm:hover {
+		background: color-mix(in srgb, var(--color-danger) 28%, transparent);
+		color: var(--color-danger);
+	}
+
+	@keyframes confirm-pulse {
+		from {
+			opacity: 0.85;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 </style>
