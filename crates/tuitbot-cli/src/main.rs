@@ -228,6 +228,11 @@ async fn run() -> anyhow::Result<()> {
         }
     };
 
+    // Validate db_path early for all commands except Test (which shows its own diagnostics).
+    if !matches!(&cli.command, Commands::Test(_)) {
+        tuitbot_core::startup::validate_db_path(&config.storage.db_path)?;
+    }
+
     // Check for config upgrade opportunity before `run`
     if matches!(&cli.command, Commands::Run(_)) && std::io::stdin().is_terminal() {
         commands::update::check_before_run(&cli.config).await?;

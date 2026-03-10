@@ -17,7 +17,7 @@ pub async fn execute(args: BackupArgs, config_path: &str, out: CliOutput) -> any
         );
     }
 
-    let db_path = resolve_db_path(config_path);
+    let db_path = resolve_db_path(config_path)?;
     let data = db_path
         .parent()
         .map(|p| p.to_path_buf())
