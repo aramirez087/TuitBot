@@ -733,7 +733,25 @@ mod tests {
     fn profile_manifest_version_triplet() {
         use crate::state::Profile as SP;
         let m = crate::tools::manifest::generate_profile_manifest(SP::Write);
-        assert!(m.tuitbot_mcp_version.contains('.'));
+        // Must be a valid semver string with exactly three numeric components.
+        let parts: Vec<&str> = m.tuitbot_mcp_version.splitn(3, '.').collect();
+        assert_eq!(
+            parts.len(),
+            3,
+            "tuitbot_mcp_version must have three dot-separated components"
+        );
+        for part in &parts {
+            assert!(
+                part.parse::<u64>().is_ok(),
+                "each semver component must be a non-negative integer, got {part:?}"
+            );
+        }
+        // Must match the compile-time crate version exactly.
+        assert_eq!(
+            m.tuitbot_mcp_version,
+            env!("CARGO_PKG_VERSION"),
+            "tuitbot_mcp_version must match the tuitbot-mcp crate version"
+        );
         assert_eq!(m.mcp_schema_version, crate::spec::MCP_SCHEMA_VERSION);
         assert_eq!(m.x_api_spec_version, crate::spec::X_API_SPEC_VERSION);
     }
