@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.31](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.30...tuitbot-cli-v0.1.31) - 2026-03-10
+
+### Fixed
+
+- *(mcp)* bump tuitbot-mcp to 0.1.30 so manifest ships correct version (closes #123)
+
 ## [0.1.30](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.29...tuitbot-cli-v0.1.30) - 2026-03-10
 
 ### Fixed
