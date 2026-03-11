@@ -109,6 +109,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(routes::content::schedule_studio_draft),
         )
         .route(
+            "/drafts/{id}/reschedule",
+            patch(routes::content::reschedule_studio_draft),
+        )
+        .route(
             "/drafts/{id}/unschedule",
             post(routes::content::unschedule_studio_draft),
         )

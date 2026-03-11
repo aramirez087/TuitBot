@@ -306,6 +306,18 @@ async fn compose_thread_blocks_flow(
         sorted.iter().flat_map(|b| b.media_paths.clone()).collect()
     };
 
+    // Validate scheduled_for early, before any branching logic
+    let normalized_schedule = match &body.scheduled_for {
+        Some(raw) => Some(
+            tuitbot_core::scheduling::validate_and_normalize(
+                raw,
+                tuitbot_core::scheduling::DEFAULT_GRACE_SECONDS,
+            )
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?,
+        ),
+        None => None,
+    };
+
     let approval_mode = read_approval_mode(state, &ctx.account_id).await?;
 
     if approval_mode {
@@ -344,14 +356,14 @@ async fn compose_thread_blocks_flow(
             "id": id,
             "block_ids": block_ids,
         })))
-    } else if body.scheduled_for.is_some() {
-        // User explicitly chose a future time — save to calendar.
+    } else if let Some(ref normalized) = normalized_schedule {
+        // User explicitly chose a future time — already validated above.
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
             "thread",
             &content,
-            body.scheduled_for.as_deref(),
+            Some(normalized),
         )
         .await?;
 
@@ -360,7 +372,7 @@ async fn compose_thread_blocks_flow(
             event: WsEvent::ContentScheduled {
                 id,
                 content_type: "thread".to_string(),
-                scheduled_for: body.scheduled_for.clone(),
+                scheduled_for: Some(normalized.clone()),
             },
         });
 
@@ -373,7 +385,7 @@ async fn compose_thread_blocks_flow(
         // Immediate publish — try posting as a reply chain.
         let can_post = super::can_post_for(state, &ctx.account_id).await;
         if !can_post {
-            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
             let id = scheduled_content::insert_for(
                 &state.db,
                 &ctx.account_id,
@@ -410,6 +422,18 @@ async fn persist_content(
     body: &ComposeRequest,
     content: &str,
 ) -> Result<Json<Value>, ApiError> {
+    // Validate scheduled_for early, before any branching logic
+    let normalized_schedule = match &body.scheduled_for {
+        Some(raw) => Some(
+            tuitbot_core::scheduling::validate_and_normalize(
+                raw,
+                tuitbot_core::scheduling::DEFAULT_GRACE_SECONDS,
+            )
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?,
+        ),
+        None => None,
+    };
+
     let approval_mode = read_approval_mode(state, &ctx.account_id).await?;
 
     if approval_mode {
@@ -449,14 +473,14 @@ async fn persist_content(
             "status": "queued_for_approval",
             "id": id,
         })))
-    } else if body.scheduled_for.is_some() {
-        // User explicitly chose a future time — save to calendar.
+    } else if let Some(ref normalized) = normalized_schedule {
+        // User explicitly chose a future time — already validated above.
         let id = scheduled_content::insert_for(
             &state.db,
             &ctx.account_id,
             &body.content_type,
             content,
-            body.scheduled_for.as_deref(),
+            Some(normalized),
         )
         .await?;
 
@@ -465,7 +489,7 @@ async fn persist_content(
             event: WsEvent::ContentScheduled {
                 id,
                 content_type: body.content_type.clone(),
-                scheduled_for: body.scheduled_for.clone(),
+                scheduled_for: Some(normalized.clone()),
             },
         });
 
@@ -478,7 +502,7 @@ async fn persist_content(
         // If not configured for direct posting, save to calendar instead.
         let can_post = super::can_post_for(state, &ctx.account_id).await;
         if !can_post {
-            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+            let scheduled_for = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
             let id = scheduled_content::insert_for(
                 &state.db,
                 &ctx.account_id,

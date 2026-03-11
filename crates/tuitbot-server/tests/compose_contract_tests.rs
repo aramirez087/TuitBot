@@ -663,3 +663,108 @@ async fn compose_blocks_with_urls_respects_weighted_length() {
     .await;
     assert_eq!(status, StatusCode::OK);
 }
+
+// ============================================================
+// Scheduling validation tests
+// ============================================================
+
+#[tokio::test]
+async fn compose_with_valid_utc_schedule_accepted() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Scheduled tweet",
+            "scheduled_for": "2099-12-31T23:59:00Z"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    // Valid timestamp is accepted — may be scheduled or queued depending on config
+    let s = body["status"].as_str().unwrap();
+    assert!(
+        s == "scheduled" || s == "queued_for_approval",
+        "unexpected status: {s}"
+    );
+}
+
+#[tokio::test]
+async fn compose_with_bare_iso_schedule_accepted() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Bare ISO scheduled",
+            "scheduled_for": "2099-12-31T23:59:00"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let s = body["status"].as_str().unwrap();
+    assert!(
+        s == "scheduled" || s == "queued_for_approval",
+        "unexpected status: {s}"
+    );
+}
+
+#[tokio::test]
+async fn compose_with_offset_schedule_accepted() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Offset scheduled",
+            "scheduled_for": "2099-12-31T23:59:00+05:30"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let s = body["status"].as_str().unwrap();
+    assert!(
+        s == "scheduled" || s == "queued_for_approval",
+        "unexpected status: {s}"
+    );
+}
+
+#[tokio::test]
+async fn compose_with_past_schedule_rejected() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Past scheduled",
+            "scheduled_for": "2020-01-01T00:00:00Z"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("past"));
+}
+
+#[tokio::test]
+async fn compose_with_garbage_schedule_rejected() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Garbage time",
+            "scheduled_for": "not-a-date"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"]
+        .as_str()
+        .unwrap()
+        .contains("invalid timestamp"));
+}

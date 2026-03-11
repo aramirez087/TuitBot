@@ -41,7 +41,17 @@ pub async fn edit_scheduled(
     }
 
     let new_content = body.content.as_deref().unwrap_or(&item.content);
-    let new_scheduled_for = match &body.scheduled_for {
+    let validated_time = match &body.scheduled_for {
+        Some(raw) => Some(
+            tuitbot_core::scheduling::validate_and_normalize(
+                raw,
+                tuitbot_core::scheduling::DEFAULT_GRACE_SECONDS,
+            )
+            .map_err(|e| ApiError::BadRequest(e.to_string()))?,
+        ),
+        None => None,
+    };
+    let new_scheduled_for = match &validated_time {
         Some(t) => Some(t.as_str()),
         None => item.scheduled_for.as_deref(),
     };

@@ -450,6 +450,63 @@ async fn assign_and_unassign_tag() {
     assert_eq!(count.0, 0);
 }
 
+// ============================================================================
+// Reschedule
+// ============================================================================
+
+#[tokio::test]
+async fn reschedule_draft_updates_time() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Reschedule me", "manual")
+        .await
+        .expect("insert");
+
+    // Schedule the draft first
+    schedule_draft_for(&pool, acct, id, "2099-12-31T10:00:00Z")
+        .await
+        .expect("schedule");
+
+    // Verify it's scheduled
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "scheduled");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2099-12-31T10:00:00Z"));
+
+    // Reschedule to a new time
+    let updated = reschedule_draft_for(&pool, acct, id, "2099-12-31T15:00:00Z")
+        .await
+        .expect("reschedule");
+    assert!(updated);
+
+    // Verify the new time
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "scheduled");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2099-12-31T15:00:00Z"));
+}
+
+#[tokio::test]
+async fn reschedule_non_scheduled_returns_false() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Draft only", "manual")
+        .await
+        .expect("insert");
+
+    // Try to reschedule a draft (not scheduled) — should return false
+    let updated = reschedule_draft_for(&pool, acct, id, "2099-12-31T15:00:00Z")
+        .await
+        .expect("reschedule");
+    assert!(!updated);
+}
+
 #[tokio::test]
 async fn duplicate_tag_name_is_rejected() {
     let pool = init_test_db().await.expect("init db");

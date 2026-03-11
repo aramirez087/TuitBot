@@ -569,6 +569,14 @@ export const api = {
 					body: JSON.stringify({ scheduled_for: scheduledFor })
 				}
 			),
+		reschedule: (id: number, scheduledFor: string) =>
+			request<{ id: number; status: string; scheduled_for: string }>(
+				`/api/drafts/${id}/reschedule`,
+				{
+					method: 'PATCH',
+					body: JSON.stringify({ scheduled_for: scheduledFor })
+				}
+			),
 		unschedule: (id: number) =>
 			request<{ id: number; status: string }>(`/api/drafts/${id}/unschedule`, {
 				method: 'POST'
