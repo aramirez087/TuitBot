@@ -8,6 +8,9 @@
 		Loader2,
 	} from "lucide-svelte";
 	import type { Snippet } from "svelte";
+	import { formatInAccountTz } from "$lib/utils/timezone";
+	import ScheduleComposerSheet from "./ScheduleComposerSheet.svelte";
+	import type { ScheduleConfig } from "$lib/api";
 
 	let {
 		canSubmit,
@@ -22,9 +25,14 @@
 		mode = "tweet",
 		blockCount = 1,
 		headerLeft,
+		timezone = null,
+		scheduledDate = null,
+		schedule = null,
+		scheduledFor = null,
 		onsubmit,
 		onpublishnow,
-		onschedule,
+		onscheduleselect,
+		onunschedule,
 		ontoggleinspector,
 		ontogglepreview,
 		onopenpalette,
@@ -41,13 +49,33 @@
 		mode?: "tweet" | "thread";
 		blockCount?: number;
 		headerLeft?: Snippet;
+		timezone?: string | null;
+		scheduledDate?: string | null;
+		schedule?: ScheduleConfig | null;
+		scheduledFor?: string | null;
 		onsubmit: () => void;
 		onpublishnow?: () => void;
-		onschedule?: () => void;
+		onscheduleselect?: (date: string, time: string) => void;
+		onunschedule?: () => void;
 		ontoggleinspector: () => void;
 		ontogglepreview: () => void;
 		onopenpalette: () => void;
 	} = $props();
+
+	let scheduleSheetOpen = $state(false);
+
+	const isScheduled = $derived(!!selectedTime && !!scheduledDate);
+
+	const scheduleLabel = $derived(() => {
+		if (!scheduledFor || !timezone) return "Schedule";
+		return formatInAccountTz(scheduledFor, timezone, {
+			month: "short",
+			day: "numeric",
+			hour: "numeric",
+			minute: "2-digit",
+			timeZoneName: "short",
+		});
+	});
 </script>
 
 <header class="home-header" class:has-left={!!headerLeft}>
@@ -58,21 +86,22 @@
 	{/if}
 
 	<div class="header-right">
-		{#if selectedTime}
+		{#if isScheduled}
 			<div class="button-group">
 				<button
 					class="cta-pill schedule-pill"
 					onclick={onsubmit}
 					disabled={!canSubmit || submitting}
 					title="Schedule post"
-					aria-label={submitting ? "Scheduling" : "Schedule post"}
+					aria-label={submitting ? "Scheduling" : `Schedule for ${scheduleLabel()}`}
 				>
 					{#if submitting}
 						<Loader2 size={14} class="spin-icon" />
+						<span>Scheduling&hellip;</span>
 					{:else}
 						<Clock size={14} />
+						<span>{scheduleLabel()}</span>
 					{/if}
-					<span>{submitting ? "Scheduling\u2026" : "Schedule"}</span>
 				</button>
 				{#if canPublish}
 					<button
@@ -119,6 +148,27 @@
 		{/if}
 
 		<div class="icon-tools">
+			<div class="schedule-trigger-wrap">
+				<button
+					class="icon-btn"
+					class:active={scheduleSheetOpen}
+					onclick={() => { scheduleSheetOpen = !scheduleSheetOpen; }}
+					aria-label={scheduleSheetOpen ? "Close schedule picker" : "Open schedule picker"}
+					title="Schedule"
+				>
+					<Clock size={15} />
+				</button>
+				<ScheduleComposerSheet
+					open={scheduleSheetOpen}
+					{schedule}
+					selectedDate={scheduledDate}
+					{selectedTime}
+					onschedule={(date, time) => { onscheduleselect?.(date, time); }}
+					onunschedule={() => { onunschedule?.(); }}
+					onclose={() => { scheduleSheetOpen = false; }}
+				/>
+			</div>
+
 			<button
 				class="icon-btn"
 				class:active={previewVisible}
@@ -128,11 +178,7 @@
 					? "Close preview (\u2318\u21E7P)"
 					: "Open preview (\u2318\u21E7P)"}
 			>
-				{#if previewVisible}
-					<ScanEye size={15} />
-				{:else}
-					<ScanEye size={15} />
-				{/if}
+				<ScanEye size={15} />
 			</button>
 
 			<button
@@ -249,6 +295,10 @@
 	.publish-now-btn:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
+	}
+
+	.schedule-trigger-wrap {
+		position: relative;
 	}
 
 	.icon-tools {

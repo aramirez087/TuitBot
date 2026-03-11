@@ -14,6 +14,7 @@
 		buildComposeRequest,
 		topicWithCue,
 	} from "$lib/utils/composeHandlers";
+	import { buildScheduledFor, nowInAccountTz } from "$lib/utils/timezone";
 	import ThreadFlowLane from "./ThreadFlowLane.svelte";
 	import CommandPalette from "../CommandPalette.svelte";
 	import ComposerShell from "./ComposerShell.svelte";
@@ -92,6 +93,7 @@
 	let threadBlocks = $state<ThreadBlock[]>([]);
 	let threadValid = $state(false);
 	let selectedTime = $state<string | null>(null);
+	let scheduledDate = $state<string | null>(null);
 	let submitting = $state(false);
 	let submitError = $state<string | null>(null);
 	let attachedMedia = $state<AttachedMedia[]>([]);
@@ -124,6 +126,7 @@
 		blocks: ThreadBlock[];
 		media?: AttachedMedia[];
 		selectedTime?: string | null;
+		scheduledDate?: string | null;
 		citations?: VaultCitation[];
 	} | null>(null);
 	let showUndo = $state(false);
@@ -180,6 +183,17 @@
 			? sortedPreviewBlocks.length > 0
 			: tweetText.trim().length > 0,
 	);
+
+	const accountTimezone = $derived(schedule?.timezone ?? "UTC");
+
+	const scheduledFor = $derived(() => {
+		if (!selectedTime || !scheduledDate) return null;
+		try {
+			return buildScheduledFor(scheduledDate, selectedTime, accountTimezone);
+		} catch {
+			return null;
+		}
+	});
 
 	const desktopInspectorOpen = $derived(inspectorOpen && !isMobile);
 
@@ -283,6 +297,12 @@
 
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
+		if (prefillDate) {
+			const y = prefillDate.getFullYear();
+			const mo = String(prefillDate.getMonth() + 1).padStart(2, "0");
+			const d = String(prefillDate.getDate()).padStart(2, "0");
+			scheduledDate = `${y}-${mo}-${d}`;
+		}
 
 		if (draftId !== undefined && initialContent) {
 			// Draft Studio mode: hydrate from server data
@@ -496,6 +516,8 @@
 				selectedTime,
 				targetDate,
 				attachedMedia,
+				timezone: accountTimezone,
+				scheduledDate,
 			});
 			if (vaultCitations.length > 0) {
 				data.provenance = vaultCitations.map((c) => ({
@@ -523,6 +545,7 @@
 					blocks: [...threadBlocks],
 					media: [...attachedMedia],
 					selectedTime,
+					scheduledDate,
 				};
 				undoMessage =
 					canPublish && !selectedTime
@@ -533,6 +556,7 @@
 				threadBlocks = [];
 				mode = "tweet";
 				selectedTime = null;
+				scheduledDate = null;
 				// Don't revoke media URLs yet — undo may need them
 				attachedMedia = [];
 				submitting = false;
@@ -915,6 +939,8 @@
 		if (undoSnapshot.media) attachedMedia = undoSnapshot.media;
 		if (undoSnapshot.selectedTime !== undefined)
 			selectedTime = undoSnapshot.selectedTime;
+		if (undoSnapshot.scheduledDate !== undefined)
+			scheduledDate = undoSnapshot.scheduledDate;
 		vaultCitations = undoSnapshot.citations ?? [];
 		undoSnapshot = null;
 		showUndo = false;
@@ -926,6 +952,16 @@
 			inspectorOpen = true;
 			persistInspectorState(true);
 		}
+	}
+
+	function handleScheduleSelect(date: string, time: string) {
+		scheduledDate = date;
+		selectedTime = time;
+	}
+
+	function handleUnschedule() {
+		scheduledDate = null;
+		selectedTime = null;
 	}
 
 	function handleInsertText(text: string) {
@@ -1023,7 +1059,13 @@
 		{canPublish}
 		inspectorOpen={desktopInspectorOpen}
 		{embedded}
+		timezone={accountTimezone}
+		{scheduledDate}
+		{schedule}
+		scheduledFor={scheduledFor()}
 		onsubmit={handleSubmit}
+		onscheduleselect={handleScheduleSelect}
+		onunschedule={handleUnschedule}
 	>
 		{#snippet children()}
 			{#if mode === "tweet"}
@@ -1091,7 +1133,9 @@
 			<InspectorContent
 				{schedule}
 				{selectedTime}
+				{scheduledDate}
 				{targetDate}
+				timezone={accountTimezone}
 				{voiceCue}
 				{assisting}
 				{hasExistingContent}
@@ -1099,9 +1143,8 @@
 				{showUndo}
 				{mode}
 				bind:voicePanelRef
-				onselect={(time) => {
-					selectedTime = time;
-				}}
+				onscheduleselect={handleScheduleSelect}
+				onunschedule={handleUnschedule}
 				oncuechange={(c) => {
 					voiceCue = c;
 				}}
@@ -1134,7 +1177,9 @@
 				<InspectorContent
 					{schedule}
 					{selectedTime}
+					{scheduledDate}
 					{targetDate}
+					timezone={accountTimezone}
 					{voiceCue}
 					{assisting}
 					{hasExistingContent}
@@ -1142,9 +1187,8 @@
 					{showUndo}
 					{mode}
 					bind:voicePanelRef
-					onselect={(time) => {
-						selectedTime = time;
-					}}
+					onscheduleselect={handleScheduleSelect}
+					onunschedule={handleUnschedule}
 					oncuechange={(c) => {
 						voiceCue = c;
 					}}
@@ -1211,7 +1255,13 @@
 			{mode}
 			blockCount={threadBlockCount}
 			{headerLeft}
+			timezone={accountTimezone}
+			{scheduledDate}
+			{schedule}
+			scheduledFor={scheduledFor()}
 			onsubmit={handleSubmit}
+			onscheduleselect={handleScheduleSelect}
+			onunschedule={handleUnschedule}
 			ontoggleinspector={toggleInspector}
 			ontogglepreview={togglePreview}
 			onopenpalette={() => {

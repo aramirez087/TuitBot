@@ -1,6 +1,9 @@
 <script lang="ts">
-	import { Send } from "lucide-svelte";
+	import { Send, Clock } from "lucide-svelte";
 	import type { Snippet } from "svelte";
+	import type { ScheduleConfig } from "$lib/api";
+	import { formatInAccountTz } from "$lib/utils/timezone";
+	import ScheduleComposerSheet from "./ScheduleComposerSheet.svelte";
 
 	let {
 		canSubmit,
@@ -10,7 +13,13 @@
 		canPublish = true,
 		inspectorOpen = false,
 		embedded = false,
+		timezone = null,
+		scheduledDate = null,
+		schedule = null,
+		scheduledFor = null,
 		onsubmit,
+		onscheduleselect,
+		onunschedule,
 		children,
 		toolbar,
 		inspector,
@@ -22,11 +31,37 @@
 		canPublish?: boolean;
 		inspectorOpen?: boolean;
 		embedded?: boolean;
+		timezone?: string | null;
+		scheduledDate?: string | null;
+		schedule?: ScheduleConfig | null;
+		scheduledFor?: string | null;
 		onsubmit: () => void;
+		onscheduleselect?: (date: string, time: string) => void;
+		onunschedule?: () => void;
 		children: Snippet;
 		toolbar?: Snippet;
 		inspector?: Snippet;
 	} = $props();
+
+	let scheduleSheetOpen = $state(false);
+
+	const isScheduled = $derived(!!selectedTime && !!scheduledDate);
+
+	const submitLabel = $derived(() => {
+		if (submitting) return isScheduled ? "Scheduling\u2026" : "Submitting\u2026";
+		if (isScheduled && scheduledFor && timezone) {
+			return formatInAccountTz(scheduledFor, timezone, {
+				month: "short",
+				day: "numeric",
+				hour: "numeric",
+				minute: "2-digit",
+				timeZoneName: "short",
+			});
+		}
+		if (selectedTime) return "Schedule";
+		if (canPublish) return "Post now";
+		return "Save to Calendar";
+	});
 </script>
 
 <div class="canvas" class:with-inspector={inspectorOpen && inspector}>
@@ -43,21 +78,40 @@
 
 		{#if !embedded}
 			<div class="submit-anchor">
-				<button
-					class="submit-pill"
-					onclick={onsubmit}
-					disabled={!canSubmit || submitting}
-					title={!canPublish && !selectedTime ? 'Connect X API to publish directly' : ''}
-				>
-					<Send size={14} />
-					{submitting
-						? "Submitting..."
-						: selectedTime
-							? "Schedule"
-							: canPublish
-								? "Post now"
-								: "Save to Calendar"}
-				</button>
+				<div class="submit-group">
+					<div class="schedule-trigger-wrap">
+						<button
+							class="schedule-trigger-btn"
+							onclick={() => { scheduleSheetOpen = !scheduleSheetOpen; }}
+							aria-label={scheduleSheetOpen ? "Close schedule picker" : "Open schedule picker"}
+							title="Schedule"
+						>
+							<Clock size={14} />
+						</button>
+						<ScheduleComposerSheet
+							open={scheduleSheetOpen}
+							{schedule}
+							selectedDate={scheduledDate}
+							{selectedTime}
+							onschedule={(date, time) => { onscheduleselect?.(date, time); }}
+							onunschedule={() => { onunschedule?.(); }}
+							onclose={() => { scheduleSheetOpen = false; }}
+						/>
+					</div>
+					<button
+						class="submit-pill"
+						onclick={onsubmit}
+						disabled={!canSubmit || submitting}
+						title={!canPublish && !selectedTime ? 'Connect X API to publish directly' : ''}
+					>
+						{#if isScheduled}
+							<Clock size={14} />
+						{:else}
+							<Send size={14} />
+						{/if}
+						{submitLabel()}
+					</button>
+				</div>
 			</div>
 		{/if}
 	</div>
@@ -131,6 +185,38 @@
 		justify-content: flex-end;
 		padding: 12px 0 0;
 		pointer-events: none;
+	}
+
+	.submit-group {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		pointer-events: auto;
+	}
+
+	.schedule-trigger-wrap {
+		position: relative;
+	}
+
+	.schedule-trigger-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border: 1px solid var(--color-border);
+		border-radius: 20px;
+		background: var(--color-surface);
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: all 0.15s ease;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	}
+
+	.schedule-trigger-btn:hover {
+		border-color: var(--color-accent);
+		color: var(--color-accent);
+		background: var(--color-surface-hover);
 	}
 
 	.submit-pill {
