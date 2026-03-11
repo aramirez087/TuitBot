@@ -5,12 +5,20 @@
 	import { connected } from "$lib/stores/websocket";
 	import { checkForUpdate } from "$lib/stores/update";
 	import { initAccounts, syncCurrentProfile, bootstrapState, ACCOUNT_SWITCHED_EVENT } from "$lib/stores/accounts";
+	import { authMode } from "$lib/stores/auth";
 	import { onMount, onDestroy } from "svelte";
 	import { page } from "$app/stores";
 	import { goto } from "$app/navigation";
 	import { fade } from "svelte/transition";
 
 	let { children } = $props();
+
+	// Auth guard: redirect to /login if unauthenticated.
+	$effect(() => {
+		if ($authMode === 'none') {
+			goto('/login');
+		}
+	});
 
 	const shortcuts: Record<string, string> = {
 		'1': '/',
@@ -65,25 +73,27 @@
 	});
 </script>
 
-<div class="app-shell">
-	<Sidebar />
-	<main class="main-content">
-		{#if $bootstrapState === 'loading'}
-			<div class="bootstrap-loading" in:fade={{ duration: 100 }}>
-				<div class="bootstrap-spinner"></div>
-			</div>
-		{:else}
-			{#if !$connected}
-				<ConnectionBanner />
-			{/if}
-			{#key $page.url.pathname}
-				<div in:fade={{ duration: 150 }}>
-					{@render children()}
+{#if $authMode !== 'none'}
+	<div class="app-shell">
+		<Sidebar />
+		<main class="main-content">
+			{#if $bootstrapState === 'loading'}
+				<div class="bootstrap-loading" in:fade={{ duration: 100 }}>
+					<div class="bootstrap-spinner"></div>
 				</div>
-			{/key}
-		{/if}
-	</main>
-</div>
+			{:else}
+				{#if !$connected}
+					<ConnectionBanner />
+				{/if}
+				{#key $page.url.pathname}
+					<div in:fade={{ duration: 150 }}>
+						{@render children()}
+					</div>
+				{/key}
+			{/if}
+		</main>
+	</div>
+{/if}
 
 <style>
 	.app-shell {
