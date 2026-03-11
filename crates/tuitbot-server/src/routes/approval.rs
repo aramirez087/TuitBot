@@ -7,7 +7,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tuitbot_core::config::Config;
-use tuitbot_core::storage::{action_log, approval_queue};
+use tuitbot_core::storage::{action_log, approval_queue, scheduled_content};
 
 use crate::account::{require_approve, AccountContext};
 use crate::error::ApiError;
@@ -176,6 +176,74 @@ pub async fn approve_item(
     }
 
     let review = body.map(|b| b.0).unwrap_or_default();
+
+    // Check if this item has a future scheduling intent.
+    let schedule_bridge = item.scheduled_for.as_deref().and_then(|sched| {
+        chrono::NaiveDateTime::parse_from_str(sched, "%Y-%m-%dT%H:%M:%SZ")
+            .ok()
+            .filter(|dt| *dt > chrono::Utc::now().naive_utc())
+            .map(|_| sched.to_string())
+    });
+
+    if let Some(ref sched) = schedule_bridge {
+        // Approve and mark as "scheduled" — the posting engine only picks up "approved" items,
+        // so "scheduled" prevents double-posting.
+        approval_queue::update_status_with_review_for(
+            &state.db,
+            &ctx.account_id,
+            id,
+            "scheduled",
+            &review,
+        )
+        .await?;
+
+        // Bridge to scheduled_content so the scheduler posts at the intended time.
+        let sc_id = scheduled_content::insert_for(
+            &state.db,
+            &ctx.account_id,
+            &item.action_type,
+            &item.generated_content,
+            Some(sched),
+        )
+        .await?;
+
+        let metadata = json!({
+            "approval_id": id,
+            "scheduled_content_id": sc_id,
+            "scheduled_for": sched,
+            "actor": review.actor,
+            "notes": review.notes,
+            "action_type": item.action_type,
+        });
+        let _ = action_log::log_action_for(
+            &state.db,
+            &ctx.account_id,
+            "approval_approved_scheduled",
+            "success",
+            Some(&format!("Approved item {id} → scheduled for {sched}")),
+            Some(&metadata.to_string()),
+        )
+        .await;
+
+        let _ = state.event_tx.send(AccountWsEvent {
+            account_id: ctx.account_id.clone(),
+            event: WsEvent::ApprovalUpdated {
+                id,
+                status: "scheduled".to_string(),
+                action_type: item.action_type,
+                actor: review.actor,
+            },
+        });
+
+        return Ok(Json(json!({
+            "status": "scheduled",
+            "id": id,
+            "scheduled_content_id": sc_id,
+            "scheduled_for": sched,
+        })));
+    }
+
+    // No scheduling intent (or scheduled_for is in the past) — approve for immediate posting.
     approval_queue::update_status_with_review_for(
         &state.db,
         &ctx.account_id,
@@ -309,34 +377,35 @@ pub async fn approve_all(
         let clamped: Vec<&i64> = ids.iter().take(max_batch).collect();
         let mut approved = Vec::with_capacity(clamped.len());
         for &id in &clamped {
-            if let Ok(Some(_)) =
+            if let Ok(Some(item)) =
                 approval_queue::get_by_id_for(&state.db, &ctx.account_id, *id).await
             {
-                if approval_queue::update_status_with_review_for(
-                    &state.db,
-                    &ctx.account_id,
-                    *id,
-                    "approved",
-                    &review,
-                )
-                .await
-                .is_ok()
-                {
+                let result = approve_single_item(&state, &ctx.account_id, &item, &review).await;
+                if result.is_ok() {
                     approved.push(*id);
                 }
             }
         }
         approved
     } else {
-        // Approve oldest N pending items.
+        // Approve oldest N pending items, handling scheduling intent per-item.
         let effective_max = body
             .as_ref()
             .and_then(|b| b.max)
             .map(|m| m.min(max_batch))
             .unwrap_or(max_batch);
 
-        approval_queue::batch_approve_for(&state.db, &ctx.account_id, effective_max, &review)
-            .await?
+        let pending = approval_queue::get_pending_for(&state.db, &ctx.account_id).await?;
+        let mut approved = Vec::with_capacity(effective_max);
+        for item in pending.iter().take(effective_max) {
+            if approve_single_item(&state, &ctx.account_id, item, &review)
+                .await
+                .is_ok()
+            {
+                approved.push(item.id);
+            }
+        }
+        approved
     };
 
     let count = approved_ids.len();
@@ -477,6 +546,48 @@ pub async fn get_edit_history(
     // Query by approval_id PK is already implicitly scoped.
     let history = approval_queue::get_edit_history(&state.db, id).await?;
     Ok(Json(json!(history)))
+}
+
+/// Approve a single item, bridging to scheduled_content if it has a future `scheduled_for`.
+async fn approve_single_item(
+    state: &AppState,
+    account_id: &str,
+    item: &approval_queue::ApprovalItem,
+    review: &approval_queue::ReviewAction,
+) -> Result<(), ApiError> {
+    let schedule_bridge = item.scheduled_for.as_deref().and_then(|sched| {
+        chrono::NaiveDateTime::parse_from_str(sched, "%Y-%m-%dT%H:%M:%SZ")
+            .ok()
+            .filter(|dt| *dt > chrono::Utc::now().naive_utc())
+            .map(|_| sched.to_string())
+    });
+
+    if let Some(ref sched) = schedule_bridge {
+        approval_queue::update_status_with_review_for(
+            &state.db,
+            account_id,
+            item.id,
+            "scheduled",
+            review,
+        )
+        .await?;
+
+        scheduled_content::insert_for(
+            &state.db,
+            account_id,
+            &item.action_type,
+            &item.generated_content,
+            Some(sched),
+        )
+        .await?;
+    } else {
+        approval_queue::update_status_with_review_for(
+            &state.db, account_id, item.id, "approved", review,
+        )
+        .await?;
+    }
+
+    Ok(())
 }
 
 /// Read the config from disk (best-effort, returns defaults on failure).

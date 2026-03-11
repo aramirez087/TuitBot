@@ -230,6 +230,7 @@ pub async fn queue_reply(
         None, // reason
         None, // detected_risks
         provenance_input.as_ref(),
+        None, // no scheduling intent — discovery replies post immediately
     )
     .await?;
 

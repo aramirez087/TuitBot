@@ -15,6 +15,10 @@
 		<span class="stat approved">{stats.approved} approved</span>
 		<span class="stat-separator">&middot;</span>
 		<span class="stat rejected">{stats.rejected} rejected</span>
+		{#if stats.scheduled > 0}
+			<span class="stat-separator">&middot;</span>
+			<span class="stat scheduled">{stats.scheduled} scheduled</span>
+		{/if}
 		{#if stats.failed > 0}
 			<span class="stat-separator">&middot;</span>
 			<span class="stat failed">{stats.failed} failed</span>
@@ -45,6 +49,10 @@
 
 	.stat.rejected {
 		color: var(--color-danger);
+	}
+
+	.stat.scheduled {
+		color: var(--color-accent);
 	}
 
 	.stat.failed {

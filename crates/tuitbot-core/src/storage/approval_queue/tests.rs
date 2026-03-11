@@ -503,3 +503,157 @@ async fn mark_failed_sets_status() {
     let stats = get_stats(&pool).await.expect("stats");
     assert_eq!(stats.failed, 1);
 }
+
+// ── Scheduled intent tests ──────────────────────────────────────────
+
+#[tokio::test]
+async fn enqueue_with_scheduled_for_preserves_timestamp() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue_with_context_for(
+        &pool,
+        DEFAULT_ACCOUNT_ID,
+        "tweet",
+        "",
+        "",
+        "Hello scheduled world",
+        "General",
+        "",
+        0.0,
+        "[]",
+        None,
+        None,
+        Some("2026-03-15T14:00:00Z"),
+    )
+    .await
+    .expect("enqueue");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("found");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2026-03-15T14:00:00Z"));
+    assert_eq!(item.status, "pending");
+}
+
+#[tokio::test]
+async fn enqueue_without_scheduled_for_is_null() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "No schedule",
+        "General",
+        "",
+        0.0,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("found");
+    assert!(item.scheduled_for.is_none());
+}
+
+#[tokio::test]
+async fn scheduled_status_counted_in_stats() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue_with_context_for(
+        &pool,
+        DEFAULT_ACCOUNT_ID,
+        "tweet",
+        "",
+        "",
+        "Scheduled item",
+        "",
+        "",
+        0.0,
+        "[]",
+        None,
+        None,
+        Some("2026-03-20T10:00:00Z"),
+    )
+    .await
+    .expect("enqueue");
+
+    // Simulate approval → scheduled transition.
+    sqlx::query("UPDATE approval_queue SET status = 'scheduled' WHERE id = ? AND account_id = ?")
+        .bind(id)
+        .bind(DEFAULT_ACCOUNT_ID)
+        .execute(&pool)
+        .await
+        .expect("set scheduled");
+
+    let stats = get_stats(&pool).await.expect("stats");
+    assert_eq!(stats.scheduled, 1);
+    assert_eq!(stats.pending, 0);
+}
+
+#[tokio::test]
+async fn scheduled_items_excluded_from_next_approved() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Sched item",
+        "General",
+        "",
+        0.0,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    // Set to "scheduled" (not "approved") — should not appear in next_approved.
+    sqlx::query("UPDATE approval_queue SET status = 'scheduled' WHERE id = ? AND account_id = ?")
+        .bind(id)
+        .bind(DEFAULT_ACCOUNT_ID)
+        .execute(&pool)
+        .await
+        .expect("set scheduled");
+
+    let next = get_next_approved(&pool).await.expect("next");
+    assert!(
+        next.is_none(),
+        "scheduled items must not be picked up by the posting engine"
+    );
+}
+
+#[tokio::test]
+async fn enqueue_with_provenance_and_scheduled_for() {
+    let pool = init_test_db().await.expect("init db");
+
+    let prov = super::ProvenanceInput {
+        source_node_id: None,
+        source_seed_id: None,
+        source_chunks_json: r#"[{"type":"manual"}]"#.to_string(),
+        refs: vec![],
+    };
+
+    let id = enqueue_with_provenance_for(
+        &pool,
+        DEFAULT_ACCOUNT_ID,
+        "thread",
+        "",
+        "",
+        "Thread content",
+        "Tech",
+        "",
+        0.0,
+        "[]",
+        None,
+        None,
+        Some(&prov),
+        Some("2026-04-01T09:00:00Z"),
+    )
+    .await
+    .expect("enqueue");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("found");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2026-04-01T09:00:00Z"));
+    assert_eq!(item.source_chunks_json, r#"[{"type":"manual"}]"#);
+}

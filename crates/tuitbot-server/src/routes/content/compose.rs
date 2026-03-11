@@ -92,6 +92,7 @@ pub async fn compose_tweet(
             None,
             None,
             prov_input.as_ref(),
+            body.scheduled_for.as_deref(),
         )
         .await?;
 
@@ -108,6 +109,7 @@ pub async fn compose_tweet(
         Ok(Json(json!({
             "status": "queued_for_approval",
             "id": id,
+            "scheduled_for": body.scheduled_for,
         })))
     } else {
         // Without X API client in AppState, we can only acknowledge the intent.
@@ -146,7 +148,7 @@ pub async fn compose_thread(
     let combined = body.tweets.join("\n---\n");
 
     if approval_mode {
-        let id = approval_queue::enqueue_for(
+        let id = approval_queue::enqueue_with_context_for(
             &state.db,
             &ctx.account_id,
             "thread",
@@ -157,6 +159,9 @@ pub async fn compose_thread(
             "",
             0.0,
             "[]",
+            None,
+            None,
+            body.scheduled_for.as_deref(),
         )
         .await?;
 
@@ -173,6 +178,7 @@ pub async fn compose_thread(
         Ok(Json(json!({
             "status": "queued_for_approval",
             "id": id,
+            "scheduled_for": body.scheduled_for,
         })))
     } else {
         Ok(Json(json!({
@@ -338,6 +344,7 @@ async fn compose_thread_blocks_flow(
             None,
             None,
             prov_input.as_ref(),
+            normalized_schedule.as_deref(),
         )
         .await?;
 
@@ -355,6 +362,7 @@ async fn compose_thread_blocks_flow(
             "status": "queued_for_approval",
             "id": id,
             "block_ids": block_ids,
+            "scheduled_for": normalized_schedule,
         })))
     } else if let Some(ref normalized) = normalized_schedule {
         // User explicitly chose a future time — already validated above.
@@ -456,6 +464,7 @@ async fn persist_content(
             None,
             None,
             prov_input.as_ref(),
+            normalized_schedule.as_deref(),
         )
         .await?;
 
@@ -472,6 +481,7 @@ async fn persist_content(
         Ok(Json(json!({
             "status": "queued_for_approval",
             "id": id,
+            "scheduled_for": normalized_schedule,
         })))
     } else if let Some(ref normalized) = normalized_schedule {
         // User explicitly chose a future time — already validated above.

@@ -268,6 +268,7 @@ pub async fn publish_draft(
         None,
         None,
         prov_input.as_ref(),
+        None, // no scheduling intent — direct publish via approval poster
     )
     .await
     .map_err(ApiError::Storage)?;

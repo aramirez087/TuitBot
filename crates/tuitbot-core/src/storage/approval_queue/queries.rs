@@ -14,7 +14,8 @@ const SELECT_COLS: &str = "id, action_type, target_tweet_id, target_author, \
     COALESCE(qa_hard_flags, '[]') AS qa_hard_flags, COALESCE(qa_soft_flags, '[]') AS qa_soft_flags, \
     COALESCE(qa_recommendations, '[]') AS qa_recommendations, COALESCE(qa_score, 0) AS qa_score, \
     COALESCE(qa_requires_override, 0) AS qa_requires_override, qa_override_by, qa_override_note, qa_override_at, \
-    source_node_id, source_seed_id, COALESCE(source_chunks_json, '[]') AS source_chunks_json";
+    source_node_id, source_seed_id, COALESCE(source_chunks_json, '[]') AS source_chunks_json, \
+    scheduled_for";
 
 /// Insert a new item into the approval queue for a specific account.
 #[allow(clippy::too_many_arguments)]
@@ -41,6 +42,7 @@ pub async fn enqueue_for(
         archetype,
         score,
         media_paths,
+        None,
         None,
         None,
     )
@@ -75,7 +77,8 @@ pub async fn enqueue(
     .await
 }
 
-/// Insert a new item into the approval queue with optional reason and risks for a specific account.
+/// Insert a new item into the approval queue with optional reason, risks, and scheduling intent
+/// for a specific account.
 #[allow(clippy::too_many_arguments)]
 pub async fn enqueue_with_context_for(
     pool: &DbPool,
@@ -90,11 +93,13 @@ pub async fn enqueue_with_context_for(
     media_paths: &str,
     reason: Option<&str>,
     detected_risks: Option<&str>,
+    scheduled_for: Option<&str>,
 ) -> Result<i64, StorageError> {
     let result = sqlx::query(
         "INSERT INTO approval_queue (account_id, action_type, target_tweet_id, target_author, \
-         generated_content, topic, archetype, score, media_paths, reason, detected_risks) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         generated_content, topic, archetype, score, media_paths, reason, detected_risks, \
+         scheduled_for) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(account_id)
     .bind(action_type)
@@ -107,6 +112,7 @@ pub async fn enqueue_with_context_for(
     .bind(media_paths)
     .bind(reason)
     .bind(detected_risks.unwrap_or("[]"))
+    .bind(scheduled_for)
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;
@@ -142,6 +148,7 @@ pub async fn enqueue_with_context(
         media_paths,
         reason,
         detected_risks,
+        None,
     )
     .await
 }
@@ -173,6 +180,7 @@ pub async fn enqueue_with_provenance_for(
     reason: Option<&str>,
     detected_risks: Option<&str>,
     provenance: Option<&ProvenanceInput>,
+    scheduled_for: Option<&str>,
 ) -> Result<i64, StorageError> {
     let (source_node_id, source_seed_id, source_chunks_json) = match provenance {
         Some(p) => (
@@ -186,8 +194,8 @@ pub async fn enqueue_with_provenance_for(
     let result = sqlx::query(
         "INSERT INTO approval_queue (account_id, action_type, target_tweet_id, target_author, \
          generated_content, topic, archetype, score, media_paths, reason, detected_risks, \
-         source_node_id, source_seed_id, source_chunks_json) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         source_node_id, source_seed_id, source_chunks_json, scheduled_for) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(account_id)
     .bind(action_type)
@@ -203,6 +211,7 @@ pub async fn enqueue_with_provenance_for(
     .bind(source_node_id)
     .bind(source_seed_id)
     .bind(source_chunks_json)
+    .bind(scheduled_for)
     .execute(pool)
     .await
     .map_err(|e| StorageError::Query { source: e })?;
@@ -419,12 +428,13 @@ pub async fn get_by_id(pool: &DbPool, id: i64) -> Result<Option<ApprovalItem>, S
 
 /// Get counts of items grouped by status for a specific account.
 pub async fn get_stats_for(pool: &DbPool, account_id: &str) -> Result<ApprovalStats, StorageError> {
-    let row: (i64, i64, i64, i64) = sqlx::query_as(
+    let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
         "SELECT \
             COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0), \
             COALESCE(SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END), 0), \
             COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0), \
-            COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) \
+            COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0), \
+            COALESCE(SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END), 0) \
          FROM approval_queue WHERE account_id = ?",
     )
     .bind(account_id)
@@ -437,6 +447,7 @@ pub async fn get_stats_for(pool: &DbPool, account_id: &str) -> Result<ApprovalSt
         approved: row.1,
         rejected: row.2,
         failed: row.3,
+        scheduled: row.4,
     })
 }
 

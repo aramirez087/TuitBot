@@ -767,6 +767,157 @@ mod publish_tests {
     }
 }
 
+// ── Approval + scheduling mode combination tests ────────────────────
+
+mod approval_scheduling_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn autopilot_approval_on_queues_with_pending_status() {
+        let db = storage::init_test_db().await.unwrap();
+        seed_discovered_tweet(&db, "t1", "Rust topic", "dev").await;
+
+        let llm: Arc<dyn LlmProvider> = Arc::new(MockLlmProvider::new("Insightful!"));
+        let client = MockXApiClient::empty();
+        let mut config = test_config();
+        config.approval_mode = true;
+
+        let results = queue::execute(
+            &db,
+            Some(&client as &dyn XApiClient),
+            Some(&llm),
+            &config,
+            QueueInput {
+                items: vec![QueueItem {
+                    candidate_id: "t1".to_string(),
+                    pre_drafted_text: Some("Scheduled reply".to_string()),
+                }],
+                mention_product: false,
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert!(matches!(&results[0], ProposeResult::Queued { .. }));
+
+        // Verify the item is in the approval queue with pending status.
+        let pending = storage::approval_queue::get_pending(&db).await.unwrap();
+        assert!(!pending.is_empty());
+        assert_eq!(pending[0].status, "pending");
+    }
+
+    #[tokio::test]
+    async fn autopilot_approval_off_executes_immediately() {
+        let db = storage::init_test_db().await.unwrap();
+        seed_discovered_tweet(&db, "t1", "Rust topic", "dev").await;
+
+        let client = MockXApiClient::empty();
+        let mut config = test_config();
+        config.approval_mode = false;
+
+        let results = queue::execute(
+            &db,
+            Some(&client as &dyn XApiClient),
+            None,
+            &config,
+            QueueInput {
+                items: vec![QueueItem {
+                    candidate_id: "t1".to_string(),
+                    pre_drafted_text: Some("Direct post".to_string()),
+                }],
+                mention_product: false,
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            ProposeResult::Executed { reply_tweet_id, .. } => {
+                assert_eq!(reply_tweet_id, "reply_1");
+            }
+            other => panic!("Expected Executed, got {other:?}"),
+        }
+
+        // Approval queue should be empty.
+        let pending = storage::approval_queue::get_pending(&db).await.unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[tokio::test]
+    async fn scheduled_for_preserved_through_enqueue() {
+        let db = storage::init_test_db().await.unwrap();
+
+        // Enqueue with scheduling intent.
+        let id = storage::approval_queue::enqueue_with_context_for(
+            &db,
+            storage::accounts::DEFAULT_ACCOUNT_ID,
+            "tweet",
+            "",
+            "",
+            "Scheduled tweet content",
+            "Topic",
+            "",
+            0.0,
+            "[]",
+            None,
+            None,
+            Some("2026-03-15T14:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        // Verify scheduled_for is stored.
+        let item = storage::approval_queue::get_by_id(&db, id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(item.scheduled_for.as_deref(), Some("2026-03-15T14:00:00Z"));
+        assert_eq!(item.status, "pending");
+    }
+
+    #[tokio::test]
+    async fn approval_mode_preserves_schedule_across_status_changes() {
+        let db = storage::init_test_db().await.unwrap();
+
+        let id = storage::approval_queue::enqueue_with_context_for(
+            &db,
+            storage::accounts::DEFAULT_ACCOUNT_ID,
+            "tweet",
+            "",
+            "",
+            "Content with schedule",
+            "",
+            "",
+            0.0,
+            "[]",
+            None,
+            None,
+            Some("2026-04-01T10:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        // Approve the item.
+        let review = storage::approval_queue::ReviewAction {
+            actor: Some("tester".to_string()),
+            notes: None,
+        };
+        storage::approval_queue::update_status_with_review(&db, id, "approved", &review)
+            .await
+            .unwrap();
+
+        // scheduled_for should still be present after status change.
+        let item = storage::approval_queue::get_by_id(&db, id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(item.status, "approved");
+        assert_eq!(item.scheduled_for.as_deref(), Some("2026-04-01T10:00:00Z"));
+    }
+}
+
 // ── Error propagation tests ──────────────────────────────────────────
 
 mod error_tests {

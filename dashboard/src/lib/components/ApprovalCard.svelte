@@ -9,9 +9,11 @@
 		Pencil,
 		X,
 		Film,
-		ShieldAlert
+		ShieldAlert,
+		Clock
 	} from 'lucide-svelte';
 	import { api, type ApprovalItem } from '$lib/api';
+	import { formatInAccountTz } from '$lib/utils/timezone';
 	import ApprovalEditHistory from './ApprovalEditHistory.svelte';
 	import ApprovalRejectDialog from './ApprovalRejectDialog.svelte';
 
@@ -19,6 +21,7 @@
 		item: ApprovalItem;
 		focused: boolean;
 		editing: boolean;
+		timezone?: string;
 		onApprove: (id: number) => void;
 		onReject: (id: number, notes?: string) => void;
 		onStartEdit: (id: number) => void;
@@ -30,6 +33,7 @@
 		item,
 		focused,
 		editing,
+		timezone = 'UTC',
 		onApprove,
 		onReject,
 		onStartEdit,
@@ -68,7 +72,21 @@
 			? 'status-pending'
 			: item.status === 'approved'
 				? 'status-approved'
-				: 'status-rejected'
+				: item.status === 'scheduled'
+					? 'status-scheduled'
+					: 'status-rejected'
+	);
+
+	const scheduledLabel = $derived(
+		item.scheduled_for
+			? formatInAccountTz(item.scheduled_for, timezone, {
+					month: 'short',
+					day: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit',
+					timeZoneName: 'short'
+				})
+			: null
 	);
 
 	function relativeTime(iso: string): string {
@@ -130,6 +148,13 @@
 			<div class="card-context">
 				<span class="context-label">Replying to</span>
 				<span class="context-author">@{item.target_author.replace(/^@/, '')}</span>
+			</div>
+		{/if}
+
+		{#if scheduledLabel}
+			<div class="card-schedule">
+				<Clock size={12} />
+				<span>Scheduled for {scheduledLabel}</span>
 			</div>
 		{/if}
 
@@ -264,6 +289,8 @@
 			<div class="card-actions-readonly">
 				{#if item.status === 'approved'}
 					<span class="readonly-badge approved"><CheckCircle size={12} /> Approved</span>
+				{:else if item.status === 'scheduled'}
+					<span class="readonly-badge scheduled"><Clock size={12} /> Scheduled</span>
 				{:else}
 					<span class="readonly-badge rejected"><X size={12} /> Rejected</span>
 				{/if}
@@ -326,6 +353,11 @@
 		color: var(--color-danger);
 	}
 
+	.card-icon.status-scheduled {
+		background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+		color: var(--color-accent);
+	}
+
 	.card-body {
 		flex: 1;
 		min-width: 0;
@@ -367,6 +399,11 @@
 		color: var(--color-danger);
 	}
 
+	.card-badge.status-scheduled {
+		background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+		color: var(--color-accent);
+	}
+
 	.card-score {
 		font-size: 12px;
 		font-weight: 600;
@@ -394,6 +431,20 @@
 	.context-author {
 		color: var(--color-accent);
 		font-weight: 600;
+	}
+
+	.card-schedule {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-bottom: 8px;
+		padding: 4px 10px;
+		border-radius: 5px;
+		background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		color: var(--color-accent);
+		font-size: 12px;
+		font-weight: 500;
+		width: fit-content;
 	}
 
 	.card-content {
@@ -718,5 +769,10 @@
 	.readonly-badge.rejected {
 		background-color: color-mix(in srgb, var(--color-danger) 12%, transparent);
 		color: var(--color-danger);
+	}
+
+	.readonly-badge.scheduled {
+		background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		color: var(--color-accent);
 	}
 </style>
