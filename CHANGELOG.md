@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.34](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.33...tuitbot-cli-v0.1.34) - 2026-03-11
+
+### Added
+
+- Session 6 — polish telemetry and qa
+- Session 5 — approval and autopilot scheduling coherence
+- Session 2 — scheduling domain and api foundation
+
 ## [0.1.33](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.32...tuitbot-cli-v0.1.33) - 2026-03-10
 
 ### Fixed
