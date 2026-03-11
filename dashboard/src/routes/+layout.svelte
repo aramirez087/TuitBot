@@ -36,6 +36,8 @@
 				const status = await api.settings.configStatus();
 				if (!status.configured && !$page.url.pathname.startsWith("/onboarding")) {
 					goto("/onboarding");
+				} else if (status.configured && $page.url.pathname.startsWith("/onboarding")) {
+					goto("/");
 				}
 			} catch {
 				// Server not ready — allow through.
@@ -59,6 +61,12 @@
 					return;
 				}
 
+				// Already configured — redirect away from onboarding.
+				if (path.startsWith("/onboarding")) {
+					goto("/");
+					return;
+				}
+
 				// Configured instance — check for existing session.
 				const hasSession = await checkAuth();
 				if (hasSession) {
@@ -67,9 +75,8 @@
 						goto("/");
 					}
 				} else {
-					if (!path.startsWith("/login") && !path.startsWith("/onboarding")) {
+					if (!path.startsWith("/login")) {
 						goto("/login");
-						ready = true;
 						return;
 					}
 				}

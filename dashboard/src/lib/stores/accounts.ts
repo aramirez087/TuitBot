@@ -107,6 +107,7 @@ export function updateAccountLocally(id: string, fields: Partial<Account>): void
 /** Sync X profile data (avatar, display name) for the current account. */
 export async function syncCurrentProfile(): Promise<void> {
 	const id = getPersistedAccountId();
+	if (id === DEFAULT_ACCOUNT_ID) return; // No real account selected yet.
 	try {
 		const updated = await api.accounts.syncProfile(id);
 		accounts.update((list) =>

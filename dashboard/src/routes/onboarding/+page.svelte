@@ -63,22 +63,8 @@
 		($onboardingData.llm_api_key.trim().length > 0 && $onboardingData.llm_model.trim().length > 0)
 	);
 
-	// Check deployment mode on mount — redirect if already configured.
+	// Deployment mode flag — set by root layout via page data or detected on submit.
 	let unsupportedMode = $state('');
-	$effect(() => {
-		api.settings.configStatus().then((status: { configured?: boolean; deployment_mode?: string }) => {
-			if (status.configured) {
-				goto('/');
-				return;
-			}
-			const mode = status.deployment_mode;
-			if (mode && !['desktop', 'self_host', 'cloud'].includes(mode)) {
-				unsupportedMode = mode;
-			}
-		}).catch(() => {
-			// Server unavailable — let the user proceed; submit() will catch it.
-		});
-	});
 
 	// Track step transitions for funnel measurement.
 	let prevTrackedStep = $state(-1);
@@ -379,29 +365,28 @@
 
 	<div class="onboarding-content">
 		<div class="progress">
-			{#each steps as step, i}
-				{#if step !== 'Analyze'}
-					{@const isSkipped = skippedSteps.has(step)}
-					<div
-						class="progress-step"
-						class:active={i === currentStep || (step === 'Profile' && isAnalyzeStep)}
-						class:completed={i < currentStep && !isSkipped}
-						class:skipped={isSkipped && i < currentStep}
-					>
-						<div class="progress-dot">
-							{#if isSkipped && i < currentStep}
-								<span class="skip-mark">&mdash;</span>
-							{:else if i < currentStep}
-								<span class="check-mark">&#10003;</span>
-							{:else}
-								{i + 1}
-							{/if}
-						</div>
-						<span class="progress-label">{step}</span>
+			{#each steps.filter((s) => s !== 'Analyze') as step, displayIdx}
+				{@const realIdx = steps.indexOf(step)}
+				{@const isSkipped = skippedSteps.has(step)}
+				<div
+					class="progress-step"
+					class:active={realIdx === currentStep || (step === 'Profile' && isAnalyzeStep)}
+					class:completed={realIdx < currentStep && !isSkipped}
+					class:skipped={isSkipped && realIdx < currentStep}
+				>
+					<div class="progress-dot">
+						{#if isSkipped && realIdx < currentStep}
+							<span class="skip-mark">&mdash;</span>
+						{:else if realIdx < currentStep}
+							<span class="check-mark">&#10003;</span>
+						{:else}
+							{displayIdx + 1}
+						{/if}
 					</div>
-					{#if i < steps.length - 1 && steps[i + 1] !== 'Analyze'}
-						<div class="progress-line" class:filled={i < currentStep}></div>
-					{/if}
+					<span class="progress-label">{step}</span>
+				</div>
+				{#if displayIdx < steps.filter((s) => s !== 'Analyze').length - 1}
+					<div class="progress-line" class:filled={realIdx < currentStep}></div>
 				{/if}
 			{/each}
 		</div>
