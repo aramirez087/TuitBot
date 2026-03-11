@@ -98,8 +98,8 @@ Each matrix row is instrumented via the scheduling funnel events (Session 06). S
 |------------|-----------------|
 | No Schedule + No Approval | `compose:publish-now` |
 | Schedule + No Approval | `schedule:created`, `schedule:time-selected` |
-| No Schedule + Approval | `compose:publish-now` (with `has_approval: true`) |
-| Schedule + Approval | `schedule:created` (with `has_approval: true`), `schedule:approval-bridge` (on approve) |
+| No Schedule + Approval | `compose:publish-now` |
+| Schedule + Approval | `schedule:created`, `schedule:approval-bridge` (on approve) |
 | Reschedule (any surface) | `schedule:reschedule` (source: `draft-studio` or `calendar`) |
 | Unschedule (any surface) | `schedule:unschedule` (source: `draft-studio` or `calendar`) |
 | Submit error (any path) | `compose:submit-error` |
