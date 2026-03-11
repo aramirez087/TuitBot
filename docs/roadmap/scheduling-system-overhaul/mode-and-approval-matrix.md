@@ -89,3 +89,17 @@ Now includes `scheduled` count:
 - **ApprovalStats** shows "N scheduled" count when > 0.
 - **Settings** copy explains that scheduled posts retain their target time through approval.
 - **Approval page** subtitle mentions scheduled items posting at their intended time.
+
+## Telemetry Coverage
+
+Each matrix row is instrumented via the scheduling funnel events (Session 06). See `telemetry-and-copy-notes.md` for the full event inventory.
+
+| Matrix Row | Telemetry Events |
+|------------|-----------------|
+| No Schedule + No Approval | `compose:publish-now` |
+| Schedule + No Approval | `schedule:created`, `schedule:time-selected` |
+| No Schedule + Approval | `compose:publish-now` (with `has_approval: true`) |
+| Schedule + Approval | `schedule:created` (with `has_approval: true`), `schedule:approval-bridge` (on approve) |
+| Reschedule (any surface) | `schedule:reschedule` (source: `draft-studio` or `calendar`) |
+| Unschedule (any surface) | `schedule:unschedule` (source: `draft-studio` or `calendar`) |
+| Submit error (any path) | `compose:submit-error` |

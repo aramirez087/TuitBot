@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Clock, X, Zap } from 'lucide-svelte';
 	import { formatInAccountTz, toAccountTzParts, nowInAccountTz } from '$lib/utils/timezone';
+	import { trackFunnel } from '$lib/analytics/funnel';
 
 	let {
 		timezone = 'UTC',
@@ -10,6 +11,7 @@
 		scheduledFor = null,
 		status = 'draft',
 		compact = false,
+		context = 'composer',
 		onschedule,
 		onunschedule,
 	}: {
@@ -20,6 +22,7 @@
 		scheduledFor?: string | null;
 		status?: 'draft' | 'scheduled' | 'posted';
 		compact?: boolean;
+		context?: 'composer' | 'draft-studio' | 'calendar';
 		onschedule?: (date: string, time: string) => void;
 		onunschedule?: () => void;
 	} = $props();
@@ -76,11 +79,13 @@
 	function selectPreferredTime(time: string) {
 		const now = nowInAccountTz(timezone);
 		const dateToUse = customDate || selectedDate || now.date;
+		trackFunnel('schedule:time-selected', { context, source: 'preferred-time', timezone });
 		onschedule?.(dateToUse, time);
 	}
 
 	function selectCustom() {
 		if (customTime && customDate && /^\d{2}:\d{2}$/.test(customTime)) {
+			trackFunnel('schedule:time-selected', { context, source: 'custom', timezone });
 			onschedule?.(customDate, customTime);
 		}
 	}
@@ -129,8 +134,8 @@
 	}
 </script>
 
-<div class="schedule-picker" class:compact>
-	<div class="tz-badge" title={timezone}>
+<div class="schedule-picker" class:compact aria-label="Schedule picker">
+	<div class="tz-badge" id="tz-info" title={timezone}>
 		<Clock size={11} />
 		<span>{tzFull()} ({tzLabel()})</span>
 	</div>
@@ -160,6 +165,7 @@
 			class="picker-input date-input"
 			bind:value={customDate}
 			aria-label="Schedule date"
+			aria-describedby="tz-info"
 		/>
 		<input
 			type="time"
@@ -167,6 +173,7 @@
 			bind:value={customTime}
 			onkeydown={handleKeydown}
 			aria-label="Schedule time"
+			aria-describedby="tz-info"
 		/>
 		<button
 			class="set-btn"

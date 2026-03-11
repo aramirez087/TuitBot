@@ -13,7 +13,7 @@
 	let { title, description = '', actionLabel = '', onaction, icon }: Props = $props();
 </script>
 
-<div class="empty-state">
+<div class="empty-state" role="status">
 	<div class="empty-icon">
 		{#if icon}
 			{@render icon()}

@@ -768,3 +768,74 @@ async fn compose_with_garbage_schedule_rejected() {
         .unwrap()
         .contains("invalid timestamp"));
 }
+
+// ============================================================
+// Scheduling response contract tests (Session 06)
+// ============================================================
+
+#[tokio::test]
+async fn compose_scheduled_tweet_returns_scheduled_for_in_response() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Scheduled with response check",
+            "scheduled_for": "2099-06-15T14:00:00Z"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    // The response should echo back the scheduled_for timestamp
+    let sf = body["scheduled_for"].as_str();
+    assert!(
+        sf.is_some(),
+        "response should include scheduled_for: {body}"
+    );
+    assert!(sf.unwrap().contains("2099"));
+}
+
+#[tokio::test]
+async fn compose_thread_with_blocks_and_schedule_accepted() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "thread",
+            "content": "ignored",
+            "blocks": two_blocks(),
+            "scheduled_for": "2099-12-31T12:00:00Z"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let s = body["status"].as_str().unwrap();
+    assert!(
+        s == "scheduled" || s == "queued_for_approval",
+        "unexpected status: {s}"
+    );
+    // Verify block_ids are present
+    assert!(body["block_ids"].is_array());
+}
+
+#[tokio::test]
+async fn compose_without_schedule_has_no_scheduled_for() {
+    let router = test_router().await;
+    let (status, body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "No schedule tweet"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    // No scheduled_for in response when not provided
+    assert!(
+        body.get("scheduled_for").is_none() || body["scheduled_for"].is_null(),
+        "response should not include scheduled_for when not provided"
+    );
+}

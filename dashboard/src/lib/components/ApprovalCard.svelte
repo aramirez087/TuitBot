@@ -14,6 +14,7 @@
 	} from 'lucide-svelte';
 	import { api, type ApprovalItem } from '$lib/api';
 	import { formatInAccountTz } from '$lib/utils/timezone';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import ApprovalEditHistory from './ApprovalEditHistory.svelte';
 	import ApprovalRejectDialog from './ApprovalRejectDialog.svelte';
 
@@ -44,6 +45,7 @@
 	let editContent = $state('');
 	let textareaEl: HTMLTextAreaElement | undefined = $state();
 	let showRejectDialog = $state(false);
+	let announcement = $state('');
 
 	const charCount = $derived(editing ? editContent.length : item.generated_content.length);
 	const isOverLimit = $derived(charCount > 280);
@@ -129,7 +131,8 @@
 	});
 </script>
 
-<div class="card" class:focused class:editing transition:fly={{ x: 300, duration: 250 }}>
+<div class="card" class:focused class:editing transition:fly={{ x: 300, duration: 250 }} aria-label="{typeLabel} approval item">
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
 	<div class="card-icon {statusClass}">
 		<Icon size={16} />
 	</div>
@@ -269,7 +272,7 @@
 			/>
 		{:else if item.status === 'pending' && !editing}
 			<div class="card-actions">
-				<button class="action-btn approve" onclick={() => onApprove(item.id)}>
+				<button class="action-btn approve" onclick={() => { if (item.scheduled_for) { trackFunnel('schedule:approval-bridge', { has_scheduled_for: true }); announcement = 'Item approved and scheduled'; } else { announcement = 'Item approved'; } onApprove(item.id); }}>
 					<CheckCircle size={14} />
 					Approve
 					<kbd>a</kbd>
@@ -774,5 +777,17 @@
 	.readonly-badge.scheduled {
 		background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
 		color: var(--color-accent);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
 	}
 </style>

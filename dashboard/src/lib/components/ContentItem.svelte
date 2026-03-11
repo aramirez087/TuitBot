@@ -2,6 +2,7 @@
 	import type { CalendarItem } from '$lib/api';
 	import { MessageSquare, FileText, GitBranch, BarChart3, X, Pencil, CalendarClock, CalendarX2 } from 'lucide-svelte';
 	import { formatInAccountTz } from '$lib/utils/timezone';
+	import { trackFunnel } from '$lib/analytics/funnel';
 
 	let {
 		item,
@@ -20,6 +21,7 @@
 	} = $props();
 
 	let expanded = $state(false);
+	let announcement = $state('');
 
 	const typeColors: Record<string, string> = {
 		tweet: 'var(--color-accent)',
@@ -88,7 +90,10 @@
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
+	aria-expanded={expanded}
+	aria-label="{typeLabels[item.content_type] || item.content_type}: {preview}"
 >
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
 	<div class="item-header">
 		<span class="item-icon">
 			<TypeIcon size={12} />
@@ -130,13 +135,13 @@
 						</button>
 					{/if}
 					{#if canReschedule && onreschedule}
-						<button class="action-btn" onclick={(e) => { e.stopPropagation(); onreschedule(item.id); }}>
+						<button class="action-btn" onclick={(e) => { e.stopPropagation(); trackFunnel('schedule:reschedule', { source: 'calendar' }); onreschedule(item.id); announcement = 'Item rescheduled'; }}>
 							<CalendarClock size={12} />
 							Reschedule
 						</button>
 					{/if}
 					{#if canUnschedule && onunschedule}
-						<button class="action-btn" onclick={(e) => { e.stopPropagation(); onunschedule(item.id); }}>
+						<button class="action-btn" onclick={(e) => { e.stopPropagation(); trackFunnel('schedule:unschedule', { source: 'calendar' }); onunschedule(item.id); announcement = 'Item unscheduled'; }}>
 							<CalendarX2 size={12} />
 							Unschedule
 						</button>
@@ -281,5 +286,17 @@
 	.action-btn.cancel:hover {
 		border-color: var(--color-danger);
 		color: var(--color-danger);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
 	}
 </style>

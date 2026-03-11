@@ -15,6 +15,7 @@
 		topicWithCue,
 	} from "$lib/utils/composeHandlers";
 	import { buildScheduledFor, nowInAccountTz } from "$lib/utils/timezone";
+	import { trackFunnel } from "$lib/analytics/funnel";
 	import ThreadFlowLane from "./ThreadFlowLane.svelte";
 	import CommandPalette from "../CommandPalette.svelte";
 	import ComposerShell from "./ComposerShell.svelte";
@@ -528,6 +529,13 @@
 					snippet: c.snippet,
 				}));
 			}
+			if (data.scheduled_for) {
+				trackFunnel('schedule:created', { mode, timezone: accountTimezone });
+			} else if (canPublish) {
+				trackFunnel('compose:publish-now', { mode });
+			} else {
+				trackFunnel('compose:save-draft', { mode });
+			}
 			if (draftSaveManager) {
 				await draftSaveManager.flush();
 			} else {
@@ -547,10 +555,16 @@
 					selectedTime,
 					scheduledDate,
 				};
-				undoMessage =
-					canPublish && !selectedTime
-						? "Published."
-						: "Saved to calendar.";
+				if (selectedTime) {
+					undoMessage = 'Scheduled.';
+					statusAnnouncement = 'Post scheduled for ' + (scheduledFor() ?? selectedTime);
+				} else if (canPublish) {
+					undoMessage = 'Published.';
+					statusAnnouncement = 'Post published';
+				} else {
+					undoMessage = 'Saved to calendar.';
+					statusAnnouncement = 'Post saved to calendar';
+				}
 
 				tweetText = "";
 				threadBlocks = [];
@@ -580,7 +594,10 @@
 				}, 10000);
 			}
 		} catch (e) {
-			submitError = e instanceof Error ? e.message : "Failed to submit";
+			const rawMsg = e instanceof Error ? e.message : 'Failed to submit';
+			const errorCtx = selectedTime ? "Couldn't schedule post" : canPublish ? "Couldn't publish" : "Couldn't save draft";
+			submitError = errorCtx + ': ' + rawMsg;
+			trackFunnel('compose:submit-error', { error_type: rawMsg, mode });
 			submitting = false;
 		}
 	}

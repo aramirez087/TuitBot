@@ -3,6 +3,7 @@
 	import type { DraftSummary } from '$lib/api/types';
 	import SchedulePicker from '../SchedulePicker.svelte';
 	import { buildScheduledFor, toAccountTzParts, nowInAccountTz } from '$lib/utils/timezone';
+	import { trackFunnel } from '$lib/analytics/funnel';
 
 	let {
 		draftSummary,
@@ -25,6 +26,7 @@
 	} = $props();
 
 	let pickerDate = $state<string | null>(null);
+	let announcement = $state('');
 	let pickerTime = $state<string | null>(null);
 
 	$effect(() => {
@@ -46,25 +48,32 @@
 	function handleSchedule(date: string, time: string) {
 		const utcIso = buildScheduledFor(date, time, timezone);
 		if (draftSummary.status === 'scheduled') {
+			trackFunnel('schedule:reschedule', { source: 'draft-studio', timezone });
 			onreschedule(utcIso);
+			announcement = 'Schedule updated';
 		} else {
+			trackFunnel('schedule:created', { mode: 'draft-studio', timezone });
 			onschedule(utcIso);
+			announcement = 'Draft scheduled for ' + time;
 		}
 		pickerDate = date;
 		pickerTime = time;
 	}
 
 	function handleUnschedule() {
+		trackFunnel('schedule:unschedule', { source: 'draft-studio' });
 		onunschedule();
 		pickerTime = null;
+		announcement = 'Schedule removed';
 	}
 </script>
 
-<div class="schedule-section">
+<div class="schedule-section" aria-label="Schedule section">
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
 	{#if draftSummary.status === 'posted'}
 		<div class="field-label schedule-label">
 			<Copy size={12} />
-			Actions
+			Post Actions
 		</div>
 		<button class="action-btn" type="button" onclick={onduplicate}>
 			Duplicate as draft
@@ -73,6 +82,7 @@
 		<SchedulePicker
 			{timezone}
 			{preferredTimes}
+			context="draft-studio"
 			selectedDate={pickerDate}
 			selectedTime={pickerTime}
 			scheduledFor={draftSummary.scheduled_for}
@@ -123,5 +133,17 @@
 		background: var(--color-surface-hover);
 		border-color: var(--color-accent);
 		color: var(--color-accent);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
 	}
 </style>
