@@ -13,6 +13,7 @@ pub mod mcp_policy;
 pub mod mutation_gateway;
 pub mod net;
 pub mod safety;
+pub mod scheduling;
 pub mod scoring;
 pub mod source;
 pub mod startup;

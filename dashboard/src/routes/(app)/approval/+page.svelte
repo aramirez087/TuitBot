@@ -6,6 +6,7 @@
 	import ApprovalFilters from '$lib/components/ApprovalFilters.svelte';
 	import ApprovalCard from '$lib/components/ApprovalCard.svelte';
 	import BulkActions from '$lib/components/BulkActions.svelte';
+	import { accountTimezone, loadSchedule } from '$lib/stores/calendar';
 	import {
 		items,
 		stats,
@@ -105,6 +106,7 @@
 	onMount(() => {
 		loadItems(true);
 		loadStats();
+		loadSchedule();
 		startAutoRefresh();
 		window.addEventListener('keydown', handleKeydown);
 		const handler = () => { loadItems(true); loadStats(); };
@@ -128,7 +130,7 @@
 	<div class="page-header-row">
 		<div>
 			<h1>Approval</h1>
-			<p class="subtitle">Review and approve queued actions</p>
+			<p class="subtitle">Review and approve queued actions. Scheduled items will post at their intended time.</p>
 		</div>
 		<div class="header-actions">
 			<div class="export-wrapper">
@@ -188,7 +190,7 @@
 				</div>
 				{#if $selectedStatus === 'pending'}
 					<p class="empty-title">No pending items — you're all caught up!</p>
-					<p class="empty-hint">New items will appear here when the automation generates content.</p>
+					<p class="empty-hint">New items will appear here when automation generates content or you schedule posts with approval enabled.</p>
 				{:else}
 					<p class="empty-title">No {$selectedStatus} items</p>
 					<p class="empty-hint">Try a different filter to see more items.</p>
@@ -203,6 +205,7 @@
 						{item}
 						focused={$focusedIndex === i}
 						editing={editingId === item.id}
+						timezone={$accountTimezone}
 						onApprove={approveItem}
 						onReject={rejectItem}
 						onStartEdit={(id) => (editingId = id)}

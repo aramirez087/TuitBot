@@ -339,7 +339,7 @@ async fn schedule_draft_creates_revision_and_activity() {
     assert_eq!(body["status"].as_str().unwrap(), "scheduled");
     assert_eq!(
         body["scheduled_for"].as_str().unwrap(),
-        "2099-12-31T23:59:59"
+        "2099-12-31T23:59:59Z"
     );
 
     // Check revision was created
@@ -598,4 +598,240 @@ async fn legacy_edit_draft_still_works() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
+}
+
+// ============================================================
+// Scheduling validation
+// ============================================================
+
+#[tokio::test]
+async fn schedule_draft_with_valid_utc() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Schedule me UTC").await;
+
+    let (status, body) = post_json(
+        router,
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T23:59:59Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"].as_str().unwrap(), "scheduled");
+    // Verify the stored time has Z suffix
+    assert!(body["scheduled_for"].as_str().unwrap().ends_with('Z'));
+}
+
+#[tokio::test]
+async fn schedule_draft_with_past_time_rejected() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Past schedule").await;
+
+    let (status, body) = post_json(
+        router,
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2020-01-01T00:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("past"));
+}
+
+// ============================================================
+// Atomic reschedule
+// ============================================================
+
+#[tokio::test]
+async fn reschedule_draft_atomically() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Reschedule me").await;
+
+    // Schedule first
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T10:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Reschedule atomically
+    let (status, body) = patch_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/reschedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T15:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"].as_str().unwrap(), "scheduled");
+    assert_eq!(
+        body["scheduled_for"].as_str().unwrap(),
+        "2099-12-31T15:00:00Z"
+    );
+
+    // Verify via GET — item is still scheduled, no intermediate draft state
+    let (_, draft) = get_json(router, &format!("/api/drafts/{id}")).await;
+    assert_eq!(draft["status"].as_str().unwrap(), "scheduled");
+    assert_eq!(
+        draft["scheduled_for"].as_str().unwrap(),
+        "2099-12-31T15:00:00Z"
+    );
+}
+
+#[tokio::test]
+async fn reschedule_non_scheduled_fails() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Not scheduled").await;
+
+    // Try to reschedule without scheduling first
+    let (status, body) = patch_json(
+        router,
+        &format!("/api/drafts/{id}/reschedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T15:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("not 'scheduled'"));
+}
+
+#[tokio::test]
+async fn reschedule_creates_revision() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Reschedule rev").await;
+
+    // Schedule
+    post_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T10:00:00Z" }),
+    )
+    .await;
+
+    // Reschedule
+    let (status, _) = patch_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/reschedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T15:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Check revisions — should have "schedule" + "reschedule"
+    let (_, revisions) = get_json(router, &format!("/api/drafts/{id}/revisions")).await;
+    let revs = revisions.as_array().unwrap();
+    assert_eq!(revs.len(), 2);
+    // Newest first
+    assert_eq!(revs[0]["trigger_kind"].as_str().unwrap(), "reschedule");
+    assert_eq!(revs[1]["trigger_kind"].as_str().unwrap(), "schedule");
+}
+
+#[tokio::test]
+async fn reschedule_logs_activity() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Reschedule act").await;
+
+    // Schedule
+    post_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T10:00:00Z" }),
+    )
+    .await;
+
+    // Reschedule
+    patch_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/reschedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T15:00:00Z" }),
+    )
+    .await;
+
+    // Check activity — created + scheduled + rescheduled
+    let (_, activity) = get_json(router, &format!("/api/drafts/{id}/activity")).await;
+    let acts = activity.as_array().unwrap();
+    assert_eq!(acts.len(), 3);
+    assert_eq!(acts[0]["action"].as_str().unwrap(), "rescheduled");
+    // Verify the detail contains from/to times
+    let detail: serde_json::Value =
+        serde_json::from_str(acts[0]["detail"].as_str().unwrap()).unwrap();
+    assert_eq!(detail["from"].as_str().unwrap(), "2099-12-31T10:00:00Z");
+    assert_eq!(detail["to"].as_str().unwrap(), "2099-12-31T15:00:00Z");
+}
+
+// ============================================================
+// Reschedule revision detail (Session 06)
+// ============================================================
+
+#[tokio::test]
+async fn reschedule_revision_has_reschedule_trigger() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Reschedule rev detail").await;
+
+    // Schedule
+    post_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T10:00:00Z" }),
+    )
+    .await;
+
+    // Reschedule
+    let (status, _) = patch_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/reschedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T18:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Check revision detail — the reschedule revision should have a detail
+    // containing from/to timestamps
+    let (_, revisions) = get_json(router, &format!("/api/drafts/{id}/revisions")).await;
+    let revs = revisions.as_array().unwrap();
+    assert!(revs.len() >= 2);
+
+    let reschedule_rev = &revs[0];
+    assert_eq!(
+        reschedule_rev["trigger_kind"].as_str().unwrap(),
+        "reschedule"
+    );
+    // Revision detail should include the new scheduled time
+    if let Some(detail_str) = reschedule_rev["detail"].as_str() {
+        let detail: serde_json::Value = serde_json::from_str(detail_str).unwrap();
+        assert_eq!(detail["from"].as_str().unwrap(), "2099-12-31T10:00:00Z");
+        assert_eq!(detail["to"].as_str().unwrap(), "2099-12-31T18:00:00Z");
+    }
+}
+
+#[tokio::test]
+async fn schedule_draft_then_unschedule_then_reschedule_fails() {
+    let router = test_router().await;
+    let (id, _) = create_test_draft(&router, "Lifecycle test").await;
+
+    // Schedule
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/schedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T10:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Unschedule
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/drafts/{id}/unschedule"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Reschedule should fail — item is now a draft, not scheduled
+    let (status, body) = patch_json(
+        router,
+        &format!("/api/drafts/{id}/reschedule"),
+        serde_json::json!({ "scheduled_for": "2099-12-31T15:00:00Z" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("not 'scheduled'"));
 }

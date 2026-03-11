@@ -1,18 +1,27 @@
 <script lang="ts">
 	import type { CalendarItem } from '$lib/api';
-	import { MessageSquare, FileText, GitBranch, BarChart3, X, Pencil } from 'lucide-svelte';
+	import { MessageSquare, FileText, GitBranch, BarChart3, X, Pencil, CalendarClock, CalendarX2 } from 'lucide-svelte';
+	import { formatInAccountTz } from '$lib/utils/timezone';
+	import { trackFunnel } from '$lib/analytics/funnel';
 
 	let {
 		item,
+		timezone = 'UTC',
 		oncancel,
-		onedit
+		onedit,
+		onreschedule,
+		onunschedule
 	}: {
 		item: CalendarItem;
+		timezone?: string;
 		oncancel?: (id: number) => void;
 		onedit?: (id: number) => void;
+		onreschedule?: (id: number) => void;
+		onunschedule?: (id: number) => void;
 	} = $props();
 
 	let expanded = $state(false);
+	let announcement = $state('');
 
 	const typeColors: Record<string, string> = {
 		tweet: 'var(--color-accent)',
@@ -41,7 +50,17 @@
 	);
 	const isPosted = $derived(item.status === 'posted' || item.status === 'sent');
 	const isScheduled = $derived(item.status === 'scheduled');
-	const canEdit = $derived(isScheduled && item.source === 'manual');
+	const canEditContent = $derived(isScheduled && item.source === 'manual');
+	const canReschedule = $derived(isScheduled);
+	const canUnschedule = $derived(isScheduled);
+
+	const scheduledTimeLabel = $derived(
+		isScheduled && item.timestamp
+			? formatInAccountTz(item.timestamp, timezone, {
+				hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+			})
+			: null
+	);
 
 	const TypeIcon = $derived(
 		item.content_type === 'reply' ? MessageSquare : item.content_type === 'thread' ? GitBranch : FileText
@@ -71,7 +90,10 @@
 	onkeydown={handleKeydown}
 	role="button"
 	tabindex="0"
+	aria-expanded={expanded}
+	aria-label="{typeLabels[item.content_type] || item.content_type}: {preview}"
 >
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
 	<div class="item-header">
 		<span class="item-icon">
 			<TypeIcon size={12} />
@@ -86,6 +108,9 @@
 			<div class="item-meta">
 				<span class="item-badge">{typeLabels[item.content_type] || item.content_type}</span>
 				<span class="item-status">{statusLabels[item.status] || item.status}</span>
+				{#if scheduledTimeLabel}
+					<span class="item-time">{scheduledTimeLabel}</span>
+				{/if}
 				{#if item.topic}
 					<span class="item-topic">{item.topic}</span>
 				{/if}
@@ -101,12 +126,24 @@
 				</div>
 			{/if}
 
-			{#if canEdit}
+			{#if isScheduled}
 				<div class="item-actions">
-					{#if onedit}
+					{#if canEditContent && onedit}
 						<button class="action-btn edit" onclick={(e) => { e.stopPropagation(); onedit(item.id); }}>
 							<Pencil size={12} />
 							Edit
+						</button>
+					{/if}
+					{#if canReschedule && onreschedule}
+						<button class="action-btn" onclick={(e) => { e.stopPropagation(); trackFunnel('schedule:reschedule', { source: 'calendar' }); onreschedule(item.id); announcement = 'Item rescheduled'; }}>
+							<CalendarClock size={12} />
+							Reschedule
+						</button>
+					{/if}
+					{#if canUnschedule && onunschedule}
+						<button class="action-btn" onclick={(e) => { e.stopPropagation(); trackFunnel('schedule:unschedule', { source: 'calendar' }); onunschedule(item.id); announcement = 'Item unscheduled'; }}>
+							<CalendarX2 size={12} />
+							Unschedule
 						</button>
 					{/if}
 					{#if oncancel}
@@ -202,8 +239,14 @@
 
 	.item-status,
 	.item-topic,
-	.item-author {
+	.item-author,
+	.item-time {
 		color: var(--color-text-muted);
+	}
+
+	.item-time {
+		font-family: var(--font-mono);
+		font-size: 9px;
 	}
 
 	.item-performance {
@@ -243,5 +286,17 @@
 	.action-btn.cancel:hover {
 		border-color: var(--color-danger);
 		color: var(--color-danger);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
 	}
 </style>

@@ -1,23 +1,30 @@
 <script lang="ts">
 	import type { CalendarItem, ScheduleConfig } from '$lib/api';
+	import { toAccountTzParts, nowInAccountTz } from '$lib/utils/timezone';
 	import ContentItem from './ContentItem.svelte';
 
 	let {
 		items,
 		schedule,
 		days,
+		timezone = 'UTC',
 		onslotclick,
 		ondayclick,
 		oncancel,
-		onedit
+		onedit,
+		onreschedule,
+		onunschedule
 	}: {
 		items: CalendarItem[];
 		schedule: ScheduleConfig | null;
 		days: Date[];
+		timezone?: string;
 		onslotclick?: (date: Date, time: string) => void;
 		ondayclick?: (date: Date) => void;
 		oncancel?: (id: number) => void;
 		onedit?: (id: number) => void;
+		onreschedule?: (id: number) => void;
+		onunschedule?: (id: number) => void;
 	} = $props();
 
 	const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -25,12 +32,17 @@
 	const preferredTimes = $derived(schedule?.preferred_times ?? []);
 
 	const today = $derived(() => {
-		const now = new Date();
-		return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+		return nowInAccountTz(timezone).date;
 	});
 
+	/** Date key for layout dates (grid anchors — already midnight-aligned). */
 	function dateKey(d: Date): string {
 		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	}
+
+	/** Date key for item timestamps — uses account timezone. */
+	function itemDateKey(timestamp: string): string {
+		return toAccountTzParts(timestamp, timezone).date;
 	}
 
 	function isToday(d: Date): boolean {
@@ -45,26 +57,23 @@
 		return d.toLocaleDateString('en-US', { month: 'short' });
 	}
 
-	/** Group items by date key. */
+	/** Group items by date key (in account timezone). */
 	const itemsByDate = $derived(() => {
 		const map = new Map<string, CalendarItem[]>();
 		for (const item of items) {
-			const d = new Date(item.timestamp);
-			const key = dateKey(d);
+			const key = itemDateKey(item.timestamp);
 			if (!map.has(key)) map.set(key, []);
 			map.get(key)!.push(item);
 		}
 		return map;
 	});
 
-	/** Group items by date+time slot. */
+	/** Group items by date+time slot (in account timezone). */
 	const itemsBySlot = $derived(() => {
 		const map = new Map<string, CalendarItem[]>();
 		for (const item of items) {
-			const d = new Date(item.timestamp);
-			const key = dateKey(d);
-			const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-			const slotKey = `${key}|${time}`;
+			const parts = toAccountTzParts(item.timestamp, timezone);
+			const slotKey = `${parts.date}|${parts.time}`;
 			if (!map.has(slotKey)) map.set(slotKey, []);
 			map.get(slotKey)!.push(item);
 		}
@@ -86,8 +95,7 @@
 		const byDate = itemsByDate();
 		const dayItems = byDate.get(dk) ?? [];
 		for (const item of dayItems) {
-			const d = new Date(item.timestamp);
-			const itemTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+			const itemTime = toAccountTzParts(item.timestamp, timezone).time;
 			if (matchesSlot(time, itemTime)) {
 				result.push(item);
 			}
@@ -102,8 +110,7 @@
 		const dayItems = byDate.get(dk) ?? [];
 		if (preferredTimes.length === 0) return dayItems;
 		return dayItems.filter((item) => {
-			const d = new Date(item.timestamp);
-			const itemTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+			const itemTime = toAccountTzParts(item.timestamp, timezone).time;
 			return !preferredTimes.some((pt) => matchesSlot(pt, itemTime));
 		});
 	}
@@ -158,7 +165,7 @@
 					>
 						{#if slotItems.length > 0}
 							{#each slotItems as item}
-								<ContentItem {item} {oncancel} {onedit} />
+								<ContentItem {item} {timezone} {oncancel} {onedit} {onreschedule} {onunschedule} />
 							{/each}
 						{:else}
 							<span class="empty-plus">+</span>
@@ -187,7 +194,7 @@
 				>
 					{#if unslotted.length > 0}
 						{#each unslotted as item}
-							<ContentItem {item} {oncancel} {onedit} />
+							<ContentItem {item} {timezone} {oncancel} {onedit} {onreschedule} {onunschedule} />
 						{/each}
 					{:else}
 						<span class="empty-plus">+</span>

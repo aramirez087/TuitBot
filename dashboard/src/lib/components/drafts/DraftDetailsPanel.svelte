@@ -13,6 +13,8 @@
 		tags,
 		allTags,
 		prefillSchedule = null,
+		timezone = 'UTC',
+		preferredTimes = [],
 		onupdatemeta,
 		onassigntag,
 		onunassigntag,
@@ -28,6 +30,8 @@
 		tags: ContentTag[];
 		allTags: ContentTag[];
 		prefillSchedule?: string | null;
+		timezone?: string;
+		preferredTimes?: string[];
 		onupdatemeta: (data: { title?: string; notes?: string }) => void;
 		onassigntag: (tagId: number) => void;
 		onunassigntag: (tagId: number) => void;
@@ -54,11 +58,13 @@
 
 			<DraftTagsSection {tags} {allTags} {onassigntag} {onunassigntag} {oncreatetag} />
 
-			<DraftMetadataSection {draftSummary} />
+			<DraftMetadataSection {draftSummary} {timezone} />
 
 			<DraftScheduleSection
 				{draftSummary}
 				{prefillSchedule}
+				{timezone}
+				{preferredTimes}
 				{onschedule}
 				{onunschedule}
 				{onreschedule}

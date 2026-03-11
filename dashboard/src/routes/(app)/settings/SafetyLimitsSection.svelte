@@ -134,9 +134,9 @@
 			</select>
 			<span class="field-hint">
 				{#if ($draft.mode ?? 'autopilot') === 'composer'}
-					Composer mode disables all autonomous loops. Use AI Assist to generate content, then approve manually.
+					Composer mode disables autonomous loops. Manual compose and scheduling are always available.
 				{:else}
-					Autopilot runs discovery, content generation, and posting automatically.
+					Autopilot runs discovery, content generation, and posting automatically. Manual scheduling is always available.
 				{/if}
 			</span>
 		</div>
@@ -146,7 +146,7 @@
 				<div class="toggle-info">
 					<span class="field-label">Approval Mode</span>
 					<span class="field-hint">
-						Queue all posts for manual review before publishing{#if ($draft.mode ?? 'autopilot') === 'composer'} (always on in Composer mode){/if}
+						Queue all posts for manual review before publishing. Scheduled posts retain their target time and will post at the scheduled time after approval.{#if ($draft.mode ?? 'autopilot') === 'composer'} Always on in Composer mode.{/if}
 					</span>
 				</div>
 				<button

@@ -350,8 +350,7 @@ export async function unscheduleDraft(id: number): Promise<boolean> {
 
 export async function rescheduleDraft(id: number, scheduledFor: string): Promise<boolean> {
 	try {
-		await api.draftStudio.unschedule(id);
-		const result = await api.draftStudio.schedule(id, scheduledFor);
+		const result = await api.draftStudio.reschedule(id, scheduledFor);
 		collection = collection.map((d) =>
 			d.id === id
 				? { ...d, status: result.status, scheduled_for: result.scheduled_for }

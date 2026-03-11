@@ -359,6 +359,13 @@ pub async fn schedule_studio_draft(
         )));
     }
 
+    // Validate and normalize the scheduled time
+    let normalized = tuitbot_core::scheduling::validate_and_normalize(
+        &body.scheduled_for,
+        tuitbot_core::scheduling::DEFAULT_GRACE_SECONDS,
+    )
+    .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
     // Create revision snapshot before scheduling
     let _ = scheduled_content::insert_revision_for(
         &state.db,
@@ -370,7 +377,7 @@ pub async fn schedule_studio_draft(
     )
     .await;
 
-    scheduled_content::schedule_draft_for(&state.db, &ctx.account_id, id, &body.scheduled_for)
+    scheduled_content::schedule_draft_for(&state.db, &ctx.account_id, id, &normalized)
         .await
         .map_err(ApiError::Storage)?;
 
@@ -380,14 +387,14 @@ pub async fn schedule_studio_draft(
         &ctx.account_id,
         id,
         "scheduled",
-        Some(&json!({ "scheduled_for": body.scheduled_for }).to_string()),
+        Some(&json!({ "scheduled_for": normalized }).to_string()),
     )
     .await;
 
     Ok(Json(json!({
         "id": id,
         "status": "scheduled",
-        "scheduled_for": body.scheduled_for
+        "scheduled_for": normalized
     })))
 }
 
@@ -438,6 +445,84 @@ pub async fn unschedule_studio_draft(
             .await;
 
     Ok(Json(json!({ "id": id, "status": "draft" })))
+}
+
+/// Request body for atomic reschedule.
+#[derive(Deserialize)]
+pub struct RescheduleBody {
+    pub scheduled_for: String,
+}
+
+/// `PATCH /api/drafts/:id/reschedule` — atomically change the scheduled time.
+pub async fn reschedule_studio_draft(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Path(id): Path<i64>,
+    Json(body): Json<RescheduleBody>,
+) -> Result<Json<Value>, ApiError> {
+    require_mutate(&ctx)?;
+
+    let item = scheduled_content::get_by_id_for(&state.db, &ctx.account_id, id)
+        .await
+        .map_err(ApiError::Storage)?
+        .ok_or_else(|| ApiError::NotFound(format!("Draft {id} not found")))?;
+
+    if item.status != "scheduled" {
+        return Err(ApiError::BadRequest(format!(
+            "Item is in '{}' status, not 'scheduled'",
+            item.status
+        )));
+    }
+
+    let normalized = tuitbot_core::scheduling::validate_and_normalize(
+        &body.scheduled_for,
+        tuitbot_core::scheduling::DEFAULT_GRACE_SECONDS,
+    )
+    .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    // Snapshot before reschedule
+    let _ = scheduled_content::insert_revision_for(
+        &state.db,
+        &ctx.account_id,
+        id,
+        &item.content,
+        &item.content_type,
+        "reschedule",
+    )
+    .await;
+
+    let updated =
+        scheduled_content::reschedule_draft_for(&state.db, &ctx.account_id, id, &normalized)
+            .await
+            .map_err(ApiError::Storage)?;
+
+    if !updated {
+        return Err(ApiError::BadRequest(
+            "Failed to reschedule — item may have changed status".to_string(),
+        ));
+    }
+
+    // Log activity
+    let _ = scheduled_content::insert_activity_for(
+        &state.db,
+        &ctx.account_id,
+        id,
+        "rescheduled",
+        Some(
+            &json!({
+                "from": item.scheduled_for,
+                "to": normalized
+            })
+            .to_string(),
+        ),
+    )
+    .await;
+
+    Ok(Json(json!({
+        "id": id,
+        "status": "scheduled",
+        "scheduled_for": normalized
+    })))
 }
 
 /// `POST /api/drafts/:id/archive` — soft-delete a draft.

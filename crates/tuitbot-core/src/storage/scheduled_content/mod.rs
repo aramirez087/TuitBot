@@ -539,6 +539,29 @@ pub async fn schedule_draft(
     schedule_draft_for(pool, DEFAULT_ACCOUNT_ID, id, scheduled_for).await
 }
 
+/// Atomically reschedule a scheduled item to a new time.
+///
+/// Only works on items with `status = 'scheduled'`.
+/// Returns `true` if the update was applied.
+pub async fn reschedule_draft_for(
+    pool: &DbPool,
+    account_id: &str,
+    id: i64,
+    new_scheduled_for: &str,
+) -> Result<bool, StorageError> {
+    let result = sqlx::query(
+        "UPDATE scheduled_content SET scheduled_for = ?, updated_at = datetime('now') \
+         WHERE id = ? AND account_id = ? AND status = 'scheduled'",
+    )
+    .bind(new_scheduled_for)
+    .bind(id)
+    .bind(account_id)
+    .execute(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+    Ok(result.rows_affected() > 0)
+}
+
 /// Unschedule a scheduled item back to draft for a specific account.
 pub async fn unschedule_draft_for(
     pool: &DbPool,

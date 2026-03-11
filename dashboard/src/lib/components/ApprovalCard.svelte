@@ -9,9 +9,12 @@
 		Pencil,
 		X,
 		Film,
-		ShieldAlert
+		ShieldAlert,
+		Clock
 	} from 'lucide-svelte';
 	import { api, type ApprovalItem } from '$lib/api';
+	import { formatInAccountTz } from '$lib/utils/timezone';
+	import { trackFunnel } from '$lib/analytics/funnel';
 	import ApprovalEditHistory from './ApprovalEditHistory.svelte';
 	import ApprovalRejectDialog from './ApprovalRejectDialog.svelte';
 
@@ -19,6 +22,7 @@
 		item: ApprovalItem;
 		focused: boolean;
 		editing: boolean;
+		timezone?: string;
 		onApprove: (id: number) => void;
 		onReject: (id: number, notes?: string) => void;
 		onStartEdit: (id: number) => void;
@@ -30,6 +34,7 @@
 		item,
 		focused,
 		editing,
+		timezone = 'UTC',
 		onApprove,
 		onReject,
 		onStartEdit,
@@ -40,6 +45,7 @@
 	let editContent = $state('');
 	let textareaEl: HTMLTextAreaElement | undefined = $state();
 	let showRejectDialog = $state(false);
+	let announcement = $state('');
 
 	const charCount = $derived(editing ? editContent.length : item.generated_content.length);
 	const isOverLimit = $derived(charCount > 280);
@@ -68,7 +74,21 @@
 			? 'status-pending'
 			: item.status === 'approved'
 				? 'status-approved'
-				: 'status-rejected'
+				: item.status === 'scheduled'
+					? 'status-scheduled'
+					: 'status-rejected'
+	);
+
+	const scheduledLabel = $derived(
+		item.scheduled_for
+			? formatInAccountTz(item.scheduled_for, timezone, {
+					month: 'short',
+					day: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit',
+					timeZoneName: 'short'
+				})
+			: null
 	);
 
 	function relativeTime(iso: string): string {
@@ -111,7 +131,8 @@
 	});
 </script>
 
-<div class="card" class:focused class:editing transition:fly={{ x: 300, duration: 250 }}>
+<div class="card" class:focused class:editing transition:fly={{ x: 300, duration: 250 }} aria-label="{typeLabel} approval item">
+	<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
 	<div class="card-icon {statusClass}">
 		<Icon size={16} />
 	</div>
@@ -130,6 +151,13 @@
 			<div class="card-context">
 				<span class="context-label">Replying to</span>
 				<span class="context-author">@{item.target_author.replace(/^@/, '')}</span>
+			</div>
+		{/if}
+
+		{#if scheduledLabel}
+			<div class="card-schedule">
+				<Clock size={12} />
+				<span>Scheduled for {scheduledLabel}</span>
 			</div>
 		{/if}
 
@@ -244,7 +272,7 @@
 			/>
 		{:else if item.status === 'pending' && !editing}
 			<div class="card-actions">
-				<button class="action-btn approve" onclick={() => onApprove(item.id)}>
+				<button class="action-btn approve" onclick={() => { if (item.scheduled_for) { trackFunnel('schedule:approval-bridge', { has_scheduled_for: true }); announcement = 'Item approved and scheduled'; } else { announcement = 'Item approved'; } onApprove(item.id); }}>
 					<CheckCircle size={14} />
 					Approve
 					<kbd>a</kbd>
@@ -264,6 +292,8 @@
 			<div class="card-actions-readonly">
 				{#if item.status === 'approved'}
 					<span class="readonly-badge approved"><CheckCircle size={12} /> Approved</span>
+				{:else if item.status === 'scheduled'}
+					<span class="readonly-badge scheduled"><Clock size={12} /> Scheduled</span>
 				{:else}
 					<span class="readonly-badge rejected"><X size={12} /> Rejected</span>
 				{/if}
@@ -326,6 +356,11 @@
 		color: var(--color-danger);
 	}
 
+	.card-icon.status-scheduled {
+		background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+		color: var(--color-accent);
+	}
+
 	.card-body {
 		flex: 1;
 		min-width: 0;
@@ -367,6 +402,11 @@
 		color: var(--color-danger);
 	}
 
+	.card-badge.status-scheduled {
+		background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+		color: var(--color-accent);
+	}
+
 	.card-score {
 		font-size: 12px;
 		font-weight: 600;
@@ -394,6 +434,20 @@
 	.context-author {
 		color: var(--color-accent);
 		font-weight: 600;
+	}
+
+	.card-schedule {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-bottom: 8px;
+		padding: 4px 10px;
+		border-radius: 5px;
+		background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		color: var(--color-accent);
+		font-size: 12px;
+		font-weight: 500;
+		width: fit-content;
 	}
 
 	.card-content {
@@ -718,5 +772,22 @@
 	.readonly-badge.rejected {
 		background-color: color-mix(in srgb, var(--color-danger) 12%, transparent);
 		color: var(--color-danger);
+	}
+
+	.readonly-badge.scheduled {
+		background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+		color: var(--color-accent);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border-width: 0;
 	}
 </style>

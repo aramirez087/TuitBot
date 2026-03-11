@@ -171,6 +171,7 @@ wsEvents.subscribe(($events) => {
 		const updatedStatus = latest.status as string;
 
 		// If the current filter wouldn't show this status, remove the item.
+		// "scheduled" is a terminal status like "approved" — remove from pending view.
 		const currentFilter = get(selectedStatus);
 		if (currentFilter !== 'all' && currentFilter !== updatedStatus) {
 			items.update(($items) => $items.filter((i) => i.id !== updatedId));

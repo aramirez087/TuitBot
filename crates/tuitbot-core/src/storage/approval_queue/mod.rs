@@ -41,6 +41,7 @@ struct ApprovalRow {
     source_node_id: Option<i64>,
     source_seed_id: Option<i64>,
     source_chunks_json: String,
+    scheduled_for: Option<String>,
 }
 
 /// A pending item in the approval queue.
@@ -94,6 +95,8 @@ pub struct ApprovalItem {
     /// JSON array of selected chunk references.
     #[serde(serialize_with = "serialize_json_string")]
     pub source_chunks_json: String,
+    /// Optional UTC timestamp preserving the user's scheduling intent.
+    pub scheduled_for: Option<String>,
 }
 
 /// Serialize a JSON-encoded string as a raw JSON value.
@@ -140,6 +143,7 @@ impl From<ApprovalRow> for ApprovalItem {
             source_node_id: r.source_node_id,
             source_seed_id: r.source_seed_id,
             source_chunks_json: r.source_chunks_json,
+            scheduled_for: r.scheduled_for,
         }
     }
 }
@@ -151,6 +155,7 @@ pub struct ApprovalStats {
     pub approved: i64,
     pub rejected: i64,
     pub failed: i64,
+    pub scheduled: i64,
 }
 
 /// Optional review metadata for approve/reject actions.

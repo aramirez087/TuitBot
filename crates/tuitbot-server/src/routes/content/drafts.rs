@@ -187,12 +187,18 @@ pub async fn schedule_draft(
 ) -> Result<Json<Value>, ApiError> {
     require_mutate(&ctx)?;
 
-    scheduled_content::schedule_draft_for(&state.db, &ctx.account_id, id, &body.scheduled_for)
+    let normalized = tuitbot_core::scheduling::validate_and_normalize(
+        &body.scheduled_for,
+        tuitbot_core::scheduling::DEFAULT_GRACE_SECONDS,
+    )
+    .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    scheduled_content::schedule_draft_for(&state.db, &ctx.account_id, id, &normalized)
         .await
         .map_err(ApiError::Storage)?;
 
     Ok(Json(
-        json!({ "id": id, "status": "scheduled", "scheduled_for": body.scheduled_for }),
+        json!({ "id": id, "status": "scheduled", "scheduled_for": normalized }),
     ))
 }
 
@@ -262,6 +268,7 @@ pub async fn publish_draft(
         None,
         None,
         prov_input.as_ref(),
+        None, // no scheduling intent — direct publish via approval poster
     )
     .await
     .map_err(ApiError::Storage)?;

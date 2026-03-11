@@ -14,15 +14,18 @@
 		Clock,
 		X
 	} from 'lucide-svelte';
+	import { formatInAccountTz } from '$lib/utils/timezone';
 
 	let {
 		revisions = [],
 		activity = [],
+		timezone = 'UTC',
 		onrestore,
 		onclose
 	}: {
 		revisions: ContentRevision[];
 		activity: ContentActivity[];
+		timezone?: string;
 		onrestore: (revisionId: number) => void;
 		onclose: () => void;
 	} = $props();
@@ -34,6 +37,7 @@
 		manual: { label: 'Manual Checkpoint', icon: Save },
 		schedule: { label: 'Before Scheduling', icon: CalendarClock },
 		unschedule: { label: 'Before Unscheduling', icon: CalendarX2 },
+		reschedule: { label: 'Before Reschedule', icon: CalendarClock },
 		ai_rewrite: { label: 'AI Rewrite', icon: Sparkles },
 		pre_restore: { label: 'Before Restore', icon: RotateCcw },
 		created: { label: 'Initial Version', icon: Plus }
@@ -44,6 +48,7 @@
 		edited: { label: 'Edited', icon: Pencil },
 		ai_rewrite: { label: 'AI Rewrite', icon: Sparkles },
 		scheduled: { label: 'Scheduled', icon: CalendarClock },
+		rescheduled: { label: 'Rescheduled', icon: CalendarClock },
 		unscheduled: { label: 'Unscheduled', icon: CalendarX2 },
 		archived: { label: 'Archived', icon: Archive },
 		restored: { label: 'Restored from Archive', icon: ArchiveRestore },
@@ -210,8 +215,20 @@
 								{#if detail}
 									{#if detail.scheduled_for}
 										<p class="act-detail">
-											{new Date(detail.scheduled_for as string).toLocaleString(undefined, {
-												month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+											{formatInAccountTz(detail.scheduled_for as string, timezone, {
+												month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+												timeZoneName: 'short'
+											})}
+										</p>
+									{/if}
+									{#if detail.from && detail.to}
+										<p class="act-detail">
+											{formatInAccountTz(detail.from as string, timezone, {
+												month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+												timeZoneName: 'short'
+											})} → {formatInAccountTz(detail.to as string, timezone, {
+												month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+												timeZoneName: 'short'
 											})}
 										</p>
 									{/if}

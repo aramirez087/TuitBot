@@ -5,6 +5,7 @@
 
 import type { ComposeRequest, ThreadBlock } from '$lib/api';
 import type { AttachedMedia } from '$lib/components/composer/TweetEditor.svelte';
+import { buildScheduledFor } from './timezone';
 
 export interface BuildComposeRequestOpts {
 	mode: 'tweet' | 'thread';
@@ -13,11 +14,16 @@ export interface BuildComposeRequestOpts {
 	selectedTime: string | null;
 	targetDate: Date;
 	attachedMedia: AttachedMedia[];
+	/** IANA timezone from ScheduleConfig (e.g. "America/New_York"). Falls back to "UTC". */
+	timezone?: string;
+	/** Explicit "YYYY-MM-DD" date for scheduling (from SchedulePicker). Takes priority over targetDate. */
+	scheduledDate?: string | null;
 }
 
 /** Build a ComposeRequest from current editor state. */
 export function buildComposeRequest(opts: BuildComposeRequestOpts): ComposeRequest {
-	const { mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia } = opts;
+	const { mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia, timezone, scheduledDate } =
+		opts;
 	const data: ComposeRequest = { content_type: mode, content: '' };
 
 	if (mode === 'tweet') {
@@ -34,10 +40,17 @@ export function buildComposeRequest(opts: BuildComposeRequestOpts): ComposeReque
 	}
 
 	if (selectedTime) {
-		const scheduled = new Date(targetDate);
-		const [h, m] = selectedTime.split(':').map(Number);
-		scheduled.setHours(h, m, 0, 0);
-		data.scheduled_for = scheduled.toISOString().replace('Z', '');
+		const tz = timezone || 'UTC';
+		let dateStr: string;
+		if (scheduledDate) {
+			dateStr = scheduledDate;
+		} else {
+			const year = targetDate.getFullYear();
+			const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+			const day = String(targetDate.getDate()).padStart(2, '0');
+			dateStr = `${year}-${month}-${day}`;
+		}
+		data.scheduled_for = buildScheduledFor(dateStr, selectedTime, tz);
 	}
 
 	if (attachedMedia.length > 0) data.media_paths = attachedMedia.map((m) => m.path);

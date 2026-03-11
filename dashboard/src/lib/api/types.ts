@@ -179,6 +179,7 @@ export interface ApprovalItem {
 	qa_override_by?: string;
 	qa_override_note?: string;
 	qa_override_at?: string;
+	scheduled_for?: string;
 }
 
 export interface EditHistoryEntry {
@@ -202,6 +203,7 @@ export interface ApprovalStats {
 	approved: number;
 	rejected: number;
 	failed: number;
+	scheduled: number;
 }
 
 // --- Content types ---

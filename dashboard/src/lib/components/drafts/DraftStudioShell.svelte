@@ -3,6 +3,7 @@
 	import { onMount } from "svelte";
 	import { ACCOUNT_SWITCHED_EVENT } from "$lib/stores/accounts";
 	import { canPost } from "$lib/stores/runtime";
+	import { schedule as scheduleStore, loadSchedule } from "$lib/stores/calendar";
 	import * as studio from "$lib/stores/draftStudio.svelte";
 	import { api, type ThreadBlock } from "$lib/api";
 	import type { ScheduledContentItem } from "$lib/api/types";
@@ -77,6 +78,9 @@
 		api.assist.mode().then((res) => {
 			approvalMode = res.approval_mode;
 		}).catch(() => { /* default to approval_mode=true (safe fallback) */ });
+
+		// Load schedule config for timezone and preferred times
+		loadSchedule();
 
 		const isNewDraft = $page.url.searchParams.get("new") === "true";
 		const hasExplicitId = $page.url.searchParams.has("id");
@@ -558,7 +562,7 @@
 						draftId={hydrationDraftId}
 						initialContent={hydration}
 						embedded={true}
-						schedule={null}
+						schedule={$scheduleStore}
 						canPublish={publishEnabled}
 						onsubmit={handleDraftSubmit}
 						onsyncstatus={handleSyncStatus}
@@ -611,6 +615,8 @@
 					tags={studio.getSelectedDraftTags()}
 					allTags={studio.getAccountTags()}
 					{prefillSchedule}
+					timezone={$scheduleStore?.timezone ?? 'UTC'}
+					preferredTimes={$scheduleStore?.preferred_times ?? []}
 					onupdatemeta={handleMetaUpdate}
 					onassigntag={handleAssignTag}
 					onunassigntag={handleUnassignTag}
@@ -625,6 +631,7 @@
 				<DraftHistoryPanel
 					revisions={studio.getRevisions()}
 					activity={studio.getActivity()}
+					timezone={$scheduleStore?.timezone ?? 'UTC'}
 					onrestore={handleRestoreFromRevision}
 					onclose={() => (detailsPanelOpen = false)}
 				/>

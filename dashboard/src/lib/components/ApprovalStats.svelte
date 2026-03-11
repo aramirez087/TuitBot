@@ -9,12 +9,16 @@
 </script>
 
 {#if stats}
-	<div class="stats-bar">
+	<div class="stats-bar" role="status" aria-label="Approval queue statistics">
 		<span class="stat pending">{stats.pending} pending</span>
 		<span class="stat-separator">&middot;</span>
 		<span class="stat approved">{stats.approved} approved</span>
 		<span class="stat-separator">&middot;</span>
 		<span class="stat rejected">{stats.rejected} rejected</span>
+		{#if stats.scheduled > 0}
+			<span class="stat-separator">&middot;</span>
+			<span class="stat scheduled">{stats.scheduled} scheduled</span>
+		{/if}
 		{#if stats.failed > 0}
 			<span class="stat-separator">&middot;</span>
 			<span class="stat failed">{stats.failed} failed</span>
@@ -45,6 +49,10 @@
 
 	.stat.rejected {
 		color: var(--color-danger);
+	}
+
+	.stat.scheduled {
+		color: var(--color-accent);
 	}
 
 	.stat.failed {

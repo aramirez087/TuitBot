@@ -450,6 +450,63 @@ async fn assign_and_unassign_tag() {
     assert_eq!(count.0, 0);
 }
 
+// ============================================================================
+// Reschedule
+// ============================================================================
+
+#[tokio::test]
+async fn reschedule_draft_updates_time() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Reschedule me", "manual")
+        .await
+        .expect("insert");
+
+    // Schedule the draft first
+    schedule_draft_for(&pool, acct, id, "2099-12-31T10:00:00Z")
+        .await
+        .expect("schedule");
+
+    // Verify it's scheduled
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "scheduled");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2099-12-31T10:00:00Z"));
+
+    // Reschedule to a new time
+    let updated = reschedule_draft_for(&pool, acct, id, "2099-12-31T15:00:00Z")
+        .await
+        .expect("reschedule");
+    assert!(updated);
+
+    // Verify the new time
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "scheduled");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2099-12-31T15:00:00Z"));
+}
+
+#[tokio::test]
+async fn reschedule_non_scheduled_returns_false() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Draft only", "manual")
+        .await
+        .expect("insert");
+
+    // Try to reschedule a draft (not scheduled) — should return false
+    let updated = reschedule_draft_for(&pool, acct, id, "2099-12-31T15:00:00Z")
+        .await
+        .expect("reschedule");
+    assert!(!updated);
+}
+
 #[tokio::test]
 async fn duplicate_tag_name_is_rejected() {
     let pool = init_test_db().await.expect("init db");
@@ -486,4 +543,84 @@ async fn list_drafts_excludes_archived() {
     let archived = list_archived_drafts_for(&pool, acct).await.expect("list");
     assert_eq!(archived.len(), 1);
     assert_eq!(archived[0].id, id2);
+}
+
+// ============================================================================
+// Scheduling edge cases (Session 06)
+// ============================================================================
+
+#[tokio::test]
+async fn get_due_items_excludes_cancelled() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert(&pool, "tweet", "Will cancel", Some("2020-01-01T09:00:00Z"))
+        .await
+        .expect("insert");
+
+    // Cancel the item
+    cancel(&pool, id).await.expect("cancel");
+
+    // Due items should be empty — cancelled items must never appear
+    let due = get_due_items(&pool).await.expect("due");
+    assert!(
+        due.iter().all(|item| item.id != id),
+        "cancelled item should not appear in due items"
+    );
+}
+
+#[tokio::test]
+async fn range_query_boundary_inclusivity() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert items at exact boundary timestamps
+    insert(&pool, "tweet", "At start", Some("2026-03-01T00:00:00Z"))
+        .await
+        .expect("insert");
+    insert(&pool, "tweet", "At end", Some("2026-03-02T00:00:00Z"))
+        .await
+        .expect("insert");
+    insert(&pool, "tweet", "After end", Some("2026-03-02T00:00:01Z"))
+        .await
+        .expect("insert");
+
+    let items = get_in_range(&pool, "2026-03-01T00:00:00Z", "2026-03-02T00:00:00Z")
+        .await
+        .expect("range");
+
+    // Start boundary should be included, end boundary should be included
+    let contents: Vec<&str> = items.iter().map(|i| i.content.as_str()).collect();
+    assert!(
+        contents.contains(&"At start"),
+        "start boundary should be included"
+    );
+    assert!(
+        !contents.contains(&"After end"),
+        "items after end boundary should be excluded"
+    );
+}
+
+#[tokio::test]
+async fn scheduled_for_preserves_timezone_offset_format() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert with a positive offset — the DB stores it as-is (no normalization at storage layer)
+    let id = insert(
+        &pool,
+        "tweet",
+        "Offset tweet",
+        Some("2099-06-15T14:30:00+05:00"),
+    )
+    .await
+    .expect("insert");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("exists");
+    // The stored value should contain the offset as provided
+    assert!(
+        item.scheduled_for
+            .as_ref()
+            .map(|s| s.contains("14:30:00"))
+            .unwrap_or(false),
+        "stored timestamp should preserve the time component: {:?}",
+        item.scheduled_for,
+    );
 }

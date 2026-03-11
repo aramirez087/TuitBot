@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ScheduleConfig } from '$lib/api';
-	import TimePicker from '../TimePicker.svelte';
+	import SchedulePicker from '../SchedulePicker.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import FromNotesPanel from '../FromNotesPanel.svelte';
 	import FromVaultPanel from './FromVaultPanel.svelte';
@@ -8,14 +8,17 @@
 	let {
 		schedule,
 		selectedTime,
+		scheduledDate = null,
 		targetDate,
+		timezone = 'UTC',
 		voiceCue,
 		assisting,
 		hasExistingContent,
 		notesPanelMode,
 		showUndo,
 		mode,
-		onselect,
+		onscheduleselect,
+		onunschedule,
 		oncuechange,
 		onaiassist,
 		onopenotes,
@@ -28,14 +31,17 @@
 	}: {
 		schedule: ScheduleConfig | null;
 		selectedTime: string | null;
+		scheduledDate?: string | null;
 		targetDate: Date;
+		timezone?: string;
 		voiceCue: string;
 		assisting: boolean;
 		hasExistingContent: boolean;
 		notesPanelMode: 'notes' | 'vault' | null;
 		showUndo: boolean;
 		mode: 'tweet' | 'thread';
-		onselect: (time: string | null) => void;
+		onscheduleselect: (date: string, time: string) => void;
+		onunschedule: () => void;
 		oncuechange: (cue: string) => void;
 		onaiassist: () => void;
 		onopenotes: () => void;
@@ -50,13 +56,16 @@
 
 <div class="inspector-section">
 	<div class="inspector-section-label">Schedule</div>
-	<TimePicker
-		{schedule} {selectedTime} {targetDate}
-		onselect={(time) => onselect(time || null)}
+	<SchedulePicker
+		{timezone}
+		preferredTimes={schedule?.preferred_times ?? []}
+		selectedDate={scheduledDate}
+		{selectedTime}
+		status="draft"
+		compact={true}
+		onschedule={(date, time) => onscheduleselect(date, time)}
+		onunschedule={() => onunschedule()}
 	/>
-	{#if !selectedTime}
-		<p class="inspector-hint">Posts immediately unless scheduled</p>
-	{/if}
 </div>
 
 <div class="inspector-section">
@@ -163,12 +172,6 @@
 		color: var(--color-text-subtle);
 		margin: 0 0 8px;
 		line-height: 1.4;
-	}
-
-	.inspector-hint {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-		margin: 6px 0 0;
 	}
 
 	.ai-actions-row {

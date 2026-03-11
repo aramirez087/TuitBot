@@ -19,6 +19,7 @@
 		viewMode,
 		weekDays,
 		monthDays,
+		accountTimezone,
 		loadCalendar,
 		loadSchedule,
 		cancelScheduledItem,
@@ -85,6 +86,25 @@
 
 	function handleEditScheduled(id: number) {
 		goto(`/drafts?id=${id}`);
+	}
+
+	function handleReschedule(id: number) {
+		goto(`/drafts?id=${id}`);
+	}
+
+	async function handleUnschedule(id: number) {
+		try {
+			await api.draftStudio.unschedule(id);
+			await loadCalendar();
+		} catch {
+			// Item may not be a draft-studio item; try the scheduled content API
+			try {
+				await api.content.cancelScheduled(id);
+				await loadCalendar();
+			} catch {
+				// Silently fail — item may have already been unscheduled
+			}
+		}
 	}
 
 	onMount(() => {
@@ -161,10 +181,13 @@
 				items={$calendarItems}
 				schedule={$schedule}
 				days={$weekDays}
+				timezone={$accountTimezone}
 				onslotclick={handleSlotClick}
 				ondayclick={handleDayClick}
 				oncancel={handleCancel}
 				onedit={handleEditScheduled}
+				onreschedule={handleReschedule}
+				onunschedule={handleUnschedule}
 			/>
 		{:else}
 			<CalendarMonthView
