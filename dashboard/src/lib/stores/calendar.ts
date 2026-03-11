@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { api, type CalendarItem, type ScheduleConfig, type ComposeRequest } from '$lib/api';
 import { events as wsEvents } from './websocket';
+import { buildScheduledFor, nowInAccountTz, toAccountTzParts } from '$lib/utils/timezone';
 
 // --- Writable stores ---
 
@@ -12,6 +13,9 @@ export const currentDate = writable(new Date());
 export const viewMode = writable<'week' | 'month'>('week');
 
 // --- Derived stores ---
+
+/** Account timezone from schedule config. */
+export const accountTimezone = derived(schedule, ($s) => $s?.timezone ?? 'UTC');
 
 /** Start of the current week (Monday). */
 export const weekStart = derived(currentDate, ($date) => {
@@ -84,28 +88,36 @@ export const monthDays = derived(monthStart, ($start) => {
 
 // --- Data loading ---
 
-function formatDateISO(d: Date): string {
-	return d.toISOString().replace('Z', '');
+/** Format a layout Date as YYYY-MM-DD for timezone boundary conversion. */
+function dateToYMD(d: Date): string {
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * Compute the UTC boundaries for the current view, accounting for the account timezone.
+ * "Monday 00:00 in account tz" → UTC start boundary.
+ */
 function getDateRange(): { from: string; to: string } {
 	const mode = get(viewMode);
-	const date = get(currentDate);
+	const tz = get(accountTimezone);
 
 	if (mode === 'week') {
 		const start = get(weekStart);
 		const end = new Date(start);
 		end.setDate(end.getDate() + 7);
-		return { from: formatDateISO(start), to: formatDateISO(end) };
+		const from = buildScheduledFor(dateToYMD(start), '00:00', tz);
+		const to = buildScheduledFor(dateToYMD(end), '00:00', tz);
+		return { from, to };
 	} else {
 		const start = get(monthStart);
 		const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-		// Include padding days
 		const startDow = start.getDay();
 		const padBefore = startDow === 0 ? 6 : startDow - 1;
 		const paddedStart = new Date(start);
 		paddedStart.setDate(paddedStart.getDate() - padBefore);
-		return { from: formatDateISO(paddedStart), to: formatDateISO(end) };
+		const from = buildScheduledFor(dateToYMD(paddedStart), '00:00', tz);
+		const to = buildScheduledFor(dateToYMD(end), '00:00', tz);
+		return { from, to };
 	}
 }
 

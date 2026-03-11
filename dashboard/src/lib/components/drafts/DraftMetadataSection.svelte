@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { Clock, FileText, Sparkles, Radio } from 'lucide-svelte';
 	import type { DraftSummary } from '$lib/api/types';
+	import { formatInAccountTz } from '$lib/utils/timezone';
 
 	let {
-		draftSummary
+		draftSummary,
+		timezone = 'UTC'
 	}: {
 		draftSummary: DraftSummary;
+		timezone?: string;
 	} = $props();
 
 	const sourceLabel = $derived(
@@ -97,7 +100,10 @@
 				<Clock size={12} />
 				Scheduled
 			</span>
-			<span class="meta-value">{formatDate(draftSummary.scheduled_for)}</span>
+			<span class="meta-value">{formatInAccountTz(draftSummary.scheduled_for, timezone, {
+				month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+				timeZoneName: 'short'
+			})}</span>
 		</div>
 	{/if}
 </div>

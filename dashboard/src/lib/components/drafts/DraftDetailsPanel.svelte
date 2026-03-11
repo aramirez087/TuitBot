@@ -58,7 +58,7 @@
 
 			<DraftTagsSection {tags} {allTags} {onassigntag} {onunassigntag} {oncreatetag} />
 
-			<DraftMetadataSection {draftSummary} />
+			<DraftMetadataSection {draftSummary} {timezone} />
 
 			<DraftScheduleSection
 				{draftSummary}

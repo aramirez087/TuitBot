@@ -631,6 +631,7 @@
 				<DraftHistoryPanel
 					revisions={studio.getRevisions()}
 					activity={studio.getActivity()}
+					timezone={$scheduleStore?.timezone ?? 'UTC'}
 					onrestore={handleRestoreFromRevision}
 					onclose={() => (detailsPanelOpen = false)}
 				/>
