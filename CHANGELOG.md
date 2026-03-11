@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.33](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.32...tuitbot-cli-v0.1.33) - 2026-03-10
+
+### Fixed
+
+- complete audit rows on x_not_configured and reject approval without X auth
+
 ## [0.1.32](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.31...tuitbot-cli-v0.1.32) - 2026-03-10
 
 ### Fixed
