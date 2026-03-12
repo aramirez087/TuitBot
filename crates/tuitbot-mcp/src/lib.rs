@@ -30,7 +30,7 @@ use tuitbot_core::config::Config;
 use tuitbot_core::llm;
 use tuitbot_core::startup;
 use tuitbot_core::storage;
-use tuitbot_core::x_api::{NullXApiClient, XApiClient, XApiHttpClient};
+use tuitbot_core::x_api::{LocalModeXClient, NullXApiClient, XApiClient, XApiHttpClient};
 
 use server::{
     AdminMcpServer, ApiReadonlyMcpServer, ReadonlyMcpServer, UtilityReadonlyMcpServer,
@@ -81,7 +81,57 @@ async fn init_write_state(config: Config) -> anyhow::Result<Arc<AppState>> {
         }
     };
 
-    // Try to initialize X API client (optional — direct X tools won't work without it)
+    // Log provider backend selection.
+    let backend = provider::parse_backend(&config.x_api.provider_backend);
+    match backend {
+        provider::ProviderBackend::XApi => {
+            tracing::info!(backend = "x_api", "Provider backend: official X API");
+        }
+        provider::ProviderBackend::Scraper => {
+            tracing::warn!(
+                backend = "scraper",
+                allow_mutations = config.x_api.scraper_allow_mutations,
+                "Provider backend: scraper (elevated risk)"
+            );
+        }
+    }
+
+    // ── Scraper backend: use LocalModeXClient, skip OAuth ───────────
+    if backend == provider::ProviderBackend::Scraper {
+        let data_dir = tuitbot_core::startup::data_dir();
+        let client =
+            LocalModeXClient::with_session(config.x_api.scraper_allow_mutations, &data_dir).await;
+
+        let (x_client, authenticated_user_id): (Option<Box<dyn XApiClient>>, Option<String>) =
+            match client.get_me().await {
+                Ok(user) => {
+                    tracing::info!(
+                        username = %user.username, user_id = %user.id,
+                        "Scraper client initialized (write profile)"
+                    );
+                    (Some(Box::new(client)), Some(user.id))
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Scraper get_me() unavailable: {e}. \
+                         Direct X tools will be disabled."
+                    );
+                    (Some(Box::new(client)), None)
+                }
+            };
+
+        return Ok(Arc::new(AppState {
+            pool,
+            config,
+            llm_provider,
+            x_client,
+            authenticated_user_id,
+            granted_scopes: vec![],
+            idempotency: Arc::new(IdempotencyStore::new()),
+        }));
+    }
+
+    // ── Official X API backend ──────────────────────────────────────
     let (x_client, authenticated_user_id, granted_scopes): (
         Option<Box<dyn XApiClient>>,
         Option<String>,
@@ -122,21 +172,6 @@ async fn init_write_state(config: Config) -> anyhow::Result<Arc<AppState>> {
             (None, None, vec![])
         }
     };
-
-    // Log provider backend selection.
-    let backend = provider::parse_backend(&config.x_api.provider_backend);
-    match backend {
-        provider::ProviderBackend::XApi => {
-            tracing::info!(backend = "x_api", "Provider backend: official X API");
-        }
-        provider::ProviderBackend::Scraper => {
-            tracing::warn!(
-                backend = "scraper",
-                allow_mutations = config.x_api.scraper_allow_mutations,
-                "Provider backend: scraper (elevated risk)"
-            );
-        }
-    }
 
     Ok(Arc::new(AppState {
         pool,
@@ -201,6 +236,54 @@ async fn init_readonly_state(
     config: Config,
     profile: Profile,
 ) -> anyhow::Result<SharedReadonlyState> {
+    // Log provider backend selection.
+    let backend = provider::parse_backend(&config.x_api.provider_backend);
+    match backend {
+        provider::ProviderBackend::XApi => {
+            tracing::info!(backend = "x_api", "Provider backend: official X API");
+        }
+        provider::ProviderBackend::Scraper => {
+            tracing::warn!(
+                backend = "scraper",
+                allow_mutations = config.x_api.scraper_allow_mutations,
+                "Provider backend: scraper (elevated risk)"
+            );
+        }
+    }
+
+    // ── Scraper backend: use LocalModeXClient, skip OAuth ───────────
+    if backend == provider::ProviderBackend::Scraper {
+        let data_dir = tuitbot_core::startup::data_dir();
+        let client =
+            LocalModeXClient::with_session(config.x_api.scraper_allow_mutations, &data_dir).await;
+
+        let (authenticated_user_id, x_available) = match client.get_me().await {
+            Ok(user) => {
+                tracing::info!(
+                    username = %user.username, user_id = %user.id,
+                    profile = %profile,
+                    "Scraper client initialized ({profile} profile)"
+                );
+                (user.id, true)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Scraper get_me() unavailable: {e}. \
+                     Non-X tools (get_config, score_tweet) are still available."
+                );
+                (String::new(), false)
+            }
+        };
+
+        return Ok(Arc::new(ReadonlyState {
+            config,
+            x_client: Box::new(client),
+            authenticated_user_id,
+            x_available,
+        }));
+    }
+
+    // ── Official X API backend ──────────────────────────────────────
     let (x_client, authenticated_user_id, x_available): (Box<dyn XApiClient>, String, bool) =
         match startup::load_tokens_from_file() {
             Ok(tokens) if !tokens.is_expired() => {
@@ -251,21 +334,6 @@ async fn init_readonly_state(
                 )
             }
         };
-
-    // Log provider backend selection.
-    let backend = provider::parse_backend(&config.x_api.provider_backend);
-    match backend {
-        provider::ProviderBackend::XApi => {
-            tracing::info!(backend = "x_api", "Provider backend: official X API");
-        }
-        provider::ProviderBackend::Scraper => {
-            tracing::warn!(
-                backend = "scraper",
-                allow_mutations = config.x_api.scraper_allow_mutations,
-                "Provider backend: scraper (elevated risk)"
-            );
-        }
-    }
 
     Ok(Arc::new(ReadonlyState {
         config,
