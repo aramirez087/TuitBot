@@ -721,10 +721,13 @@ export const api = {
 	},
 
 	onboarding: {
-		startAuth: () =>
+		startAuth: (clientId?: string) =>
 			request<{ authorization_url: string; state: string }>(
 				'/api/onboarding/x-auth/start',
-				{ method: 'POST' }
+				{
+					method: 'POST',
+					body: JSON.stringify(clientId ? { client_id: clientId } : {})
+				}
 			),
 		completeAuth: (code: string, state: string) =>
 			request<{

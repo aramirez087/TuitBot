@@ -12,21 +12,34 @@
 		CheckCircle2,
 		XCircle,
 		Loader2,
-		RefreshCw
+		RefreshCw,
+		Sparkles
 	} from 'lucide-svelte';
 
 	const CALLBACK_URL = 'http://127.0.0.1:8080/callback';
 
+	interface Props {
+		hasServerClientId?: boolean;
+	}
+
+	let { hasServerClientId = false }: Props = $props();
+
 	let clientId = $state($onboardingData.client_id);
 	let clientSecret = $state($onboardingData.client_secret);
 	let copied = $state(false);
+	let analysisPhase = $state<'idle' | 'running' | 'done' | 'failed'>('idle');
 
 	let selectedMode = $derived(
 		$onboardingData.provider_backend === 'scraper' ? 'scraper' : 'x_api'
 	);
 	let isCloud = $derived($deploymentMode === 'cloud');
+
+	// Mode A: server has client_id — show hero login immediately
+	// Mode B: no server client_id — show developer setup form
+	let isHeroMode = $derived(hasServerClientId && !isCloud);
+
 	let showConnect = $derived(
-		selectedMode === 'x_api' && clientId.trim().length > 0 && !isCloud
+		!isHeroMode && selectedMode === 'x_api' && clientId.trim().length > 0 && !isCloud
 	);
 
 	// Poll timer reference for cleanup.
@@ -67,19 +80,69 @@
 		onboardingSession.setLoading(true);
 		trackFunnel('onboarding:x-auth-started', {
 			mode: selectedMode === 'scraper' ? 'scraper' : 'api',
+			hero: isHeroMode,
 		});
+
 		try {
-			const result = await api.onboarding.startAuth();
+			// In hero mode, no client_id is passed (server uses its in-memory value).
+			// In developer mode, pass the user-entered client_id.
+			const result = isHeroMode
+				? await api.onboarding.startAuth()
+				: await api.onboarding.startAuth(clientId.trim());
 			onboardingSession.setAuthUrl(result.authorization_url, result.state);
 
-			// Open the auth URL.
-			window.open(result.authorization_url, '_blank', 'noopener');
-
-			// Start polling for completion.
-			startPolling();
+			// Open the auth URL and handle the callback.
+			await openAuthWindow(result.authorization_url, result.state);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Failed to start auth';
 			trackFunnel('onboarding:x-auth-error', { error: msg });
+			onboardingSession.setError(msg);
+		}
+	}
+
+	/** Open auth URL in Tauri's isolated OAuth webview (intercepts the
+	 *  callback and emits an event). Falls back to window.open + polling
+	 *  outside Tauri. */
+	async function openAuthWindow(url: string, oauthState: string) {
+		try {
+			const { invoke } = await import('@tauri-apps/api/core');
+			const { listen } = await import('@tauri-apps/api/event');
+
+			const unlisten = await listen<{ code: string; state: string }>(
+				'oauth-callback',
+				async (event) => {
+					unlisten();
+					const { code, state } = event.payload;
+					if (code && state === oauthState) {
+						await handleOAuthCallback(code, state);
+					}
+				}
+			);
+
+			await invoke('open_oauth_window', { url });
+		} catch {
+			// Not running in Tauri — fall back to default browser + polling.
+			window.open(url, '_blank', 'noopener');
+			startPolling();
+		}
+	}
+
+	/** Complete the OAuth token exchange and handle the connected state. */
+	async function handleOAuthCallback(code: string, state: string) {
+		try {
+			const result = await api.onboarding.completeAuth(code, state);
+			if (result.status === 'connected' && result.user) {
+				const user = result.user as OnboardingXUser;
+				onboardingSession.setConnected(user);
+				trackFunnel('onboarding:x-auth-success', { username: user.username });
+				onboardingData.updateField('x_user_id', user.id);
+				onboardingData.updateField('x_username', user.username);
+				onboardingData.updateField('x_display_name', user.name);
+				onboardingData.updateField('x_avatar_url', user.profile_image_url ?? '');
+				runInlineAnalysis();
+			}
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : 'OAuth callback failed';
 			onboardingSession.setError(msg);
 		}
 	}
@@ -103,6 +166,8 @@
 						clearInterval(pollTimer);
 						pollTimer = null;
 					}
+					// Run inline heuristic analysis after successful OAuth.
+					runInlineAnalysis();
 				}
 			} catch {
 				// Silently retry on network errors during polling.
@@ -117,11 +182,37 @@
 				if (!$onboardingSession.x_connected) {
 					trackFunnel('onboarding:x-auth-error', { error: 'timeout' });
 					onboardingSession.setError(
-						'Connection timed out. Click "Connect with X" to try again.'
+						'Connection timed out. Click "Login with X" to try again.'
 					);
 				}
 			}
 		}, 300_000);
+	}
+
+	async function runInlineAnalysis() {
+		analysisPhase = 'running';
+		onboardingSession.setAnalyzing(true);
+		try {
+			// Heuristic-only analysis (no LLM config yet during onboarding).
+			const result = await api.onboarding.analyzeProfile();
+			if (result.profile) {
+				onboardingData.prefillFromInference(result.profile);
+				onboardingSession.setInferredProfile(
+					result.profile,
+					result.warnings ?? []
+				);
+				analysisPhase = 'done';
+				trackFunnel('onboarding:inline-analysis-done', {
+					status: result.status,
+				});
+			} else {
+				analysisPhase = 'failed';
+			}
+		} catch {
+			// Non-fatal — user will fill profile manually.
+			analysisPhase = 'failed';
+		}
+		onboardingSession.setAnalyzing(false);
 	}
 
 	function retryAuth() {
@@ -131,222 +222,335 @@
 </script>
 
 <div class="step">
-	<h2 class="step-title">X Access</h2>
-	<p class="step-description">Choose how Tuitbot connects to X.</p>
+	{#if isHeroMode}
+		<!-- Mode A: Server has client_id — hero login -->
+		<h2 class="step-title">Connect Your X Account</h2>
+		<p class="step-description">
+			Sign in with X to get started. We'll analyze your profile to set up
+			Tuitbot automatically.
+		</p>
 
-	{#if !isCloud}
-		<div class="mode-selector">
-			<button
-				type="button"
-				class="mode-card"
-				class:selected={selectedMode === 'x_api'}
-				onclick={() => setMode('x_api')}
-			>
-				<div class="mode-radio" class:checked={selectedMode === 'x_api'}></div>
-				<div class="mode-info">
-					<span class="mode-label"
-						>Official X API <span class="mode-badge">Recommended</span></span
-					>
-					<span class="mode-desc"
-						>Full features. Post, discover, and engage. Requires Client ID from the
-						Developer Portal.</span
-					>
-				</div>
-			</button>
-			<button
-				type="button"
-				class="mode-card"
-				class:selected={selectedMode === 'scraper'}
-				onclick={() => setMode('scraper')}
-			>
-				<div class="mode-radio" class:checked={selectedMode === 'scraper'}></div>
-				<div class="mode-info">
-					<span class="mode-label">Local No-Key Mode</span>
-					<span class="mode-desc"
-						>Get started instantly. No API credentials needed. Discovery and drafting.
-						Read-only by default.</span
-					>
-				</div>
-			</button>
-		</div>
-	{/if}
-
-	{#if selectedMode === 'x_api' || isCloud}
-		<div class="setup-guide">
-			<p class="guide-heading">Quick setup (~2 minutes)</p>
-			<ol class="guide-steps">
-				<li>
-					Go to the <a
-						href="https://developer.x.com/en/portal/dashboard"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="link"
-						>X Developer Portal <ExternalLink size={10} /></a
-					> and create a Project &amp; App (or select an existing one)
-				</li>
-				<li>
-					Under <strong>User authentication settings</strong>, enable OAuth 2.0
-				</li>
-				<li>
-					Set App type to <strong>Native App</strong> and paste this as your Callback
-					URL:
-					<span class="callback-url">
-						<code>{CALLBACK_URL}</code>
-						<button
-							class="copy-btn"
-							onclick={copyCallbackUrl}
-							title="Copy to clipboard"
+		<div class="connect-section">
+			{#if $onboardingSession.x_connected && $onboardingSession.x_user}
+				<div class="connected-card">
+					{#if $onboardingSession.x_user.profile_image_url}
+						<img
+							src={$onboardingSession.x_user.profile_image_url}
+							alt=""
+							class="avatar"
+						/>
+					{:else}
+						<div class="avatar avatar-placeholder"></div>
+					{/if}
+					<div class="connected-info">
+						<span class="display-name"
+							>{$onboardingSession.x_user.name}</span
 						>
-							{#if copied}
-								<Check size={13} />
-							{:else}
-								<Copy size={13} />
-							{/if}
-						</button>
-					</span>
-				</li>
-				<li>Copy the <strong>Client ID</strong> from the "Keys and tokens" tab</li>
-			</ol>
-		</div>
-
-		<div class="fields">
-			<div class="field">
-				<label class="field-label" for="client-id"
-					>Client ID <span class="required">*</span></label
-				>
-				<input
-					id="client-id"
-					type="text"
-					class="field-input"
-					placeholder="Your OAuth 2.0 Client ID"
-					bind:value={clientId}
-				/>
-			</div>
-
-			<div class="field">
-				<label class="field-label" for="client-secret"
-					>Client Secret <span class="optional">(optional)</span></label
-				>
-				<input
-					id="client-secret"
-					type="password"
-					class="field-input"
-					placeholder="For confidential clients only"
-					bind:value={clientSecret}
-				/>
-				<span class="field-hint"
-					>Only needed for confidential OAuth clients. Most users can skip this.</span
-				>
-			</div>
-		</div>
-
-		{#if showConnect}
-			<div class="connect-section">
-				{#if $onboardingSession.x_connected && $onboardingSession.x_user}
-					<div class="connected-card">
-						{#if $onboardingSession.x_user.profile_image_url}
-							<img
-								src={$onboardingSession.x_user.profile_image_url}
-								alt=""
-								class="avatar"
-							/>
-						{:else}
-							<div class="avatar avatar-placeholder"></div>
-						{/if}
-						<div class="connected-info">
-							<span class="display-name"
-								>{$onboardingSession.x_user.name}</span
-							>
-							<span class="username"
-								>@{$onboardingSession.x_user.username}</span
-							>
-						</div>
-						<div class="connected-badge">
-							<CheckCircle2 size={18} />
-							Connected
-						</div>
+						<span class="username"
+							>@{$onboardingSession.x_user.username}</span
+						>
 					</div>
-				{:else}
-					<div class="connect-prompt">
-						<p class="connect-heading">Connect your X account</p>
-						<p class="connect-desc">
-							Sign in with X to speed up setup. We'll pre-fill your profile
-							info from your account.
-						</p>
+					<div class="connected-badge">
+						<CheckCircle2 size={18} />
+						Connected
+					</div>
+				</div>
 
-						{#if $onboardingSession.auth_error}
-							<div class="auth-error" role="alert">
-								{$onboardingSession.auth_error}
-							</div>
-						{/if}
-
-						<button
-							type="button"
-							class="btn-connect"
-							onclick={$onboardingSession.auth_loading ? undefined : startXAuth}
-							disabled={$onboardingSession.auth_loading}
-						>
-							{#if $onboardingSession.auth_loading}
-								<span class="spinner"><Loader2 size={16} /></span>
-								Waiting for X...
-							{:else if $onboardingSession.auth_error}
-								<RefreshCw size={16} />
-								Retry
-							{:else}
-								<svg
-									viewBox="0 0 24 24"
-									width="16"
-									height="16"
-									fill="currentColor"
-									aria-hidden="true"
-								>
-									<path
-										d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-									/>
-								</svg>
-								Continue with X
-							{/if}
-						</button>
-
-						{#if $onboardingSession.auth_loading}
-							<p class="connect-hint">
-								Complete the sign-in in the window that opened, then return
-								here.
-							</p>
-						{/if}
-
-						<p class="connect-skip">
-							You can skip this and connect later in Settings.
-						</p>
+				{#if analysisPhase === 'running'}
+					<div class="analysis-status">
+						<span class="spinner"><Loader2 size={14} /></span>
+						<span>Analyzing your profile...</span>
+					</div>
+				{:else if analysisPhase === 'done'}
+					<div class="analysis-status analysis-done">
+						<Sparkles size={14} />
+						<span>Profile analyzed — fields pre-filled below.</span>
 					</div>
 				{/if}
+			{:else}
+				<div class="hero-connect">
+					{#if $onboardingSession.auth_error}
+						<div class="auth-error" role="alert">
+							{$onboardingSession.auth_error}
+						</div>
+					{/if}
+
+					<button
+						type="button"
+						class="btn-connect btn-connect-hero"
+						onclick={$onboardingSession.auth_loading ? undefined : startXAuth}
+						disabled={$onboardingSession.auth_loading}
+					>
+						{#if $onboardingSession.auth_loading}
+							<span class="spinner"><Loader2 size={18} /></span>
+							Waiting for X...
+						{:else if $onboardingSession.auth_error}
+							<RefreshCw size={18} />
+							Retry
+						{:else}
+							<svg
+								viewBox="0 0 24 24"
+								width="18"
+								height="18"
+								fill="currentColor"
+								aria-hidden="true"
+							>
+								<path
+									d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+								/>
+							</svg>
+							Login with X
+						{/if}
+					</button>
+
+					{#if $onboardingSession.auth_loading}
+						<p class="connect-hint">
+							Complete the sign-in in the window that opened, then return
+							here.
+						</p>
+					{/if}
+				</div>
+
+				<button
+					type="button"
+					class="scraper-fallback"
+					onclick={() => setMode('scraper')}
+				>
+					Or continue without an X account
+				</button>
+			{/if}
+		</div>
+	{:else}
+		<!-- Mode B: No server client_id — developer setup -->
+		<h2 class="step-title">X Access</h2>
+		<p class="step-description">Choose how Tuitbot connects to X.</p>
+
+		{#if !isCloud}
+			<div class="mode-selector">
+				<button
+					type="button"
+					class="mode-card"
+					class:selected={selectedMode === 'x_api'}
+					onclick={() => setMode('x_api')}
+				>
+					<div class="mode-radio" class:checked={selectedMode === 'x_api'}></div>
+					<div class="mode-info">
+						<span class="mode-label"
+							>Official X API <span class="mode-badge">Recommended</span></span
+						>
+						<span class="mode-desc"
+							>Full features. Post, discover, and engage. Requires Client ID from the
+							Developer Portal.</span
+						>
+					</div>
+				</button>
+				<button
+					type="button"
+					class="mode-card"
+					class:selected={selectedMode === 'scraper'}
+					onclick={() => setMode('scraper')}
+				>
+					<div class="mode-radio" class:checked={selectedMode === 'scraper'}></div>
+					<div class="mode-info">
+						<span class="mode-label">Local No-Key Mode</span>
+						<span class="mode-desc"
+							>Get started instantly. No API credentials needed. Discovery and drafting.
+							Read-only by default.</span
+						>
+					</div>
+				</button>
 			</div>
 		{/if}
-	{:else}
-		<div class="feature-matrix">
-			<p class="matrix-heading">What you can do</p>
-			<ul class="matrix-list">
-				<li class="available"><CheckCircle2 size={14} /> Search and discover tweets</li>
-				<li class="available">
-					<CheckCircle2 size={14} /> Score conversations for relevance
-				</li>
-				<li class="available">
-					<CheckCircle2 size={14} /> Draft replies and original content
-				</li>
-				<li class="available">
-					<CheckCircle2 size={14} /> Plan and preview threads
-				</li>
-				<li class="unavailable">
-					<XCircle size={14} /> Post tweets and replies
-				</li>
-				<li class="unavailable">
-					<XCircle size={14} /> Mentions and home timeline
-				</li>
-			</ul>
-			<p class="matrix-footer">
-				You can switch to the Official X API anytime in Settings.
-			</p>
-		</div>
+
+		{#if selectedMode === 'x_api' || isCloud}
+			<div class="setup-guide">
+				<p class="guide-heading">Quick setup (~2 minutes)</p>
+				<ol class="guide-steps">
+					<li>
+						Go to the <a
+							href="https://developer.x.com/en/portal/dashboard"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="link"
+							>X Developer Portal <ExternalLink size={10} /></a
+						> and create a Project &amp; App (or select an existing one)
+					</li>
+					<li>
+						Under <strong>User authentication settings</strong>, enable OAuth 2.0
+					</li>
+					<li>
+						Set App type to <strong>Native App</strong> and paste this as your Callback
+						URL:
+						<span class="callback-url">
+							<code>{CALLBACK_URL}</code>
+							<button
+								class="copy-btn"
+								onclick={copyCallbackUrl}
+								title="Copy to clipboard"
+							>
+								{#if copied}
+									<Check size={13} />
+								{:else}
+									<Copy size={13} />
+								{/if}
+							</button>
+						</span>
+					</li>
+					<li>Copy the <strong>Client ID</strong> from the "Keys and tokens" tab</li>
+				</ol>
+			</div>
+
+			<div class="fields">
+				<div class="field">
+					<label class="field-label" for="client-id"
+						>Client ID <span class="required">*</span></label
+					>
+					<input
+						id="client-id"
+						type="text"
+						class="field-input"
+						placeholder="Your OAuth 2.0 Client ID"
+						bind:value={clientId}
+					/>
+				</div>
+
+				<div class="field">
+					<label class="field-label" for="client-secret"
+						>Client Secret <span class="optional">(optional)</span></label
+					>
+					<input
+						id="client-secret"
+						type="password"
+						class="field-input"
+						placeholder="For confidential clients only"
+						bind:value={clientSecret}
+					/>
+					<span class="field-hint"
+						>Only needed for confidential OAuth clients. Most users can skip this.</span
+					>
+				</div>
+			</div>
+
+			{#if showConnect}
+				<div class="connect-section">
+					{#if $onboardingSession.x_connected && $onboardingSession.x_user}
+						<div class="connected-card">
+							{#if $onboardingSession.x_user.profile_image_url}
+								<img
+									src={$onboardingSession.x_user.profile_image_url}
+									alt=""
+									class="avatar"
+								/>
+							{:else}
+								<div class="avatar avatar-placeholder"></div>
+							{/if}
+							<div class="connected-info">
+								<span class="display-name"
+									>{$onboardingSession.x_user.name}</span
+								>
+								<span class="username"
+									>@{$onboardingSession.x_user.username}</span
+								>
+							</div>
+							<div class="connected-badge">
+								<CheckCircle2 size={18} />
+								Connected
+							</div>
+						</div>
+
+						{#if analysisPhase === 'running'}
+							<div class="analysis-status">
+								<span class="spinner"><Loader2 size={14} /></span>
+								<span>Analyzing your profile...</span>
+							</div>
+						{:else if analysisPhase === 'done'}
+							<div class="analysis-status analysis-done">
+								<Sparkles size={14} />
+								<span>Profile analyzed — fields pre-filled below.</span>
+							</div>
+						{/if}
+					{:else}
+						<div class="connect-prompt">
+							<p class="connect-heading">Connect your X account</p>
+							<p class="connect-desc">
+								Sign in with X to speed up setup. We'll pre-fill your profile
+								info from your account.
+							</p>
+
+							{#if $onboardingSession.auth_error}
+								<div class="auth-error" role="alert">
+									{$onboardingSession.auth_error}
+								</div>
+							{/if}
+
+							<button
+								type="button"
+								class="btn-connect"
+								onclick={$onboardingSession.auth_loading ? undefined : startXAuth}
+								disabled={$onboardingSession.auth_loading}
+							>
+								{#if $onboardingSession.auth_loading}
+									<span class="spinner"><Loader2 size={16} /></span>
+									Waiting for X...
+								{:else if $onboardingSession.auth_error}
+									<RefreshCw size={16} />
+									Retry
+								{:else}
+									<svg
+										viewBox="0 0 24 24"
+										width="16"
+										height="16"
+										fill="currentColor"
+										aria-hidden="true"
+									>
+										<path
+											d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+										/>
+									</svg>
+									Continue with X
+								{/if}
+							</button>
+
+							{#if $onboardingSession.auth_loading}
+								<p class="connect-hint">
+									Complete the sign-in in the window that opened, then return
+									here.
+								</p>
+							{/if}
+
+							<p class="connect-skip">
+								You can skip this and connect later in Settings.
+							</p>
+						</div>
+					{/if}
+				</div>
+			{/if}
+		{:else}
+			<div class="feature-matrix">
+				<p class="matrix-heading">What you can do</p>
+				<ul class="matrix-list">
+					<li class="available"><CheckCircle2 size={14} /> Search and discover tweets</li>
+					<li class="available">
+						<CheckCircle2 size={14} /> Score conversations for relevance
+					</li>
+					<li class="available">
+						<CheckCircle2 size={14} /> Draft replies and original content
+					</li>
+					<li class="available">
+						<CheckCircle2 size={14} /> Plan and preview threads
+					</li>
+					<li class="unavailable">
+						<XCircle size={14} /> Post tweets and replies
+					</li>
+					<li class="unavailable">
+						<XCircle size={14} /> Mentions and home timeline
+					</li>
+				</ul>
+				<p class="matrix-footer">
+					You can switch to the Official X API anytime in Settings.
+				</p>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -578,9 +782,47 @@
 		border-color: var(--color-accent);
 	}
 
+	/* --- Hero connect (Mode A) --- */
+
+	.hero-connect {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 14px;
+		padding: 32px 24px;
+		background: var(--color-base);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+	}
+
+	.btn-connect-hero {
+		padding: 14px 32px;
+		font-size: 16px;
+		border-radius: 10px;
+		align-self: center;
+	}
+
+	.scraper-fallback {
+		background: none;
+		border: none;
+		color: var(--color-text-subtle);
+		font-size: 13px;
+		cursor: pointer;
+		padding: 4px 0;
+		transition: color 0.15s;
+	}
+
+	.scraper-fallback:hover {
+		color: var(--color-text-muted);
+		text-decoration: underline;
+	}
+
 	/* --- Connect with X section --- */
 
 	.connect-section {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 		margin-top: 4px;
 	}
 
@@ -645,6 +887,7 @@
 		color: var(--color-text-muted);
 		margin: 0;
 		font-style: italic;
+		text-align: center;
 	}
 
 	.connect-skip {
@@ -660,6 +903,26 @@
 		border-radius: 6px;
 		color: var(--color-danger);
 		font-size: 13px;
+	}
+
+	/* --- Analysis status --- */
+
+	.analysis-status {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		background: color-mix(in srgb, var(--color-accent) 6%, var(--color-base));
+		border: 1px solid color-mix(in srgb, var(--color-accent) 20%, var(--color-border));
+		border-radius: 8px;
+		font-size: 13px;
+		color: var(--color-text-muted);
+	}
+
+	.analysis-done {
+		background: color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--color-base));
+		border-color: color-mix(in srgb, var(--color-success, #22c55e) 25%, var(--color-border));
+		color: var(--color-success, #22c55e);
 	}
 
 	/* --- Connected state --- */

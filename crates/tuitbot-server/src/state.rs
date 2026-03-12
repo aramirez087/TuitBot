@@ -33,6 +33,8 @@ pub struct PendingOAuth {
     pub created_at: Instant,
     /// The account ID that initiated this OAuth flow (empty for connectors).
     pub account_id: String,
+    /// The X API client ID used for this flow (for callback token exchange).
+    pub client_id: String,
 }
 
 /// Shared application state accessible by all route handlers.

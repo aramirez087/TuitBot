@@ -526,6 +526,7 @@ export interface ConfigStatus {
 	deployment_mode: DeploymentModeValue;
 	capabilities: DeploymentCapabilities;
 	capability_tier: CapabilityTier;
+	has_x_client_id: boolean;
 }
 
 export interface SettingsValidationResult {

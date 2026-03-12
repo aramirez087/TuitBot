@@ -74,6 +74,7 @@ pub async fn start_link(
                 code_verifier: pkce.verifier,
                 created_at: std::time::Instant::now(),
                 account_id: id.clone(),
+                client_id: state.x_client_id.clone(),
             },
         );
     }
@@ -107,7 +108,7 @@ pub async fn complete_link(
     require_mutate(&ctx)?;
 
     // Look up and consume the pending PKCE state.
-    let code_verifier = {
+    let (code_verifier, flow_client_id) = {
         let mut pending = state.pending_oauth.lock().await;
         match pending.remove(&body.state) {
             Some(p) if p.created_at.elapsed() < OAUTH_STATE_TTL => {
@@ -116,7 +117,7 @@ pub async fn complete_link(
                         "state parameter does not match this account".to_string(),
                     ));
                 }
-                p.code_verifier
+                (p.code_verifier, p.client_id)
             }
             Some(_) => {
                 return Err(ApiError::BadRequest("state expired".to_string()));
@@ -132,9 +133,9 @@ pub async fn complete_link(
     let config: tuitbot_core::config::Config = toml::from_str(&contents).unwrap_or_default();
     let redirect_uri = build_redirect_uri(&config.auth.callback_host, config.auth.callback_port);
 
-    // Exchange code for tokens.
+    // Exchange code for tokens using the client_id from the start flow.
     let stored_tokens = tuitbot_core::startup::exchange_auth_code(
-        &state.x_client_id,
+        &flow_client_id,
         &body.code,
         &redirect_uri,
         &code_verifier,

@@ -110,6 +110,7 @@ pub async fn link_google_drive(
                 code_verifier,
                 created_at: std::time::Instant::now(),
                 account_id: String::new(),
+                client_id: String::new(),
             },
         );
     }

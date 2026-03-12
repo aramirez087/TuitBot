@@ -2,9 +2,10 @@
 	import { onboardingData } from '$lib/stores/onboarding';
 	import { onboardingSession } from '$lib/stores/onboarding-session';
 	import type { Confidence, InferenceProvenance, InferredField } from '$lib/api/types';
+	import { api } from '$lib/api';
 	import { trackFunnel } from '$lib/analytics/funnel';
 	import TagInput from '$lib/components/settings/TagInput.svelte';
-	import { User, Building2, CheckCircle2, AlertTriangle, Info } from 'lucide-svelte';
+	import { User, Building2, CheckCircle2, AlertTriangle, Info, Loader2, Sparkles } from 'lucide-svelte';
 
 	let accountType = $state($onboardingData.account_type);
 	let productName = $state($onboardingData.product_name);
@@ -20,6 +21,56 @@
 	let warnings = $derived($onboardingSession.analysis_warnings);
 	let xUser = $derived($onboardingSession.x_user);
 	let xConnected = $derived($onboardingSession.x_connected);
+
+	let enriching = $state(false);
+	let enrichDone = $state(false);
+
+	// On mount: if X is connected and LLM is configured, re-run analysis
+	// with LLM enrichment to get better target_audience, keywords, and topics.
+	let llmEnrichAttempted = false;
+	$effect(() => {
+		if (llmEnrichAttempted) return;
+		const data = $onboardingData;
+		const hasLlm = data.llm_provider === 'ollama' ||
+			(data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0);
+		if ($onboardingSession.x_connected && hasLlm) {
+			llmEnrichAttempted = true;
+			runLlmEnrichment(data);
+		}
+	});
+
+	async function runLlmEnrichment(data: typeof $onboardingData) {
+		enriching = true;
+		try {
+			const result = await api.onboarding.analyzeProfile({
+				provider: data.llm_provider,
+				...(data.llm_api_key ? { api_key: data.llm_api_key } : {}),
+				model: data.llm_model,
+				...(data.llm_base_url ? { base_url: data.llm_base_url } : {}),
+			});
+			if (result.profile && result.status === 'ok') {
+				onboardingData.prefillFromInference(result.profile);
+				onboardingSession.setInferredProfile(
+					result.profile,
+					result.warnings ?? []
+				);
+				// Re-read updated store values into local state.
+				const updated = $onboardingData;
+				accountType = updated.account_type;
+				productName = updated.product_name;
+				productDescription = updated.product_description;
+				productUrl = updated.product_url;
+				targetAudience = updated.target_audience;
+				productKeywords = updated.product_keywords;
+				industryTopics = updated.industry_topics;
+				enrichDone = true;
+				trackFunnel('onboarding:llm-enrich-done');
+			}
+		} catch {
+			// Non-fatal — heuristic values remain.
+		}
+		enriching = false;
+	}
 
 	// Pre-compute field metadata for template use (avoids @const in plain elements)
 	let accountTypeMeta = $derived(fieldMeta(profile?.account_type));
@@ -100,6 +151,18 @@
 			Tell Tuitbot about yourself so it can find relevant conversations and generate on-brand content.
 		{/if}
 	</p>
+
+	{#if enriching}
+		<div class="enrich-banner">
+			<span class="spinner"><Loader2 size={14} /></span>
+			<span>Enriching profile with AI...</span>
+		</div>
+	{:else if enrichDone}
+		<div class="enrich-banner enrich-done">
+			<Sparkles size={14} />
+			<span>Profile enriched with AI — review the updated fields below.</span>
+		</div>
+	{/if}
 
 	{#if xConnected && xUser}
 		<div class="connected-card">
@@ -527,5 +590,34 @@
 		background: var(--color-surface);
 		color: var(--color-text-muted);
 		font-size: 13px;
+	}
+
+	.enrich-banner {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 14px;
+		background: color-mix(in srgb, var(--color-accent) 6%, var(--color-base));
+		border: 1px solid color-mix(in srgb, var(--color-accent) 20%, var(--color-border));
+		border-radius: 8px;
+		font-size: 13px;
+		color: var(--color-text-muted);
+	}
+
+	.enrich-done {
+		background: color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--color-base));
+		border-color: color-mix(in srgb, var(--color-success, #22c55e) 25%, var(--color-border));
+		color: var(--color-success, #22c55e);
+	}
+
+	.spinner {
+		display: inline-flex;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 </style>

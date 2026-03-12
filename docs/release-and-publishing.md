@@ -5,6 +5,9 @@
 Workflow: `.github/workflows/release.yml`
 
 1. Every push to `main` updates the release PR via `release-plz release-pr`.
+   Dashboard-only changes under `dashboard/**` are fingerprinted into
+   `crates/tuitbot-server/dashboard-release-marker.txt` during this job so
+   they also trigger a `tuitbot-server` release PR.
 2. A manual run of `.github/workflows/release.yml` on `main` publishes crates and creates release tags.
 3. Manual runs also accept an optional `release_tag` input so you can backfill assets for an existing `tuitbot-cli-v...` or `tuitbot-server-v...` tag.
 4. If no `release_tag` input is provided, a rerun on the release PR merge commit can still recover the tagged release from the merge parents and backfill missing assets.
