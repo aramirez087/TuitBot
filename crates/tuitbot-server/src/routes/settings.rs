@@ -86,7 +86,10 @@ struct TestResult {
 /// Read the config file, merge a JSON patch into it, and parse the result.
 ///
 /// Returns `(merged_toml_string, parsed_config)` on success.
-fn merge_patch_and_parse(config_path: &Path, patch: &Value) -> Result<(String, Config), ApiError> {
+pub(crate) fn merge_patch_and_parse(
+    config_path: &Path,
+    patch: &Value,
+) -> Result<(String, Config), ApiError> {
     let contents = std::fs::read_to_string(config_path).map_err(|e| {
         ApiError::BadRequest(format!(
             "could not read config file {}: {e}",
@@ -113,7 +116,7 @@ fn merge_patch_and_parse(config_path: &Path, patch: &Value) -> Result<(String, C
 }
 
 /// Load and parse the base config from the TOML file.
-fn load_base_config(config_path: &Path) -> Result<Config, ApiError> {
+pub(crate) fn load_base_config(config_path: &Path) -> Result<Config, ApiError> {
     let contents = std::fs::read_to_string(config_path).map_err(|e| {
         ApiError::BadRequest(format!(
             "could not read config file {}: {e}",

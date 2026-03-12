@@ -6,11 +6,13 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
-use tuitbot_core::storage::accounts::account_scraper_session_path;
+use tuitbot_core::config::merge_overrides;
+use tuitbot_core::storage::accounts::{self, account_scraper_session_path, DEFAULT_ACCOUNT_ID};
 use tuitbot_core::x_api::ScraperSession;
 
 use crate::account::AccountContext;
 use crate::error::ApiError;
+use crate::routes::settings::merge_patch_and_parse;
 use crate::state::AppState;
 
 /// Request body for importing a browser session.
@@ -77,13 +79,71 @@ pub async fn import_scraper_session(
         .save(&session_path)
         .map_err(|e| ApiError::Internal(format!("failed to save session: {e}")))?;
 
-    tracing::info!(account_id = %ctx.account_id, "Browser session imported successfully");
+    // Ensure provider_backend is set to "scraper" so that `can_post_for()`
+    // checks the correct credential file. Without this, a user who previously
+    // had X API tokens configured would still have provider_backend="" and
+    // `can_post_for()` would return false even though a valid session exists.
+    let backend_updated = ensure_scraper_backend(&state, &ctx.account_id).await?;
+
+    tracing::info!(
+        account_id = %ctx.account_id,
+        backend_updated,
+        "Browser session imported successfully"
+    );
 
     Ok(Json(serde_json::json!({
         "status": "imported",
         "username": session.username,
         "created_at": session.created_at,
+        "backend_updated": backend_updated,
     })))
+}
+
+/// Set `provider_backend = "scraper"` in the config if it isn't already.
+///
+/// Returns `true` if the config was updated, `false` if it was already correct.
+async fn ensure_scraper_backend(state: &AppState, account_id: &str) -> Result<bool, ApiError> {
+    let config = state
+        .load_effective_config(account_id)
+        .await
+        .map_err(|e| ApiError::Internal(format!("failed to load config: {e}")))?;
+
+    if config.x_api.provider_backend == "scraper" {
+        return Ok(false);
+    }
+
+    let patch = serde_json::json!({
+        "x_api": { "provider_backend": "scraper" }
+    });
+
+    if account_id == DEFAULT_ACCOUNT_ID {
+        let (merged_str, _config) = merge_patch_and_parse(&state.config_path, &patch)?;
+        std::fs::write(&state.config_path, &merged_str).map_err(|e| {
+            ApiError::Internal(format!(
+                "could not write config file {}: {e}",
+                state.config_path.display()
+            ))
+        })?;
+    } else {
+        let account = accounts::get_account(&state.db, account_id)
+            .await?
+            .ok_or_else(|| ApiError::NotFound(format!("account not found: {account_id}")))?;
+
+        let new_overrides = merge_overrides(&account.config_overrides, &patch)
+            .map_err(|e| ApiError::Internal(format!("override merge failed: {e}")))?;
+
+        accounts::update_account(
+            &state.db,
+            account_id,
+            accounts::UpdateAccountParams {
+                config_overrides: Some(&new_overrides),
+                ..Default::default()
+            },
+        )
+        .await?;
+    }
+
+    Ok(true)
 }
 
 /// `DELETE /api/settings/scraper-session` — remove the browser session.
