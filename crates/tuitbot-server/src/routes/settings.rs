@@ -86,7 +86,10 @@ struct TestResult {
 /// Read the config file, merge a JSON patch into it, and parse the result.
 ///
 /// Returns `(merged_toml_string, parsed_config)` on success.
-fn merge_patch_and_parse(config_path: &Path, patch: &Value) -> Result<(String, Config), ApiError> {
+pub(crate) fn merge_patch_and_parse(
+    config_path: &Path,
+    patch: &Value,
+) -> Result<(String, Config), ApiError> {
     let contents = std::fs::read_to_string(config_path).map_err(|e| {
         ApiError::BadRequest(format!(
             "could not read config file {}: {e}",
@@ -113,7 +116,7 @@ fn merge_patch_and_parse(config_path: &Path, patch: &Value) -> Result<(String, C
 }
 
 /// Load and parse the base config from the TOML file.
-fn load_base_config(config_path: &Path) -> Result<Config, ApiError> {
+pub(crate) fn load_base_config(config_path: &Path) -> Result<Config, ApiError> {
     let contents = std::fs::read_to_string(config_path).map_err(|e| {
         ApiError::BadRequest(format!(
             "could not read config file {}: {e}",
@@ -170,6 +173,7 @@ pub async fn config_status(State(state): State<Arc<AppState>>) -> Json<Value> {
         "deployment_mode": state.deployment_mode,
         "capabilities": capabilities,
         "capability_tier": capability_tier,
+        "has_x_client_id": !state.x_client_id.is_empty(),
     }))
 }
 
@@ -221,6 +225,27 @@ pub async fn init_settings(
         }
         if passphrase::is_claimed(&state.data_dir) {
             return Err(ApiError::Conflict("instance already claimed".into()));
+        }
+    }
+
+    // Inject server's in-memory x_client_id if the frontend didn't provide one.
+    // This covers the post-reset case where the user logged in via the server's
+    // remembered client_id but never typed one into the form.
+    if !state.x_client_id.is_empty() {
+        if let Some(obj) = body.as_object_mut() {
+            let x_api = obj.entry("x_api").or_insert_with(|| serde_json::json!({}));
+            if let Some(x_api_obj) = x_api.as_object_mut() {
+                let current = x_api_obj
+                    .get("client_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if current.is_empty() {
+                    x_api_obj.insert(
+                        "client_id".to_string(),
+                        serde_json::Value::String(state.x_client_id.clone()),
+                    );
+                }
+            }
         }
     }
 

@@ -3,6 +3,8 @@
 	import { api } from '$lib/api';
 	import { syncAccountProfile } from '$lib/stores/accounts';
 	import { getAccountId } from '$lib/api/http';
+	import { reloadCapabilities } from '$lib/stores/runtime';
+	import { updateDraft } from '$lib/stores/settings';
 	import { onMount } from 'svelte';
 
 	let sessionExists = $state(false);
@@ -52,6 +54,13 @@
 			authToken = '';
 			ct0 = '';
 			username = '';
+			// Backend auto-sets provider_backend to "scraper" — sync the
+			// settings draft so the UI reflects the change without a reload.
+			if (result.backend_updated) {
+				updateDraft('x_api.provider_backend', 'scraper');
+			}
+			// Refresh runtime status so canPost/capabilityTier update.
+			reloadCapabilities();
 			// Sync profile to pull avatar/username/display name from X.
 			try {
 				await syncAccountProfile(getAccountId());

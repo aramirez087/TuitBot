@@ -151,7 +151,7 @@ export const api = {
 				id: string,
 				data: { auth_token: string; ct0: string; username?: string }
 			) =>
-				request<{ status: string; username?: string; created_at?: string }>(
+				request<{ status: string; username?: string; created_at?: string; backend_updated?: boolean }>(
 					'/api/settings/scraper-session',
 					{
 						method: 'POST',
@@ -300,7 +300,7 @@ export const api = {
 					'/api/settings/scraper-session'
 				),
 			import: (data: { auth_token: string; ct0: string; username?: string }) =>
-				request<{ status: string; username?: string; created_at?: string }>(
+				request<{ status: string; username?: string; created_at?: string; backend_updated?: boolean }>(
 					'/api/settings/scraper-session',
 					{
 						method: 'POST',
@@ -721,10 +721,13 @@ export const api = {
 	},
 
 	onboarding: {
-		startAuth: () =>
+		startAuth: (clientId?: string) =>
 			request<{ authorization_url: string; state: string }>(
 				'/api/onboarding/x-auth/start',
-				{ method: 'POST' }
+				{
+					method: 'POST',
+					body: JSON.stringify(clientId ? { client_id: clientId } : {})
+				}
 			),
 		completeAuth: (code: string, state: string) =>
 			request<{

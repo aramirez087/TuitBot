@@ -9,7 +9,6 @@
 	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
 	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
 	import LlmStep from '$lib/components/onboarding/LlmStep.svelte';
-	import ProfileAnalysisState from '$lib/components/onboarding/ProfileAnalysisState.svelte';
 	import PrefillProfileForm from '$lib/components/onboarding/PrefillProfileForm.svelte';
 	import LanguageBrandStep from '$lib/components/onboarding/LanguageBrandStep.svelte';
 	import SourcesStep from '$lib/components/onboarding/SourcesStep.svelte';
@@ -17,24 +16,38 @@
 	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
 	import { Zap, ArrowLeft, ArrowRight, Loader2, SkipForward, RefreshCw } from 'lucide-svelte';
+	import { onboardingSession } from '$lib/stores/onboarding-session';
 
 	// Optional steps that can be skipped during progressive activation.
-	const OPTIONAL_STEPS = new Set(['LLM', 'Analyze', 'Language', 'Vault', 'Validate']);
+	const OPTIONAL_STEPS = new Set(['LLM', 'Language', 'Vault', 'Validate']);
 
 	// Step flow varies by mode:
-	// API mode: Welcome → X Access → LLM → Analyze → Profile → Language → Vault → Validate → Review [→ Secure]
+	// API mode: Welcome → X Access → LLM → Profile → Language → Vault → Validate → Review [→ Secure]
 	// Scraper mode: Welcome → X Access → Profile → LLM → Language → Vault → Validate → Review [→ Secure]
+	// (Analyze step removed — inline analysis happens within XApiStep after OAuth)
 	let isScraperMode = $derived($onboardingData.provider_backend === 'scraper');
 	let baseSteps = $derived(
 		isScraperMode
 			? ['Welcome', 'X Access', 'Profile', 'LLM', 'Language', 'Vault', 'Validate', 'Review']
-			: ['Welcome', 'X Access', 'LLM', 'Analyze', 'Profile', 'Language', 'Vault', 'Validate', 'Review']
+			: ['Welcome', 'X Access', 'LLM', 'Profile', 'Language', 'Vault', 'Validate', 'Review']
 	);
 
 	let currentStep = $state(0);
 	let submitting = $state(false);
 	let errorMsg = $state('');
 	let skippedSteps = $state(new Set<string>());
+
+	// Whether the server has an in-memory x_client_id (e.g. after factory reset).
+	let hasServerClientId = $state(false);
+
+	// Fetch config status on mount to check for server-side client_id.
+	$effect(() => {
+		api.settings.configStatus().then((status) => {
+			hasServerClientId = status.has_x_client_id;
+		}).catch(() => {
+			// Non-fatal — default to developer setup flow.
+		});
+	});
 
 	// Claim state — only used in web mode.
 	let claimPassphrase = $state('');
@@ -49,12 +62,11 @@
 	let currentStepName = $derived(steps[currentStep] ?? '');
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
-	let isAnalyzeStep = $derived(currentStepName === 'Analyze');
 
 	// Show "Skip to finish" after Profile step (where required steps end).
 	let canSkipToFinish = $derived(
 		currentStepName === 'Profile' ||
-		(OPTIONAL_STEPS.has(currentStepName) && currentStepName !== 'Analyze')
+		OPTIONAL_STEPS.has(currentStepName)
 	);
 
 	// Determine if LLM is configured (for display purposes).
@@ -101,6 +113,7 @@
 				return true;
 			case 'X Access':
 				if (data.provider_backend === 'scraper') return true;
+				if (hasServerClientId) return $onboardingSession.x_connected;
 				return data.client_id.trim().length > 0;
 			case 'Profile':
 				return (
@@ -113,8 +126,6 @@
 			case 'LLM':
 				// Optional in progressive activation — always advanceable
 				return true;
-			case 'Analyze':
-				return false;
 			case 'Language':
 				return true;
 			case 'Vault':
@@ -133,17 +144,6 @@
 
 	function next() {
 		if (currentStep < steps.length - 1) {
-			// In API mode, skip Analyze step if LLM is not configured
-			if (currentStepName === 'LLM' && !isScraperMode && !hasLlmConfig) {
-				// Skip Analyze step — jump past it to Profile
-				const analyzeIdx = steps.indexOf('Analyze');
-				if (analyzeIdx >= 0) {
-					skippedSteps = new Set([...skippedSteps, 'Analyze']);
-					currentStep = analyzeIdx + 1;
-					errorMsg = '';
-					return;
-				}
-			}
 			currentStep++;
 			errorMsg = '';
 		}
@@ -151,12 +151,7 @@
 
 	function back() {
 		if (currentStep > 0) {
-			// When going back from Profile in API mode, skip the Analyze step
-			if (currentStepName === 'Profile' && !isScraperMode) {
-				currentStep -= 2;
-			} else {
-				currentStep--;
-			}
+			currentStep--;
 			errorMsg = '';
 		}
 	}
@@ -203,7 +198,7 @@
 				x_api: data.provider_backend === 'scraper'
 					? { provider_backend: 'scraper' }
 					: {
-						client_id: data.client_id,
+						...(data.client_id ? { client_id: data.client_id } : {}),
 						...(data.client_secret ? { client_secret: data.client_secret } : {}),
 					},
 				business: {
@@ -292,7 +287,8 @@
 			if (alreadyClaimed) {
 				goto('/login');
 			} else {
-				goto('/');
+				const exampleText = "Just discovered an interesting take on this — what do you all think? 🧵";
+				goto(`/drafts?new=true&prefill_content=${encodeURIComponent(exampleText)}`);
 			}
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : '';
@@ -307,7 +303,7 @@
 			if (msg.toLowerCase().includes('already exists')) {
 				trackFunnel('onboarding:409-recovery', { reason: 'already_exists' });
 				onboardingData.reset();
-				goto('/');
+				goto('/drafts?new=true');
 				return;
 			}
 			if (msg.toLowerCase().includes('already claimed') && config.claim) {
@@ -365,19 +361,18 @@
 
 	<div class="onboarding-content">
 		<div class="progress">
-			{#each steps.filter((s) => s !== 'Analyze') as step, displayIdx}
-				{@const realIdx = steps.indexOf(step)}
+			{#each steps as step, displayIdx}
 				{@const isSkipped = skippedSteps.has(step)}
 				<div
 					class="progress-step"
-					class:active={realIdx === currentStep || (step === 'Profile' && isAnalyzeStep)}
-					class:completed={realIdx < currentStep && !isSkipped}
-					class:skipped={isSkipped && realIdx < currentStep}
+					class:active={displayIdx === currentStep}
+					class:completed={displayIdx < currentStep && !isSkipped}
+					class:skipped={isSkipped && displayIdx < currentStep}
 				>
 					<div class="progress-dot">
-						{#if isSkipped && realIdx < currentStep}
+						{#if isSkipped && displayIdx < currentStep}
 							<span class="skip-mark">&mdash;</span>
-						{:else if realIdx < currentStep}
+						{:else if displayIdx < currentStep}
 							<span class="check-mark">&#10003;</span>
 						{:else}
 							{displayIdx + 1}
@@ -385,8 +380,8 @@
 					</div>
 					<span class="progress-label">{step}</span>
 				</div>
-				{#if displayIdx < steps.filter((s) => s !== 'Analyze').length - 1}
-					<div class="progress-line" class:filled={realIdx < currentStep}></div>
+				{#if displayIdx < steps.length - 1}
+					<div class="progress-line" class:filled={displayIdx < currentStep}></div>
 				{/if}
 			{/each}
 		</div>
@@ -395,11 +390,9 @@
 			{#if currentStepName === 'Welcome'}
 				<WelcomeStep />
 			{:else if currentStepName === 'X Access'}
-				<XApiStep />
+				<XApiStep {hasServerClientId} />
 			{:else if currentStepName === 'LLM'}
 				<LlmStep />
-			{:else if currentStepName === 'Analyze'}
-				<ProfileAnalysisState oncomplete={next} />
 			{:else if currentStepName === 'Profile'}
 				<PrefillProfileForm />
 			{:else if currentStepName === 'Language'}
@@ -426,7 +419,7 @@
 		{/if}
 
 		<div class="actions">
-			{#if currentStep > 0 && !isAnalyzeStep}
+			{#if currentStep > 0}
 				<button class="btn btn-secondary" onclick={back} disabled={submitting}>
 					<ArrowLeft size={16} />
 					Back
@@ -435,10 +428,7 @@
 				<div></div>
 			{/if}
 
-			{#if isAnalyzeStep}
-				<!-- Analyze step auto-advances; no button needed -->
-				<div></div>
-			{:else if !isLastStep}
+			{#if !isLastStep}
 				<div class="action-group">
 					{#if canSkipToFinish && canAdvance()}
 						<button

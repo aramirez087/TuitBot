@@ -9,7 +9,7 @@ repository = "https://github.com/aramirez087/TuitBot"
 homepage = "https://github.com/aramirez087/TuitBot"
 documentation = "https://docs.rs/tuitbot-server"
 keywords = ["x-api", "twitter", "api-server", "automation", "dashboard"]
-include = ["src/**/*", "build.rs", "Cargo.toml", "dashboard-dist/**/*"]
+include = ["src/**/*", "build.rs", "Cargo.toml", "dashboard-dist/**/*", "dashboard-release-marker.txt"]
 
 [dependencies]
 tuitbot-core = { version = "0.1.30", path = "../tuitbot-core" }

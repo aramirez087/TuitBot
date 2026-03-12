@@ -50,14 +50,32 @@ fn user_to_json(user: &tuitbot_core::x_api::types::User) -> Value {
     })
 }
 
+/// Optional request body for starting onboarding auth.
+#[derive(Deserialize, Default)]
+pub struct StartAuthRequest {
+    /// Optional client_id override. If absent, uses the server's in-memory value.
+    #[serde(default)]
+    pub client_id: Option<String>,
+}
+
 /// `POST /api/onboarding/x-auth/start` — start an OAuth PKCE flow.
 ///
 /// No account exists yet. Generates a PKCE challenge and stores it
 /// under the `__onboarding__` sentinel. Returns the authorization URL.
+///
+/// Accepts an optional `client_id` in the request body. If absent or empty,
+/// falls back to the server's in-memory `x_client_id` (useful after factory
+/// reset when the client_id is still in memory).
 pub async fn start_onboarding_auth(
     State(state): State<Arc<AppState>>,
+    Json(body): Json<StartAuthRequest>,
 ) -> Result<Json<Value>, ApiError> {
-    if state.x_client_id.is_empty() {
+    let effective_id = body
+        .client_id
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| state.x_client_id.clone());
+
+    if effective_id.is_empty() {
         return Err(ApiError::BadRequest(
             "X API client_id not configured. Set x_api.client_id in config.toml.".to_string(),
         ));
@@ -70,12 +88,7 @@ pub async fn start_onboarding_auth(
 
     let pkce = generate_pkce();
 
-    let auth_url = build_auth_url(
-        &state.x_client_id,
-        &redirect_uri,
-        &pkce.state,
-        &pkce.challenge,
-    );
+    let auth_url = build_auth_url(&effective_id, &redirect_uri, &pkce.state, &pkce.challenge);
 
     // Store pending PKCE state with onboarding sentinel.
     {
@@ -89,6 +102,7 @@ pub async fn start_onboarding_auth(
                 code_verifier: pkce.verifier,
                 created_at: std::time::Instant::now(),
                 account_id: ONBOARDING_ACCOUNT_ID.to_string(),
+                client_id: effective_id,
             },
         );
     }
@@ -118,7 +132,7 @@ pub async fn complete_onboarding_auth(
     Json(body): Json<OnboardingCallbackRequest>,
 ) -> Result<Json<Value>, ApiError> {
     // Look up and consume the pending PKCE state.
-    let code_verifier = {
+    let (code_verifier, flow_client_id) = {
         let mut pending = state.pending_oauth.lock().await;
         match pending.remove(&body.state) {
             Some(p) if p.created_at.elapsed() < OAUTH_STATE_TTL => {
@@ -127,7 +141,7 @@ pub async fn complete_onboarding_auth(
                         "state parameter does not match onboarding flow".to_string(),
                     ));
                 }
-                p.code_verifier
+                (p.code_verifier, p.client_id)
             }
             Some(_) => {
                 return Err(ApiError::BadRequest("state expired".to_string()));
@@ -143,9 +157,9 @@ pub async fn complete_onboarding_auth(
     let config: tuitbot_core::config::Config = toml::from_str(&contents).unwrap_or_default();
     let redirect_uri = build_redirect_uri(&config.auth.callback_host, config.auth.callback_port);
 
-    // Exchange code for tokens.
+    // Exchange code for tokens using the client_id from the start flow.
     let stored_tokens = tuitbot_core::startup::exchange_auth_code(
-        &state.x_client_id,
+        &flow_client_id,
         &body.code,
         &redirect_uri,
         &code_verifier,

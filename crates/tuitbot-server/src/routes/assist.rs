@@ -311,7 +311,11 @@ pub async fn get_mode(
         StatusCode::OK,
         Json(ModeResponse {
             mode: config.mode.to_string(),
-            approval_mode: config.effective_approval_mode(),
+            // Return the raw `approval_mode` setting — not the effective one.
+            // The Composer-mode override that forces approval for autonomous
+            // loops should not affect user-initiated manual compose actions
+            // in the dashboard (the Publish button).
+            approval_mode: config.approval_mode,
         }),
     ))
 }

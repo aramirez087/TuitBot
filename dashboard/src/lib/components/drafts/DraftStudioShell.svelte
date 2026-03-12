@@ -101,16 +101,20 @@
 		studio.loadTags();
 
 		// Handle ?new=true param (from Cmd+N or external redirect)
+		// Also supports ?prefill_content=... for pre-populated drafts (e.g. post-onboarding)
 		if ($page.url.searchParams.get("new") === "true") {
+			const prefillContent =
+				$page.url.searchParams.get("prefill_content") || undefined;
 			const url = new URL(window.location.href);
 			url.searchParams.delete("new");
+			url.searchParams.delete("prefill_content");
 			history.replaceState(null, "", url.toString());
-			studio.createDraft().then((newId) => {
+			studio.createDraft(prefillContent).then((newId) => {
 				if (newId !== null) {
 					console.info("[draft-studio]", {
 						event: "draft_created",
 						id: newId,
-						source: "cmd-n",
+						source: prefillContent ? "onboarding" : "cmd-n",
 					});
 				}
 			});

@@ -242,14 +242,17 @@ export async function setTagFilter(tagId: number | null): Promise<void> {
 	await loadDrafts();
 }
 
-export async function createDraft(): Promise<number | null> {
+export async function createDraft(initialContent?: string): Promise<number | null> {
 	try {
-		const result = await api.draftStudio.create({ content_type: 'tweet' });
+		const result = await api.draftStudio.create({
+			content_type: 'tweet',
+			...(initialContent ? { content: initialContent } : {}),
+		});
 		const newDraft: DraftSummary = {
 			id: result.id,
 			title: null,
 			content_type: 'tweet',
-			content_preview: '',
+			content_preview: initialContent ? initialContent.slice(0, 100) : '',
 			status: 'draft',
 			scheduled_for: null,
 			archived_at: null,

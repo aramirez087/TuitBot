@@ -6,8 +6,6 @@
 	import CalendarMonthView from '$lib/components/CalendarMonthView.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import ActivationChecklist from '$lib/components/onboarding/ActivationChecklist.svelte';
-	import { capabilityTier } from '$lib/stores/capability';
 	import { api } from '$lib/api';
 	import { trackFunnel } from '$lib/analytics/funnel';
 	import {
@@ -125,10 +123,6 @@
 <svelte:head>
 	<title>Content Calendar — Tuitbot</title>
 </svelte:head>
-
-{#if $capabilityTier !== 'posting_ready'}
-	<ActivationChecklist compact />
-{/if}
 
 <div class="page-header">
 	<div class="header-left">

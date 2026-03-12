@@ -208,6 +208,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Update dashboard release marker
+        run: bash scripts/update-dashboard-release-marker.sh
+
       - name: Build dashboard for embedding
         run: |
           cd dashboard && npm ci && npm run build

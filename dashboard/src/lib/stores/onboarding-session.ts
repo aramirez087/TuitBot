@@ -65,7 +65,7 @@ function createOnboardingSession() {
 				...s,
 				auth_url: url,
 				oauth_state: state,
-				auth_loading: false
+				auth_loading: true
 			}));
 		},
 		setError: (error: string) => {
