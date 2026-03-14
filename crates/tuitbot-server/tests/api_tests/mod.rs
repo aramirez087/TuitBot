@@ -17,6 +17,7 @@ mod approval;
 mod compose;
 mod content;
 mod discovery;
+mod discovery_feed; // Task 3.4: discovery feed route integration tests
 
 /// The test API token used across all tests.
 pub const TEST_TOKEN: &str = "test-token-abc123";

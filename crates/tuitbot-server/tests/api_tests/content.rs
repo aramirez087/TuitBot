@@ -483,4 +483,3 @@ api_key = "test-key-not-real"
     assert_eq!(state.content_generators.lock().await.len(), 2);
 }
 
-/// Test: load_effective_config returns per-account config.

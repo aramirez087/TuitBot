@@ -392,4 +392,3 @@ async fn runtime_isolation_start_stop() {
     assert_eq!(body["running"], true, "B should survive A's stop");
 }
 
-/// Test: content generator cache is per-account (lazy init).
