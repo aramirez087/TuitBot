@@ -1,0 +1,39 @@
+coverage:
+  # Overall project coverage targets.
+  # These are aspirational — actual enforcement is handled in CI via
+  # cargo-tarpaulin --fail-under (Rust) and Vitest thresholds (frontend).
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 5%        # Allow ±5% swing before marking the PR red
+        informational: true  # Don't block PRs on initial ramp-up
+    patch:
+      default:
+        target: 60%          # New code on PRs should be ≥60% covered
+        threshold: 5%
+
+  # Track Rust and TypeScript separately
+  flags:
+    rust:
+      paths:
+        - crates/
+      carryforward: true
+    frontend:
+      paths:
+        - dashboard/src/
+      carryforward: true
+
+# Ignore generated/non-application files
+ignore:
+  - "dashboard/src/**/*.d.ts"
+  - "dashboard/src/lib/assets/**"
+  - "crates/*/tests/**"
+  - "crates/*/benches/**"
+  - "scripts/**"
+  - "**/*.config.*"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true    # Only comment when coverage changes

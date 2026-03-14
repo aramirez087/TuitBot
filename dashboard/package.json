@@ -17,7 +17,9 @@
 		"test:unit:run": "svelte-kit sync && vitest run --config vitest.config.ts",
 		"test:component": "playwright test",
 		"test:e2e": "playwright test",
-		"test": "svelte-kit sync && vitest run --config vitest.config.ts && playwright test"
+		"test": "svelte-kit sync && vitest run --config vitest.config.ts && playwright test",
+		"test:coverage": "svelte-kit sync && vitest run --config vitest.config.ts --coverage",
+		"test:coverage:ci": "svelte-kit sync && vitest run --config vitest.config.ts --coverage --reporter=json"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.58.2",
