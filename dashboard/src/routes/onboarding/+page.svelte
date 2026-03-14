@@ -3,8 +3,7 @@
 	import { page } from '$app/stores';
 	import { api } from '$lib/api';
 	import { onboardingData } from '$lib/stores/onboarding';
-	import { authMode as authModeStore, claimSession } from '$lib/stores/auth';
-	import { connectWs } from '$lib/stores/websocket';
+	import { authMode as authModeStore } from '$lib/stores/auth';
 	import { trackFunnel } from '$lib/analytics/funnel';
 	import WelcomeStep from '$lib/components/onboarding/WelcomeStep.svelte';
 	import XApiStep from '$lib/components/onboarding/XApiStep.svelte';
@@ -15,8 +14,11 @@
 	import ValidationStep from '$lib/components/onboarding/ValidationStep.svelte';
 	import ReviewStep from '$lib/components/onboarding/ReviewStep.svelte';
 	import ClaimStep from '$lib/components/onboarding/ClaimStep.svelte';
-	import { Zap, ArrowLeft, ArrowRight, Loader2, SkipForward, RefreshCw } from 'lucide-svelte';
+	import { Zap, RefreshCw } from 'lucide-svelte';
 	import { onboardingSession } from '$lib/stores/onboarding-session';
+	import { submitOnboarding } from '$lib/utils/submitOnboarding';
+	import OnboardingStepNav from './OnboardingStepNav.svelte';
+	import OnboardingActions from './OnboardingActions.svelte';
 
 	// Optional steps that can be skipped during progressive activation.
 	const OPTIONAL_STEPS = new Set(['LLM', 'Language', 'Vault', 'Validate']);
@@ -24,7 +26,6 @@
 	// Step flow varies by mode:
 	// API mode: Welcome → X Access → LLM → Profile → Language → Vault → Validate → Review [→ Secure]
 	// Scraper mode: Welcome → X Access → Profile → LLM → Language → Vault → Validate → Review [→ Secure]
-	// (Analyze step removed — inline analysis happens within XApiStep after OAuth)
 	let isScraperMode = $derived($onboardingData.provider_backend === 'scraper');
 	let baseSteps = $derived(
 		isScraperMode
@@ -36,25 +37,17 @@
 	let submitting = $state(false);
 	let errorMsg = $state('');
 	let skippedSteps = $state(new Set<string>());
-
-	// Whether the server has an in-memory x_client_id (e.g. after factory reset).
 	let hasServerClientId = $state(false);
 
-	// Fetch config status on mount to check for server-side client_id.
 	$effect(() => {
 		api.settings.configStatus().then((status) => {
 			hasServerClientId = status.has_x_client_id;
-		}).catch(() => {
-			// Non-fatal — default to developer setup flow.
-		});
+		}).catch(() => { /* non-fatal */ });
 	});
 
-	// Claim state — only used in web mode.
 	let claimPassphrase = $state('');
 	let passphraseSaved = $state(false);
 
-	// Tauri/bearer mode skips the claim step. Web mode always shows it —
-	// either as passphrase generation (fresh) or recovery guidance (already claimed).
 	let isTauri = $derived($authModeStore === 'tauri');
 	let alreadyClaimed = $derived($page.url.searchParams.get('claimed') === '1');
 	let showClaimStep = $derived(!isTauri);
@@ -63,41 +56,30 @@
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
 
-	// Show "Skip to finish" after Profile step (where required steps end).
 	let canSkipToFinish = $derived(
-		currentStepName === 'Profile' ||
-		OPTIONAL_STEPS.has(currentStepName)
+		currentStepName === 'Profile' || OPTIONAL_STEPS.has(currentStepName)
 	);
 
-	// Determine if LLM is configured (for display purposes).
 	let hasLlmConfig = $derived(
 		$onboardingData.llm_provider === 'ollama' ||
 		($onboardingData.llm_api_key.trim().length > 0 && $onboardingData.llm_model.trim().length > 0)
 	);
 
-	// Deployment mode flag — set by root layout via page data or detected on submit.
 	let unsupportedMode = $state('');
 
-	// Track step transitions for funnel measurement.
 	let prevTrackedStep = $state(-1);
 	$effect(() => {
 		if (currentStep !== prevTrackedStep) {
 			if (currentStep === 0 && prevTrackedStep === -1) {
-				trackFunnel('onboarding:started', {
-					mode: isScraperMode ? 'scraper' : 'api',
-				});
+				trackFunnel('onboarding:started', { mode: isScraperMode ? 'scraper' : 'api' });
 			}
 			if (currentStep > 0) {
-				trackFunnel('onboarding:step-entered', {
-					step: currentStepName,
-					index: currentStep,
-				});
+				trackFunnel('onboarding:step-entered', { step: currentStepName, index: currentStep });
 			}
 			prevTrackedStep = currentStep;
 		}
 	});
 
-	// Prevent navigation away during claim step if passphrase is generated but not submitted.
 	$effect(() => {
 		if (isClaimStep && claimPassphrase && !submitting) {
 			const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -109,8 +91,7 @@
 	function canAdvance(): boolean {
 		const data = $onboardingData;
 		switch (currentStepName) {
-			case 'Welcome':
-				return true;
+			case 'Welcome': return true;
 			case 'X Access':
 				if (data.provider_backend === 'scraper') return true;
 				if (hasServerClientId) return $onboardingSession.x_connected;
@@ -123,41 +104,27 @@
 					data.product_keywords.length > 0 &&
 					data.industry_topics.length > 0
 				);
-			case 'LLM':
-				// Optional in progressive activation — always advanceable
-				return true;
-			case 'Language':
-				return true;
-			case 'Vault':
-				return true;
-			case 'Validate':
-				return true;
-			case 'Review':
-				return true;
+			case 'LLM': return true;
+			case 'Language': return true;
+			case 'Vault': return true;
+			case 'Validate': return true;
+			case 'Review': return true;
 			case 'Secure':
 				if (alreadyClaimed) return passphraseSaved;
 				return claimPassphrase.trim().length >= 8 && passphraseSaved;
-			default:
-				return false;
+			default: return false;
 		}
 	}
 
 	function next() {
-		if (currentStep < steps.length - 1) {
-			currentStep++;
-			errorMsg = '';
-		}
+		if (currentStep < steps.length - 1) { currentStep++; errorMsg = ''; }
 	}
 
 	function back() {
-		if (currentStep > 0) {
-			currentStep--;
-			errorMsg = '';
-		}
+		if (currentStep > 0) { currentStep--; errorMsg = ''; }
 	}
 
 	function skipToFinish() {
-		// Mark all remaining optional steps as skipped
 		const reviewIdx = steps.indexOf('Review');
 		if (reviewIdx < 0) return;
 		const skipped: string[] = [];
@@ -168,10 +135,7 @@
 				skipped.push(stepName);
 			}
 		}
-		trackFunnel('onboarding:step-skipped', {
-			from_step: currentStepName,
-			skipped,
-		});
+		trackFunnel('onboarding:step-skipped', { from_step: currentStepName, skipped });
 		currentStep = reviewIdx;
 		errorMsg = '';
 	}
@@ -179,156 +143,16 @@
 	async function submit() {
 		submitting = true;
 		errorMsg = '';
-		let config: Record<string, unknown> = {};
-
-		const data = $onboardingData;
-		const tierLabel = (data.llm_provider === 'ollama' || (data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0))
-			? (data.provider_backend === 'scraper' || data.client_id.trim().length > 0 ? 'generation_ready' : 'profile_ready')
-			: (data.provider_backend === 'scraper' || data.client_id.trim().length > 0 ? 'exploration_ready' : 'profile_ready');
-
-		trackFunnel('onboarding:submitted', {
-			has_x_auth: !!data.x_user_id,
-			has_llm: data.llm_provider === 'ollama' || (data.llm_api_key.trim().length > 0 && data.llm_model.trim().length > 0),
-			has_vault: data.vault_path.length > 0 || data.connection_id !== null || data.folder_id.length > 0,
-			tier: tierLabel,
-		});
-
 		try {
-			config = {
-				x_api: data.provider_backend === 'scraper'
-					? { provider_backend: 'scraper' }
-					: {
-						...(data.client_id ? { client_id: data.client_id } : {}),
-						...(data.client_secret ? { client_secret: data.client_secret } : {}),
-					},
-				business: {
-					product_name: data.product_name,
-					product_description: data.product_description,
-					...(data.product_url ? { product_url: data.product_url } : {}),
-					target_audience: data.target_audience,
-					product_keywords: data.product_keywords,
-					industry_topics: data.industry_topics,
-				},
-				approval_mode: data.approval_mode,
-			};
-
-			// Only include LLM section if provider and key are configured
-			if (data.llm_provider && (data.llm_provider === 'ollama' || data.llm_api_key)) {
-				config.llm = {
-					provider: data.llm_provider,
-					...(data.llm_api_key ? { api_key: data.llm_api_key } : {}),
-					model: data.llm_model,
-					...(data.llm_base_url ? { base_url: data.llm_base_url } : {}),
-				};
-			}
-
-			if (data.source_type === 'google_drive' && (data.connection_id || data.folder_id)) {
-				config.content_sources = {
-					sources: [{
-						source_type: 'google_drive',
-						path: null,
-						folder_id: data.folder_id || null,
-						service_account_key: null,
-						connection_id: data.connection_id,
-						watch: data.vault_watch,
-						file_patterns: ['*.md', '*.txt'],
-						loop_back_enabled: false,
-						poll_interval_seconds: data.poll_interval_seconds || 300,
-					}]
-				};
-			} else if (data.vault_path) {
-				config.content_sources = {
-					sources: [{
-						source_type: 'local_fs',
-						path: data.vault_path,
-						folder_id: null,
-						service_account_key: null,
-						watch: data.vault_watch,
-						file_patterns: ['*.md', '*.txt'],
-						loop_back_enabled: data.vault_loop_back,
-						poll_interval_seconds: null,
-					}]
-				};
-			}
-
-			// Include X identity for account provisioning (if connected during onboarding).
-			if (data.x_user_id) {
-				config.x_profile = {
-					x_user_id: data.x_user_id,
-					x_username: data.x_username,
-					x_display_name: data.x_display_name,
-					x_avatar_url: data.x_avatar_url || null,
-				};
-			}
-
-			// Include claim for web mode (skip if instance already claimed).
-			if (showClaimStep && claimPassphrase.trim()) {
-				config.claim = { passphrase: claimPassphrase.trim() };
-			}
-
-			const result = await api.settings.init(config);
-
-			if (result.status === 'validation_failed' && result.errors) {
-				errorMsg = result.errors.map((e: { field: string; message: string }) => `${e.field}: ${e.message}`).join('; ');
-				return;
-			}
-
-			// If claim was included, establish session from response.
-			if (result.csrf_token) {
-				claimSession(result.csrf_token);
-				connectWs();
-			}
-
-			trackFunnel('onboarding:completed', {
-				tier: tierLabel,
-				claimed: showClaimStep,
+			const result = await submitOnboarding({
+				data: $onboardingData,
+				showClaimStep,
+				claimPassphrase,
+				alreadyClaimed,
 			});
+			if (result.kind === 'error') { errorMsg = result.message; return; }
 			onboardingData.reset();
-			if (alreadyClaimed) {
-				goto('/login');
-			} else {
-				const exampleText = "Just discovered an interesting take on this — what do you all think? 🧵";
-				goto(`/drafts?new=true&prefill_content=${encodeURIComponent(exampleText)}`);
-			}
-		} catch (e) {
-			const msg = e instanceof Error ? e.message : '';
-			// Network failure — server unreachable.
-			if (e instanceof TypeError && msg.includes('fetch')) {
-				errorMsg = "Can't reach the Tuitbot server. Check that it's running and try again.";
-				trackFunnel('onboarding:error', { error: 'network', step: 'submit' });
-				return;
-			}
-			// Config already exists (double-submit, browser back/forward).
-			// Provisioning already succeeded — redirect to home.
-			if (msg.toLowerCase().includes('already exists')) {
-				trackFunnel('onboarding:409-recovery', { reason: 'already_exists' });
-				onboardingData.reset();
-				goto('/drafts?new=true');
-				return;
-			}
-			if (msg.toLowerCase().includes('already claimed') && config.claim) {
-				trackFunnel('onboarding:409-recovery', { reason: 'already_claimed' });
-				// Instance was claimed between page load and submit (race condition).
-				// Retry without claim so the config is still created.
-				try {
-					delete config.claim;
-					await api.settings.init(config);
-					onboardingData.reset();
-					goto('/login');
-					return;
-				} catch (retryErr) {
-					const retryMsg = retryErr instanceof Error ? retryErr.message : '';
-					// If retry also gets 409 (config already exists), redirect.
-					if (retryMsg.toLowerCase().includes('already exists')) {
-						onboardingData.reset();
-						goto('/login');
-						return;
-					}
-					// Retry also failed — show original error.
-				}
-			}
-			errorMsg = msg || 'Failed to create configuration';
-			trackFunnel('onboarding:error', { error: errorMsg, step: 'submit' });
+			goto(result.to);
 		} finally {
 			submitting = false;
 		}
@@ -351,121 +175,63 @@
 		</div>
 	</div>
 {:else}
-<div class="onboarding">
-	<div class="onboarding-header">
-		<div class="logo">
-			<Zap size={20} strokeWidth={2.5} />
-			<span class="logo-text">Tuitbot</span>
-		</div>
-	</div>
-
-	<div class="onboarding-content">
-		<div class="progress">
-			{#each steps as step, displayIdx}
-				{@const isSkipped = skippedSteps.has(step)}
-				<div
-					class="progress-step"
-					class:active={displayIdx === currentStep}
-					class:completed={displayIdx < currentStep && !isSkipped}
-					class:skipped={isSkipped && displayIdx < currentStep}
-				>
-					<div class="progress-dot">
-						{#if isSkipped && displayIdx < currentStep}
-							<span class="skip-mark">&mdash;</span>
-						{:else if displayIdx < currentStep}
-							<span class="check-mark">&#10003;</span>
-						{:else}
-							{displayIdx + 1}
-						{/if}
-					</div>
-					<span class="progress-label">{step}</span>
-				</div>
-				{#if displayIdx < steps.length - 1}
-					<div class="progress-line" class:filled={displayIdx < currentStep}></div>
-				{/if}
-			{/each}
-		</div>
-
-		<div class="step-content">
-			{#if currentStepName === 'Welcome'}
-				<WelcomeStep />
-			{:else if currentStepName === 'X Access'}
-				<XApiStep {hasServerClientId} />
-			{:else if currentStepName === 'LLM'}
-				<LlmStep />
-			{:else if currentStepName === 'Profile'}
-				<PrefillProfileForm />
-			{:else if currentStepName === 'Language'}
-				<LanguageBrandStep />
-			{:else if currentStepName === 'Vault'}
-				<SourcesStep />
-			{:else if currentStepName === 'Validate'}
-				<ValidationStep {hasLlmConfig} />
-			{:else if currentStepName === 'Review'}
-				<ReviewStep {skippedSteps} />
-			{:else if currentStepName === 'Secure'}
-				<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} {alreadyClaimed} />
-			{/if}
-		</div>
-
-		{#if errorMsg}
-			<div class="error-banner" role="alert">
-				<span>{errorMsg}</span>
-				<button type="button" class="error-retry-btn" onclick={submit} disabled={submitting}>
-					<RefreshCw size={14} />
-					Retry
-				</button>
+	<div class="onboarding">
+		<div class="onboarding-header">
+			<div class="logo">
+				<Zap size={20} strokeWidth={2.5} />
+				<span class="logo-text">Tuitbot</span>
 			</div>
-		{/if}
+		</div>
 
-		<div class="actions">
-			{#if currentStep > 0}
-				<button class="btn btn-secondary" onclick={back} disabled={submitting}>
-					<ArrowLeft size={16} />
-					Back
-				</button>
-			{:else}
-				<div></div>
-			{/if}
+		<div class="onboarding-content">
+			<OnboardingStepNav {steps} {currentStep} {skippedSteps} />
 
-			{#if !isLastStep}
-				<div class="action-group">
-					{#if canSkipToFinish && canAdvance()}
-						<button
-							class="btn btn-ghost"
-							onclick={skipToFinish}
-						>
-							Skip optional steps
-							<SkipForward size={14} />
-						</button>
-					{/if}
-					<button
-						class="btn btn-primary"
-						onclick={next}
-						disabled={!canAdvance()}
-					>
-						{currentStep === 0 ? 'Get Started' : 'Next'}
-						<ArrowRight size={16} />
+			<div class="step-content">
+				{#if currentStepName === 'Welcome'}
+					<WelcomeStep />
+				{:else if currentStepName === 'X Access'}
+					<XApiStep {hasServerClientId} />
+				{:else if currentStepName === 'LLM'}
+					<LlmStep />
+				{:else if currentStepName === 'Profile'}
+					<PrefillProfileForm />
+				{:else if currentStepName === 'Language'}
+					<LanguageBrandStep />
+				{:else if currentStepName === 'Vault'}
+					<SourcesStep />
+				{:else if currentStepName === 'Validate'}
+					<ValidationStep {hasLlmConfig} />
+				{:else if currentStepName === 'Review'}
+					<ReviewStep {skippedSteps} />
+				{:else if currentStepName === 'Secure'}
+					<ClaimStep bind:passphrase={claimPassphrase} bind:saved={passphraseSaved} {alreadyClaimed} />
+				{/if}
+			</div>
+
+			{#if errorMsg}
+				<div class="error-banner" role="alert">
+					<span>{errorMsg}</span>
+					<button type="button" class="error-retry-btn" onclick={submit} disabled={submitting}>
+						<RefreshCw size={14} />
+						Retry
 					</button>
 				</div>
-			{:else}
-				<button
-					class="btn btn-primary"
-					onclick={submit}
-					disabled={submitting || (isClaimStep && !canAdvance())}
-				>
-					{#if submitting}
-						<span class="spinner"><Loader2 size={16} /></span>
-						Creating...
-					{:else}
-						Start Tuitbot
-						<Zap size={16} />
-					{/if}
-				</button>
 			{/if}
+
+			<OnboardingActions
+				{currentStep}
+				{isLastStep}
+				{isClaimStep}
+				{canSkipToFinish}
+				advanceAllowed={canAdvance()}
+				{submitting}
+				onBack={back}
+				onNext={next}
+				onSkip={skipToFinish}
+				onSubmit={submit}
+			/>
 		</div>
 	</div>
-</div>
 {/if}
 
 <style>
@@ -504,91 +270,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 32px;
-	}
-
-	.progress {
-		display: flex;
-		align-items: center;
-		gap: 0;
-	}
-
-	.progress-step {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.progress-dot {
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 12px;
-		font-weight: 600;
-		background: var(--color-surface);
-		border: 2px solid var(--color-border);
-		color: var(--color-text-muted);
-		transition: all 0.2s;
-	}
-
-	.progress-step.active .progress-dot {
-		background: var(--color-accent);
-		border-color: var(--color-accent);
-		color: white;
-	}
-
-	.progress-step.completed .progress-dot {
-		background: var(--color-success);
-		border-color: var(--color-success);
-		color: white;
-	}
-
-	.progress-step.skipped .progress-dot {
-		background: var(--color-surface);
-		border-color: var(--color-border);
-		color: var(--color-text-subtle);
-		border-style: dashed;
-	}
-
-	.check-mark {
-		font-size: 14px;
-	}
-
-	.skip-mark {
-		font-size: 14px;
-		font-weight: 700;
-	}
-
-	.progress-label {
-		font-size: 11px;
-		color: var(--color-text-subtle);
-		white-space: nowrap;
-	}
-
-	.progress-step.active .progress-label {
-		color: var(--color-text);
-		font-weight: 500;
-	}
-
-	.progress-step.skipped .progress-label {
-		color: var(--color-text-subtle);
-		font-style: italic;
-	}
-
-	.progress-line {
-		flex: 1;
-		height: 2px;
-		background: var(--color-border);
-		margin: 0 4px;
-		margin-bottom: 20px;
-		transition: background 0.2s;
-	}
-
-	.progress-line.filled {
-		background: var(--color-success);
 	}
 
 	.step-content {
@@ -657,90 +338,5 @@
 		padding: 2px 6px;
 		border-radius: 4px;
 		font-size: 13px;
-	}
-
-	.actions {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding-top: 16px;
-		border-top: 1px solid var(--color-border-subtle);
-	}
-
-	.action-group {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-
-	.btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-		padding: 10px 20px;
-		border: none;
-		border-radius: 8px;
-		font-size: 14px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.15s;
-	}
-
-	.btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.btn-primary {
-		background: var(--color-accent);
-		color: white;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		filter: brightness(1.1);
-	}
-
-	.btn-primary:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-	}
-
-	.btn-secondary {
-		background: var(--color-surface);
-		color: var(--color-text-muted);
-		border: 1px solid var(--color-border);
-	}
-
-	.btn-secondary:hover:not(:disabled) {
-		background: var(--color-surface-hover);
-		color: var(--color-text);
-	}
-
-	.btn-secondary:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 2px;
-	}
-
-	.btn-ghost {
-		background: transparent;
-		color: var(--color-text-muted);
-		padding: 10px 14px;
-		font-size: 13px;
-	}
-
-	.btn-ghost:hover:not(:disabled) {
-		color: var(--color-text);
-		background: var(--color-surface);
-	}
-
-	.spinner {
-		display: inline-flex;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
 	}
 </style>
