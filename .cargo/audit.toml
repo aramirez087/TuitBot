@@ -9,6 +9,26 @@ ignore = [
     # TuitBot is SQLite-only (no MySQL driver linked or reachable at runtime).
     # No fix available upstream yet; revisit when sqlx publishes a patched release.
     "RUSTSEC-2023-0071",
+
+    # RUSTSEC-2025-0057: fxhash no longer maintained.
+    # Transitive dep via scraper → selectors. Not used directly by TuitBot.
+    # Revisit if scraper or selectors drops fxhash.
+    "RUSTSEC-2025-0057",
+
+    # RUSTSEC-2024-0384: `instant` is unmaintained.
+    # Transitive dep; no longer developed but has no known security impact.
+    # Revisit when upstream dependents migrate away.
+    "RUSTSEC-2024-0384",
+
+    # RUSTSEC-2025-0134: rustls-pemfile 1.x unmaintained (superseded by 2.x).
+    # Transitive dep; functionality unchanged, no known vulnerability.
+    # Will resolve when upstream dependents upgrade to rustls-pemfile 2.x.
+    "RUSTSEC-2025-0134",
+
+    # RUSTSEC-2026-0002: lru 0.13 IterMut unsound (Stacked Borrows violation).
+    # Transitive dep. TuitBot does not call IterMut on any lru cache directly.
+    # Revisit when lru publishes a patched release.
+    "RUSTSEC-2026-0002",
 ]
 
 [output]

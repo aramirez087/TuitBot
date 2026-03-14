@@ -107,7 +107,7 @@ jobs:
           #   See: https://crates.io/crates/rquest-util
           disallowed_pattern='(^|[[:space:]])(GPL-[0-9]|AGPL-[0-9]|SSPL)'
           rust_violations=$(grep -E "$disallowed_pattern" licenses/rust-licenses.txt \
-            | grep -v '^rquest-util' \
+            | grep -v 'rquest-util' \
             || true)
           node_violations=$(grep -E "$disallowed_pattern" licenses/frontend-licenses.csv || true)
 
