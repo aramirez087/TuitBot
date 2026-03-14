@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TweetPreview from '../TweetPreview.svelte';
+	import ComposerPreviewSurface from './ComposerPreviewSurface.svelte';
 
 	let {
 		mode,
@@ -7,7 +8,10 @@
 		tweetMediaPaths = [],
 		tweetLocalPreviews,
 		blocks = [],
-		handle = '@you'
+		handle = '@you',
+		avatarUrl = null,
+		previewMode = false,
+		onclosepreview,
 	}: {
 		mode: 'tweet' | 'thread';
 		tweetText?: string;
@@ -15,6 +19,9 @@
 		tweetLocalPreviews?: Map<string, string>;
 		blocks?: Array<{ id: string; text: string; media_paths: string[] }>;
 		handle?: string;
+		avatarUrl?: string | null;
+		previewMode?: boolean;
+		onclosepreview?: () => void;
 	} = $props();
 
 	const hasTweetContent = $derived(
@@ -59,6 +66,19 @@
 		{/if}
 	</div>
 </div>
+
+{#if previewMode}
+	<ComposerPreviewSurface
+		{mode}
+		{tweetText}
+		{blocks}
+		tweetMediaPaths={tweetMediaPaths ?? []}
+		tweetLocalPreviews={tweetLocalPreviews ?? new Map()}
+		{handle}
+		{avatarUrl}
+		onclose={() => { onclosepreview?.(); }}
+	/>
+{/if}
 
 <style>
 	.preview-rail {
