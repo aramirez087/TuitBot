@@ -15,6 +15,7 @@ export default defineConfig({
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'json', 'html', 'lcov'],
+			reportsDirectory: './coverage',
 			// Broad measurement scope — all lib files appear in reports.
 			include: ['src/lib/**'],
 			exclude: ['src/lib/assets/**', 'src/**/*.d.ts'],

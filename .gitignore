@@ -35,6 +35,12 @@ docs/generated/coverage-report.json
 docs/generated/coverage-report.md
 roadmap/artifacts/
 
+# Coverage output (cargo-tarpaulin + Vitest)
+coverage/
+*.profraw
+*.profdata
+lcov.info
+
 # Dashboard (Svelte + Tauri)
 dashboard/node_modules/
 dashboard/.svelte-kit/

@@ -2,7 +2,7 @@ name: Coverage
 
 on:
   push:
-    branches: [main, refactor/sprint-1]
+    branches: [main]
   pull_request:
 
 env:
@@ -48,6 +48,14 @@ jobs:
         env:
           RUSTFLAGS: "-D warnings"
 
+      - name: Upload Rust coverage report (artifact)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-coverage-report
+          path: coverage/cobertura.xml
+          retention-days: 30
+
       - name: Upload Rust coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -84,6 +92,16 @@ jobs:
 
       - name: Run coverage (thresholds enforced)
         run: npm run test:coverage:ci
+
+      - name: Upload frontend coverage report (artifact)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage-report
+          path: |
+            dashboard/coverage/lcov.info
+            dashboard/coverage/coverage-final.json
+          retention-days: 30
 
       - name: Upload frontend coverage to Codecov
         uses: codecov/codecov-action@v4

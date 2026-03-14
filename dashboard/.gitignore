@@ -1,5 +1,8 @@
 node_modules
 
+# Coverage output (Vitest / v8)
+coverage/
+
 # Output
 .output
 .vercel
