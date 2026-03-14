@@ -2,8 +2,6 @@
 
 use std::collections::HashSet;
 
-use super::*;
-
 #[test]
 fn manifest_generates_without_panic() {
     let manifest = generate_manifest();
