@@ -15,4 +15,5 @@ ignore = [
 # Treat advisory warnings (e.g. unmaintained crates) as failures, not just notices.
 # This mirrors the --deny warnings flag used in CI and ensures a consistent
 # local experience when running `cargo audit` manually.
+quiet = false
 deny = ["warnings"]

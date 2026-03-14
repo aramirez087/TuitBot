@@ -24,8 +24,7 @@ async fn admin_get_follower_trend() {
 #[tokio::test]
 async fn admin_get_action_log() {
     let state = make_state().await;
-    let result =
-        workflow::actions::get_action_log(&state.pool, 24, None, &state.config).await;
+    let result = workflow::actions::get_action_log(&state.pool, 24, None, &state.config).await;
     assert!(!result.is_empty());
 }
 
@@ -123,8 +122,7 @@ async fn admin_get_pending_count() {
 async fn admin_approve_item() {
     let state = make_state().await;
     // Non-existent ID — returns error JSON, not panic
-    let result =
-        workflow::approval::approve_item(&state.pool, 99999, &state.config, false).await;
+    let result = workflow::approval::approve_item(&state.pool, 99999, &state.config, false).await;
     assert!(!result.is_empty());
 }
 
@@ -138,8 +136,7 @@ async fn admin_reject_item() {
 #[tokio::test]
 async fn admin_approve_all() {
     let state = make_state().await;
-    let result =
-        workflow::approval::approve_all(&state.pool, &state.config, false).await;
+    let result = workflow::approval::approve_all(&state.pool, &state.config, false).await;
     assert!(!result.is_empty());
 }
 

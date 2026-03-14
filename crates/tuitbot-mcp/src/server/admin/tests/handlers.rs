@@ -217,14 +217,9 @@ async fn admin_x_put() {
 #[tokio::test]
 async fn admin_x_delete() {
     let state = make_state().await;
-    let result = workflow::x_actions::x_request::x_delete_audited(
-        &state,
-        "/2/tweets/123",
-        None,
-        None,
-        None,
-    )
-    .await;
+    let result =
+        workflow::x_actions::x_request::x_delete_audited(&state, "/2/tweets/123", None, None, None)
+            .await;
     assert!(!result.is_empty());
 }
 
@@ -240,15 +235,15 @@ async fn admin_get_author_context() {
 #[tokio::test]
 async fn admin_recommend_engagement_action() {
     let state = make_state().await;
-    let result = workflow::context::recommend_engagement(&state, "tuitbot", "Check this out!", None).await;
+    let result =
+        workflow::context::recommend_engagement(&state, "tuitbot", "Check this out!", None).await;
     assert!(!result.is_empty());
 }
 
 #[tokio::test]
 async fn admin_topic_performance_snapshot() {
     let state = make_state().await;
-    let result =
-        workflow::context::topic_performance_snapshot(&state.pool, 30).await;
+    let result = workflow::context::topic_performance_snapshot(&state.pool, 30).await;
     assert!(!result.is_empty());
 }
 
@@ -286,16 +281,14 @@ async fn admin_find_reply_opportunities() {
 async fn admin_draft_replies_for_candidates() {
     let state = make_state().await;
     // No LLM configured — the composite will return an llm_not_configured response
-    let result =
-        workflow::composite::draft_replies::execute(&state, &[], None, false).await;
+    let result = workflow::composite::draft_replies::execute(&state, &[], None, false).await;
     assert!(!result.is_empty());
 }
 
 #[tokio::test]
 async fn admin_propose_and_queue_replies() {
     let state = make_state().await;
-    let result =
-        workflow::composite::propose_queue::execute(&state, &[], false).await;
+    let result = workflow::composite::propose_queue::execute(&state, &[], false).await;
     assert!(!result.is_empty());
 }
 
