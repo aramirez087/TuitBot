@@ -195,6 +195,46 @@ async fn upload_media_returns_media_upload_error() {
     );
 }
 
+// --- Mutation-gated tests for newly implemented methods ---
+
+#[tokio::test]
+async fn bookmark_tweet_blocked_when_mutations_disabled() {
+    let client = LocalModeXClient::new(false);
+    let err = client.bookmark_tweet("user1", "tweet1").await.unwrap_err();
+    assert!(matches!(err, XApiError::ScraperMutationBlocked { .. }));
+}
+
+#[tokio::test]
+async fn unbookmark_tweet_blocked_when_mutations_disabled() {
+    let client = LocalModeXClient::new(false);
+    let err = client
+        .unbookmark_tweet("user1", "tweet1")
+        .await
+        .unwrap_err();
+    assert!(matches!(err, XApiError::ScraperMutationBlocked { .. }));
+}
+
+#[tokio::test]
+async fn retweet_blocked_when_mutations_disabled() {
+    let client = LocalModeXClient::new(false);
+    let err = client.retweet("user1", "tweet1").await.unwrap_err();
+    assert!(matches!(err, XApiError::ScraperMutationBlocked { .. }));
+}
+
+#[tokio::test]
+async fn unretweet_blocked_when_mutations_disabled() {
+    let client = LocalModeXClient::new(false);
+    let err = client.unretweet("user1", "tweet1").await.unwrap_err();
+    assert!(matches!(err, XApiError::ScraperMutationBlocked { .. }));
+}
+
+#[tokio::test]
+async fn unlike_tweet_blocked_when_mutations_disabled() {
+    let client = LocalModeXClient::new(false);
+    let err = client.unlike_tweet("user1", "tweet1").await.unwrap_err();
+    assert!(matches!(err, XApiError::ScraperMutationBlocked { .. }));
+}
+
 // --- Trait object compatibility ---
 
 #[tokio::test]
