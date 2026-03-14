@@ -58,6 +58,9 @@ export default defineConfig({
 		}
 	},
 	resolve: {
+		// Ensure browser exports are used instead of SSR exports.
+		// Without this, Svelte 5 resolves to index-server.js in vitest.
+		conditions: ['browser', 'import', 'module', 'default'],
 		alias: {
 			$lib: resolve('./src/lib'),
 			$app: resolve('./node_modules/@sveltejs/kit/src/runtime/app')
