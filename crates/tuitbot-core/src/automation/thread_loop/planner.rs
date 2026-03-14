@@ -370,4 +370,156 @@ mod tests {
         assert_eq!(poster.posted_count(), 5);
         assert_eq!(recent.len(), 1);
     }
+
+    // -------------------------------------------------------------------------
+    // run() loop — cancellation coverage
+    // -------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_cancels_immediately_with_topics() {
+        // Pre-cancel: loop sees is_cancelled() == true and exits without posting.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            Arc::new(MockPoster::new()),
+            make_topics(),
+            604800,
+            false,
+        );
+
+        let scheduler =
+            LoopScheduler::new(Duration::from_secs(3600), Duration::ZERO, Duration::ZERO);
+        loop_.run(cancel, scheduler, None).await;
+    }
+
+    #[tokio::test]
+    async fn run_no_topics_exits_on_cancel() {
+        // Empty topics: awaits cancel immediately.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            Arc::new(MockPoster::new()),
+            vec![], // no topics
+            604800,
+            false,
+        );
+
+        let scheduler = LoopScheduler::new(Duration::from_secs(1), Duration::ZERO, Duration::ZERO);
+        loop_.run(cancel, scheduler, None).await;
+    }
+
+    #[tokio::test]
+    async fn run_interval_mode_one_iteration_then_cancel() {
+        // Interval mode: one fast iteration (TooSoon), then cancel fires.
+        // Using large interval so run_iteration returns TooSoon quickly.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+
+        // last_thread = now → elapsed is ~0 → with interval=999999 → TooSoon
+        let storage = Arc::new(MockStorage::new(Some(chrono::Utc::now())));
+
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            Arc::new(MockPoster::new()),
+            make_topics(),
+            999999, // large interval → TooSoon every time
+            false,
+        );
+
+        let scheduler =
+            LoopScheduler::new(Duration::from_millis(1), Duration::ZERO, Duration::ZERO);
+
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            cancel_clone.cancel();
+        });
+
+        tokio::time::timeout(Duration::from_secs(5), loop_.run(cancel, scheduler, None))
+            .await
+            .expect("run() should complete within timeout");
+    }
+
+    // -------------------------------------------------------------------------
+    // log_thread_result — all arms
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn log_thread_result_all_variants() {
+        // Exercises every match arm — no panics (tracing calls)
+        ThreadLoop::log_thread_result(
+            &ThreadResult::Posted {
+                topic: "Rust".to_string(),
+                tweet_count: 3,
+                thread_id: "t1".to_string(),
+            },
+            false,
+        );
+        ThreadLoop::log_thread_result(
+            &ThreadResult::PartialFailure {
+                topic: "Rust".to_string(),
+                tweets_posted: 2,
+                total_tweets: 5,
+                error: "network error".to_string(),
+            },
+            false,
+        );
+        ThreadLoop::log_thread_result(
+            &ThreadResult::TooSoon {
+                elapsed_secs: 10,
+                interval_secs: 604800,
+            },
+            false,
+        );
+        ThreadLoop::log_thread_result(&ThreadResult::RateLimited, false);
+        ThreadLoop::log_thread_result(&ThreadResult::NoTopics, false);
+        ThreadLoop::log_thread_result(
+            &ThreadResult::ValidationFailed {
+                error: "too long".to_string(),
+            },
+            false,
+        );
+        ThreadLoop::log_thread_result(
+            &ThreadResult::Failed {
+                error: "llm failed".to_string(),
+            },
+            false,
+        );
+    }
 }

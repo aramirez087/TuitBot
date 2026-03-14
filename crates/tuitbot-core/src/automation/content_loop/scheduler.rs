@@ -425,4 +425,144 @@ mod tests {
         assert_eq!(storage.posted_count(), 1);
         assert_eq!(recent.len(), 1);
     }
+
+    // ---------------------------------------------------------------------------
+    // run() loop — cancellation coverage
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_cancels_immediately_with_topics() {
+        // Pre-cancel the token: loop should see is_cancelled() == true and exit
+        // without doing any work. Covers lines: slot_mode setup, loop entry, break.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        cancel.cancel(); // already cancelled before run() is called
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            3600,
+            false,
+        );
+
+        let scheduler =
+            LoopScheduler::new(Duration::from_secs(3600), Duration::ZERO, Duration::ZERO);
+        // Should return immediately — no panic, no post
+        content.run(cancel, scheduler, None).await;
+    }
+
+    #[tokio::test]
+    async fn run_no_topics_exits_on_cancel() {
+        // Empty topics: run() logs a warning then awaits cancel.
+        // Pre-cancelling means cancel.cancelled().await resolves immediately.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            vec![], // no topics
+            3600,
+            false,
+        );
+
+        let scheduler = LoopScheduler::new(Duration::from_secs(1), Duration::ZERO, Duration::ZERO);
+        content.run(cancel, scheduler, None).await;
+    }
+
+    #[tokio::test]
+    async fn run_interval_mode_one_iteration_then_cancel() {
+        // Interval mode with a very short scheduler interval.
+        // The loop runs one iteration, then gets cancelled via a background task.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "interval tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            0, // post_window_secs=0 → always elapsed
+            false,
+        );
+
+        // Scheduler with 1ms interval so tick() resolves immediately
+        let scheduler =
+            LoopScheduler::new(Duration::from_millis(1), Duration::ZERO, Duration::ZERO);
+
+        // Cancel after 50ms to let one iteration complete
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            cancel_clone.cancel();
+        });
+
+        tokio::time::timeout(Duration::from_secs(5), content.run(cancel, scheduler, None))
+            .await
+            .expect("run() should complete within timeout");
+    }
+
+    // ---------------------------------------------------------------------------
+    // log_content_result — all arms
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn log_content_result_all_variants() {
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "t".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            3600,
+            false,
+        );
+
+        // Exercise every arm — no panics, no assertions needed (these are tracing calls)
+        content.log_content_result(&ContentResult::Posted {
+            topic: "Rust".to_string(),
+            content: "hello".to_string(),
+        });
+        content.log_content_result(&ContentResult::TooSoon {
+            elapsed_secs: 10,
+            window_secs: 3600,
+        });
+        content.log_content_result(&ContentResult::RateLimited);
+        content.log_content_result(&ContentResult::NoTopics);
+        content.log_content_result(&ContentResult::Failed {
+            error: "oops".to_string(),
+        });
+    }
 }

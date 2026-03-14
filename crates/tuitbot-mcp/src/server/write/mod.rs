@@ -273,3 +273,6 @@ impl WriteMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 }
+
+#[cfg(test)]
+mod tests;
