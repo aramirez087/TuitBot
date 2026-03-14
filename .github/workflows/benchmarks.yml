@@ -1,0 +1,146 @@
+name: Benchmarks
+
+# Run on every push to main only — benchmarks are expensive and comparing
+# against a moving baseline in PRs adds noise.  Regressions surface on the
+# next main push and are reported as PR comments on the triggering merge.
+
+on:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Rust benchmarks — cargo criterion (scoring + content hot paths)
+  # ─────────────────────────────────────────────────────────────────────────
+  rust-benchmarks:
+    name: Rust benchmarks (criterion)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required by benchmark-action to push to gh-pages
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-bench-
+
+      - name: Run benchmarks (bencher output for trend tracking)
+        # --output-format bencher emits the standard cargo-bench text format:
+        #   test <name> ... bench: <ns/iter> (+/- <variance>)
+        # which github-action-benchmark can parse and store.
+        run: |
+          mkdir -p bench-output
+          cargo bench -p tuitbot-core \
+            -- --output-format bencher \
+            2>&1 | tee bench-output/rust.txt
+
+      - name: Upload criterion HTML report (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-report
+          path: target/criterion/
+          retention-days: 30
+
+      - name: Store benchmark results + alert on regression
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Rust Benchmarks
+          tool: cargo
+          output-file-path: bench-output/rust.txt
+          # Alert when a benchmark regresses by more than 10% vs stored baseline.
+          alert-threshold: '110%'
+          comment-on-alert: true
+          fail-on-alert: false          # Warn, don't hard-fail (flaky hardware)
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Persist results to gh-pages branch under benchmarks/rust/
+          auto-push: true
+          benchmark-data-dir-path: benchmarks/rust
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Frontend bundle size — track JS/CSS growth commit-to-commit
+  # ─────────────────────────────────────────────────────────────────────────
+  bundle-size:
+    name: Frontend bundle size
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: cd dashboard && npm ci
+
+      - name: Build dashboard
+        run: cd dashboard && npm run build
+
+      - name: Measure bundle sizes
+        id: sizes
+        run: |
+          set -euo pipefail
+
+          js_bytes=$(find dashboard/build -name "*.js" -not -name "*.map" \
+            | xargs wc -c 2>/dev/null | awk 'END {print $1+0}')
+          css_bytes=$(find dashboard/build -name "*.css" -not -name "*.map" \
+            | xargs wc -c 2>/dev/null | awk 'END {print $1+0}')
+          total_bytes=$(du -sb dashboard/build | awk '{print $1}')
+
+          echo "js_bytes=$js_bytes"
+          echo "css_bytes=$css_bytes"
+          echo "total_bytes=$total_bytes"
+
+          # github-action-benchmark customSmallerIsBetter format
+          cat > bundle-size.json <<EOF
+          [
+            { "name": "JS (minified)", "unit": "bytes", "value": $js_bytes },
+            { "name": "CSS (minified)", "unit": "bytes", "value": $css_bytes },
+            { "name": "Total build", "unit": "bytes", "value": $total_bytes }
+          ]
+          EOF
+
+          echo "=== Bundle sizes ==="
+          echo "  JS:    $(numfmt --to=iec $js_bytes)"
+          echo "  CSS:   $(numfmt --to=iec $css_bytes)"
+          echo "  Total: $(numfmt --to=iec $total_bytes)"
+
+      - name: Upload bundle-size JSON (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size
+          path: bundle-size.json
+          retention-days: 90
+
+      - name: Store bundle size + alert on growth > 5%
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Frontend Bundle Size
+          tool: customSmallerIsBetter
+          output-file-path: bundle-size.json
+          # Alert when any metric grows more than 5% vs stored baseline.
+          alert-threshold: '105%'
+          comment-on-alert: true
+          fail-on-alert: false
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          benchmark-data-dir-path: benchmarks/bundle-size
