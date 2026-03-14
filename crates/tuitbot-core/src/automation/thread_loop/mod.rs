@@ -14,6 +14,8 @@
 
 mod generator;
 mod planner;
+#[cfg(test)]
+mod tests_guardrails; // Task 3.5: safety guardrails + thread semantics
 
 use super::loop_helpers::{ContentLoopError, ContentSafety, ContentStorage, ThreadPoster};
 use std::sync::Arc;

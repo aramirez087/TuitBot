@@ -16,6 +16,8 @@
 mod generator;
 mod publisher;
 mod scheduler;
+#[cfg(test)]
+mod tests_guardrails; // Task 3.5: safety guardrails + publisher tests
 
 use super::loop_helpers::{
     ContentSafety, ContentStorage, ThreadPoster, TopicScorer, TweetGenerator,

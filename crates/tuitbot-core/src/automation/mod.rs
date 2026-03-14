@@ -15,6 +15,8 @@
 //! - [`thread_loop`]: Generates and posts multi-tweet threads.
 
 pub mod adapters;
+#[cfg(test)]
+mod safety_guardrails_tests; // Task 3.5: production-limits safety guardrail tests
 pub mod analytics_loop;
 pub mod approval_poster;
 pub mod circuit_breaker;
