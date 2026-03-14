@@ -263,13 +263,15 @@ mod tests {
 
     #[tokio::test]
     async fn cooldown_to_half_open() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        // Use 500 ms cooldown (was 50 ms) so the Open→HalfOpen assertion at line
+        // +2 stays stable even under tarpaulin's instrumentation overhead.
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
 
         cb.record_error().await;
         assert_eq!(cb.state().await, BreakerState::Open);
 
         // Wait for cooldown.
-        tokio::time::sleep(Duration::from_millis(60)).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
 
         assert_eq!(cb.state().await, BreakerState::HalfOpen);
         assert!(cb.should_allow_mutation().await);
@@ -277,12 +279,12 @@ mod tests {
 
     #[tokio::test]
     async fn success_resets_to_closed() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
 
         cb.record_error().await;
         assert_eq!(cb.state().await, BreakerState::Open);
 
-        tokio::time::sleep(Duration::from_millis(60)).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
         assert_eq!(cb.state().await, BreakerState::HalfOpen);
 
         cb.record_success().await;
@@ -292,10 +294,10 @@ mod tests {
 
     #[tokio::test]
     async fn half_open_failure_reopens() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
 
         cb.record_error().await;
-        tokio::time::sleep(Duration::from_millis(60)).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
         assert_eq!(cb.state().await, BreakerState::HalfOpen);
 
         let state = cb.record_error().await;
@@ -305,14 +307,15 @@ mod tests {
 
     #[tokio::test]
     async fn sliding_window_eviction() {
-        let cb = CircuitBreaker::new(3, Duration::from_millis(100), Duration::from_secs(10));
+        // Use 1 s window / 1.2 s sleep (was 100 ms / 150 ms) for tarpaulin stability.
+        let cb = CircuitBreaker::new(3, Duration::from_millis(1000), Duration::from_secs(10));
 
         cb.record_error().await;
         cb.record_error().await;
         assert_eq!(cb.error_count().await, 2);
 
         // Wait for window to expire.
-        tokio::time::sleep(Duration::from_millis(150)).await;
+        tokio::time::sleep(Duration::from_millis(1200)).await;
 
         // Old errors evicted; this single error shouldn't trip.
         let state = cb.record_error().await;
@@ -339,7 +342,7 @@ mod tests {
 
     #[tokio::test]
     async fn wait_until_closed_returns_on_transition() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
         cb.record_error().await;
 
         let cancel = CancellationToken::new();
