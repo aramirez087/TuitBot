@@ -339,6 +339,474 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
+    // Publisher: scheduled thread posting
+    // -------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn try_post_scheduled_thread_posts_via_thread_poster() {
+        use crate::automation::thread_loop::test_mocks::MockPoster;
+        let tweets = serde_json::to_string(&vec!["Tweet 1", "Tweet 2", "Tweet 3"]).unwrap();
+        let storage = ScheduledMockStorage::with_item(99, "thread", &tweets);
+        let poster = Arc::new(MockPoster::new());
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            0,
+            false,
+        )
+        .with_thread_poster(poster.clone());
+
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_some());
+        assert!(matches!(result.unwrap(), ContentResult::Posted { .. }));
+        assert_eq!(poster.posted_count(), 3, "all 3 tweets should be posted");
+        let marked = storage.marked_posted.lock().expect("lock");
+        assert_eq!(marked.len(), 1);
+        assert_eq!(marked[0], 99);
+    }
+
+    #[tokio::test]
+    async fn try_post_scheduled_thread_fails_without_poster() {
+        let tweets = serde_json::to_string(&vec!["Tweet 1", "Tweet 2"]).unwrap();
+        let storage = ScheduledMockStorage::with_item(10, "thread", &tweets);
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            0,
+            false,
+        );
+        // No .with_thread_poster() → should fail
+
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_some());
+        match result.unwrap() {
+            ContentResult::Failed { error } => {
+                assert!(
+                    error.contains("No thread poster"),
+                    "expected 'No thread poster' error, got: {error}"
+                );
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn try_post_scheduled_thread_fails_on_unparseable_content() {
+        use crate::automation::thread_loop::test_mocks::MockPoster;
+        let storage = ScheduledMockStorage::with_item(11, "thread", "not json at all");
+        let poster = Arc::new(MockPoster::new());
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            0,
+            false,
+        )
+        .with_thread_poster(poster);
+
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_some());
+        match result.unwrap() {
+            ContentResult::Failed { error } => {
+                assert!(
+                    error.contains("Cannot parse"),
+                    "expected parse error, got: {error}"
+                );
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn try_post_scheduled_thread_fails_on_empty_tweets() {
+        use crate::automation::thread_loop::test_mocks::MockPoster;
+        let tweets: Vec<String> = vec![];
+        let json = serde_json::to_string(&tweets).unwrap();
+        let storage = ScheduledMockStorage::with_item(12, "thread", &json);
+        let poster = Arc::new(MockPoster::new());
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            0,
+            false,
+        )
+        .with_thread_poster(poster);
+
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_some());
+        match result.unwrap() {
+            ContentResult::Failed { error } => {
+                assert!(
+                    error.contains("no tweets"),
+                    "expected 'no tweets' error, got: {error}"
+                );
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn try_post_scheduled_thread_partial_failure() {
+        use crate::automation::thread_loop::test_mocks::MockPoster;
+        let tweets = serde_json::to_string(&vec!["Tweet 1", "Tweet 2", "Tweet 3"]).unwrap();
+        let storage = ScheduledMockStorage::with_item(13, "thread", &tweets);
+        let poster = Arc::new(MockPoster::failing_at(1)); // fail on second tweet
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            0,
+            false,
+        )
+        .with_thread_poster(poster);
+
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_some());
+        match result.unwrap() {
+            ContentResult::Failed { error } => {
+                assert!(error.contains("Thread failed at tweet 2/3"), "got: {error}");
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    // ScheduledMockStorage variant that returns an error from next_scheduled_item
+    struct FailingScheduledStorage;
+
+    #[async_trait::async_trait]
+    impl ContentStorage for FailingScheduledStorage {
+        async fn last_tweet_time(
+            &self,
+        ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(None)
+        }
+        async fn last_thread_time(
+            &self,
+        ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(None)
+        }
+        async fn todays_tweet_times(
+            &self,
+        ) -> Result<Vec<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(Vec::new())
+        }
+        async fn post_tweet(&self, _: &str, _: &str) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn create_thread(&self, _: &str, _: usize) -> Result<String, ContentLoopError> {
+            Ok("t1".to_string())
+        }
+        async fn update_thread_status(
+            &self,
+            _: &str,
+            _: &str,
+            _: usize,
+            _: Option<&str>,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn store_thread_tweet(
+            &self,
+            _: &str,
+            _: usize,
+            _: &str,
+            _: &str,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn log_action(&self, _: &str, _: &str, _: &str) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn next_scheduled_item(
+            &self,
+        ) -> Result<Option<(i64, String, String)>, ContentLoopError> {
+            Err(ContentLoopError::StorageError("db unavailable".to_string()))
+        }
+        async fn mark_scheduled_posted(
+            &self,
+            _: i64,
+            _: Option<&str>,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn try_post_scheduled_returns_none_on_storage_error() {
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(FailingScheduledStorage),
+            make_topics(),
+            0,
+            false,
+        );
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_none(), "storage error → None (graceful fallback)");
+    }
+
+    // ScheduledMockStorage variant where post_tweet fails
+    struct FailingPostScheduledStorage {
+        scheduled: Mutex<Option<(i64, String, String)>>,
+    }
+
+    impl FailingPostScheduledStorage {
+        fn with_item(id: i64, content: &str) -> Arc<Self> {
+            Arc::new(Self {
+                scheduled: Mutex::new(Some((id, "tweet".to_string(), content.to_string()))),
+            })
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ContentStorage for FailingPostScheduledStorage {
+        async fn last_tweet_time(
+            &self,
+        ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(None)
+        }
+        async fn last_thread_time(
+            &self,
+        ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(None)
+        }
+        async fn todays_tweet_times(
+            &self,
+        ) -> Result<Vec<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(Vec::new())
+        }
+        async fn post_tweet(&self, _: &str, _: &str) -> Result<(), ContentLoopError> {
+            Err(ContentLoopError::PostFailed(
+                "X API unavailable".to_string(),
+            ))
+        }
+        async fn create_thread(&self, _: &str, _: usize) -> Result<String, ContentLoopError> {
+            Ok("t1".to_string())
+        }
+        async fn update_thread_status(
+            &self,
+            _: &str,
+            _: &str,
+            _: usize,
+            _: Option<&str>,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn store_thread_tweet(
+            &self,
+            _: &str,
+            _: usize,
+            _: &str,
+            _: &str,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn log_action(&self, _: &str, _: &str, _: &str) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn next_scheduled_item(
+            &self,
+        ) -> Result<Option<(i64, String, String)>, ContentLoopError> {
+            Ok(self.scheduled.lock().expect("lock").clone())
+        }
+        async fn mark_scheduled_posted(
+            &self,
+            _: i64,
+            _: Option<&str>,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn try_post_scheduled_tweet_failure_returns_failed() {
+        let storage = FailingPostScheduledStorage::with_item(20, "My scheduled tweet");
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            0,
+            false,
+        );
+        let result = content.try_post_scheduled().await;
+        assert!(result.is_some());
+        match result.unwrap() {
+            ContentResult::Failed { error } => {
+                assert!(
+                    error.contains("Scheduled post failed"),
+                    "expected 'Scheduled post failed', got: {error}"
+                );
+            }
+            other => panic!("expected Failed, got {other:?}"),
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Scheduler: run_slot_iteration
+    // -------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_slot_iteration_posts_when_no_scheduled_and_safety_allows() {
+        let storage = Arc::new(MockStorage::new(None));
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "Slot tweet!".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::thread_rng();
+        let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::Posted { .. }));
+        assert_eq!(storage.posted_count(), 1);
+        assert_eq!(recent.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn run_slot_iteration_rate_limited_when_safety_blocks() {
+        let storage = Arc::new(MockStorage::new(None));
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: false,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::thread_rng();
+        let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::RateLimited));
+    }
+
+    #[tokio::test]
+    async fn run_slot_iteration_prioritizes_scheduled_content() {
+        let storage = ScheduledMockStorage::with_item(50, "tweet", "Scheduled first!");
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "should not be used".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::thread_rng();
+        let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
+        match result {
+            ContentResult::Posted { topic, content } => {
+                assert!(topic.contains("scheduled:50"));
+                assert_eq!(content, "Scheduled first!");
+            }
+            other => panic!("expected Posted with scheduled content, got {other:?}"),
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Scheduler: run_iteration with scheduled content priority
+    // -------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_iteration_checks_scheduled_before_elapsed() {
+        let storage = ScheduledMockStorage::with_item(60, "tweet", "Iteration scheduled!");
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "should not be used".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::thread_rng();
+        let result = content.run_iteration(&mut recent, 3, &mut rng).await;
+        match result {
+            ContentResult::Posted { topic, .. } => {
+                assert!(
+                    topic.contains("scheduled:60"),
+                    "scheduled content should take priority"
+                );
+            }
+            other => panic!("expected Posted with scheduled content, got {other:?}"),
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Posted result captures correct topic + content
     // -------------------------------------------------------------------------
 

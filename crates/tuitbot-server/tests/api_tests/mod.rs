@@ -19,9 +19,10 @@ mod approval_workflow; // Task 3.4: approval happy-path mutations (approve/rejec
 mod compose;
 mod content;
 mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + schedule
+mod coverage_gaps;
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
-mod x_auth; // X OAuth unlink tests
+mod x_auth; // X OAuth unlink tests // Task 3.8: integration tests for 0%-coverage server routes
 
 /// The test API token used across all tests.
 pub const TEST_TOKEN: &str = "test-token-abc123";
