@@ -138,3 +138,66 @@ async fn delete_tweet_always_requires_approval() {
     assert_eq!(parsed["success"], true);
     assert_eq!(parsed["data"]["routed_to_approval"], true);
 }
+
+#[tokio::test]
+async fn unlike_tweet_success() {
+    let state = make_state(Some(Box::new(MockXApiClient)), Some("u1".into())).await;
+    let result = unlike_tweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["liked"], false);
+}
+
+#[tokio::test]
+async fn bookmark_tweet_success() {
+    let state = make_state(Some(Box::new(MockXApiClient)), Some("u1".into())).await;
+    let result = bookmark_tweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["bookmarked"], true);
+}
+
+#[tokio::test]
+async fn unbookmark_tweet_success() {
+    let state = make_state(Some(Box::new(MockXApiClient)), Some("u1".into())).await;
+    let result = unbookmark_tweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["bookmarked"], false);
+}
+
+#[tokio::test]
+async fn like_tweet_not_configured() {
+    let state = make_state(None, Some("u1".into())).await;
+    let result = like_tweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn follow_user_no_user_id() {
+    let state = make_state(Some(Box::new(MockXApiClient)), None).await;
+    let result = follow_user(&state, "target1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn retweet_no_user_id() {
+    let state = make_state(Some(Box::new(MockXApiClient)), None).await;
+    let result = retweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn unretweet_no_user_id() {
+    let state = make_state(Some(Box::new(MockXApiClient)), None).await;
+    let result = unretweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}

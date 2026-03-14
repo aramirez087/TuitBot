@@ -536,4 +536,55 @@ mod tests {
         let err = ContentLoopError::Other("unknown".to_string());
         assert_eq!(err.to_string(), "unknown");
     }
+
+    #[test]
+    fn error_tracker_manual_reset() {
+        let mut tracker = ConsecutiveErrorTracker::new(3, Duration::from_secs(300));
+        tracker.record_error();
+        tracker.record_error();
+        assert_eq!(tracker.count(), 2);
+        tracker.reset();
+        assert_eq!(tracker.count(), 0);
+        assert!(!tracker.should_pause());
+    }
+
+    #[test]
+    fn loop_error_display_remaining_variants() {
+        let err = LoopError::RateLimited { retry_after: None };
+        assert_eq!(err.to_string(), "rate limited");
+
+        let err = LoopError::NetworkError("timeout".to_string());
+        assert_eq!(err.to_string(), "network error: timeout");
+
+        let err = LoopError::StorageError("disk full".to_string());
+        assert_eq!(err.to_string(), "storage error: disk full");
+
+        let err = LoopError::Other("unknown".to_string());
+        assert_eq!(err.to_string(), "unknown");
+    }
+
+    #[test]
+    fn rate_limit_backoff_very_high_attempt() {
+        assert_eq!(rate_limit_backoff(None, 100), Duration::from_secs(900));
+    }
+
+    #[test]
+    fn consecutive_error_tracker_new_state() {
+        let tracker = ConsecutiveErrorTracker::new(5, Duration::from_secs(60));
+        assert_eq!(tracker.count(), 0);
+        assert!(!tracker.should_pause());
+        assert_eq!(tracker.pause_duration(), Duration::from_secs(60));
+    }
+
+    #[test]
+    fn score_result_debug() {
+        let sr = ScoreResult {
+            total: 75.0,
+            meets_threshold: true,
+            matched_keywords: vec!["rust".to_string()],
+        };
+        let debug = format!("{sr:?}");
+        assert!(debug.contains("75"));
+        assert!(debug.contains("rust"));
+    }
 }

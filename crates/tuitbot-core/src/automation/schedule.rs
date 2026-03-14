@@ -749,4 +749,54 @@ mod tests {
         let result = schedule_gate(&schedule_opt, &cancel).await;
         assert!(!result);
     }
+
+    #[test]
+    fn posting_slot_to_naive_time() {
+        let slot = PostingSlot::parse("14:30").unwrap();
+        let time = slot.to_naive_time();
+        assert_eq!(time.hour(), 14);
+        assert_eq!(time.minute(), 30);
+    }
+
+    #[test]
+    fn posting_slot_equality() {
+        let a = PostingSlot::parse("09:15").unwrap();
+        let b = PostingSlot::parse("09:15").unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn from_config_with_thread_preferred_time() {
+        let mut config = default_schedule_config();
+        config.thread_preferred_day = Some("Wed".to_string());
+        config.thread_preferred_time = "14:30".to_string();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert!(schedule.has_thread_preferred_schedule());
+        assert!(schedule.next_thread_slot().is_some());
+    }
+
+    #[test]
+    fn from_config_mixed_preferred_times() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["auto".to_string(), "20:00".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 4);
+    }
+
+    #[test]
+    fn from_config_deduplicates_preferred_times() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["09:15".to_string(), "09:15".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 1);
+    }
+
+    #[test]
+    fn from_config_invalid_preferred_time_ignored() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["25:99".to_string(), "09:00".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 1);
+        assert_eq!(schedule.preferred_times[0].format(), "09:00");
+    }
 }

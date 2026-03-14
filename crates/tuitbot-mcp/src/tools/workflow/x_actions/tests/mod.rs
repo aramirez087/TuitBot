@@ -21,7 +21,7 @@ use super::*;
 
 // ── Mock X API clients ──────────────────────────────────────────────
 
-struct MockXApiClient;
+pub(crate) struct MockXApiClient;
 
 #[async_trait::async_trait]
 impl XApiClient for MockXApiClient {
@@ -447,7 +447,10 @@ impl XApiClient for ErrorXApiClient {
 
 // ── Helper functions ────────────────────────────────────────────────
 
-async fn make_state(x_client: Option<Box<dyn XApiClient>>, user_id: Option<String>) -> SharedState {
+pub(crate) async fn make_state(
+    x_client: Option<Box<dyn XApiClient>>,
+    user_id: Option<String>,
+) -> SharedState {
     let mut config = Config::default();
     config.mcp_policy.enforce_for_mutations = false;
     let pool = storage::init_test_db().await.expect("init db");
