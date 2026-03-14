@@ -25,15 +25,13 @@ export default defineConfig({
 			// Targets: ≥70% lines/branches, ≥55% functions (WS handlers not
 			// reachable in unit tests).  Raise these as Task 3.2–3.5 land.
 			// Per-file thresholds for the four fully-tested writable stores.
-			// Actual coverage (branches|funcs|lines): approval≈55|77|78,
-			// analytics≈100|88|91, settings≈68|88|78, targets≈57|84|83.
-			// Thresholds are set ≈5% below actuals as a regression floor.
-			// Raise toward ≥70% (frontend target) as Tasks 3.2–3.5 add coverage.
+			// Raised to spec levels (Tasks 3.2–3.5 complete, thresholds now enforced).
+			// Target: statements/lines ≥75%, branches ≥70%, functions ≥75%.
 			thresholds: {
 				'src/lib/stores/approval.ts': {
 					statements: 75,
-					branches: 50,
-					functions: 70,
+					branches: 70,
+					functions: 75,
 					lines: 75
 				},
 				'src/lib/stores/analytics.ts': {
@@ -44,13 +42,13 @@ export default defineConfig({
 				},
 				'src/lib/stores/settings.ts': {
 					statements: 75,
-					branches: 60,
+					branches: 70,
 					functions: 80,
 					lines: 75
 				},
 				'src/lib/stores/targets.ts': {
 					statements: 75,
-					branches: 50,
+					branches: 70,
 					functions: 75,
 					lines: 75
 				}

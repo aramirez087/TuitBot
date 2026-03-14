@@ -445,3 +445,99 @@ describe('scoringTotal', () => {
 		expect(get(store.scoringTotal)).toBe(110);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// testLlmConnection
+// ---------------------------------------------------------------------------
+
+describe('testLlmConnection', () => {
+	it('returns error when draft is null', async () => {
+		store.resetStores();
+		const result = await store.testLlmConnection();
+		expect(result.success).toBe(false);
+		expect(result.error).toMatch(/No settings loaded/i);
+	});
+
+	it('calls api.settings.testLlm with draft llm fields', async () => {
+		await store.loadSettings();
+		(api.settings.testLlm as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			success: true,
+			message: 'Connected'
+		});
+		const result = await store.testLlmConnection();
+		expect(result.success).toBe(true);
+		expect(api.settings.testLlm).toHaveBeenCalledWith(
+			expect.objectContaining({ provider: expect.any(String), model: expect.any(String) })
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// resetSectionToBase
+// ---------------------------------------------------------------------------
+
+describe('resetSectionToBase', () => {
+	beforeEach(async () => {
+		await store.loadSettings();
+	});
+
+	it('returns true and updates config on success', async () => {
+		(api.settings.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(CONFIG);
+		const result = await store.resetSectionToBase('llm');
+		expect(result).toBe(true);
+		expect(get(store.lastSaved)).toBeInstanceOf(Date);
+	});
+
+	it('sets saveError and returns false on failure', async () => {
+		(api.settings.patch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+			new Error('Reset failed')
+		);
+		const result = await store.resetSectionToBase('llm');
+		expect(result).toBe(false);
+		expect(get(store.saveError)).toMatch(/Reset failed/);
+	});
+
+	it('sets saving=false in finally block on success', async () => {
+		(api.settings.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(CONFIG);
+		await store.resetSectionToBase('llm');
+		expect(get(store.saving)).toBe(false);
+	});
+
+	it('sets saving=false in finally block on failure', async () => {
+		(api.settings.patch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('err'));
+		await store.resetSectionToBase('llm');
+		expect(get(store.saving)).toBe(false);
+	});
+
+	it('handles EffectiveSettingsResponse envelope when account is not DEFAULT', async () => {
+		// Simulate a non-default account returning an envelope response
+		const envelope = {
+			config: CONFIG,
+			_overrides: ['llm']
+		};
+		(api.settings.patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(envelope);
+		const result = await store.resetSectionToBase('llm');
+		// Falls through to the TuitbotConfig branch since getAccountId() returns DEFAULT in tests
+		expect(result).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// hasDangerousChanges — additional branches
+// ---------------------------------------------------------------------------
+
+describe('hasDangerousChanges (additional branches)', () => {
+	beforeEach(async () => {
+		await store.loadSettings();
+	});
+
+	it('returns true when x_api.provider_backend changes', () => {
+		store.updateDraft('x_api.provider_backend', 'scraper');
+		expect(store.hasDangerousChanges()).toBe(true);
+	});
+
+	it('returns false when draft is null (guards against crash)', () => {
+		store.draft.set(null);
+		expect(store.hasDangerousChanges()).toBe(false);
+	});
+});

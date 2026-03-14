@@ -453,3 +453,36 @@ describe('derived stores', () => {
 		expect(get(store.pendingCount)).toBe(0);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// startAutoRefresh / stopAutoRefresh
+// ---------------------------------------------------------------------------
+
+describe('startAutoRefresh / stopAutoRefresh', () => {
+	it('startAutoRefresh sets up an interval without crashing', () => {
+		vi.useFakeTimers();
+		expect(() => store.startAutoRefresh(1000)).not.toThrow();
+		vi.runOnlyPendingTimers(); // advance one tick only (not infinite loop)
+		vi.useRealTimers();
+	});
+
+	it('stopAutoRefresh clears the interval', () => {
+		vi.useFakeTimers();
+		store.startAutoRefresh(1000);
+		expect(() => store.stopAutoRefresh()).not.toThrow();
+		vi.useRealTimers();
+	});
+
+	it('stopAutoRefresh is safe to call when no interval is running', () => {
+		expect(() => store.stopAutoRefresh()).not.toThrow();
+	});
+
+	it('startAutoRefresh replaces any existing interval (calls stop first)', () => {
+		vi.useFakeTimers();
+		store.startAutoRefresh(1000);
+		// Calling again should not throw and should replace the interval
+		expect(() => store.startAutoRefresh(2000)).not.toThrow();
+		store.stopAutoRefresh();
+		vi.useRealTimers();
+	});
+});

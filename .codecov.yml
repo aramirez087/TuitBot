@@ -7,7 +7,7 @@ coverage:
       default:
         target: 70%
         threshold: 5%        # Allow ±5% swing before marking the PR red
-        informational: true  # Don't block PRs on initial ramp-up
+        informational: false  # Enforcement on: thresholds now at spec
     patch:
       default:
         target: 60%          # New code on PRs should be ≥60% covered
