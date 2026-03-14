@@ -16,29 +16,6 @@ env:
 permissions: {}
 
 jobs:
-  build-dashboard:
-    name: Build dashboard (once)
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build dashboard
-        run: cd dashboard && npm ci && npm run build
-
-      - name: Upload dashboard artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dashboard-dist
-          path: dashboard/build/
-          if-no-files-found: error
-
   release-context:
     name: Release context
     if: github.ref == 'refs/heads/main'
@@ -71,7 +48,7 @@ jobs:
 
   release:
     name: Release (tag + GitHub Release)
-    needs: [release-context, build-dashboard]
+    needs: release-context
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || needs.release-context.outputs.is_release_pr_push == 'true')
     runs-on: ubuntu-latest
     permissions:
@@ -92,16 +69,16 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Download dashboard artifact
-        uses: actions/download-artifact@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: dashboard-dist
-          path: dashboard/build
+          node-version: '20'
 
-      - name: Install dashboard dist
+      - name: Build dashboard for embedding
         run: |
-          mkdir -p crates/tuitbot-server/dashboard-dist
-          cp -r dashboard/build/* crates/tuitbot-server/dashboard-dist/
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
 
       - name: Run release-plz release
         id: release-plz
@@ -207,7 +184,7 @@ jobs:
 
   release-pr:
     name: Release PR (next version)
-    needs: [release-context, build-dashboard]
+    needs: release-context
     if: github.event_name == 'push' && needs.release-context.outputs.is_release_pr_push != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -226,19 +203,19 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Download dashboard artifact
-        uses: actions/download-artifact@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: dashboard-dist
-          path: dashboard/build
-
-      - name: Install dashboard dist
-        run: |
-          mkdir -p crates/tuitbot-server/dashboard-dist
-          cp -r dashboard/build/* crates/tuitbot-server/dashboard-dist/
+          node-version: '20'
 
       - name: Update dashboard release marker
         run: bash scripts/update-dashboard-release-marker.sh
+
+      - name: Build dashboard for embedding
+        run: |
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
 
       - name: Run release-plz release-pr
         uses: release-plz/action@v0.5
@@ -250,7 +227,7 @@ jobs:
 
   build-assets:
     name: Build release asset (${{ matrix.target }})
-    needs: [release, build-dashboard]
+    needs: release
     if: needs.release.outputs.asset_release_ready == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -314,17 +291,16 @@ jobs:
           RANLIB_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ranlib
         run: cargo build --locked --release --package tuitbot-cli --target ${{ matrix.target }}
 
-      - name: Download dashboard artifact
-        uses: actions/download-artifact@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          name: dashboard-dist
-          path: dashboard/build
+          node-version: '20'
 
-      - name: Install dashboard dist
-        shell: bash
+      - name: Build dashboard for server embedding
         run: |
-          mkdir -p crates/tuitbot-server/dashboard-dist
-          cp -r dashboard/build/* crates/tuitbot-server/dashboard-dist/
+          cd dashboard && npm ci && npm run build
+          mkdir -p ../crates/tuitbot-server/dashboard-dist
+          cp -r build/* ../crates/tuitbot-server/dashboard-dist/
 
       - name: Build tuitbot-server binary
         if: ${{ matrix.cross != true }}

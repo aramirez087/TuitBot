@@ -408,3 +408,58 @@ async fn run_utility_write_server(config: Config) -> anyhow::Result<()> {
     service.waiting().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test: `init_readonly_state` must not bail when
+    /// `provider_backend = "scraper"` and no browser session file exists.
+    /// This was the root cause of the MCP readonly crash reported by users.
+    #[tokio::test]
+    async fn init_readonly_scraper_no_session_does_not_fail() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::Readonly).await;
+        assert!(
+            state.is_ok(),
+            "init_readonly_state should succeed with scraper backend even without a session: {:?}",
+            state.err()
+        );
+    }
+
+    /// Regression test: `init_readonly_state` must gracefully degrade when
+    /// `provider_backend = "x_api"` (default) and no token file exists.
+    #[tokio::test]
+    async fn init_readonly_x_api_no_tokens_does_not_fail() {
+        let config = Config::default(); // provider_backend defaults to ""  → x_api
+
+        let state = init_readonly_state(config, Profile::Readonly).await;
+        assert!(
+            state.is_ok(),
+            "init_readonly_state should succeed without tokens (graceful degradation): {:?}",
+            state.err()
+        );
+
+        let state = state.unwrap();
+        assert!(
+            !state.x_available,
+            "x_available should be false when no tokens are present"
+        );
+    }
+
+    /// Same regression check for api-readonly profile with scraper backend.
+    #[tokio::test]
+    async fn init_readonly_scraper_api_readonly_profile() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::ApiReadonly).await;
+        assert!(
+            state.is_ok(),
+            "api-readonly + scraper should not crash: {:?}",
+            state.err()
+        );
+    }
+}
