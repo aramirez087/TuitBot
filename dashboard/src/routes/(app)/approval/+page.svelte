@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { CheckCircle, Download } from 'lucide-svelte';
+	import { Download } from 'lucide-svelte';
 	import { api } from '$lib/api';
 	import ApprovalStats from '$lib/components/ApprovalStats.svelte';
 	import ApprovalFilters from '$lib/components/ApprovalFilters.svelte';
-	import ApprovalCard from '$lib/components/ApprovalCard.svelte';
-	import BulkActions from '$lib/components/BulkActions.svelte';
+	import ApprovalBulkActions from '$lib/components/ApprovalBulkActions.svelte';
+	import ApprovalQueueFeed from './ApprovalQueueFeed.svelte';
 	import { accountTimezone, loadSchedule } from '$lib/stores/calendar';
 	import {
 		items,
@@ -18,13 +18,12 @@
 		dateFilter,
 		focusedIndex,
 		focusedItem,
-		isEmpty,
 		pendingCount,
 		loadItems,
 		loadStats,
+		editItem,
 		approveItem,
 		rejectItem,
-		editItem,
 		approveAllItems,
 		setStatusFilter,
 		setTypeFilter,
@@ -146,7 +145,7 @@
 				{/if}
 			</div>
 			{#if $selectedStatus === 'pending' && $pendingCount > 0}
-				<BulkActions pendingCount={$pendingCount} maxBatch={25} onApproveAll={approveAllItems} />
+				<ApprovalBulkActions pendingCount={$pendingCount} maxBatch={25} onApproveAll={approveAllItems} />
 			{/if}
 		</div>
 	</div>
@@ -175,48 +174,13 @@
 	/>
 </div>
 
-<div class="queue-section">
-	{#if $loading && $items.length === 0}
-		<div class="feed-container">
-			{#each { length: 5 } as _}
-				<div class="skeleton-item"></div>
-			{/each}
-		</div>
-	{:else if $isEmpty}
-		<div class="feed-container">
-			<div class="empty-state">
-				<div class="empty-icon">
-					<CheckCircle size={32} />
-				</div>
-				{#if $selectedStatus === 'pending'}
-					<p class="empty-title">No pending items — you're all caught up!</p>
-					<p class="empty-hint">New items will appear here when automation generates content or you schedule posts with approval enabled.</p>
-				{:else}
-					<p class="empty-title">No {$selectedStatus} items</p>
-					<p class="empty-hint">Try a different filter to see more items.</p>
-				{/if}
-			</div>
-		</div>
-	{:else}
-		<div class="feed-container">
-			{#each $items as item, i (item.id)}
-				<div data-approval-index={i}>
-					<ApprovalCard
-						{item}
-						focused={$focusedIndex === i}
-						editing={editingId === item.id}
-						timezone={$accountTimezone}
-						onApprove={approveItem}
-						onReject={rejectItem}
-						onStartEdit={(id) => (editingId = id)}
-						onSaveEdit={handleSaveEdit}
-						onCancelEdit={() => (editingId = null)}
-					/>
-				</div>
-			{/each}
-		</div>
-	{/if}
-</div>
+<ApprovalQueueFeed
+	{editingId}
+	timezone={$accountTimezone}
+	onStartEdit={(id) => (editingId = id)}
+	onSaveEdit={handleSaveEdit}
+	onCancelEdit={() => (editingId = null)}
+/>
 
 <div class="keyboard-hints">
 	<kbd>j</kbd><kbd>k</kbd> navigate
@@ -355,43 +319,6 @@
 		margin-bottom: 20px;
 	}
 
-	.queue-section {
-		background-color: var(--color-surface);
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		padding: 0;
-		overflow: hidden;
-	}
-
-	.feed-container {
-		background-color: var(--color-base);
-		overflow: hidden;
-	}
-
-	.empty-state {
-		padding: 60px 20px;
-		text-align: center;
-	}
-
-	.empty-icon {
-		color: var(--color-success);
-		margin-bottom: 12px;
-		opacity: 0.6;
-	}
-
-	.empty-title {
-		margin: 0 0 6px;
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--color-text);
-	}
-
-	.empty-hint {
-		margin: 0;
-		font-size: 13px;
-		color: var(--color-text-subtle);
-	}
-
 	.keyboard-hints {
 		display: flex;
 		align-items: center;
@@ -415,27 +342,6 @@
 
 	.hint-sep {
 		color: var(--color-border);
-	}
-
-	.skeleton-item {
-		height: 120px;
-		border-bottom: 1px solid var(--color-border-subtle);
-		background-color: var(--color-surface-active);
-		animation: pulse 1.5s ease-in-out infinite;
-	}
-
-	.skeleton-item:last-child {
-		border-bottom: none;
-	}
-
-	@keyframes pulse {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.4;
-		}
 	}
 
 	@media (max-width: 640px) {
