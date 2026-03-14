@@ -1,5 +1,18 @@
+# cargo-audit configuration
+# Ref: https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+
 [advisories]
+# Explicitly ignored advisories.  Every entry MUST have a comment explaining
+# why it is safe to ignore (what the affected feature is, and why we don't use it).
 ignore = [
-    # sqlx-mysql is not used by this project (SQLite-only), and the advisory has no fixed upgrade.
+    # RUSTSEC-2023-0071: Marvin attack in RSA crate via sqlx-mysql.
+    # TuitBot is SQLite-only (no MySQL driver linked or reachable at runtime).
+    # No fix available upstream yet; revisit when sqlx publishes a patched release.
     "RUSTSEC-2023-0071",
 ]
+
+[output]
+# Treat advisory warnings (e.g. unmaintained crates) as failures, not just notices.
+# This mirrors the --deny warnings flag used in CI and ensures a consistent
+# local experience when running `cargo audit` manually.
+deny = ["warnings"]

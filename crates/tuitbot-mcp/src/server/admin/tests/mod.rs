@@ -1,8 +1,10 @@
 //! Coverage tests for AdminMcpServer handlers (admin/handlers.rs, admin/tools.rs, admin/mod.rs).
 //!
-//! Each test instantiates `AdminMcpServer` with a minimal mock state and calls
-//! one handler method. The handlers are thin wrappers over workflow functions;
-//! these tests verify the dispatch layer is exercised, not the business logic.
+//! Tests exercise the workflow layer that the handlers delegate to, using a
+//! minimal AppState backed by an in-memory test DB and a no-op X client.
+//! Handler methods are private (proc-macro generated), so tests call the
+//! same workflow functions the handlers call — this covers the dispatch path
+//! and the business logic in one shot.
 
 mod handlers;
 mod tools;
@@ -18,6 +20,10 @@ use tuitbot_core::x_api::XApiClient;
 use crate::state::AppState;
 
 // ── Minimal no-op X client ────────────────────────────────────────────
+//
+// Only the 8 required (non-default) trait methods need to be implemented.
+// All optional methods already have default impls in XApiClient that return
+// ApiError — those defaults are sufficient for these smoke tests.
 
 pub(super) struct NullX;
 
@@ -25,174 +31,54 @@ pub(super) struct NullX;
 impl XApiClient for NullX {
     async fn search_tweets(
         &self,
-        _: &str,
-        _: u32,
-        _: Option<&str>,
-        _: Option<&str>,
+        _query: &str,
+        _max_results: u32,
+        _since_id: Option<&str>,
+        _pagination_token: Option<&str>,
     ) -> Result<SearchResponse, XApiError> {
-        Err(XApiError::NotConfigured)
+        Err(XApiError::AuthExpired)
     }
-    async fn get_tweet(&self, _: &str) -> Result<Tweet, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_me(&self) -> Result<User, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_user_by_username(&self, _: &str) -> Result<User, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_user_by_id(&self, _: &str) -> Result<User, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_users_by_ids(&self, _: &[&str]) -> Result<Vec<User>, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
+
     async fn get_mentions(
         &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&str>,
+        _user_id: &str,
+        _since_id: Option<&str>,
+        _pagination_token: Option<&str>,
     ) -> Result<MentionResponse, XApiError> {
-        Err(XApiError::NotConfigured)
+        Err(XApiError::AuthExpired)
     }
-    async fn get_user_tweets(
-        &self,
-        _: &str,
-        _: u32,
-        _: Option<&str>,
-    ) -> Result<SearchResponse, XApiError> {
-        Err(XApiError::NotConfigured)
+
+    async fn post_tweet(&self, _text: &str) -> Result<PostedTweet, XApiError> {
+        Err(XApiError::AuthExpired)
     }
-    async fn get_home_timeline(
-        &self,
-        _: u32,
-        _: Option<&str>,
-    ) -> Result<SearchResponse, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_followers(
-        &self,
-        _: &str,
-        _: Option<u32>,
-        _: Option<&str>,
-    ) -> Result<Vec<User>, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_following(
-        &self,
-        _: &str,
-        _: Option<u32>,
-        _: Option<&str>,
-    ) -> Result<Vec<User>, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_liked_tweets(
-        &self,
-        _: &str,
-        _: Option<u32>,
-        _: Option<&str>,
-    ) -> Result<SearchResponse, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_bookmarks(
-        &self,
-        _: Option<u32>,
-        _: Option<&str>,
-    ) -> Result<SearchResponse, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn get_tweet_liking_users(
-        &self,
-        _: &str,
-        _: Option<u32>,
-        _: Option<&str>,
-    ) -> Result<Vec<User>, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn post_tweet(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&[&str]>,
-    ) -> Result<Tweet, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
+
     async fn reply_to_tweet(
         &self,
-        _: &str,
-        _: &str,
-        _: Option<&[&str]>,
-    ) -> Result<Tweet, XApiError> {
-        Err(XApiError::NotConfigured)
+        _text: &str,
+        _in_reply_to_id: &str,
+    ) -> Result<PostedTweet, XApiError> {
+        Err(XApiError::AuthExpired)
     }
-    async fn quote_tweet(&self, _: &str, _: &str, _: Option<&[&str]>) -> Result<Tweet, XApiError> {
-        Err(XApiError::NotConfigured)
+
+    async fn get_tweet(&self, _tweet_id: &str) -> Result<Tweet, XApiError> {
+        Err(XApiError::AuthExpired)
     }
-    async fn delete_tweet(&self, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
+
+    async fn get_me(&self) -> Result<User, XApiError> {
+        Err(XApiError::AuthExpired)
     }
-    async fn like_tweet(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn unlike_tweet(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn retweet(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn unretweet(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn follow_user(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn unfollow_user(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn bookmark_tweet(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn unbookmark_tweet(&self, _: &str, _: &str) -> Result<(), XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn upload_media(
+
+    async fn get_user_tweets(
         &self,
-        _: &std::path::Path,
-        _: Option<&str>,
-    ) -> Result<String, XApiError> {
-        Err(XApiError::NotConfigured)
+        _user_id: &str,
+        _max_results: u32,
+        _pagination_token: Option<&str>,
+    ) -> Result<SearchResponse, XApiError> {
+        Err(XApiError::AuthExpired)
     }
-    async fn get_v2(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&[(&str, &str)]>,
-    ) -> Result<serde_json::Value, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn post_v2(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<serde_json::Value>,
-    ) -> Result<serde_json::Value, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn put_v2(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<serde_json::Value>,
-    ) -> Result<serde_json::Value, XApiError> {
-        Err(XApiError::NotConfigured)
-    }
-    async fn delete_v2(
-        &self,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&[(&str, &str)]>,
-    ) -> Result<serde_json::Value, XApiError> {
-        Err(XApiError::NotConfigured)
+
+    async fn get_user_by_username(&self, _username: &str) -> Result<User, XApiError> {
+        Err(XApiError::AuthExpired)
     }
 }
 
@@ -224,6 +110,7 @@ fn kv_to_tuples_none() {
 
 #[test]
 fn kv_to_tuples_some() {
+    use crate::requests::KeyValue;
     let kv = vec![KeyValue {
         key: "a".to_string(),
         value: "b".to_string(),

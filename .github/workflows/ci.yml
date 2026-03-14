@@ -97,11 +97,32 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
+      - name: Cache cargo-audit binary
+        id: cache-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: cargo-audit-${{ runner.os }}-
 
-      - name: Run audit
-        run: cargo audit
+      - name: Install cargo-audit
+        if: steps.cache-audit.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked
+
+      - name: Rust security audit (--deny warnings)
+        # .cargo/audit.toml holds explicit RUSTSEC ignores for known false positives.
+        # --deny warnings blocks advisory warnings (not just vulnerabilities).
+        run: cargo audit --deny warnings
+
+      - name: Setup Node.js for npm audit
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Frontend npm audit (high severity)
+        # Fails on high/critical vulnerabilities only. Moderate issues are
+        # reported but do not block CI (use Dependabot PRs to track them).
+        run: cd dashboard && npm audit --audit-level=high
 
   manifest-sync:
     name: MCP manifest sync

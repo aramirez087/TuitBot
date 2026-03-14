@@ -446,6 +446,30 @@ jobs:
           cd dist
           sha256sum tuitbot-* > SHA256SUMS
 
+      # ── SBOM generation ──────────────────────────────────────────────────
+      # Generates a CycloneDX SBOM covering both Rust (Cargo.lock) and
+      # Node (dashboard/package-lock.json) dependency trees.
+      # The resulting .cdx.json file is uploaded alongside the release archives.
+      - name: Install syft (SBOM generator)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM (CycloneDX JSON)
+        env:
+          TAG: ${{ needs.release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          sbom_file="dist/tuitbot-${TAG}-sbom.cdx.json"
+          # Scan both the Rust workspace root and the Node dashboard
+          syft dir:. \
+            --config /dev/null \
+            --scope all-layers \
+            --output cyclonedx-json="${sbom_file}"
+          echo "SBOM written to: ${sbom_file}"
+          # Sanity-check: confirm the file is valid JSON
+          python3 -c "import json,sys; json.load(open('${sbom_file}')); print('✅ SBOM JSON is valid')"
+
       - name: Ensure GitHub release exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

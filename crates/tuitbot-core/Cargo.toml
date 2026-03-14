@@ -49,3 +49,12 @@ tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 wiremock = "0.6"
 tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "scoring_bench"
+harness = false
+
+[[bench]]
+name = "content_bench"
+harness = false
