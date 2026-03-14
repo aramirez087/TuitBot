@@ -3,6 +3,7 @@
 	import type { DraftSummary, ContentTag } from "$lib/api/types";
 	import DraftRailItem from "./DraftRailItem.svelte";
 	import DraftFilterBar from "./DraftFilterBar.svelte";
+	import DraftRailTabs from "./DraftRailTabs.svelte";
 
 	type TabKey = "active" | "scheduled" | "posted" | "archive";
 
@@ -64,7 +65,6 @@
 	let itemEls: DraftRailItem[] = $state([]);
 	let newDraftBtnEl: HTMLButtonElement | undefined = $state();
 
-	// Clamp focusedIndex when the list shrinks
 	$effect(() => {
 		if (drafts.length === 0) return;
 		if (focusedIndex >= drafts.length) {
@@ -72,13 +72,11 @@
 		}
 	});
 
-	// Scroll focused item into view
 	$effect(() => {
 		const item = itemEls[focusedIndex];
 		if (item) item.scrollIntoViewIfNeeded();
 	});
 
-	// Reset focusedIndex on tab change
 	$effect(() => {
 		void tab;
 		focusedIndex = 0;
@@ -107,7 +105,6 @@
 	}
 
 	function handleListKeydown(e: KeyboardEvent) {
-		// Ignore if focus is inside a button (action buttons handle their own events)
 		const target = e.target as HTMLElement;
 		if (
 			target.tagName === "BUTTON" &&
@@ -146,12 +143,7 @@
 				break;
 			case "d":
 			case "D":
-				if (
-					!e.metaKey &&
-					!e.ctrlKey &&
-					!e.altKey &&
-					drafts[focusedIndex]
-				) {
+				if (!e.metaKey && !e.ctrlKey && !e.altKey && drafts[focusedIndex]) {
 					e.preventDefault();
 					onduplicate(drafts[focusedIndex].id);
 				}
@@ -169,18 +161,10 @@
 					onrestore(drafts[focusedIndex].id);
 				}
 				break;
-			case "1":
-				ontabchange("active");
-				break;
-			case "2":
-				ontabchange("scheduled");
-				break;
-			case "3":
-				ontabchange("posted");
-				break;
-			case "4":
-				ontabchange("archive");
-				break;
+			case "1": ontabchange("active"); break;
+			case "2": ontabchange("scheduled"); break;
+			case "3": ontabchange("posted"); break;
+			case "4": ontabchange("archive"); break;
 			case "Escape": {
 				const item = itemEls[focusedIndex];
 				if (item?.isConfirmingDelete()) {
@@ -216,21 +200,7 @@
 </script>
 
 <div class="rail">
-	<div class="rail-tabs" role="tablist" aria-label="Draft tabs">
-		{#each tabs as t}
-			<button
-				class="tab-btn"
-				class:active={tab === t.key}
-				type="button"
-				role="tab"
-				aria-selected={tab === t.key}
-				onclick={() => ontabchange(t.key)}
-			>
-				{t.label}
-				<span class="tab-count">{tabCounts[t.key]}</span>
-			</button>
-		{/each}
-	</div>
+	<DraftRailTabs {tabs} {tab} {tabCounts} {ontabchange} />
 
 	{#if onsearch && onsort && ontagfilter}
 		<DraftFilterBar
@@ -305,46 +275,6 @@
 		background: var(--color-surface);
 	}
 
-	.rail-tabs {
-		display: flex;
-		flex-shrink: 0;
-		border-bottom: 1px solid var(--color-border-subtle);
-		padding: 0 4px;
-	}
-
-	.tab-btn {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 4px;
-		padding: 10px 4px;
-		border: none;
-		border-bottom: 2px solid transparent;
-		background: transparent;
-		color: var(--color-text-muted);
-		font-size: 12px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.15s ease;
-	}
-
-	.tab-btn:hover {
-		color: var(--color-text);
-	}
-
-	.tab-btn.active {
-		color: var(--color-accent);
-		border-bottom-color: var(--color-accent);
-	}
-
-	.tab-count {
-		font-size: 10px;
-		font-weight: 700;
-		font-family: var(--font-mono);
-		opacity: 0.7;
-	}
-
 	.rail-list {
 		flex: 1;
 		overflow-y: auto;
@@ -404,11 +334,7 @@
 	}
 
 	@keyframes spin {
-		from {
-			transform: rotate(0deg);
-		}
-		to {
-			transform: rotate(360deg);
-		}
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 </style>
