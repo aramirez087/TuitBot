@@ -13,12 +13,15 @@ use tuitbot_server::state::AppState;
 use tuitbot_server::ws::AccountWsEvent;
 
 mod analytics;
+mod analytics_summary; // Task 3.4: analytics summary + recent-performance endpoints
 mod approval;
+mod approval_workflow; // Task 3.4: approval happy-path mutations (approve/reject/bulk/history)
 mod compose;
 mod content;
 mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + schedule
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
+mod x_auth; // X OAuth unlink tests
 
 /// The test API token used across all tests.
 pub const TEST_TOKEN: &str = "test-token-abc123";

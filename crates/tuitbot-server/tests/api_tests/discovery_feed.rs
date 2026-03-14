@@ -115,9 +115,15 @@ async fn discovery_feed_each_item_has_required_fields() {
     if !arr.is_empty() {
         let item = &arr[0];
         assert!(item["id"].is_string(), "missing id field");
-        assert!(item["author_username"].is_string(), "missing author_username");
+        assert!(
+            item["author_username"].is_string(),
+            "missing author_username"
+        );
         assert!(item["content"].is_string(), "missing content");
-        assert!(item["relevance_score"].is_number(), "missing relevance_score");
+        assert!(
+            item["relevance_score"].is_number(),
+            "missing relevance_score"
+        );
     }
 }
 
@@ -209,8 +215,7 @@ async fn discovery_compose_reply_without_llm_returns_error() {
     )
     .await;
     assert!(
-        status == StatusCode::BAD_REQUEST
-            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        status == StatusCode::BAD_REQUEST || status == StatusCode::INTERNAL_SERVER_ERROR,
         "expected 400 or 500 without LLM configured, got {status}"
     );
 }

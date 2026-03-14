@@ -38,7 +38,11 @@ async fn content_drafts_list_empty_on_fresh_db() {
     let router = test_router().await;
     let (status, body) = get_json(router, "/api/content/drafts").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body.as_array().unwrap().len(), 0, "fresh db should have 0 drafts");
+    assert_eq!(
+        body.as_array().unwrap().len(),
+        0,
+        "fresh db should have 0 drafts"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +357,9 @@ async fn content_drafts_schedule_requires_auth() {
         .method("POST")
         .uri("/api/content/drafts/1/schedule")
         .header("Content-Type", "application/json")
-        .body(axum::body::Body::from(r#"{"scheduled_for":"2027-01-01T12:00:00Z"}"#))
+        .body(axum::body::Body::from(
+            r#"{"scheduled_for":"2027-01-01T12:00:00Z"}"#,
+        ))
         .unwrap();
     let resp = tower::ServiceExt::oneshot(router, req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
