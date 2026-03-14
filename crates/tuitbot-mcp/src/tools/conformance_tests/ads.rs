@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn ads_tools_target_ads_api_host() {
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             if all_ads_tools().contains(&ep.tool_name) {
                 assert_eq!(
                     ep.host,
@@ -238,7 +238,7 @@ mod tests {
 
     #[test]
     fn ads_tools_use_ads_v12_api() {
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             if all_ads_tools().contains(&ep.tool_name) {
                 assert_eq!(
                     ep.api_version, "ads-v12",

@@ -180,29 +180,39 @@ mod tests {
         }
     }
 
-    /// write.rs must NOT register universal request tool handlers.
+    /// write/ must NOT register universal request tool handlers.
     #[test]
     fn write_server_does_not_register_universal_tools() {
-        let source = include_str!("../server/write.rs");
-        let fn_names = extract_tool_fn_names(source);
+        let source = [
+            include_str!("../server/write/mod.rs"),
+            include_str!("../server/write/tools.rs"),
+            include_str!("../server/write/handlers.rs"),
+        ]
+        .join("\n");
+        let fn_names = extract_tool_fn_names(&source);
         let admin_tools: HashSet<&str> = admin_only_tools().iter().copied().collect();
         for name in &fn_names {
             assert!(
                 !admin_tools.contains(name.as_str()),
-                "SAFETY VIOLATION: write.rs registers admin-only tool '{name}'"
+                "SAFETY VIOLATION: write/ registers admin-only tool '{name}'"
             );
         }
     }
 
-    /// admin.rs MUST register all universal request tool handlers.
+    /// admin/ MUST register all universal request tool handlers.
     #[test]
     fn admin_server_registers_universal_tools() {
-        let source = include_str!("../server/admin.rs");
-        let fn_names: HashSet<String> = extract_tool_fn_names(source).into_iter().collect();
+        let source = [
+            include_str!("../server/admin/mod.rs"),
+            include_str!("../server/admin/tools.rs"),
+            include_str!("../server/admin/handlers.rs"),
+        ]
+        .join("\n");
+        let fn_names: HashSet<String> = extract_tool_fn_names(&source).into_iter().collect();
         for &tool in admin_only_tools() {
             assert!(
                 fn_names.contains(tool),
-                "admin.rs is missing universal tool handler '{tool}'"
+                "admin/ is missing universal tool handler '{tool}'"
             );
         }
     }
@@ -554,13 +564,18 @@ mod tests {
 
     #[test]
     fn write_server_tool_count() {
-        let source = include_str!("../server/write.rs");
-        let fn_names = extract_tool_fn_names(source);
+        let source = [
+            include_str!("../server/write/mod.rs"),
+            include_str!("../server/write/tools.rs"),
+            include_str!("../server/write/handlers.rs"),
+        ]
+        .join("\n");
+        let fn_names = extract_tool_fn_names(&source);
         // 72 curated - 4 admin-only universal request tools = 68
         assert_eq!(
             fn_names.len(),
             68,
-            "write.rs has {} tools (expected 68): {:?}",
+            "write/ has {} tools (expected 68): {:?}",
             fn_names.len(),
             fn_names
         );
@@ -568,13 +583,18 @@ mod tests {
 
     #[test]
     fn admin_server_tool_count() {
-        let source = include_str!("../server/admin.rs");
-        let fn_names = extract_tool_fn_names(source);
+        let source = [
+            include_str!("../server/admin/mod.rs"),
+            include_str!("../server/admin/tools.rs"),
+            include_str!("../server/admin/handlers.rs"),
+        ]
+        .join("\n");
+        let fn_names = extract_tool_fn_names(&source);
         // All 72 curated tools including universal request tools
         assert_eq!(
             fn_names.len(),
             72,
-            "admin.rs has {} tools (expected 72): {:?}",
+            "admin/ has {} tools (expected 72): {:?}",
             fn_names.len(),
             fn_names
         );

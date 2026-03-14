@@ -131,7 +131,7 @@ impl TweetFactory {
     }
 }
 
-
+#[cfg(test)]
 mod tests {
     use super::*;
 

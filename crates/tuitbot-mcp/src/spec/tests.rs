@@ -33,7 +33,7 @@ fn spec_has_expected_endpoint_count() {
 #[test]
 fn no_duplicate_tool_names_in_spec() {
     let mut seen = HashSet::new();
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             seen.insert(ep.tool_name),
             "duplicate spec tool name: {}",
@@ -44,7 +44,7 @@ fn no_duplicate_tool_names_in_spec() {
 
 #[test]
 fn all_tool_names_follow_naming_convention() {
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         let valid = ep.tool_name.starts_with("x_v2_") || ep.tool_name.starts_with("x_ads_");
         assert!(
             valid,
@@ -56,7 +56,7 @@ fn all_tool_names_follow_naming_convention() {
 
 #[test]
 fn all_paths_start_with_slash() {
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             ep.path.starts_with('/'),
             "tool {} path must start with /: {}",
@@ -68,7 +68,7 @@ fn all_paths_start_with_slash() {
 
 #[test]
 fn mutations_are_post_put_or_delete() {
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         if ep.method.is_mutation() {
             assert!(
                 matches!(
@@ -84,7 +84,7 @@ fn mutations_are_post_put_or_delete() {
 
 #[test]
 fn all_endpoints_have_scopes() {
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             !ep.scopes.is_empty(),
             "tool {} must declare at least one OAuth scope",
@@ -95,7 +95,7 @@ fn all_endpoints_have_scopes() {
 
 #[test]
 fn all_endpoints_have_error_codes() {
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             !ep.error_codes.is_empty(),
             "tool {} must have at least one error code",
@@ -106,7 +106,7 @@ fn all_endpoints_have_error_codes() {
 
 #[test]
 fn all_endpoints_have_at_least_one_profile() {
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             !ep.profiles.is_empty(),
             "tool {} must be assigned to at least one profile",
@@ -212,7 +212,7 @@ fn read_tools_are_shared_lane() {
 #[test]
 fn all_api_versions_are_recognized() {
     let valid_versions = ["v2", "ads-v12"];
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             valid_versions.contains(&ep.api_version),
             "tool {} uses unrecognized api_version: {} (expected one of {:?})",
@@ -239,7 +239,7 @@ fn groups_match_expected_set() {
     .iter()
     .copied()
     .collect();
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         assert!(
             valid_groups.contains(ep.group),
             "tool {} has unexpected group: {}",
@@ -252,7 +252,7 @@ fn groups_match_expected_set() {
 #[test]
 fn ads_endpoints_target_ads_host() {
     use crate::tools::manifest::ToolCategory;
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         if ep.category == ToolCategory::Ads {
             assert_eq!(
                 ep.host,
@@ -278,7 +278,7 @@ fn ads_endpoints_target_ads_host() {
 #[test]
 fn ads_endpoints_are_admin_only() {
     use crate::tools::manifest::{Profile, ToolCategory};
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         if ep.category == ToolCategory::Ads {
             assert_eq!(
                 ep.profiles,
@@ -329,7 +329,7 @@ fn category_distribution() {
 #[test]
 fn compliance_endpoints_are_admin_only() {
     use crate::tools::manifest::{Profile, ToolCategory};
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         if ep.category == ToolCategory::Compliance {
             assert_eq!(
                 ep.profiles,
@@ -345,7 +345,7 @@ fn compliance_endpoints_are_admin_only() {
 #[test]
 fn compliance_endpoints_use_default_host() {
     use crate::tools::manifest::ToolCategory;
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         if ep.category == ToolCategory::Compliance {
             assert_eq!(
                 ep.host, None,

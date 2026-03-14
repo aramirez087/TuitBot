@@ -202,7 +202,10 @@ mod tests {
         assert!(
             matches!(
                 result,
-                ThreadResult::PartialFailure { tweets_posted: 1, .. }
+                ThreadResult::PartialFailure {
+                    tweets_posted: 1,
+                    ..
+                }
             ),
             "expected PartialFailure with 1 tweet posted, got {result:?}"
         );

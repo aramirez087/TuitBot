@@ -208,24 +208,66 @@ mod tests {
 
     #[async_trait::async_trait]
     impl ContentStorage for ScheduledMockStorage {
-        async fn last_tweet_time(&self) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> { Ok(None) }
-        async fn last_thread_time(&self) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> { Ok(None) }
-        async fn todays_tweet_times(&self) -> Result<Vec<chrono::DateTime<chrono::Utc>>, ContentLoopError> { Ok(Vec::new()) }
+        async fn last_tweet_time(
+            &self,
+        ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(None)
+        }
+        async fn last_thread_time(
+            &self,
+        ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(None)
+        }
+        async fn todays_tweet_times(
+            &self,
+        ) -> Result<Vec<chrono::DateTime<chrono::Utc>>, ContentLoopError> {
+            Ok(Vec::new())
+        }
         async fn post_tweet(&self, topic: &str, content: &str) -> Result<(), ContentLoopError> {
-            self.posted_scheduled.lock().expect("lock").push((topic.to_string(), content.to_string()));
+            self.posted_scheduled
+                .lock()
+                .expect("lock")
+                .push((topic.to_string(), content.to_string()));
             Ok(())
         }
-        async fn create_thread(&self, _t: &str, _c: usize) -> Result<String, ContentLoopError> { Ok("t1".to_string()) }
-        async fn update_thread_status(&self, _id: &str, _s: &str, _c: usize, _r: Option<&str>) -> Result<(), ContentLoopError> { Ok(()) }
-        async fn store_thread_tweet(&self, _id: &str, _pos: usize, _tid: &str, _c: &str) -> Result<(), ContentLoopError> { Ok(()) }
+        async fn create_thread(&self, _t: &str, _c: usize) -> Result<String, ContentLoopError> {
+            Ok("t1".to_string())
+        }
+        async fn update_thread_status(
+            &self,
+            _id: &str,
+            _s: &str,
+            _c: usize,
+            _r: Option<&str>,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
+        async fn store_thread_tweet(
+            &self,
+            _id: &str,
+            _pos: usize,
+            _tid: &str,
+            _c: &str,
+        ) -> Result<(), ContentLoopError> {
+            Ok(())
+        }
         async fn log_action(&self, a: &str, s: &str, m: &str) -> Result<(), ContentLoopError> {
-            self.actions.lock().expect("lock").push((a.to_string(), s.to_string(), m.to_string()));
+            self.actions
+                .lock()
+                .expect("lock")
+                .push((a.to_string(), s.to_string(), m.to_string()));
             Ok(())
         }
-        async fn next_scheduled_item(&self) -> Result<Option<(i64, String, String)>, ContentLoopError> {
+        async fn next_scheduled_item(
+            &self,
+        ) -> Result<Option<(i64, String, String)>, ContentLoopError> {
             Ok(self.scheduled.lock().expect("lock").clone())
         }
-        async fn mark_scheduled_posted(&self, id: i64, _tid: Option<&str>) -> Result<(), ContentLoopError> {
+        async fn mark_scheduled_posted(
+            &self,
+            id: i64,
+            _tid: Option<&str>,
+        ) -> Result<(), ContentLoopError> {
             self.marked_posted.lock().expect("lock").push(id);
             Ok(())
         }
@@ -234,10 +276,17 @@ mod tests {
     #[tokio::test]
     async fn try_post_scheduled_returns_none_when_queue_empty() {
         let content = ContentLoop::new(
-            Arc::new(MockGenerator { response: "tweet".to_string() }),
-            Arc::new(MockSafety { can_tweet: true, can_thread: true }),
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
             ScheduledMockStorage::empty(),
-            make_topics(), 0, false,
+            make_topics(),
+            0,
+            false,
         );
         let result = content.try_post_scheduled().await;
         assert!(result.is_none(), "empty queue → None");
@@ -247,10 +296,17 @@ mod tests {
     async fn try_post_scheduled_posts_tweet_type() {
         let storage = ScheduledMockStorage::with_item(42, "tweet", "Scheduled tweet content");
         let content = ContentLoop::new(
-            Arc::new(MockGenerator { response: "unused".to_string() }),
-            Arc::new(MockSafety { can_tweet: true, can_thread: true }),
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
             storage.clone(),
-            make_topics(), 0, false,
+            make_topics(),
+            0,
+            false,
         );
         let result = content.try_post_scheduled().await;
         assert!(result.is_some());
@@ -264,10 +320,17 @@ mod tests {
     async fn try_post_scheduled_dry_run_does_not_post() {
         let storage = ScheduledMockStorage::with_item(7, "tweet", "Dry scheduled tweet");
         let content = ContentLoop::new(
-            Arc::new(MockGenerator { response: "unused".to_string() }),
-            Arc::new(MockSafety { can_tweet: true, can_thread: true }),
+            Arc::new(MockGenerator {
+                response: "unused".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
             storage.clone(),
-            make_topics(), 0, true,
+            make_topics(),
+            0,
+            true,
         );
         let result = content.try_post_scheduled().await;
         assert!(result.is_some());
@@ -282,11 +345,17 @@ mod tests {
     #[tokio::test]
     async fn posted_result_contains_topic_and_content() {
         let content = ContentLoop::new(
-            Arc::new(MockGenerator { response: "Great content about testing".to_string() }),
-            Arc::new(MockSafety { can_tweet: true, can_thread: true }),
+            Arc::new(MockGenerator {
+                response: "Great content about testing".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
             Arc::new(MockStorage::new(None)),
             vec!["testing".to_string()],
-            0, false,
+            0,
+            false,
         );
         let result = content.run_once(Some("testing")).await;
         match result {

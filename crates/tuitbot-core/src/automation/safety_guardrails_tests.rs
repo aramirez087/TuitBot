@@ -75,10 +75,7 @@ mod tests {
 
         exhaust_replies(&guard, 5).await;
 
-        let result = guard
-            .can_reply_to("tweet_6th", None)
-            .await
-            .expect("check");
+        let result = guard.can_reply_to("tweet_6th", None).await.expect("check");
         match result {
             Err(DenialReason::RateLimited {
                 action_type,
@@ -224,10 +221,7 @@ mod tests {
             .check_author_limit("author_1", 1)
             .await
             .expect("check");
-        assert!(
-            result.is_ok(),
-            "first reply to author_1 should be allowed"
-        );
+        assert!(result.is_ok(), "first reply to author_1 should be allowed");
     }
 
     #[tokio::test]
@@ -311,8 +305,10 @@ mod tests {
 
         // Jaccard threshold = 0.8. These two texts differ only in the last word,
         // giving Jaccard ≈ 0.85 — just above the threshold.
-        let original = "Rust ownership model makes memory safety a first-class citizen in systems programming";
-        let near_dup  = "Rust ownership model makes memory safety a first-class citizen in systems engineering";
+        let original =
+            "Rust ownership model makes memory safety a first-class citizen in systems programming";
+        let near_dup =
+            "Rust ownership model makes memory safety a first-class citizen in systems engineering";
 
         // Record original reply
         let reply = crate::storage::replies::ReplySent {
@@ -347,7 +343,8 @@ mod tests {
         let (pool, guard) = setup_guard_with_defaults().await;
 
         let original = "Rust ownership model prevents memory errors at compile time";
-        let different = "Python list comprehensions are elegant and readable for data transformation";
+        let different =
+            "Python list comprehensions are elegant and readable for data transformation";
 
         let reply = crate::storage::replies::ReplySent {
             id: 0,
