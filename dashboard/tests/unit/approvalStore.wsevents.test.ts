@@ -51,11 +51,22 @@ import * as store from '../../src/lib/stores/approval';
 
 const ITEM = {
 	id: 1,
-	content: 'Test tweet',
-	scheduled_for: null,
+	action_type: 'reply',
+	target_tweet_id: '123456789',
+	target_author: 'testuser',
+	generated_content: 'Test tweet',
+	topic: 'general',
+	archetype: 'informative',
+	score: 0.8,
 	status: 'pending',
-	source: 'content_loop',
-	created_at: '2026-01-01T00:00:00Z'
+	created_at: '2026-01-01T00:00:00Z',
+	media_paths: [],
+	detected_risks: [],
+	qa_score: 0.9,
+	qa_hard_flags: [],
+	qa_soft_flags: [],
+	qa_requires_override: false,
+	scheduled_for: undefined
 };
 
 // --- Dispatch helper ---------------------------------------------------------

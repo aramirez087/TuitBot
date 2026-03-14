@@ -52,7 +52,9 @@ const makeDraftSummary = (id: number, status: 'draft' | 'scheduled' | 'posted' =
 	title: `Draft ${id}`,
 	created_at: '2026-03-14T00:00:00.000Z',
 	updated_at: '2026-03-14T01:00:00.000Z',
-	scheduled_for: status === 'scheduled' ? '2026-03-20T10:00:00.000Z' : undefined
+	scheduled_for: status === 'scheduled' ? '2026-03-20T10:00:00.000Z' : null,
+	archived_at: null,
+	source: 'manual'
 });
 
 const DRAFT_SUMMARIES: DraftSummary[] = [
