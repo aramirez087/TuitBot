@@ -1,0 +1,94 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main, refactor/sprint-1]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Rust coverage via cargo-tarpaulin
+  # -----------------------------------------------------------------------
+  rust-coverage:
+    name: Rust coverage (tarpaulin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-coverage-
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Run tarpaulin
+        run: |
+          cargo tarpaulin \
+            --workspace \
+            --exclude tuitbot-mcp \
+            --out Xml \
+            --output-dir coverage/ \
+            --fail-under 75 \
+            --timeout 120 \
+            --skip-clean
+        env:
+          RUSTFLAGS: "-D warnings"
+
+      - name: Upload Rust coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/cobertura.xml
+          flags: rust
+          fail_ci_if_error: false
+
+  # -----------------------------------------------------------------------
+  # TypeScript / Svelte coverage via Vitest
+  # -----------------------------------------------------------------------
+  frontend-coverage:
+    name: Frontend coverage (vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run coverage (thresholds enforced)
+        run: npm run test:coverage:ci
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: dashboard/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
