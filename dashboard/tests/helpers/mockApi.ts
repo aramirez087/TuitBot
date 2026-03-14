@@ -23,13 +23,13 @@ import type {
 // Health & runtime
 // ---------------------------------------------------------------------------
 
-const health = vi.fn<[], Promise<HealthResponse>>().mockResolvedValue({
+const health = vi.fn<() => Promise<HealthResponse>>().mockResolvedValue({
 	status: 'ok',
 	version: '0.1.0-test'
 });
 
 const runtime = {
-	status: vi.fn<[], Promise<RuntimeStatus>>().mockResolvedValue({
+	status: vi.fn<() => Promise<RuntimeStatus>>().mockResolvedValue({
 		running: true,
 		task_count: 3,
 		deployment_mode: 'desktop',
@@ -42,7 +42,8 @@ const runtime = {
 			preferred_source_default: 'local'
 		},
 		provider_backend: 'local',
-		can_post: false
+		can_post: false,
+		capability_tier: 'generation_ready'
 	}),
 	start: vi.fn().mockResolvedValue({ status: 'started' }),
 	stop: vi.fn().mockResolvedValue({ status: 'stopped' })
@@ -53,9 +54,9 @@ const runtime = {
 // ---------------------------------------------------------------------------
 
 const approval = {
-	list: vi.fn<[string?, string?, string?, string?], Promise<ApprovalItem[]>>()
+	list: vi.fn<() => Promise<ApprovalItem[]>>()
 		.mockResolvedValue(fixtures.approvalItems),
-	stats: vi.fn<[], Promise<ApprovalStats>>().mockResolvedValue(fixtures.approvalStats),
+	stats: vi.fn<() => Promise<ApprovalStats>>().mockResolvedValue(fixtures.approvalStats),
 	approve: vi.fn().mockResolvedValue({ success: true }),
 	reject: vi.fn().mockResolvedValue({ success: true }),
 	edit: vi.fn().mockResolvedValue(fixtures.approvalItem()),
@@ -67,7 +68,7 @@ const approval = {
 // ---------------------------------------------------------------------------
 
 const analytics = {
-	summary: vi.fn<[], Promise<AnalyticsSummary>>().mockResolvedValue(fixtures.analyticsSummary),
+	summary: vi.fn<() => Promise<AnalyticsSummary>>().mockResolvedValue(fixtures.analyticsSummary),
 	followers: vi.fn().mockResolvedValue([]),
 	performance: vi.fn().mockResolvedValue([])
 };
@@ -138,7 +139,8 @@ export function resetMockApi(): void {
 			preferred_source_default: 'local'
 		},
 		provider_backend: 'local',
-		can_post: false
+		can_post: false,
+		capability_tier: 'generation_ready'
 	});
 	approval.list.mockResolvedValue(fixtures.approvalItems);
 	approval.stats.mockResolvedValue(fixtures.approvalStats);

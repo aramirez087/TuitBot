@@ -48,7 +48,9 @@ export const approvalItems: ApprovalItem[] = [
 export const approvalStats: ApprovalStats = {
 	pending: 2,
 	approved: 1,
-	rejected: 1
+	rejected: 1,
+	failed: 0,
+	scheduled: 0
 };
 
 // ---------------------------------------------------------------------------
@@ -91,30 +93,28 @@ export const config: Partial<TuitbotConfig> = {
 		industry_topics: ['saas', 'devtools'],
 		brand_voice: 'helpful and direct'
 	}
-} as Partial<TuitbotConfig>;
+} as unknown as Partial<TuitbotConfig>;
 
 // ---------------------------------------------------------------------------
 // Targets
 // ---------------------------------------------------------------------------
 
 export const targetAccount = (overrides: Partial<TargetAccount> = {}): TargetAccount => ({
-	id: 1,
+	account_id: 'target_user_id',
 	username: 'target_user',
-	display_name: 'Target User',
-	follower_count: 5000,
-	following_count: 800,
-	tweet_count: 1200,
-	bio: 'Building in public.',
-	profile_image_url: null,
-	is_active: true,
-	added_at: '2026-01-01T00:00:00.000Z',
+	followed_at: '2026-01-01T00:00:00.000Z',
+	first_engagement_at: '2026-01-02T00:00:00.000Z',
+	total_replies_sent: 5,
+	last_reply_at: '2026-03-01T00:00:00.000Z',
+	status: 'active',
+	interactions_today: 1,
 	...overrides
 });
 
 export const targets: TargetAccount[] = [
-	targetAccount({ id: 1, username: 'user_a', follower_count: 12000 }),
-	targetAccount({ id: 2, username: 'user_b', follower_count: 3400 }),
-	targetAccount({ id: 3, username: 'user_c', is_active: false, follower_count: 890 })
+	targetAccount({ account_id: 'user_a_id', username: 'user_a' }),
+	targetAccount({ account_id: 'user_b_id', username: 'user_b' }),
+	targetAccount({ account_id: 'user_c_id', username: 'user_c', status: 'inactive' })
 ];
 
 // ---------------------------------------------------------------------------

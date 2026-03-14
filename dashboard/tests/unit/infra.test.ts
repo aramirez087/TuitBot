@@ -31,9 +31,9 @@ describe('Test infrastructure', () => {
 	});
 
 	it('targetAccount factory applies overrides', () => {
-		const t = fixtures.targetAccount({ username: 'custom_user', follower_count: 99 });
+		const t = fixtures.targetAccount({ username: 'custom_user', total_replies_sent: 99 });
 		expect(t.username).toBe('custom_user');
-		expect(t.follower_count).toBe(99);
+		expect(t.total_replies_sent).toBe(99);
 	});
 
 	it('mockApprovalStore initialises with fixture data', () => {
