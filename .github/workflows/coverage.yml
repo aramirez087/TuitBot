@@ -32,11 +32,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install cargo-tarpaulin
-        # Use cargo-binstall when available to skip compile time; fall back to source
-        run: |
-          cargo install cargo-binstall --locked 2>/dev/null || true
-          cargo binstall cargo-tarpaulin --no-confirm 2>/dev/null \
-            || cargo install cargo-tarpaulin --locked
+        run: cargo install cargo-tarpaulin --locked
 
       - name: Run Rust tests + collect coverage
         run: |
