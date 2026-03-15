@@ -464,7 +464,7 @@ jobs:
           fi
 
       - name: Import GPG key
-        if: ${{ env.GPG_PRIVATE_KEY != '' }}
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -475,7 +475,7 @@ jobs:
           git config --global user.signingkey $(gpg --list-keys --with-colons | grep fpr | head -1 | cut -d: -f10)
 
       - name: Sign release artifacts with GPG
-        if: ${{ env.GPG_PRIVATE_KEY != '' }}
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -484,7 +484,7 @@ jobs:
           cd dist
           # Sign each artifact with detached signature (.asc)
           for artifact in *; do
-            if [ -f "$artifact" ] && [ ! "$artifact" = *.asc ]; then
+            if [ -f "$artifact" ] && [[ ! "$artifact" =~ \.asc$ ]]; then
               echo "Signing $artifact..."
               gpg --batch --no-tty --passphrase "$GPG_PASSPHRASE" \
                 --detach-sign --armor "$artifact" || \
