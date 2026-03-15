@@ -1,0 +1,89 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ── Rust benchmarks via cargo-criterion ──
+  rust-benchmarks:
+    name: Rust benchmarks (criterion)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for baseline comparison
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+            ${{ runner.os }}-cargo-
+
+      - name: Run criterion benchmarks
+        run: |
+          cargo bench --workspace \
+            --no-run 2>&1 | head -20
+          # Collect baselines into target/criterion for artifact upload.
+          cargo bench --workspace -- --verbose 2>&1 | tee bench_output.txt
+        env:
+          RUSTFLAGS: "-D warnings"
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-results-${{ github.run_id }}
+          path: |
+            target/criterion
+            bench_output.txt
+          retention-days: 30
+
+  # ── Frontend bundle size tracking ──
+  bundle-size:
+    name: Frontend bundle size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: cd dashboard && npm ci
+
+      - name: Build dashboard
+        run: cd dashboard && npm run build
+
+      - name: Report bundle size
+        run: |
+          echo "## 📦 Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cd dashboard && du -sh dist/ 2>/dev/null | awk '{print "- Total: **" $1 "**"}' >> $GITHUB_STEP_SUMMARY
+          find dist -type f -name "*.js" -o -name "*.css" 2>/dev/null | while read f; do
+            size=$(du -h "$f" | cut -f1)
+            echo "- $f: $size"
+          done | head -10 >> $GITHUB_STEP_SUMMARY
+        shell: bash
+
+      - name: Upload bundle artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-build-${{ github.run_id }}
+          path: dashboard/dist
+          retention-days: 30
