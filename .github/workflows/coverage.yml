@@ -32,7 +32,9 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
 
       - name: Run Rust tests + collect coverage
         run: |
