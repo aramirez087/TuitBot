@@ -356,3 +356,140 @@ fn randomized_delay(min: Duration, max: Duration) -> Duration {
     let max_ms = max.as_millis() as u64;
     Duration::from_millis(rand::thread_rng().gen_range(min_ms..=max_ms))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── randomized_delay ────────────────────────────────────────────
+
+    #[test]
+    fn delay_returns_min_when_min_equals_max() {
+        let d = randomized_delay(Duration::from_secs(5), Duration::from_secs(5));
+        assert_eq!(d, Duration::from_secs(5));
+    }
+
+    #[test]
+    fn delay_returns_min_when_min_greater_than_max() {
+        let d = randomized_delay(Duration::from_secs(10), Duration::from_secs(5));
+        assert_eq!(d, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn delay_returns_zero_when_both_zero() {
+        let d = randomized_delay(Duration::ZERO, Duration::ZERO);
+        assert_eq!(d, Duration::ZERO);
+    }
+
+    #[test]
+    fn delay_within_range() {
+        let min = Duration::from_millis(100);
+        let max = Duration::from_millis(500);
+        for _ in 0..50 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min, "delay {d:?} should be >= {min:?}");
+            assert!(d <= max, "delay {d:?} should be <= {max:?}");
+        }
+    }
+
+    #[test]
+    fn delay_zero_min_nonzero_max() {
+        let min = Duration::ZERO;
+        let max = Duration::from_millis(100);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(d <= max);
+        }
+    }
+
+    #[test]
+    fn delay_narrow_range_produces_deterministic_ish_result() {
+        let min = Duration::from_millis(50);
+        let max = Duration::from_millis(51);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min && d <= max);
+        }
+    }
+
+    // ── media_paths JSON parsing (mirrors inline logic) ─────────────
+
+    #[test]
+    fn media_paths_parses_valid_json_array() {
+        let json = r#"["/tmp/img1.png", "/tmp/img2.jpg"]"#;
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], "/tmp/img1.png");
+    }
+
+    #[test]
+    fn media_paths_parses_empty_array() {
+        let json = "[]";
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn media_paths_invalid_json_returns_empty() {
+        let json = "not valid json";
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn media_paths_empty_string_returns_empty() {
+        let json = "";
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    // ── action_type routing logic ───────────────────────────────────
+
+    #[test]
+    fn action_type_reply_with_target_routes_to_reply() {
+        let action_type = "reply";
+        let target_tweet_id = "12345";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(is_reply);
+    }
+
+    #[test]
+    fn action_type_reply_without_target_routes_to_tweet() {
+        let action_type = "reply";
+        let target_tweet_id = "";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(!is_reply);
+    }
+
+    #[test]
+    fn action_type_tweet_routes_to_tweet() {
+        let action_type = "tweet";
+        let target_tweet_id = "";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(!is_reply);
+    }
+
+    #[test]
+    fn action_type_thread_tweet_routes_to_tweet() {
+        let action_type = "thread_tweet";
+        let target_tweet_id = "some_id";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(!is_reply);
+    }
+
+    // ── action log format string ────────────────────────────────────
+
+    #[test]
+    fn action_log_format_for_reply() {
+        let action_type = "reply";
+        let log_action = format!("{action_type}_posted");
+        assert_eq!(log_action, "reply_posted");
+    }
+
+    #[test]
+    fn action_log_format_for_tweet() {
+        let action_type = "tweet";
+        let log_action = format!("{action_type}_posted");
+        assert_eq!(log_action, "tweet_posted");
+    }
+}

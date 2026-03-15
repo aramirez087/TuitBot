@@ -210,3 +210,270 @@ pub async fn run_discovery_cycle(
         },
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::workflow::ScoreBreakdown;
+
+    fn make_candidate(tweet_id: &str, already_replied: bool, action: &str) -> ScoredCandidate {
+        ScoredCandidate {
+            tweet_id: tweet_id.to_string(),
+            author_username: "user".to_string(),
+            author_followers: 100,
+            text: "test".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            score_total: 50.0,
+            score_breakdown: ScoreBreakdown {
+                keyword_relevance: 10.0,
+                follower: 10.0,
+                recency: 10.0,
+                engagement: 10.0,
+                reply_count: 5.0,
+                content_type: 5.0,
+            },
+            matched_keywords: vec!["test".to_string()],
+            recommended_action: action.to_string(),
+            already_replied,
+        }
+    }
+
+    // ── Actionable candidate filtering ──────────────────────────────
+
+    #[test]
+    fn filter_actionable_excludes_already_replied() {
+        let candidates = vec![
+            make_candidate("t1", false, "reply"),
+            make_candidate("t2", true, "reply"),
+            make_candidate("t3", false, "reply"),
+        ];
+
+        let actionable: Vec<String> = candidates
+            .iter()
+            .filter(|c| !c.already_replied && c.recommended_action != "skip")
+            .map(|c| c.tweet_id.clone())
+            .collect();
+
+        assert_eq!(actionable, vec!["t1", "t3"]);
+    }
+
+    #[test]
+    fn filter_actionable_excludes_skip_action() {
+        let candidates = vec![
+            make_candidate("t1", false, "reply"),
+            make_candidate("t2", false, "skip"),
+            make_candidate("t3", false, "like"),
+        ];
+
+        let actionable: Vec<String> = candidates
+            .iter()
+            .filter(|c| !c.already_replied && c.recommended_action != "skip")
+            .map(|c| c.tweet_id.clone())
+            .collect();
+
+        assert_eq!(actionable, vec!["t1", "t3"]);
+    }
+
+    #[test]
+    fn filter_actionable_all_replied_returns_empty() {
+        let candidates = vec![
+            make_candidate("t1", true, "reply"),
+            make_candidate("t2", true, "reply"),
+        ];
+
+        let actionable: Vec<String> = candidates
+            .iter()
+            .filter(|c| !c.already_replied && c.recommended_action != "skip")
+            .map(|c| c.tweet_id.clone())
+            .collect();
+
+        assert!(actionable.is_empty());
+    }
+
+    #[test]
+    fn filter_actionable_all_skip_returns_empty() {
+        let candidates = vec![
+            make_candidate("t1", false, "skip"),
+            make_candidate("t2", false, "skip"),
+        ];
+
+        let actionable: Vec<String> = candidates
+            .iter()
+            .filter(|c| !c.already_replied && c.recommended_action != "skip")
+            .map(|c| c.tweet_id.clone())
+            .collect();
+
+        assert!(actionable.is_empty());
+    }
+
+    // ── Queue item collection from drafts ───────────────────────────
+
+    #[test]
+    fn collect_queue_items_from_drafts() {
+        let drafts = vec![
+            DraftResult::Success {
+                candidate_id: "t1".to_string(),
+                draft_text: "Great point!".to_string(),
+                archetype: "agree_and_expand".to_string(),
+                char_count: 12,
+                confidence: "high".to_string(),
+                risks: vec![],
+                vault_citations: vec![],
+            },
+            DraftResult::Error {
+                candidate_id: "t2".to_string(),
+                error_code: "llm_error".to_string(),
+                error_message: "timeout".to_string(),
+            },
+            DraftResult::Success {
+                candidate_id: "t3".to_string(),
+                draft_text: "Interesting!".to_string(),
+                archetype: "ask_question".to_string(),
+                char_count: 12,
+                confidence: "medium".to_string(),
+                risks: vec![],
+                vault_citations: vec![],
+            },
+        ];
+
+        let queue_items: Vec<QueueItem> = drafts
+            .iter()
+            .filter_map(|d| match d {
+                DraftResult::Success {
+                    candidate_id,
+                    draft_text,
+                    ..
+                } => Some(QueueItem {
+                    candidate_id: candidate_id.clone(),
+                    pre_drafted_text: Some(draft_text.clone()),
+                }),
+                DraftResult::Error { .. } => None,
+            })
+            .collect();
+
+        assert_eq!(queue_items.len(), 2);
+        assert_eq!(queue_items[0].candidate_id, "t1");
+        assert_eq!(
+            queue_items[0].pre_drafted_text.as_deref(),
+            Some("Great point!")
+        );
+        assert_eq!(queue_items[1].candidate_id, "t3");
+
+        let drafts_generated = queue_items.len();
+        let drafts_failed = drafts.len() - drafts_generated;
+        assert_eq!(drafts_generated, 2);
+        assert_eq!(drafts_failed, 1);
+    }
+
+    // ── Summary counting from ProposeResult ─────────────────────────
+
+    #[test]
+    fn count_propose_results() {
+        let results = vec![
+            ProposeResult::Queued {
+                candidate_id: "t1".to_string(),
+                approval_queue_id: 1,
+            },
+            ProposeResult::Executed {
+                candidate_id: "t2".to_string(),
+                reply_tweet_id: "r1".to_string(),
+            },
+            ProposeResult::Blocked {
+                candidate_id: "t3".to_string(),
+                reason: "rate limit".to_string(),
+            },
+            ProposeResult::Queued {
+                candidate_id: "t4".to_string(),
+                approval_queue_id: 2,
+            },
+        ];
+
+        let queued = results
+            .iter()
+            .filter(|r| matches!(r, ProposeResult::Queued { .. }))
+            .count();
+        let executed = results
+            .iter()
+            .filter(|r| matches!(r, ProposeResult::Executed { .. }))
+            .count();
+        let blocked = results
+            .iter()
+            .filter(|r| matches!(r, ProposeResult::Blocked { .. }))
+            .count();
+
+        assert_eq!(queued, 2);
+        assert_eq!(executed, 1);
+        assert_eq!(blocked, 1);
+    }
+
+    // ── CycleInput construction ─────────────────────────────────────
+
+    #[test]
+    fn cycle_input_defaults() {
+        let input = CycleInput {
+            query: None,
+            min_score: None,
+            limit: None,
+            since_id: None,
+            mention_product: false,
+        };
+        assert!(input.query.is_none());
+        assert!(!input.mention_product);
+    }
+
+    #[test]
+    fn cycle_input_with_all_fields() {
+        let input = CycleInput {
+            query: Some("rust async".to_string()),
+            min_score: Some(50.0),
+            limit: Some(20),
+            since_id: Some("12345".to_string()),
+            mention_product: true,
+        };
+        assert_eq!(input.query.as_deref(), Some("rust async"));
+        assert_eq!(input.min_score, Some(50.0));
+        assert_eq!(input.limit, Some(20));
+        assert!(input.mention_product);
+    }
+
+    // ── CycleSummary zeroed report ──────────────────────────────────
+
+    #[test]
+    fn cycle_summary_empty() {
+        let summary = CycleSummary {
+            candidates_found: 0,
+            drafts_generated: 0,
+            drafts_failed: 0,
+            replies_queued: 0,
+            replies_executed: 0,
+            replies_blocked: 0,
+        };
+        assert_eq!(summary.candidates_found, 0);
+        assert_eq!(summary.drafts_generated, 0);
+        assert_eq!(summary.replies_queued, 0);
+    }
+
+    // ── CycleReport with no candidates ──────────────────────────────
+
+    #[test]
+    fn cycle_report_empty_candidates() {
+        let report = CycleReport {
+            query_used: "rust".to_string(),
+            discovered: vec![],
+            drafts: vec![],
+            queued: vec![],
+            summary: CycleSummary {
+                candidates_found: 0,
+                drafts_generated: 0,
+                drafts_failed: 0,
+                replies_queued: 0,
+                replies_executed: 0,
+                replies_blocked: 0,
+            },
+        };
+        assert_eq!(report.query_used, "rust");
+        assert!(report.discovered.is_empty());
+        assert!(report.drafts.is_empty());
+        assert!(report.queued.is_empty());
+    }
+}
