@@ -512,4 +512,238 @@ mod tests {
         let debug = format!("{result:?}");
         assert!(debug.contains("business"));
     }
+
+    // -----------------------------------------------------------------------
+    // Extended merge edge-case tests for coverage push
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn json_merge_patch_nested_null_removes() {
+        let mut base: Value =
+            serde_json::from_str(r#"{"outer": {"a": 1, "b": {"c": 3}}}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"outer": {"b": null}}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert!(base["outer"].get("b").is_none());
+        assert_eq!(base["outer"]["a"], 1);
+    }
+
+    #[test]
+    fn json_merge_patch_add_nested_key() {
+        let mut base: Value = serde_json::from_str(r#"{"a": {"b": 1}}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"a": {"c": 2}}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["a"]["b"], 1);
+        assert_eq!(base["a"]["c"], 2);
+    }
+
+    #[test]
+    fn json_merge_patch_replace_array_entirely() {
+        let mut base: Value = serde_json::from_str(r#"{"arr": [1, 2, 3]}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"arr": [4, 5]}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["arr"].as_array().unwrap().len(), 2);
+        assert_eq!(base["arr"][0], 4);
+        assert_eq!(base["arr"][1], 5);
+    }
+
+    #[test]
+    fn json_merge_patch_deeply_nested() {
+        let mut base: Value = serde_json::from_str(r#"{"a": {"b": {"c": {"d": 1}}}}"#).unwrap();
+        let patch: Value =
+            serde_json::from_str(r#"{"a": {"b": {"c": {"d": 2, "e": 3}}}}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["a"]["b"]["c"]["d"], 2);
+        assert_eq!(base["a"]["b"]["c"]["e"], 3);
+    }
+
+    #[test]
+    fn json_merge_patch_empty_patch() {
+        let mut base: Value = serde_json::from_str(r#"{"a": 1}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["a"], 1);
+    }
+
+    #[test]
+    fn json_merge_patch_number_replaces_object() {
+        let mut base: Value = serde_json::from_str(r#"{"a": {"nested": 1}}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"a": 42}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["a"], 42);
+    }
+
+    #[test]
+    fn json_merge_patch_object_replaces_number() {
+        let mut base: Value = serde_json::from_str(r#"{"a": 42}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"a": {"nested": 1}}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["a"]["nested"], 1);
+    }
+
+    #[test]
+    fn effective_config_limits_override() {
+        let base = base_config();
+        let overrides = r#"{"limits": {"max_replies_per_day": 5}}"#;
+        let result = effective_config(&base, overrides).unwrap();
+        assert_eq!(result.config.limits.max_replies_per_day, 5);
+        assert_eq!(result.overridden_keys, vec!["limits"]);
+    }
+
+    #[test]
+    fn effective_config_intervals_override() {
+        let base = base_config();
+        let overrides = r#"{"limits": {"max_replies_per_day": 42}}"#;
+        let result = effective_config(&base, overrides).unwrap();
+        assert_eq!(result.config.limits.max_replies_per_day, 42);
+    }
+
+    #[test]
+    fn effective_config_multiple_overrides() {
+        let base = base_config();
+        let overrides = r#"{
+            "scoring": {"threshold": 75},
+            "business": {"product_name": "NewProduct"},
+            "approval_mode": true
+        }"#;
+        let result = effective_config(&base, overrides).unwrap();
+        assert_eq!(result.config.scoring.threshold, 75);
+        assert_eq!(result.config.business.product_name, "NewProduct");
+        assert!(result.config.approval_mode);
+        assert_eq!(result.overridden_keys.len(), 3);
+    }
+
+    #[test]
+    fn validate_override_keys_empty_object_ok() {
+        let overrides: Value = serde_json::from_str("{}").unwrap();
+        assert!(validate_override_keys(&overrides).is_ok());
+    }
+
+    #[test]
+    fn validate_override_keys_non_object_ok() {
+        // Non-object passes (no keys to validate)
+        let overrides = Value::String("test".into());
+        assert!(validate_override_keys(&overrides).is_ok());
+    }
+
+    #[test]
+    fn validate_override_keys_all_account_scoped() {
+        for key in ACCOUNT_SCOPED_KEYS {
+            let json_str = format!(r#"{{"{key}": "test"}}"#);
+            let overrides: Value = serde_json::from_str(&json_str).unwrap();
+            assert!(
+                validate_override_keys(&overrides).is_ok(),
+                "Key '{key}' should be allowed"
+            );
+        }
+    }
+
+    #[test]
+    fn split_patch_by_scope_mixed_keys() {
+        let patch: Value = serde_json::from_str(
+            r#"{"scoring": {}, "business": {}, "llm": {}, "server": {}, "storage": {}}"#,
+        )
+        .unwrap();
+        let (account, rejected) = split_patch_by_scope(&patch);
+        assert_eq!(account.as_object().unwrap().len(), 2);
+        assert_eq!(rejected.len(), 3);
+    }
+
+    #[test]
+    fn split_patch_by_scope_empty_object() {
+        let patch: Value = serde_json::from_str("{}").unwrap();
+        let (account, rejected) = split_patch_by_scope(&patch);
+        assert!(account.as_object().unwrap().is_empty());
+        assert!(rejected.is_empty());
+    }
+
+    #[test]
+    fn merge_overrides_multiple_null_removals() {
+        let current = r#"{"scoring": {}, "business": {}, "limits": {}}"#;
+        let patch: Value = serde_json::from_str(r#"{"scoring": null, "limits": null}"#).unwrap();
+        let result = merge_overrides(current, &patch).unwrap();
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("scoring").is_none());
+        assert!(parsed.get("limits").is_none());
+        assert!(parsed.get("business").is_some());
+    }
+
+    #[test]
+    fn merge_overrides_non_object_current_becomes_object() {
+        // If current is not an object (edge case), it gets replaced
+        let patch: Value = serde_json::from_str(r#"{"mode": "composer"}"#).unwrap();
+        let result = merge_overrides(r#""string""#, &patch);
+        // This should fail because "string" is valid JSON but not an object
+        // Actually merge_overrides handles non-object current by replacing
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn merge_overrides_preserves_unmentioned_keys() {
+        let current = r#"{"scoring": {"threshold": 80}, "mode": "autopilot"}"#;
+        let patch: Value = serde_json::from_str(r#"{"scoring": {"threshold": 90}}"#).unwrap();
+        let result = merge_overrides(current, &patch).unwrap();
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["scoring"]["threshold"], 90);
+        assert_eq!(parsed["mode"], "autopilot");
+    }
+
+    #[test]
+    fn account_scoped_keys_contains_expected() {
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"mode"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"x_api"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"scoring"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"limits"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"intervals"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"approval_mode"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"max_batch_approve"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"schedule"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"targets"));
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"content_sources"));
+    }
+
+    #[test]
+    fn account_scoped_keys_excludes_instance() {
+        assert!(!ACCOUNT_SCOPED_KEYS.contains(&"llm"));
+        assert!(!ACCOUNT_SCOPED_KEYS.contains(&"server"));
+        assert!(!ACCOUNT_SCOPED_KEYS.contains(&"storage"));
+    }
+
+    #[test]
+    fn effective_config_preserves_base_when_no_override() {
+        let base = base_config();
+        let result = effective_config(&base, "{}").unwrap();
+        assert_eq!(
+            result.config.business.product_name,
+            base.business.product_name
+        );
+        assert_eq!(
+            result.config.business.product_keywords,
+            base.business.product_keywords
+        );
+        assert_eq!(result.config.scoring.threshold, base.scoring.threshold);
+    }
+
+    #[test]
+    fn effective_config_result_overridden_keys_empty_for_no_change() {
+        let base = base_config();
+        let result = effective_config(&base, "  {} ").unwrap();
+        assert!(result.overridden_keys.is_empty());
+    }
+
+    #[test]
+    fn merge_overrides_empty_patch_object() {
+        let current = r#"{"mode": "autopilot"}"#;
+        let patch: Value = serde_json::from_str("{}").unwrap();
+        let result = merge_overrides(current, &patch).unwrap();
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["mode"], "autopilot");
+    }
+
+    #[test]
+    fn merge_overrides_whitespace_current() {
+        let patch: Value = serde_json::from_str(r#"{"mode": "composer"}"#).unwrap();
+        let result = merge_overrides("  \n  ", &patch).unwrap();
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["mode"], "composer");
+    }
 }

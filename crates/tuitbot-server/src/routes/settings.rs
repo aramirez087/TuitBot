@@ -1308,4 +1308,295 @@ mod tests {
         let req: FactoryResetRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.confirmation, "RESET TUITBOT");
     }
+
+    // -----------------------------------------------------------------------
+    // Extended settings helper tests for coverage push
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn json_to_toml_negative_integer() {
+        let json = serde_json::json!(-42);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Integer(-42));
+    }
+
+    #[test]
+    fn json_to_toml_zero() {
+        let json = serde_json::json!(0);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Integer(0));
+    }
+
+    #[test]
+    fn json_to_toml_negative_float() {
+        let json = serde_json::json!(-3.14);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Float(-3.14));
+    }
+
+    #[test]
+    fn json_to_toml_large_integer() {
+        let json = serde_json::json!(i64::MAX);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Integer(i64::MAX));
+    }
+
+    #[test]
+    fn json_to_toml_nested_array_of_objects() {
+        let json = serde_json::json!([
+            {"name": "a", "value": 1},
+            {"name": "b", "value": 2}
+        ]);
+        let toml = json_to_toml(&json).unwrap();
+        let arr = toml.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(
+            arr[0].get("name").unwrap(),
+            &toml::Value::String("a".to_string())
+        );
+    }
+
+    #[test]
+    fn json_to_toml_array_of_arrays() {
+        let json = serde_json::json!([[1, 2], [3, 4]]);
+        let toml = json_to_toml(&json).unwrap();
+        let arr = toml.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn json_to_toml_object_with_all_null_values() {
+        let json = serde_json::json!({"a": null, "b": null});
+        let toml = json_to_toml(&json).unwrap();
+        let table = toml.as_table().unwrap();
+        assert!(table.is_empty());
+    }
+
+    #[test]
+    fn json_to_toml_string_with_special_chars() {
+        let json = serde_json::json!("hello\nworld\t!");
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::String("hello\nworld\t!".to_string()));
+    }
+
+    #[test]
+    fn merge_toml_multiple_new_keys() {
+        let mut base: toml::Value = toml::from_str(r#"a = 1"#).unwrap();
+        let patch: toml::Value = toml::from_str(
+            r#"b = 2
+c = 3
+d = 4"#,
+        )
+        .unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(base.get("a").unwrap(), &toml::Value::Integer(1));
+        assert_eq!(base.get("b").unwrap(), &toml::Value::Integer(2));
+        assert_eq!(base.get("c").unwrap(), &toml::Value::Integer(3));
+        assert_eq!(base.get("d").unwrap(), &toml::Value::Integer(4));
+    }
+
+    #[test]
+    fn merge_toml_deeply_nested_tables() {
+        let mut base: toml::Value = toml::from_str(
+            r#"
+            [a]
+            [a.b]
+            [a.b.c]
+            d = 1
+            "#,
+        )
+        .unwrap();
+        let patch: toml::Value = toml::from_str(
+            r#"
+            [a.b.c]
+            d = 2
+            e = 3
+            "#,
+        )
+        .unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(base["a"]["b"]["c"]["d"], toml::Value::Integer(2));
+        assert_eq!(base["a"]["b"]["c"]["e"], toml::Value::Integer(3));
+    }
+
+    #[test]
+    fn merge_toml_array_replacement() {
+        let mut base: toml::Value = toml::from_str(r#"arr = [1, 2, 3]"#).unwrap();
+        let patch: toml::Value = toml::from_str(r#"arr = [4, 5]"#).unwrap();
+        merge_toml(&mut base, &patch);
+        let arr = base.get("arr").unwrap().as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0], toml::Value::Integer(4));
+    }
+
+    #[test]
+    fn redact_service_account_keys_non_string_value() {
+        let mut json = serde_json::json!({
+            "content_sources": {
+                "sources": [
+                    { "service_account_key": 12345 }
+                ]
+            }
+        });
+        redact_service_account_keys(&mut json);
+        // Non-null, non-string values should also be redacted
+        assert_eq!(
+            json["content_sources"]["sources"][0]["service_account_key"],
+            "[redacted]"
+        );
+    }
+
+    #[test]
+    fn redact_service_account_keys_multiple_sources() {
+        let mut json = serde_json::json!({
+            "content_sources": {
+                "sources": [
+                    { "service_account_key": "secret1" },
+                    { "service_account_key": "secret2" },
+                    { "service_account_key": "secret3" }
+                ]
+            }
+        });
+        redact_service_account_keys(&mut json);
+        let sources = json["content_sources"]["sources"].as_array().unwrap();
+        for source in sources {
+            assert_eq!(source["service_account_key"], "[redacted]");
+        }
+    }
+
+    #[test]
+    fn config_errors_to_response_preserves_order() {
+        let errors = vec![
+            ConfigError::MissingField {
+                field: "first".to_string(),
+            },
+            ConfigError::MissingField {
+                field: "second".to_string(),
+            },
+            ConfigError::MissingField {
+                field: "third".to_string(),
+            },
+        ];
+        let items = config_errors_to_response(errors);
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].field, "first");
+        assert_eq!(items[1].field, "second");
+        assert_eq!(items[2].field, "third");
+    }
+
+    #[test]
+    fn delete_all_credentials_nonexistent_dir() {
+        let path = std::env::temp_dir().join("tuitbot_test_nonexistent_delete_creds");
+        // Directory doesn't exist - should return false
+        let deleted = delete_all_credentials(&path);
+        assert!(!deleted);
+    }
+
+    #[test]
+    fn delete_all_credentials_only_scraper_session() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("scraper_session.json"), "{}").expect("write");
+
+        let deleted = delete_all_credentials(dir.path());
+        assert!(deleted);
+        assert!(!dir.path().join("scraper_session.json").exists());
+    }
+
+    #[test]
+    fn delete_all_credentials_nested_accounts() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let accounts_dir = dir.path().join("accounts");
+        let account1 = accounts_dir.join("uuid-1");
+        let account2 = accounts_dir.join("uuid-2");
+        std::fs::create_dir_all(&account1).expect("create");
+        std::fs::create_dir_all(&account2).expect("create");
+        std::fs::write(account1.join("tokens.json"), "{}").expect("write");
+        std::fs::write(account2.join("tokens.json"), "{}").expect("write");
+
+        let deleted = delete_all_credentials(dir.path());
+        assert!(deleted);
+        assert!(!accounts_dir.exists());
+    }
+
+    #[test]
+    fn factory_reset_phrase_constant() {
+        assert_eq!(FACTORY_RESET_PHRASE, "RESET TUITBOT");
+        assert!(!FACTORY_RESET_PHRASE.is_empty());
+        assert!(FACTORY_RESET_PHRASE.len() > 5);
+    }
+
+    #[test]
+    fn factory_reset_request_wrong_phrase() {
+        let json = r#"{"confirmation": "wrong phrase"}"#;
+        let req: FactoryResetRequest = serde_json::from_str(json).unwrap();
+        assert_ne!(req.confirmation, FACTORY_RESET_PHRASE);
+    }
+
+    #[test]
+    fn test_llm_request_minimal() {
+        let json = r#"{"provider": "openai", "model": "gpt-3.5-turbo"}"#;
+        let req: TestLlmRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.provider, "openai");
+        assert_eq!(req.model, "gpt-3.5-turbo");
+        assert!(req.api_key.is_none());
+        assert!(req.base_url.is_none());
+    }
+
+    #[test]
+    fn json_to_toml_empty_string() {
+        let json = serde_json::json!("");
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::String(String::new()));
+    }
+
+    #[test]
+    fn json_to_toml_single_element_array() {
+        let json = serde_json::json!(["only"]);
+        let toml = json_to_toml(&json).unwrap();
+        let arr = toml.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0], toml::Value::String("only".to_string()));
+    }
+
+    #[test]
+    fn merge_toml_bool_overwrite() {
+        let mut base: toml::Value = toml::from_str(r#"flag = true"#).unwrap();
+        let patch: toml::Value = toml::from_str(r#"flag = false"#).unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(base.get("flag").unwrap(), &toml::Value::Boolean(false));
+    }
+
+    #[test]
+    fn merge_toml_string_overwrite() {
+        let mut base: toml::Value = toml::from_str(r#"name = "old""#).unwrap();
+        let patch: toml::Value = toml::from_str(r#"name = "new""#).unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(
+            base.get("name").unwrap(),
+            &toml::Value::String("new".to_string())
+        );
+    }
+
+    #[test]
+    fn validation_response_serialization() {
+        let resp = ValidationResponse {
+            valid: true,
+            errors: Vec::new(),
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["valid"], true);
+        // errors should be skipped when empty
+    }
+
+    #[test]
+    fn validation_error_item_fields() {
+        let item = ValidationErrorItem {
+            field: "test_field".to_string(),
+            message: "test message".to_string(),
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["field"], "test_field");
+        assert_eq!(json["message"], "test message");
+    }
 }

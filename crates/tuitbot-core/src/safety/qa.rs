@@ -1507,4 +1507,479 @@ mod tests {
             .iter()
             .all(|flag| flag.code != "language_mismatch"));
     }
+
+    // -----------------------------------------------------------------------
+    // Extended QA evaluator edge-case tests for coverage push
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn detect_language_mixed_en_es_stronger_english() {
+        let result =
+            detect_language("The product is great and you should build with this amazing tool");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().code, "en");
+    }
+
+    #[test]
+    fn detect_language_mixed_en_es_stronger_spanish() {
+        let result = detect_language(
+            "Hola, gracias por la ayuda con el proyecto. Estamos en una reunión para el equipo",
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().code, "es");
+    }
+
+    #[test]
+    fn extract_urls_multiple_different_schemes() {
+        let urls = extract_urls("Visit https://a.com and http://b.com and https://c.com/path?q=1");
+        assert_eq!(urls.len(), 3);
+    }
+
+    #[test]
+    fn extract_urls_url_with_query() {
+        let urls = extract_urls("Check https://example.com/path?utm_source=x&utm_campaign=y");
+        assert_eq!(urls.len(), 1);
+        assert!(urls[0].contains("utm_source"));
+    }
+
+    #[test]
+    fn extract_domain_no_scheme() {
+        let result = extract_domain("example.com/path");
+        assert_eq!(result, Some("example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_domain_with_fragment() {
+        let result = extract_domain("https://example.com#section");
+        assert_eq!(result, Some("example.com".to_string()));
+    }
+
+    #[test]
+    fn extract_domain_with_query_and_fragment() {
+        let result = extract_domain("https://example.com?key=val#frag");
+        assert_eq!(result, Some("example.com".to_string()));
+    }
+
+    #[test]
+    fn parse_query_keys_multiple_params() {
+        let keys = parse_query_keys("https://x.com?a=1&b=2&c=3&d=4");
+        assert_eq!(keys.len(), 4);
+        assert!(keys.contains("a"));
+        assert!(keys.contains("b"));
+        assert!(keys.contains("c"));
+        assert!(keys.contains("d"));
+    }
+
+    #[test]
+    fn parse_query_keys_no_value() {
+        let keys = parse_query_keys("https://x.com?key_only");
+        assert_eq!(keys.len(), 1);
+        assert!(keys.contains("key_only"));
+    }
+
+    #[test]
+    fn count_emoji_no_emoji() {
+        assert_eq!(count_emoji("Hello, world! Great stuff."), 0);
+    }
+
+    #[test]
+    fn count_emoji_mixed_text_and_emoji() {
+        assert_eq!(count_emoji("Hello \u{1F600} World \u{1F601}"), 2);
+    }
+
+    #[test]
+    fn is_emoji_boundary_ranges() {
+        assert!(is_emoji('\u{1F300}')); // start of first range
+        assert!(is_emoji('\u{1FAFF}')); // end of first range
+        assert!(is_emoji('\u{2600}')); // start of second range
+        assert!(is_emoji('\u{27BF}')); // end of second range
+        assert!(!is_emoji('\u{1F2FF}')); // just before first range
+        assert!(!is_emoji('\u{27C0}')); // just after second range
+    }
+
+    #[test]
+    fn tokenize_punctuation_heavy_text() {
+        let tokens = tokenize("hello!!! world??? foo... bar---baz");
+        assert!(tokens.contains("hello"));
+        assert!(tokens.contains("world"));
+        assert!(tokens.contains("foo"));
+    }
+
+    #[test]
+    fn tokenize_deduplicates() {
+        let tokens = tokenize("hello hello hello world");
+        assert_eq!(tokens.len(), 2);
+    }
+
+    #[test]
+    fn jaccard_similarity_one_element_overlap() {
+        let a: HashSet<String> = ["a", "b", "c"].iter().map(|s| s.to_string()).collect();
+        let b: HashSet<String> = ["c", "d", "e"].iter().map(|s| s.to_string()).collect();
+        // intersection = {c} = 1, union = {a,b,c,d,e} = 5
+        assert!((jaccard_similarity(&a, &b) - 0.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn jaccard_similarity_one_empty() {
+        let a: HashSet<String> = ["a"].iter().map(|s| s.to_string()).collect();
+        let b: HashSet<String> = HashSet::new();
+        assert!((jaccard_similarity(&a, &b) - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn max_similarity_whitespace_candidate() {
+        let recent = vec!["hello world".to_string()];
+        assert!((max_similarity("   ", &recent) - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn max_similarity_no_overlap() {
+        let recent = vec!["completely different words here".to_string()];
+        let sim = max_similarity("xyz abc def ghi", &recent);
+        assert!((sim - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn score_summary_multiple_categories() {
+        let hard = vec![
+            QaFlag {
+                code: "test1".to_string(),
+                severity: QaSeverity::Hard,
+                category: QaCategory::Language,
+                message: "test".to_string(),
+                evidence: None,
+                suggestion: None,
+            },
+            QaFlag {
+                code: "test2".to_string(),
+                severity: QaSeverity::Hard,
+                category: QaCategory::Compliance,
+                message: "test".to_string(),
+                evidence: None,
+                suggestion: None,
+            },
+        ];
+        let score = score_summary(&hard, &[]);
+        assert!((score.language - 65.0).abs() < 0.001);
+        assert!((score.compliance - 65.0).abs() < 0.001);
+        assert!((score.brand - 100.0).abs() < 0.001);
+        // Overall = (65 + 100 + 65) / 3
+        assert!((score.overall - 76.666).abs() < 0.5);
+    }
+
+    #[test]
+    fn score_summary_mixed_hard_and_soft() {
+        let hard = vec![QaFlag {
+            code: "h1".to_string(),
+            severity: QaSeverity::Hard,
+            category: QaCategory::Brand,
+            message: "test".to_string(),
+            evidence: None,
+            suggestion: None,
+        }];
+        let soft = vec![QaFlag {
+            code: "s1".to_string(),
+            severity: QaSeverity::Soft,
+            category: QaCategory::Brand,
+            message: "test".to_string(),
+            evidence: None,
+            suggestion: None,
+        }];
+        let score = score_summary(&hard, &soft);
+        // Brand: 100 - 35 - 12 = 53
+        assert!((score.brand - 53.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn collect_recommendations_preserves_order() {
+        let flags = vec![
+            QaFlag {
+                code: "a".to_string(),
+                severity: QaSeverity::Hard,
+                category: QaCategory::Brand,
+                message: "test".to_string(),
+                evidence: None,
+                suggestion: Some("First recommendation".to_string()),
+            },
+            QaFlag {
+                code: "b".to_string(),
+                severity: QaSeverity::Soft,
+                category: QaCategory::Brand,
+                message: "test".to_string(),
+                evidence: None,
+                suggestion: Some("Second recommendation".to_string()),
+            },
+        ];
+        let recs = collect_recommendations(&flags[..1], &flags[1..]);
+        assert_eq!(recs[0], "First recommendation");
+        assert_eq!(recs[1], "Second recommendation");
+    }
+
+    #[test]
+    fn collect_recommendations_empty_flags() {
+        let recs = collect_recommendations(&[], &[]);
+        assert!(recs.is_empty());
+    }
+
+    #[test]
+    fn normalize_language_code_various() {
+        assert_eq!(normalize_language_code("EN"), "en");
+        assert_eq!(normalize_language_code("  es  "), "es");
+        assert_eq!(normalize_language_code("FR"), "fr");
+        assert_eq!(normalize_language_code(""), "");
+    }
+
+    #[test]
+    fn normalize_domain_various() {
+        assert_eq!(normalize_domain("EXAMPLE.COM"), "example.com");
+        assert_eq!(normalize_domain("  Sub.Domain.ORG  "), "sub.domain.org");
+        assert_eq!(normalize_domain(""), "");
+    }
+
+    #[test]
+    fn evaluate_clean_content_no_flags() {
+        let config = base_config();
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate(
+            "How do you build marketing tools with this?",
+            "Great question! You can build marketing automation with our platform.",
+            &[],
+        );
+        assert!(report.hard_flags.is_empty());
+        // May have soft flags for various reasons, but no hard flags
+    }
+
+    #[test]
+    fn evaluate_multiple_banned_phrases() {
+        let mut config = base_config();
+        config.limits.banned_phrases = vec![
+            "buy now".to_string(),
+            "click here".to_string(),
+            "free trial".to_string(),
+        ];
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate(
+            "What do you offer?",
+            "Buy now for a free trial! Click here!",
+            &[],
+        );
+        let banned_count = report
+            .hard_flags
+            .iter()
+            .filter(|f| f.code == "banned_phrase")
+            .count();
+        assert!(banned_count >= 2, "should flag multiple banned phrases");
+    }
+
+    #[test]
+    fn evaluate_forbidden_word_case_insensitive() {
+        let mut config = base_config();
+        config.brand_voice_profile.forbidden_words = vec!["guaranteed".to_string()];
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate("How reliable?", "GUARANTEED results", &[]);
+        assert!(report
+            .hard_flags
+            .iter()
+            .any(|f| f.code == "forbidden_word"));
+    }
+
+    #[test]
+    fn evaluate_emoji_allow_policy_no_flag() {
+        let mut config = base_config();
+        config.brand_voice_profile.emoji_policy = EmojiPolicy::Allow;
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate("How?", "Great \u{1F600}\u{1F601}\u{1F602} stuff!", &[]);
+        assert!(report
+            .soft_flags
+            .iter()
+            .all(|f| !f.code.starts_with("emoji_policy")));
+    }
+
+    #[test]
+    fn evaluate_emoji_avoid_single_ok() {
+        let mut config = base_config();
+        config.brand_voice_profile.emoji_policy = EmojiPolicy::Avoid;
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate("How?", "Great \u{1F600} stuff!", &[]);
+        // 1 emoji with avoid policy should NOT flag (threshold is > 1)
+        assert!(report
+            .soft_flags
+            .iter()
+            .all(|f| f.code != "emoji_policy_avoid"));
+    }
+
+    #[test]
+    fn evaluate_emoji_forbid_single_flags() {
+        let mut config = base_config();
+        config.brand_voice_profile.emoji_policy = EmojiPolicy::Forbid;
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate("How?", "Great \u{1F600} stuff!", &[]);
+        assert!(report
+            .soft_flags
+            .iter()
+            .any(|f| f.code == "emoji_policy_forbid"));
+    }
+
+    #[test]
+    fn evaluate_allowlist_domain_passes() {
+        let mut config = base_config();
+        config.link_policy = LinkPolicyConfig {
+            allowlist: vec!["approved.com".to_string()],
+            denylist: vec![],
+            required_utm_params: vec![],
+        };
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate("Link?", "Visit https://approved.com/page", &[]);
+        assert!(report
+            .soft_flags
+            .iter()
+            .all(|f| f.code != "domain_not_in_allowlist"));
+    }
+
+    #[test]
+    fn evaluate_no_links_skips_link_checks() {
+        let mut config = base_config();
+        config.link_policy = LinkPolicyConfig {
+            allowlist: vec!["approved.com".to_string()],
+            denylist: vec!["bad.com".to_string()],
+            required_utm_params: vec!["utm_source".to_string()],
+        };
+
+        let qa = QaEvaluator::new(&config);
+        let report = qa.evaluate("What is this?", "No links here, just text.", &[]);
+        assert!(report
+            .hard_flags
+            .iter()
+            .all(|f| f.code != "denied_domain" && f.code != "missing_required_utm"));
+    }
+
+    #[test]
+    fn evaluate_high_similarity_flags() {
+        let config = base_config();
+        let qa = QaEvaluator::new(&config);
+
+        let recent = vec!["Thanks for sharing this helpful marketing tip with everyone".to_string()];
+        let report = qa.evaluate(
+            "Good tweet",
+            "Thanks for sharing this helpful marketing tip with everyone",
+            &recent,
+        );
+        assert!(report
+            .soft_flags
+            .iter()
+            .any(|f| f.code == "high_similarity_recent_content"));
+    }
+
+    #[test]
+    fn evaluate_no_similarity_with_different_content() {
+        let config = base_config();
+        let qa = QaEvaluator::new(&config);
+
+        let recent = vec!["Completely different unrelated topic discussion".to_string()];
+        let report = qa.evaluate(
+            "Question about marketing",
+            "Thanks for the great question about building products",
+            &recent,
+        );
+        assert!(report
+            .soft_flags
+            .iter()
+            .all(|f| f.code != "high_similarity_recent_content"));
+    }
+
+    #[test]
+    fn qa_severity_serialization() {
+        let hard = QaSeverity::Hard;
+        let json = serde_json::to_string(&hard).unwrap();
+        assert_eq!(json, r#""hard""#);
+
+        let soft = QaSeverity::Soft;
+        let json = serde_json::to_string(&soft).unwrap();
+        assert_eq!(json, r#""soft""#);
+    }
+
+    #[test]
+    fn qa_category_serialization() {
+        let lang = QaCategory::Language;
+        let json = serde_json::to_string(&lang).unwrap();
+        assert_eq!(json, r#""language""#);
+
+        let brand = QaCategory::Brand;
+        let json = serde_json::to_string(&brand).unwrap();
+        assert_eq!(json, r#""brand""#);
+
+        let comp = QaCategory::Compliance;
+        let json = serde_json::to_string(&comp).unwrap();
+        assert_eq!(json, r#""compliance""#);
+    }
+
+    #[test]
+    fn qa_flag_serialization_with_evidence() {
+        let flag = QaFlag {
+            code: "test_code".to_string(),
+            severity: QaSeverity::Hard,
+            category: QaCategory::Brand,
+            message: "Test message".to_string(),
+            evidence: Some("test evidence".to_string()),
+            suggestion: Some("fix it".to_string()),
+        };
+        let json = serde_json::to_string(&flag).unwrap();
+        assert!(json.contains("test_code"));
+        assert!(json.contains("test evidence"));
+        assert!(json.contains("fix it"));
+    }
+
+    #[test]
+    fn qa_flag_serialization_without_evidence() {
+        let flag = QaFlag {
+            code: "test_code".to_string(),
+            severity: QaSeverity::Soft,
+            category: QaCategory::Compliance,
+            message: "Test message".to_string(),
+            evidence: None,
+            suggestion: None,
+        };
+        let json = serde_json::to_string(&flag).unwrap();
+        assert!(json.contains("test_code"));
+        // evidence should be skipped (skip_serializing_if)
+        assert!(!json.contains("evidence"));
+    }
+
+    #[test]
+    fn qa_category_hash_equality() {
+        let a = QaCategory::Language;
+        let b = QaCategory::Language;
+        let c = QaCategory::Brand;
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+
+        let mut set = HashSet::new();
+        set.insert(a);
+        set.insert(b.clone());
+        assert_eq!(set.len(), 1);
+        set.insert(c);
+        assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn detect_language_confidence_high_for_clear_text() {
+        let result = detect_language("The quick brown fox jumps over the lazy dog with this amazing product");
+        let lang = result.unwrap();
+        assert_eq!(lang.code, "en");
+        assert!(lang.confidence > 0.5);
+    }
+
+    #[test]
+    fn detect_language_spanish_inverted_question() {
+        let result = detect_language("¿Cómo funciona este producto?");
+        assert!(result.is_some());
+        let lang = result.unwrap();
+        assert_eq!(lang.code, "es");
+    }
 }

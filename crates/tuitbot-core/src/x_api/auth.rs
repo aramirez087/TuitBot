@@ -1608,4 +1608,249 @@ mod tests {
         let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.expires_in, -1);
     }
+
+    // -----------------------------------------------------------------------
+    // Extended auth helper tests for coverage push
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tokens_access_token_long_value() {
+        let long_token = "a".repeat(2048);
+        let tokens = Tokens {
+            access_token: long_token.clone(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        let json = serde_json::to_string(&tokens).unwrap();
+        let back: Tokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.access_token.len(), 2048);
+        assert_eq!(back.access_token, long_token);
+    }
+
+    #[test]
+    fn tokens_empty_refresh_token() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: String::new(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        assert!(tokens.refresh_token.is_empty());
+        let json = serde_json::to_string(&tokens).unwrap();
+        let back: Tokens = serde_json::from_str(&json).unwrap();
+        assert!(back.refresh_token.is_empty());
+    }
+
+    #[test]
+    fn tokens_expiry_far_past() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() - chrono::Duration::days(365),
+            scopes: vec![],
+        };
+        let secs = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(secs < -86400);
+    }
+
+    #[test]
+    fn tokens_expiry_far_future() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::days(365),
+            scopes: vec![],
+        };
+        let secs = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(secs > 86400 * 300);
+    }
+
+    #[test]
+    fn save_tokens_multiple_overwrites() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        for i in 0..5 {
+            let tokens = Tokens {
+                access_token: format!("token_{i}"),
+                refresh_token: "r".into(),
+                expires_at: Utc::now(),
+                scopes: vec![],
+            };
+            save_tokens(&tokens, &path).expect("save");
+        }
+
+        let loaded = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(loaded.access_token, "token_4");
+    }
+
+    #[test]
+    fn load_tokens_valid_structure_no_scopes() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let json = r#"{
+            "access_token": "acc",
+            "refresh_token": "ref",
+            "expires_at": "2026-06-01T00:00:00Z"
+        }"#;
+        std::fs::write(&path, json).expect("write");
+        let tokens = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(tokens.access_token, "acc");
+        assert!(tokens.scopes.is_empty());
+    }
+
+    #[test]
+    fn load_tokens_with_scopes_list() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let json = r#"{
+            "access_token": "acc",
+            "refresh_token": "ref",
+            "expires_at": "2026-06-01T00:00:00Z",
+            "scopes": ["tweet.read", "tweet.write", "offline.access"]
+        }"#;
+        std::fs::write(&path, json).expect("write");
+        let tokens = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(tokens.scopes.len(), 3);
+    }
+
+    #[test]
+    fn token_refresh_response_large_expires_in() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_in": 999999,
+            "scope": "tweet.read"
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.expires_in, 999999);
+    }
+
+    #[test]
+    fn token_refresh_response_many_scopes() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_in": 3600,
+            "scope": "tweet.read tweet.write users.read follows.read follows.write offline.access"
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        let scopes: Vec<&str> = resp.scope.split_whitespace().collect();
+        assert_eq!(scopes.len(), 6);
+    }
+
+    #[tokio::test]
+    async fn token_manager_tokens_lock_write_access() {
+        let tokens = Tokens {
+            access_token: "original".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let manager = TokenManager::new(tokens, "cid".into(), path);
+
+        let lock = manager.tokens_lock();
+        {
+            let mut guard = lock.write().await;
+            guard.access_token = "modified".to_string();
+        }
+        let guard = lock.read().await;
+        assert_eq!(guard.access_token, "modified");
+    }
+
+    #[test]
+    fn build_oauth_client_localhost_callback() {
+        let client = build_oauth_client("test_client", "http://localhost:8080/callback");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn build_oauth_client_ipv6_callback() {
+        let client = build_oauth_client("test_client", "http://[::1]:8080/callback");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn required_scopes_contains_users_read() {
+        assert!(REQUIRED_SCOPES.contains(&"users.read"));
+    }
+
+    #[test]
+    fn required_scopes_has_at_least_four() {
+        assert!(REQUIRED_SCOPES.len() >= 4);
+    }
+
+    #[test]
+    fn auth_url_constant_value() {
+        assert_eq!(AUTH_URL, "https://x.com/i/oauth2/authorize");
+    }
+
+    #[test]
+    fn token_url_constant_value() {
+        assert_eq!(TOKEN_URL, "https://api.x.com/2/oauth2/token");
+    }
+
+    #[test]
+    fn refresh_window_secs_value() {
+        assert_eq!(REFRESH_WINDOW_SECS, 300);
+        assert_eq!(REFRESH_WINDOW_SECS, 5 * 60);
+    }
+
+    #[test]
+    fn tokens_serde_preserves_exact_datetime() {
+        let dt = "2026-06-15T12:30:45.123Z".parse::<DateTime<Utc>>().unwrap();
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: dt,
+            scopes: vec![],
+        };
+        let json = serde_json::to_string(&tokens).unwrap();
+        let back: Tokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.expires_at, dt);
+    }
+
+    #[test]
+    fn token_manager_new_preserves_path() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("specific_file.json");
+        let manager = TokenManager::new(tokens, "my_id".into(), path.clone());
+        assert_eq!(manager.token_path, path);
+        assert_eq!(manager.client_id, "my_id");
+    }
+
+    #[test]
+    fn save_tokens_and_verify_json_structure() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let tokens = Tokens {
+            access_token: "verify_me".into(),
+            refresh_token: "ref_verify".into(),
+            expires_at: Utc::now(),
+            scopes: vec!["s1".into(), "s2".into()],
+        };
+        save_tokens(&tokens, &path).expect("save");
+
+        let content = std::fs::read_to_string(&path).expect("read");
+        let parsed: serde_json::Value = serde_json::from_str(&content).expect("parse");
+        assert_eq!(parsed["access_token"], "verify_me");
+        assert_eq!(parsed["refresh_token"], "ref_verify");
+        assert!(parsed["scopes"].is_array());
+        assert_eq!(parsed["scopes"].as_array().unwrap().len(), 2);
+    }
 }
