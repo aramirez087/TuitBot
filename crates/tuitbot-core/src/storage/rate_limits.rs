@@ -720,4 +720,358 @@ mod tests {
         assert_eq!(usage.threads.used, 0);
         assert_eq!(usage.threads.max, 1);
     }
+
+    #[tokio::test]
+    async fn init_mcp_rate_limit_creates_row() {
+        let pool = init_test_db().await.expect("init db");
+        init_mcp_rate_limit(&pool, 60).await.expect("init mcp");
+
+        let limits = get_all_rate_limits(&pool).await.expect("get");
+        let mcp = limits
+            .iter()
+            .find(|l| l.action_type == "mcp_mutation")
+            .expect("mcp_mutation row");
+        assert_eq!(mcp.max_requests, 60);
+        assert_eq!(mcp.period_seconds, 3600);
+        assert_eq!(mcp.request_count, 0);
+    }
+
+    #[tokio::test]
+    async fn init_mcp_rate_limit_preserves_existing() {
+        let pool = init_test_db().await.expect("init db");
+        init_mcp_rate_limit(&pool, 60).await.expect("init mcp");
+        increment_rate_limit(&pool, "mcp_mutation")
+            .await
+            .expect("inc");
+
+        // Re-init should not reset counter
+        init_mcp_rate_limit(&pool, 60).await.expect("re-init mcp");
+        let limits = get_all_rate_limits(&pool).await.expect("get");
+        let mcp = limits
+            .iter()
+            .find(|l| l.action_type == "mcp_mutation")
+            .expect("mcp_mutation");
+        assert_eq!(mcp.request_count, 1);
+    }
+
+    #[tokio::test]
+    async fn check_and_increment_resets_expired_period() {
+        let pool = init_test_db().await.expect("init db");
+        init_rate_limits(&pool, &test_limits_config(), &test_intervals_config())
+            .await
+            .expect("init");
+
+        // Fill up reply limit (max = 3)
+        for _ in 0..3 {
+            check_and_increment_rate_limit(&pool, "reply")
+                .await
+                .expect("inc");
+        }
+        assert!(!check_and_increment_rate_limit(&pool, "reply")
+            .await
+            .expect("blocked"));
+
+        // Backdate period_start to 25 hours ago
+        sqlx::query(
+            "UPDATE rate_limits SET period_start = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-25 hours') \
+             WHERE action_type = 'reply'",
+        )
+        .execute(&pool)
+        .await
+        .expect("backdate");
+
+        // Should reset and allow again
+        assert!(check_and_increment_rate_limit(&pool, "reply")
+            .await
+            .expect("after reset"));
+
+        let limits = get_all_rate_limits(&pool).await.expect("get");
+        let reply = limits
+            .iter()
+            .find(|l| l.action_type == "reply")
+            .expect("reply");
+        // Counter should be 1 (reset to 0, then incremented)
+        assert_eq!(reply.request_count, 1);
+    }
+
+    #[tokio::test]
+    async fn check_and_increment_unknown_type_allows() {
+        let pool = init_test_db().await.expect("init db");
+        assert!(check_and_increment_rate_limit(&pool, "nonexistent")
+            .await
+            .expect("check"));
+    }
+
+    #[tokio::test]
+    async fn daily_usage_zero_when_no_data() {
+        let pool = init_test_db().await.expect("init db");
+        let usage = get_daily_usage(&pool).await.expect("get usage");
+        assert_eq!(usage.replies.used, 0);
+        assert_eq!(usage.replies.max, 0);
+        assert_eq!(usage.tweets.used, 0);
+        assert_eq!(usage.threads.used, 0);
+    }
+
+    #[tokio::test]
+    async fn get_all_rate_limits_empty_when_no_init() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = get_all_rate_limits(&pool).await.expect("get");
+        assert!(limits.is_empty());
+    }
+
+    #[tokio::test]
+    async fn init_policy_rate_limits_creates_rows() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![
+            PolicyRateLimit {
+                key: "mcp:like_tweet:hourly".to_string(),
+                dimension: RateLimitDimension::Tool,
+                match_value: "like_tweet".to_string(),
+                max_count: 10,
+                period_seconds: 3600,
+            },
+            PolicyRateLimit {
+                key: "mcp:engagement:daily".to_string(),
+                dimension: RateLimitDimension::Category,
+                match_value: "engagement".to_string(),
+                max_count: 50,
+                period_seconds: 86400,
+            },
+        ];
+
+        init_policy_rate_limits(&pool, &limits)
+            .await
+            .expect("init policy");
+
+        let all = get_all_rate_limits(&pool).await.expect("get");
+        assert_eq!(all.len(), 2);
+
+        let like = all
+            .iter()
+            .find(|l| l.action_type == "mcp:like_tweet:hourly")
+            .expect("like row");
+        assert_eq!(like.max_requests, 10);
+        assert_eq!(like.period_seconds, 3600);
+    }
+
+    #[tokio::test]
+    async fn check_policy_rate_limits_allows_under_limit() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![PolicyRateLimit {
+            key: "mcp:like_tweet:hourly".to_string(),
+            dimension: RateLimitDimension::Tool,
+            match_value: "like_tweet".to_string(),
+            max_count: 5,
+            period_seconds: 3600,
+        }];
+
+        init_policy_rate_limits(&pool, &limits).await.expect("init");
+
+        let exceeded = check_policy_rate_limits(&pool, "like_tweet", "engagement", &limits)
+            .await
+            .expect("check");
+        assert!(exceeded.is_none());
+    }
+
+    #[tokio::test]
+    async fn check_policy_rate_limits_blocks_at_limit() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![PolicyRateLimit {
+            key: "mcp:like_tweet:hourly".to_string(),
+            dimension: RateLimitDimension::Tool,
+            match_value: "like_tweet".to_string(),
+            max_count: 2,
+            period_seconds: 3600,
+        }];
+
+        init_policy_rate_limits(&pool, &limits).await.expect("init");
+
+        // Fill up the limit
+        for _ in 0..2 {
+            increment_rate_limit(&pool, "mcp:like_tweet:hourly")
+                .await
+                .expect("inc");
+        }
+
+        let exceeded = check_policy_rate_limits(&pool, "like_tweet", "engagement", &limits)
+            .await
+            .expect("check");
+        assert_eq!(
+            exceeded,
+            Some("mcp:like_tweet:hourly".to_string()),
+            "should report the exceeded limit key"
+        );
+    }
+
+    #[tokio::test]
+    async fn check_policy_rate_limits_skips_non_matching_dimension() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![PolicyRateLimit {
+            key: "mcp:follow:hourly".to_string(),
+            dimension: RateLimitDimension::Tool,
+            match_value: "follow_user".to_string(),
+            max_count: 1,
+            period_seconds: 3600,
+        }];
+
+        init_policy_rate_limits(&pool, &limits).await.expect("init");
+
+        // Fill up the follow limit
+        increment_rate_limit(&pool, "mcp:follow:hourly")
+            .await
+            .expect("inc");
+
+        // Check with a different tool name -- should not match
+        let exceeded = check_policy_rate_limits(&pool, "like_tweet", "engagement", &limits)
+            .await
+            .expect("check");
+        assert!(exceeded.is_none());
+    }
+
+    #[tokio::test]
+    async fn check_policy_rate_limits_global_matches_any_tool() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![PolicyRateLimit {
+            key: "mcp:global:hourly".to_string(),
+            dimension: RateLimitDimension::Global,
+            match_value: String::new(),
+            max_count: 1,
+            period_seconds: 3600,
+        }];
+
+        init_policy_rate_limits(&pool, &limits).await.expect("init");
+        increment_rate_limit(&pool, "mcp:global:hourly")
+            .await
+            .expect("inc");
+
+        let exceeded = check_policy_rate_limits(&pool, "any_tool", "any_cat", &limits)
+            .await
+            .expect("check");
+        assert_eq!(exceeded, Some("mcp:global:hourly".to_string()));
+    }
+
+    #[tokio::test]
+    async fn check_policy_rate_limits_category_dimension() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![PolicyRateLimit {
+            key: "mcp:engagement:daily".to_string(),
+            dimension: RateLimitDimension::Category,
+            match_value: "engagement".to_string(),
+            max_count: 1,
+            period_seconds: 86400,
+        }];
+
+        init_policy_rate_limits(&pool, &limits).await.expect("init");
+        increment_rate_limit(&pool, "mcp:engagement:daily")
+            .await
+            .expect("inc");
+
+        let exceeded = check_policy_rate_limits(&pool, "like_tweet", "engagement", &limits)
+            .await
+            .expect("check");
+        assert_eq!(exceeded, Some("mcp:engagement:daily".to_string()));
+    }
+
+    #[tokio::test]
+    async fn record_policy_rate_limits_increments_matching() {
+        let pool = init_test_db().await.expect("init db");
+        let limits = vec![
+            PolicyRateLimit {
+                key: "mcp:like_tweet:hourly".to_string(),
+                dimension: RateLimitDimension::Tool,
+                match_value: "like_tweet".to_string(),
+                max_count: 10,
+                period_seconds: 3600,
+            },
+            PolicyRateLimit {
+                key: "mcp:engagement:daily".to_string(),
+                dimension: RateLimitDimension::Category,
+                match_value: "engagement".to_string(),
+                max_count: 50,
+                period_seconds: 86400,
+            },
+            PolicyRateLimit {
+                key: "mcp:follow:hourly".to_string(),
+                dimension: RateLimitDimension::Tool,
+                match_value: "follow_user".to_string(),
+                max_count: 5,
+                period_seconds: 3600,
+            },
+        ];
+
+        init_policy_rate_limits(&pool, &limits).await.expect("init");
+
+        record_policy_rate_limits(&pool, "like_tweet", "engagement", &limits)
+            .await
+            .expect("record");
+
+        let all = get_all_rate_limits(&pool).await.expect("get");
+
+        let like = all
+            .iter()
+            .find(|l| l.action_type == "mcp:like_tweet:hourly")
+            .expect("like");
+        assert_eq!(like.request_count, 1, "tool match should increment");
+
+        let engagement = all
+            .iter()
+            .find(|l| l.action_type == "mcp:engagement:daily")
+            .expect("engagement");
+        assert_eq!(
+            engagement.request_count, 1,
+            "category match should increment"
+        );
+
+        let follow = all
+            .iter()
+            .find(|l| l.action_type == "mcp:follow:hourly")
+            .expect("follow");
+        assert_eq!(
+            follow.request_count, 0,
+            "non-matching tool should not increment"
+        );
+    }
+
+    #[tokio::test]
+    async fn init_rate_limits_for_different_accounts() {
+        let pool = init_test_db().await.expect("init db");
+        init_rate_limits_for(
+            &pool,
+            "acct_a",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init a");
+        init_rate_limits_for(
+            &pool,
+            "acct_b",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init b");
+
+        increment_rate_limit_for(&pool, "acct_a", "reply")
+            .await
+            .expect("inc a");
+
+        let limits_a = get_all_rate_limits_for(&pool, "acct_a")
+            .await
+            .expect("get a");
+        let reply_a = limits_a
+            .iter()
+            .find(|l| l.action_type == "reply")
+            .expect("reply a");
+        assert_eq!(reply_a.request_count, 1);
+
+        let limits_b = get_all_rate_limits_for(&pool, "acct_b")
+            .await
+            .expect("get b");
+        let reply_b = limits_b
+            .iter()
+            .find(|l| l.action_type == "reply")
+            .expect("reply b");
+        assert_eq!(reply_b.request_count, 0, "account b should be unaffected");
+    }
 }
