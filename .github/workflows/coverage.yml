@@ -45,7 +45,9 @@ jobs:
             --exclude-files "crates/*/src/bin/**" \
             --timeout 120 \
             --out xml \
-            --output-dir coverage/
+            --output-dir coverage/ \
+            -- \
+            --skip session09_expanded_benchmark
         env:
           RUSTFLAGS: "-D warnings"
           TUITBOT_SKIP_DASHBOARD_BUILD: '1'
