@@ -25,6 +25,7 @@ mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
 mod draft_studio_coverage; // Additional draft studio error-path coverage
 mod settings_accounts; // Settings, accounts, activity, connectors, vault, content, and misc route coverage
+mod settings_init_workflow; // Settings init → get → patch → validate workflow coverage
 mod x_auth; // X OAuth unlink tests // Task 3.8: integration tests for 0%-coverage server routes
 
 /// The test API token used across all tests.

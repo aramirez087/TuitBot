@@ -657,3 +657,296 @@ async fn enqueue_with_provenance_and_scheduled_for() {
     assert_eq!(item.scheduled_for.as_deref(), Some("2026-04-01T09:00:00Z"));
     assert_eq!(item.source_chunks_json, r#"[{"type":"manual"}]"#);
 }
+
+// ── Additional coverage tests ───────────────────────────────────────
+
+#[tokio::test]
+async fn get_filtered_by_action_type() {
+    let pool = init_test_db().await.expect("init db");
+
+    enqueue(&pool, "tweet", "", "", "T1", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+    enqueue(&pool, "reply", "t1", "@u", "R1", "Rust", "", 50.0, "[]")
+        .await
+        .expect("enqueue");
+    enqueue(&pool, "tweet", "", "", "T2", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    let items = get_filtered(&pool, &["pending"], Some("tweet"), None, None)
+        .await
+        .expect("filtered");
+    assert_eq!(items.len(), 2);
+    assert!(items.iter().all(|i| i.action_type == "tweet"));
+}
+
+#[tokio::test]
+async fn get_filtered_by_reviewer() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id1 = enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+    let id2 = enqueue(&pool, "tweet", "", "", "B", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    let review_alice = ReviewAction {
+        actor: Some("alice".to_string()),
+        notes: None,
+    };
+    let review_bob = ReviewAction {
+        actor: Some("bob".to_string()),
+        notes: None,
+    };
+    update_status_with_review(&pool, id1, "approved", &review_alice)
+        .await
+        .expect("approve");
+    update_status_with_review(&pool, id2, "approved", &review_bob)
+        .await
+        .expect("approve");
+
+    let items = get_filtered(&pool, &["approved"], None, Some("alice"), None)
+        .await
+        .expect("filtered");
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].generated_content, "A");
+}
+
+#[tokio::test]
+async fn get_filtered_empty_statuses_returns_empty() {
+    let pool = init_test_db().await.expect("init db");
+
+    enqueue(&pool, "tweet", "", "", "A", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    let items = get_filtered(&pool, &[], None, None, None)
+        .await
+        .expect("filtered");
+    assert!(items.is_empty());
+}
+
+#[tokio::test]
+async fn update_media_paths_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(&pool, "tweet", "", "", "Hello", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    update_media_paths(&pool, id, r#"["/tmp/img.png"]"#)
+        .await
+        .expect("update media");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("found");
+    assert_eq!(item.media_paths, r#"["/tmp/img.png"]"#);
+}
+
+#[tokio::test]
+async fn get_next_approved_returns_oldest() {
+    let pool = init_test_db().await.expect("init db");
+
+    // No approved items yet.
+    let next = get_next_approved(&pool).await.expect("next");
+    assert!(next.is_none());
+
+    let id1 = enqueue(&pool, "tweet", "", "", "First", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+    let id2 = enqueue(&pool, "tweet", "", "", "Second", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    update_status(&pool, id1, "approved")
+        .await
+        .expect("approve");
+    update_status(&pool, id2, "approved")
+        .await
+        .expect("approve");
+
+    let next = get_next_approved(&pool)
+        .await
+        .expect("next")
+        .expect("found");
+    assert_eq!(next.id, id1, "should return the first approved item");
+}
+
+#[tokio::test]
+async fn mark_posted_sets_status_and_tweet_id() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(&pool, "tweet", "", "", "Hello", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    // Must be approved before posting.
+    sqlx::query("UPDATE approval_queue SET status = 'approved' WHERE id = ? AND account_id = ?")
+        .bind(id)
+        .bind(DEFAULT_ACCOUNT_ID)
+        .execute(&pool)
+        .await
+        .expect("raw approve");
+
+    mark_posted(&pool, id, "posted_tweet_999")
+        .await
+        .expect("mark posted");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("found");
+    assert_eq!(item.status, "posted");
+
+    // Should no longer appear in next_approved.
+    let next = get_next_approved(&pool).await.expect("next");
+    assert!(next.is_none());
+}
+
+#[tokio::test]
+async fn expire_old_items_expires_nothing_when_recent() {
+    let pool = init_test_db().await.expect("init db");
+
+    enqueue(&pool, "tweet", "", "", "Fresh", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    // Items just inserted should not be expired by a 24h window.
+    let expired = expire_old_items(&pool, 24).await.expect("expire");
+    assert_eq!(expired, 0);
+
+    let pending = get_pending(&pool).await.expect("pending");
+    assert_eq!(pending.len(), 1);
+}
+
+#[tokio::test]
+async fn enqueue_for_multi_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let account_a = "account-aaa";
+    let account_b = "account-bbb";
+
+    // Create accounts.
+    crate::storage::accounts::create_account(&pool, account_a, "Account A")
+        .await
+        .expect("create a");
+    crate::storage::accounts::create_account(&pool, account_b, "Account B")
+        .await
+        .expect("create b");
+
+    enqueue_for(
+        &pool, account_a, "tweet", "", "", "From A", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue a");
+
+    enqueue_for(
+        &pool, account_b, "reply", "t1", "@u", "From B", "Rust", "", 50.0, "[]",
+    )
+    .await
+    .expect("enqueue b");
+
+    let pending_a = get_pending_for(&pool, account_a).await.expect("pending a");
+    assert_eq!(pending_a.len(), 1);
+    assert_eq!(pending_a[0].generated_content, "From A");
+
+    let pending_b = get_pending_for(&pool, account_b).await.expect("pending b");
+    assert_eq!(pending_b.len(), 1);
+    assert_eq!(pending_b[0].generated_content, "From B");
+
+    // Default account should have nothing.
+    let pending_default = get_pending(&pool).await.expect("pending default");
+    assert!(pending_default.is_empty());
+}
+
+#[tokio::test]
+async fn stats_for_multi_account() {
+    let pool = init_test_db().await.expect("init db");
+
+    let account = "stats-account";
+    crate::storage::accounts::create_account(&pool, account, "Stats")
+        .await
+        .expect("create");
+
+    let id1 = enqueue_for(
+        &pool, account, "tweet", "", "", "A", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+    enqueue_for(
+        &pool, account, "tweet", "", "", "B", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    update_status_for(&pool, account, id1, "approved")
+        .await
+        .expect("approve");
+
+    let stats = get_stats_for(&pool, account).await.expect("stats");
+    assert_eq!(stats.pending, 1);
+    assert_eq!(stats.approved, 1);
+    assert_eq!(stats.rejected, 0);
+    assert_eq!(stats.failed, 0);
+
+    // Default account stats should be unaffected.
+    let default_stats = get_stats(&pool).await.expect("default stats");
+    assert_eq!(default_stats.pending, 0);
+}
+
+#[tokio::test]
+async fn pending_count_for_account() {
+    let pool = init_test_db().await.expect("init db");
+
+    let account = "count-account";
+    crate::storage::accounts::create_account(&pool, account, "Count")
+        .await
+        .expect("create");
+
+    assert_eq!(pending_count_for(&pool, account).await.expect("count"), 0);
+
+    enqueue_for(
+        &pool, account, "tweet", "", "", "X", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    assert_eq!(pending_count_for(&pool, account).await.expect("count"), 1);
+    // Default account unaffected.
+    assert_eq!(pending_count(&pool).await.expect("count"), 0);
+}
+
+#[tokio::test]
+async fn update_content_and_approve_already_reviewed() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = enqueue(&pool, "tweet", "", "", "Draft", "General", "", 0.0, "[]")
+        .await
+        .expect("enqueue");
+
+    update_status(&pool, id, "rejected").await.expect("reject");
+
+    let err = update_content_and_approve(&pool, id, "New content")
+        .await
+        .expect_err("should fail");
+    match err {
+        crate::error::StorageError::AlreadyReviewed {
+            id: err_id,
+            current_status,
+        } => {
+            assert_eq!(err_id, id);
+            assert_eq!(current_status, "rejected");
+        }
+        other => panic!("expected AlreadyReviewed, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn batch_approve_empty_queue() {
+    let pool = init_test_db().await.expect("init db");
+
+    let review = ReviewAction {
+        actor: Some("user".to_string()),
+        notes: None,
+    };
+    let ids = batch_approve(&pool, 10, &review).await.expect("batch");
+    assert!(ids.is_empty());
+}
