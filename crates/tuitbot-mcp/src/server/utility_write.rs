@@ -507,3 +507,197 @@ impl ServerHandler for UtilityWriteMcpServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use tuitbot_core::config::Config;
+    use tuitbot_core::error::XApiError;
+    use tuitbot_core::toolkit;
+    use tuitbot_core::x_api::types::*;
+    use tuitbot_core::x_api::XApiClient;
+
+    use crate::state::ReadonlyState;
+
+    // ── Minimal no-op X client ────────────────────────────────────────────
+    struct NullX;
+
+    #[async_trait::async_trait]
+    impl XApiClient for NullX {
+        async fn search_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_mentions(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<MentionResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn post_tweet(&self, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn reply_to_tweet(&self, _: &str, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_tweet(&self, _: &str) -> Result<Tweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_me(&self) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_by_username(&self, _: &str) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+    }
+
+    fn make_state() -> Arc<ReadonlyState> {
+        Arc::new(ReadonlyState {
+            config: Config::default(),
+            x_client: Box::new(NullX),
+            authenticated_user_id: String::new(),
+            x_available: false,
+        })
+    }
+
+    // ── toolkit::read (reads also exposed via utility_write) ─────────────
+
+    #[tokio::test]
+    async fn utility_write_get_tweet_error() {
+        let state = make_state();
+        let r = toolkit::read::get_tweet(state.x_client.as_ref(), "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_get_user_by_username_error() {
+        let state = make_state();
+        let r = toolkit::read::get_user_by_username(state.x_client.as_ref(), "user").await;
+        assert!(r.is_err());
+    }
+
+    // ── toolkit::write ────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn utility_write_post_tweet_empty_text() {
+        let state = make_state();
+        let r = toolkit::write::post_tweet(state.x_client.as_ref(), "", None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_post_tweet_x_error() {
+        let state = make_state();
+        let r = toolkit::write::post_tweet(state.x_client.as_ref(), "hello world", None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_reply_to_tweet_empty_text() {
+        let state = make_state();
+        let r = toolkit::write::reply_to_tweet(state.x_client.as_ref(), "", "123", None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_reply_to_tweet_x_error() {
+        let state = make_state();
+        let r = toolkit::write::reply_to_tweet(state.x_client.as_ref(), "reply", "123", None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_delete_tweet_error() {
+        let state = make_state();
+        let r = toolkit::write::delete_tweet(state.x_client.as_ref(), "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_quote_tweet_empty_text() {
+        let state = make_state();
+        let r = toolkit::write::quote_tweet(state.x_client.as_ref(), "", "456").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_quote_tweet_x_error() {
+        let state = make_state();
+        let r = toolkit::write::quote_tweet(state.x_client.as_ref(), "quoting", "456").await;
+        assert!(r.is_err());
+    }
+
+    // ── toolkit::engage ───────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn utility_write_like_tweet_error() {
+        let state = make_state();
+        let r = toolkit::engage::like_tweet(state.x_client.as_ref(), "u1", "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_unlike_tweet_error() {
+        let state = make_state();
+        let r = toolkit::engage::unlike_tweet(state.x_client.as_ref(), "u1", "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_follow_user_error() {
+        let state = make_state();
+        let r = toolkit::engage::follow_user(state.x_client.as_ref(), "u1", "u2").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_unfollow_user_error() {
+        let state = make_state();
+        let r = toolkit::engage::unfollow_user(state.x_client.as_ref(), "u1", "u2").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_retweet_error() {
+        let state = make_state();
+        let r = toolkit::engage::retweet(state.x_client.as_ref(), "u1", "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_unretweet_error() {
+        let state = make_state();
+        let r = toolkit::engage::unretweet(state.x_client.as_ref(), "u1", "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_bookmark_tweet_error() {
+        let state = make_state();
+        let r = toolkit::engage::bookmark_tweet(state.x_client.as_ref(), "u1", "123").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_unbookmark_tweet_error() {
+        let state = make_state();
+        let r = toolkit::engage::unbookmark_tweet(state.x_client.as_ref(), "u1", "123").await;
+        assert!(r.is_err());
+    }
+}
