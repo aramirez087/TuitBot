@@ -455,4 +455,223 @@ mod tests {
         assert!((params.temperature - 0.7).abs() < f32::EPSILON);
         assert!(params.system_prompt.is_none());
     }
+
+    // --- Helper function branch coverage via prompt capture ---
+
+    #[tokio::test]
+    async fn voice_section_included_when_brand_voice_set() {
+        let mut biz = test_business();
+        biz.brand_voice = Some("Friendly, casual, and approachable".to_string());
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Friendly, casual, and approachable"));
+    }
+
+    #[tokio::test]
+    async fn voice_section_absent_when_none() {
+        let mut biz = test_business();
+        biz.brand_voice = None;
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(!system.contains("Voice & personality"));
+    }
+
+    #[tokio::test]
+    async fn voice_section_absent_when_empty_string() {
+        let mut biz = test_business();
+        biz.brand_voice = Some(String::new());
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(!system.contains("Voice & personality"));
+    }
+
+    #[tokio::test]
+    async fn audience_section_included_when_non_empty() {
+        let biz = test_business(); // target_audience = "developers"
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", true)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Your audience: developers"));
+    }
+
+    #[tokio::test]
+    async fn audience_section_absent_when_empty() {
+        let mut biz = test_business();
+        biz.target_audience = String::new();
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", true)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(!system.contains("Your audience"));
+    }
+
+    #[tokio::test]
+    async fn persona_context_with_opinions_and_experiences() {
+        let mut biz = test_business();
+        biz.persona_opinions = vec!["Rust is the future".to_string()];
+        biz.persona_experiences = vec!["Built CLI tools for 5 years".to_string()];
+        biz.content_pillars = vec!["Developer productivity".to_string()];
+
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Opinions you hold: Rust is the future"));
+        assert!(system.contains("Experiences you can reference: Built CLI tools for 5 years"));
+        assert!(system.contains("Content pillars: Developer productivity"));
+    }
+
+    #[tokio::test]
+    async fn persona_context_empty_when_no_persona() {
+        let biz = test_business(); // persona_opinions/experiences/pillars all empty
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(!system.contains("Opinions you hold"));
+        assert!(!system.contains("Experiences you can reference"));
+        assert!(!system.contains("Content pillars"));
+    }
+
+    #[tokio::test]
+    async fn reply_style_custom_when_set() {
+        let mut biz = test_business();
+        biz.reply_style = Some("Be witty and concise".to_string());
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Be witty and concise"));
+    }
+
+    #[tokio::test]
+    async fn reply_style_default_when_none() {
+        let biz = test_business(); // reply_style = None
+        let (provider, captured) = PromptCapturingProvider::new("Short reply.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_reply("test", "user", false)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Be conversational and helpful"));
+    }
+
+    #[tokio::test]
+    async fn content_style_custom_for_tweet() {
+        let mut biz = test_business();
+        biz.content_style = Some("Sharp and data-driven".to_string());
+        let (provider, captured) = PromptCapturingProvider::new("Short tweet.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_tweet("testing").await.expect("tweet");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Sharp and data-driven"));
+    }
+
+    #[tokio::test]
+    async fn content_style_default_for_tweet() {
+        let biz = test_business(); // content_style = None
+        let (provider, captured) = PromptCapturingProvider::new("Short tweet.");
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_tweet("testing").await.expect("tweet");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Be informative and engaging"));
+    }
+
+    #[test]
+    fn generation_output_debug_and_clone() {
+        let output = GenerationOutput {
+            text: "hello".to_string(),
+            usage: TokenUsage::default(),
+            model: "gpt-4".to_string(),
+            provider: "openai".to_string(),
+        };
+        let clone = output.clone();
+        assert_eq!(clone.text, "hello");
+        let debug = format!("{output:?}");
+        assert!(debug.contains("hello"));
+    }
+
+    #[test]
+    fn thread_generation_output_debug_and_clone() {
+        let output = ThreadGenerationOutput {
+            tweets: vec!["a".to_string(), "b".to_string()],
+            usage: TokenUsage::default(),
+            model: "gpt-4".to_string(),
+            provider: "openai".to_string(),
+        };
+        let clone = output.clone();
+        assert_eq!(clone.tweets.len(), 2);
+        let debug = format!("{output:?}");
+        assert!(debug.contains("gpt-4"));
+    }
+
+    #[test]
+    fn business_accessor() {
+        let biz = test_business();
+        let gen = ContentGenerator::new(Box::new(MockProvider::single("test")), biz);
+        assert_eq!(gen.business().product_name, "TestApp");
+    }
+
+    #[test]
+    fn rag_section_empty_string_returns_empty() {
+        let result = ContentGenerator::format_rag_section(Some(""));
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn rag_section_none_returns_empty() {
+        let result = ContentGenerator::format_rag_section(None);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn rag_section_with_content() {
+        let result = ContentGenerator::format_rag_section(Some("context here"));
+        assert_eq!(result, "\ncontext here");
+    }
 }

@@ -190,3 +190,140 @@ fn default_cb_window_seconds() -> u64 {
 fn default_cb_cooldown_seconds() -> u64 {
     600
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- ScheduleConfig ---
+
+    #[test]
+    fn schedule_config_default() {
+        let sc = ScheduleConfig::default();
+        assert_eq!(sc.timezone, "UTC");
+        assert_eq!(sc.active_hours_start, 8);
+        assert_eq!(sc.active_hours_end, 22);
+        assert_eq!(sc.active_days.len(), 7);
+        assert!(sc.preferred_times.is_empty());
+        assert!(sc.preferred_times_override.is_empty());
+        assert!(sc.thread_preferred_day.is_none());
+        assert_eq!(sc.thread_preferred_time, "10:00");
+    }
+
+    #[test]
+    fn schedule_config_serde_roundtrip() {
+        let sc = ScheduleConfig {
+            timezone: "America/New_York".into(),
+            active_hours_start: 9,
+            active_hours_end: 21,
+            active_days: vec!["Mon".into(), "Wed".into(), "Fri".into()],
+            preferred_times: vec!["09:15".into(), "12:30".into()],
+            preferred_times_override: HashMap::from([("Mon".into(), vec!["08:00".into()])]),
+            thread_preferred_day: Some("Tue".into()),
+            thread_preferred_time: "14:00".into(),
+        };
+        let json = serde_json::to_string(&sc).unwrap();
+        let back: ScheduleConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.timezone, "America/New_York");
+        assert_eq!(back.active_hours_start, 9);
+        assert_eq!(back.active_days.len(), 3);
+        assert_eq!(back.preferred_times.len(), 2);
+        assert_eq!(back.preferred_times_override.len(), 1);
+        assert_eq!(back.thread_preferred_day.as_deref(), Some("Tue"));
+        assert_eq!(back.thread_preferred_time, "14:00");
+    }
+
+    #[test]
+    fn schedule_config_deserialize_with_defaults() {
+        let json = r#"{}"#;
+        let sc: ScheduleConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(sc.timezone, "UTC");
+        assert_eq!(sc.active_hours_start, 8);
+        assert_eq!(sc.active_hours_end, 22);
+        assert_eq!(sc.active_days.len(), 7);
+        assert_eq!(sc.thread_preferred_time, "10:00");
+    }
+
+    // --- CircuitBreakerConfig ---
+
+    #[test]
+    fn circuit_breaker_config_default() {
+        let cb = CircuitBreakerConfig::default();
+        assert_eq!(cb.error_threshold, 5);
+        assert_eq!(cb.window_seconds, 300);
+        assert_eq!(cb.cooldown_seconds, 600);
+    }
+
+    #[test]
+    fn circuit_breaker_config_serde_roundtrip() {
+        let cb = CircuitBreakerConfig {
+            error_threshold: 10,
+            window_seconds: 600,
+            cooldown_seconds: 1200,
+        };
+        let json = serde_json::to_string(&cb).unwrap();
+        let back: CircuitBreakerConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.error_threshold, 10);
+        assert_eq!(back.window_seconds, 600);
+        assert_eq!(back.cooldown_seconds, 1200);
+    }
+
+    #[test]
+    fn circuit_breaker_config_deserialize_with_defaults() {
+        let json = r#"{}"#;
+        let cb: CircuitBreakerConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cb.error_threshold, 5);
+        assert_eq!(cb.window_seconds, 300);
+        assert_eq!(cb.cooldown_seconds, 600);
+    }
+
+    // --- McpPolicyConfig ---
+
+    #[test]
+    fn mcp_policy_config_deserialize_v1_minimal() {
+        let json = r#"{}"#;
+        let pc: McpPolicyConfig = serde_json::from_str(json).unwrap();
+        assert!(pc.enforce_for_mutations);
+        assert!(!pc.require_approval_for.is_empty());
+        assert!(pc.blocked_tools.is_empty());
+        assert!(!pc.dry_run_mutations);
+        assert_eq!(pc.max_mutations_per_hour, 20);
+        assert!(pc.template.is_none());
+        assert!(pc.rules.is_empty());
+        assert!(pc.rate_limits.is_empty());
+    }
+
+    #[test]
+    fn mcp_policy_config_serde_roundtrip() {
+        let pc = McpPolicyConfig {
+            enforce_for_mutations: false,
+            require_approval_for: vec!["post_tweet".into()],
+            blocked_tools: vec!["delete_tweet".into()],
+            dry_run_mutations: true,
+            max_mutations_per_hour: 50,
+            template: Some(crate::mcp_policy::types::PolicyTemplateName::SafeDefault),
+            rules: vec![],
+            rate_limits: vec![],
+        };
+        let json = serde_json::to_string(&pc).unwrap();
+        let back: McpPolicyConfig = serde_json::from_str(&json).unwrap();
+        assert!(!back.enforce_for_mutations);
+        assert_eq!(back.require_approval_for, vec!["post_tweet"]);
+        assert_eq!(back.blocked_tools, vec!["delete_tweet"]);
+        assert!(back.dry_run_mutations);
+        assert_eq!(back.max_mutations_per_hour, 50);
+        assert!(back.template.is_some());
+    }
+
+    #[test]
+    fn mcp_policy_config_default_approval_list() {
+        let json = r#"{}"#;
+        let pc: McpPolicyConfig = serde_json::from_str(json).unwrap();
+        assert!(pc.require_approval_for.contains(&"post_tweet".to_string()));
+        assert!(pc
+            .require_approval_for
+            .contains(&"reply_to_tweet".to_string()));
+        assert!(pc.require_approval_for.contains(&"follow_user".to_string()));
+        assert!(pc.require_approval_for.contains(&"like_tweet".to_string()));
+    }
+}

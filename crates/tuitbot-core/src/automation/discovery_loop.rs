@@ -768,6 +768,82 @@ mod tests {
         assert_eq!(summary.tweets_found, 2); // 1 tweet per keyword
     }
 
+    #[test]
+    fn discovery_summary_default() {
+        let s = DiscoverySummary::default();
+        assert_eq!(s.tweets_found, 0);
+        assert_eq!(s.qualifying, 0);
+        assert_eq!(s.replied, 0);
+        assert_eq!(s.skipped, 0);
+        assert_eq!(s.failed, 0);
+    }
+
+    #[test]
+    fn discovery_result_debug() {
+        let r = DiscoveryResult::Replied {
+            tweet_id: "1".to_string(),
+            author: "alice".to_string(),
+            score: 85.0,
+            reply_text: "Great!".to_string(),
+        };
+        let debug = format!("{r:?}");
+        assert!(debug.contains("Replied"));
+
+        let r = DiscoveryResult::BelowThreshold {
+            tweet_id: "2".to_string(),
+            score: 30.0,
+        };
+        let debug = format!("{r:?}");
+        assert!(debug.contains("BelowThreshold"));
+
+        let r = DiscoveryResult::Skipped {
+            tweet_id: "3".to_string(),
+            reason: "test".to_string(),
+        };
+        assert!(format!("{r:?}").contains("Skipped"));
+
+        let r = DiscoveryResult::Failed {
+            tweet_id: "4".to_string(),
+            error: "boom".to_string(),
+        };
+        assert!(format!("{r:?}").contains("Failed"));
+    }
+
+    #[test]
+    fn truncate_exact_length() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_empty_string() {
+        assert_eq!(truncate("", 10), "");
+    }
+
+    #[tokio::test]
+    async fn run_once_all_keywords_fail_returns_error() {
+        let poster = Arc::new(MockPoster::new());
+        let storage = Arc::new(MockStorage::new());
+        let discovery = DiscoveryLoop::new(
+            Arc::new(FailingSearcher),
+            Arc::new(MockScorer {
+                score: 85.0,
+                meets_threshold: true,
+            }),
+            Arc::new(MockGenerator {
+                reply: "test".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            storage,
+            poster,
+            vec!["rust".to_string(), "cli".to_string()],
+            70.0,
+            false,
+        );
+
+        let result = discovery.run_once(None).await;
+        assert!(result.is_err());
+    }
+
     #[tokio::test]
     async fn search_error_returns_loop_error() {
         let poster = Arc::new(MockPoster::new());

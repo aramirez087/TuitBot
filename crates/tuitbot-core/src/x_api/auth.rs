@@ -660,6 +660,81 @@ mod tests {
         assert_eq!(token, "fresh_token");
     }
 
+    #[test]
+    fn tokens_serde_missing_scopes_defaults_empty() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_at": "2026-06-01T00:00:00Z"
+        }"#;
+        let tokens: Tokens = serde_json::from_str(json).unwrap();
+        assert_eq!(tokens.access_token, "a");
+        assert!(tokens.scopes.is_empty());
+    }
+
+    #[test]
+    fn tokens_roundtrip_preserves_scopes() {
+        let tokens = Tokens {
+            access_token: "acc".into(),
+            refresh_token: "ref".into(),
+            expires_at: Utc::now(),
+            scopes: vec![
+                "tweet.read".into(),
+                "tweet.write".into(),
+                "users.read".into(),
+            ],
+        };
+        let json = serde_json::to_string(&tokens).unwrap();
+        let back: Tokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.scopes.len(), 3);
+        assert!(back.scopes.contains(&"users.read".to_string()));
+    }
+
+    #[test]
+    fn tokens_clone() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec!["s1".into()],
+        };
+        let cloned = tokens.clone();
+        assert_eq!(cloned.access_token, tokens.access_token);
+        assert_eq!(cloned.scopes, tokens.scopes);
+    }
+
+    #[test]
+    fn save_tokens_to_nonexistent_parent_creates_dirs() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("deep").join("nested").join("tokens.json");
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&tokens, &path).expect("save");
+        let loaded = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(loaded.access_token, "a");
+    }
+
+    #[tokio::test]
+    async fn token_manager_tokens_lock_returns_shared_ref() {
+        let tokens = Tokens {
+            access_token: "tok".into(),
+            refresh_token: "ref".into(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let manager = TokenManager::new(tokens, "cid".into(), path);
+
+        let lock = manager.tokens_lock();
+        let guard = lock.read().await;
+        assert_eq!(guard.access_token, "tok");
+    }
+
     #[tokio::test]
     async fn token_manager_refresh_with_mock() {
         use wiremock::matchers::{body_string_contains, method};

@@ -728,4 +728,67 @@ mod tests {
     fn truncate_long_string() {
         assert_eq!(truncate("hello world this is long", 10), "hello worl...");
     }
+
+    #[test]
+    fn truncate_exact_length() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn update_max_id_from_none() {
+        let mut max = None;
+        update_max_id(&mut max, "42");
+        assert_eq!(max, Some("42".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_longer_id_wins() {
+        // A longer numeric string is always larger
+        let mut max = Some("99".to_string());
+        update_max_id(&mut max, "100");
+        assert_eq!(max, Some("100".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_shorter_id_loses() {
+        let mut max = Some("100".to_string());
+        update_max_id(&mut max, "99");
+        assert_eq!(max, Some("100".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_equal_length_comparison() {
+        let mut max = Some("200".to_string());
+        update_max_id(&mut max, "199");
+        assert_eq!(max, Some("200".to_string()));
+
+        update_max_id(&mut max, "201");
+        assert_eq!(max, Some("201".to_string()));
+    }
+
+    #[test]
+    fn mention_result_debug() {
+        let result = MentionResult::Replied {
+            tweet_id: "123".to_string(),
+            author: "alice".to_string(),
+            reply_text: "hello".to_string(),
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("Replied"));
+        assert!(debug.contains("123"));
+
+        let result = MentionResult::Skipped {
+            tweet_id: "456".to_string(),
+            reason: "already replied".to_string(),
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("Skipped"));
+
+        let result = MentionResult::Failed {
+            tweet_id: "789".to_string(),
+            error: "timeout".to_string(),
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("Failed"));
+    }
 }

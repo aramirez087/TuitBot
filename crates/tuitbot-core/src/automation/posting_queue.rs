@@ -797,6 +797,78 @@ mod tests {
         handle.await.expect("join");
     }
 
+    // --- Pure function tests ---
+
+    #[test]
+    fn is_rate_limit_error_detects_rate_limit() {
+        assert!(is_rate_limit_error("Rate limit exceeded"));
+        assert!(is_rate_limit_error("Error 429: Too Many Requests"));
+        assert!(is_rate_limit_error("too many requests"));
+        assert!(is_rate_limit_error("Forbidden: 403"));
+        assert!(is_rate_limit_error("forbidden"));
+        assert!(!is_rate_limit_error("Internal server error"));
+        assert!(!is_rate_limit_error("Not found"));
+    }
+
+    #[test]
+    fn randomized_delay_returns_min_when_equal() {
+        let d = randomized_delay(Duration::from_millis(100), Duration::from_millis(100));
+        assert_eq!(d, Duration::from_millis(100));
+    }
+
+    #[test]
+    fn randomized_delay_returns_min_when_min_greater() {
+        let d = randomized_delay(Duration::from_millis(200), Duration::from_millis(100));
+        assert_eq!(d, Duration::from_millis(200));
+    }
+
+    #[test]
+    fn randomized_delay_returns_zero_when_both_zero() {
+        let d = randomized_delay(Duration::ZERO, Duration::ZERO);
+        assert_eq!(d, Duration::ZERO);
+    }
+
+    #[test]
+    fn randomized_delay_in_range() {
+        let min = Duration::from_millis(50);
+        let max = Duration::from_millis(150);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(
+                d >= min && d <= max,
+                "delay {:?} not in [{:?}, {:?}]",
+                d,
+                min,
+                max
+            );
+        }
+    }
+
+    #[test]
+    fn post_action_debug_tweet_variant() {
+        let action = PostAction::Tweet {
+            content: "hello world".to_string(),
+            media_ids: vec!["m1".to_string()],
+            result_tx: None,
+        };
+        let debug = format!("{action:?}");
+        assert!(debug.contains("Tweet"));
+        assert!(debug.contains("media_count"));
+    }
+
+    #[test]
+    fn post_action_debug_thread_tweet_variant() {
+        let action = PostAction::ThreadTweet {
+            content: "thread part".to_string(),
+            in_reply_to: "prev-123".to_string(),
+            media_ids: vec![],
+            result_tx: None,
+        };
+        let debug = format!("{action:?}");
+        assert!(debug.contains("ThreadTweet"));
+        assert!(debug.contains("prev-123"));
+    }
+
     #[tokio::test]
     async fn approval_mode_queues_tweets() {
         let executor = Arc::new(MockExecutor::new());

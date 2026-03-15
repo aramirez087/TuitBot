@@ -837,6 +837,62 @@ mod tests {
         assert_eq!(user_mgr.lookup_count.load(Ordering::SeqCst), 1);
     }
 
+    #[test]
+    fn target_loop_config_debug() {
+        let config = TargetLoopConfig {
+            accounts: vec!["alice".to_string(), "bob".to_string()],
+            max_target_replies_per_day: 5,
+            dry_run: false,
+        };
+        let debug = format!("{config:?}");
+        assert!(debug.contains("alice"));
+        assert!(debug.contains("5"));
+    }
+
+    #[test]
+    fn target_loop_config_clone() {
+        let config = default_config();
+        let clone = config.clone();
+        assert_eq!(clone.accounts, config.accounts);
+        assert_eq!(
+            clone.max_target_replies_per_day,
+            config.max_target_replies_per_day
+        );
+        assert_eq!(clone.dry_run, config.dry_run);
+    }
+
+    #[test]
+    fn target_result_debug_all_variants() {
+        let r = TargetResult::Replied {
+            tweet_id: "t1".to_string(),
+            account: "alice".to_string(),
+            reply_text: "hi".to_string(),
+        };
+        assert!(format!("{r:?}").contains("Replied"));
+
+        let r = TargetResult::Skipped {
+            tweet_id: "t2".to_string(),
+            reason: "dup".to_string(),
+        };
+        assert!(format!("{r:?}").contains("Skipped"));
+
+        let r = TargetResult::Failed {
+            tweet_id: "t3".to_string(),
+            error: "oops".to_string(),
+        };
+        assert!(format!("{r:?}").contains("Failed"));
+    }
+
+    #[test]
+    fn truncate_exact_boundary() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_empty() {
+        assert_eq!(truncate("", 10), "");
+    }
+
     #[tokio::test]
     async fn non_auth_error_continues_iteration() {
         let user_mgr = Arc::new(MockPartialFailUserManager {

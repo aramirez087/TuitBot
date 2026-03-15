@@ -815,3 +815,96 @@ async fn chunk_node_stale_on_update_preserves_unchanged() {
         .unwrap();
     assert_eq!(active.len(), 2);
 }
+
+// ---------------------------------------------------------------------------
+// Pure function coverage
+// ---------------------------------------------------------------------------
+
+#[test]
+fn relative_path_string_simple() {
+    let p = Path::new("subdir/file.md");
+    assert_eq!(relative_path_string(p), "subdir/file.md");
+}
+
+#[test]
+fn relative_path_string_single_component() {
+    let p = Path::new("file.txt");
+    assert_eq!(relative_path_string(p), "file.txt");
+}
+
+#[test]
+fn relative_path_string_deep_nesting() {
+    let p = Path::new("a/b/c/d.md");
+    assert_eq!(relative_path_string(p), "a/b/c/d.md");
+}
+
+#[test]
+fn ingest_summary_default() {
+    let s = IngestSummary::default();
+    assert_eq!(s.ingested, 0);
+    assert_eq!(s.skipped, 0);
+    assert!(s.errors.is_empty());
+}
+
+#[test]
+fn parsed_front_matter_default() {
+    let fm = ParsedFrontMatter::default();
+    assert!(fm.title.is_none());
+    assert!(fm.tags.is_none());
+    assert!(fm.raw_yaml.is_none());
+}
+
+#[test]
+fn matches_patterns_with_star_glob() {
+    let patterns = vec!["*.rs".to_string()];
+    assert!(matches_patterns(Path::new("lib.rs"), &patterns));
+    assert!(!matches_patterns(Path::new("lib.py"), &patterns));
+}
+
+#[test]
+fn matches_patterns_no_filename() {
+    // A path that is just a directory won't have a file_name the same way
+    let patterns = vec!["*.md".to_string()];
+    // Path::new(".") doesn't match *.md
+    assert!(!matches_patterns(Path::new("."), &patterns));
+}
+
+#[test]
+fn parse_front_matter_invalid_yaml() {
+    let content = "---\n: invalid: yaml: [[\n---\nBody.\n";
+    let (fm, body) = parse_front_matter(content);
+    // Invalid YAML: title/tags should be None, but raw_yaml should be present
+    assert!(fm.title.is_none());
+    assert!(fm.tags.is_none());
+    assert!(fm.raw_yaml.is_some());
+    assert_eq!(body, "Body.\n");
+}
+
+#[test]
+fn parse_front_matter_yaml_not_mapping() {
+    // YAML that parses but is not a mapping (e.g., a scalar)
+    let content = "---\njust a string\n---\nBody text.\n";
+    let (fm, body) = parse_front_matter(content);
+    assert!(fm.title.is_none());
+    assert!(fm.tags.is_none());
+    assert!(fm.raw_yaml.is_some());
+    assert_eq!(body, "Body text.\n");
+}
+
+#[test]
+fn watchtower_error_display() {
+    let e = WatchtowerError::Config("bad path".to_string());
+    assert_eq!(e.to_string(), "config error: bad path");
+}
+
+#[test]
+fn ingest_summary_debug() {
+    let s = IngestSummary {
+        ingested: 3,
+        skipped: 1,
+        errors: vec!["fail".to_string()],
+    };
+    let debug = format!("{s:?}");
+    assert!(debug.contains("3"));
+    assert!(debug.contains("fail"));
+}
