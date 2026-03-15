@@ -417,3 +417,131 @@ async fn malformed_snapshot_date_excluded() {
     assert_eq!(snapshots.len(), 1);
     assert_eq!(snapshots[0].follower_count, 1000);
 }
+
+// ============================================================================
+// Ancestors: reply engagement score + keyword-filtered queries
+// ============================================================================
+
+#[tokio::test]
+async fn update_reply_engagement_score_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    upsert_reply_performance(&pool, "r1", 10, 5, 1000, 67.0)
+        .await
+        .expect("upsert");
+
+    update_reply_engagement_score(&pool, "r1", 0.72)
+        .await
+        .expect("update");
+
+    let row: (Option<f64>,) =
+        sqlx::query_as("SELECT engagement_score FROM reply_performance WHERE reply_id = ?")
+            .bind("r1")
+            .fetch_one(&pool)
+            .await
+            .expect("query");
+    assert!((row.0.unwrap() - 0.72).abs() < 0.001);
+}
+
+#[tokio::test]
+async fn get_scored_ancestors_with_topic_keywords() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    // Insert two tweets with different topics
+    sqlx::query(
+        "INSERT INTO original_tweets (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-rust', 'Rust is great for systems', 'rust', 'sent', '2026-02-27T10:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert rust tweet");
+
+    sqlx::query(
+        "INSERT INTO original_tweets (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-python', 'Python is great for AI', 'python', 'sent', '2026-02-27T11:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert python tweet");
+
+    upsert_tweet_performance(&pool, "tw-rust", 20, 10, 5, 1000, 90.0)
+        .await
+        .expect("perf rust");
+    update_tweet_engagement_score(&pool, "tw-rust", 0.9)
+        .await
+        .expect("score rust");
+
+    upsert_tweet_performance(&pool, "tw-python", 15, 8, 3, 800, 70.0)
+        .await
+        .expect("perf python");
+    update_tweet_engagement_score(&pool, "tw-python", 0.7)
+        .await
+        .expect("score python");
+
+    // Filter to rust only
+    let ancestors = get_scored_ancestors(&pool, acct, &["rust".to_string()], 0.1, 10)
+        .await
+        .expect("query");
+    assert_eq!(ancestors.len(), 1);
+    assert_eq!(ancestors[0].id, "tw-rust");
+}
+
+#[tokio::test]
+async fn get_scored_ancestors_with_reply_keyword_match() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    // Insert a reply that contains keyword in content
+    sqlx::query(
+        "INSERT INTO replies_sent \
+         (account_id, target_tweet_id, reply_tweet_id, reply_content, status, created_at) \
+         VALUES (?, 't1', 'reply-ml', 'Machine learning is transforming the field', 'sent', '2026-02-28T10:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert reply");
+
+    upsert_reply_performance(&pool, "reply-ml", 30, 15, 2000, 85.0)
+        .await
+        .expect("perf");
+    update_reply_engagement_score(&pool, "reply-ml", 0.88)
+        .await
+        .expect("score");
+
+    // Search with "learning" keyword — should match the reply content via LIKE
+    let ancestors = get_scored_ancestors(&pool, acct, &["learning".to_string()], 0.1, 10)
+        .await
+        .expect("query");
+    assert_eq!(ancestors.len(), 1);
+    assert_eq!(ancestors[0].content_type, "reply");
+    assert_eq!(ancestors[0].id, "reply-ml");
+}
+
+#[tokio::test]
+async fn get_max_performance_score_picks_highest_across_tables() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Tweet with lower score
+    upsert_tweet_performance(&pool, "tw1", 5, 2, 1, 500, 40.0)
+        .await
+        .expect("upsert tweet");
+    // Reply with higher score
+    upsert_reply_performance(&pool, "r1", 30, 15, 2000, 120.0)
+        .await
+        .expect("upsert reply");
+
+    let max = get_max_performance_score(&pool).await.expect("max");
+    assert!((max - 120.0).abs() < 0.01);
+
+    // Now add an even higher tweet
+    upsert_tweet_performance(&pool, "tw2", 100, 50, 20, 5000, 200.0)
+        .await
+        .expect("upsert tweet 2");
+
+    let max = get_max_performance_score(&pool).await.expect("max");
+    assert!((max - 200.0).abs() < 0.01);
+}

@@ -624,3 +624,418 @@ async fn scheduled_for_preserves_timezone_offset_format() {
         item.scheduled_for,
     );
 }
+
+// ============================================================================
+// Draft lifecycle: insert, update, delete, schedule
+// ============================================================================
+
+#[tokio::test]
+async fn insert_draft_and_list() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_draft(&pool, "tweet", "Draft content", "manual")
+        .await
+        .expect("insert");
+    assert!(id > 0);
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("exists");
+    assert_eq!(item.status, "draft");
+    assert_eq!(item.source, "manual");
+    assert!(item.scheduled_for.is_none());
+
+    let drafts = list_drafts(&pool).await.expect("list");
+    assert!(drafts.iter().any(|d| d.id == id));
+}
+
+#[tokio::test]
+async fn update_draft_changes_content() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_draft(&pool, "tweet", "Original draft", "manual")
+        .await
+        .expect("insert");
+
+    update_draft(&pool, id, "Updated draft")
+        .await
+        .expect("update");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("exists");
+    assert_eq!(item.content, "Updated draft");
+    assert_eq!(item.status, "draft");
+}
+
+#[tokio::test]
+async fn update_draft_only_affects_drafts() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "A draft", "manual")
+        .await
+        .expect("insert");
+
+    // Schedule the draft first
+    schedule_draft_for(&pool, acct, id, "2099-12-31T10:00:00Z")
+        .await
+        .expect("schedule");
+
+    // Trying to update content via update_draft should not affect a scheduled item
+    update_draft_for(&pool, acct, id, "Should not change")
+        .await
+        .expect("update");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.content, "A draft"); // unchanged
+}
+
+#[tokio::test]
+async fn delete_draft_sets_cancelled() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_draft(&pool, "tweet", "Will delete", "manual")
+        .await
+        .expect("insert");
+
+    delete_draft(&pool, id).await.expect("delete");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("exists");
+    assert_eq!(item.status, "cancelled");
+}
+
+#[tokio::test]
+async fn delete_draft_only_affects_drafts() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Scheduled", "manual")
+        .await
+        .expect("insert");
+
+    schedule_draft_for(&pool, acct, id, "2099-12-31T10:00:00Z")
+        .await
+        .expect("schedule");
+
+    // Attempt to delete a scheduled item via delete_draft should be a no-op
+    delete_draft_for(&pool, acct, id).await.expect("delete");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "scheduled"); // unchanged
+}
+
+#[tokio::test]
+async fn schedule_draft_promotes_to_scheduled() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert_draft(&pool, "tweet", "Promote me", "manual")
+        .await
+        .expect("insert");
+
+    schedule_draft(&pool, id, "2099-06-15T10:00:00Z")
+        .await
+        .expect("schedule");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("exists");
+    assert_eq!(item.status, "scheduled");
+    assert_eq!(item.scheduled_for.as_deref(), Some("2099-06-15T10:00:00Z"));
+}
+
+// ============================================================================
+// Unschedule
+// ============================================================================
+
+#[tokio::test]
+async fn unschedule_reverts_to_draft() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Unschedule me", "manual")
+        .await
+        .expect("insert");
+
+    schedule_draft_for(&pool, acct, id, "2099-12-31T10:00:00Z")
+        .await
+        .expect("schedule");
+
+    let reverted = unschedule_draft_for(&pool, acct, id)
+        .await
+        .expect("unschedule");
+    assert!(reverted);
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "draft");
+    assert!(item.scheduled_for.is_none());
+}
+
+#[tokio::test]
+async fn unschedule_non_scheduled_returns_false() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Just a draft", "manual")
+        .await
+        .expect("insert");
+
+    let reverted = unschedule_draft_for(&pool, acct, id)
+        .await
+        .expect("unschedule");
+    assert!(!reverted);
+}
+
+// ============================================================================
+// Autosave with optimistic locking
+// ============================================================================
+
+#[tokio::test]
+async fn autosave_draft_succeeds_with_matching_timestamp() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Initial", "manual")
+        .await
+        .expect("insert");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    let ts = &item.updated_at;
+
+    let result = autosave_draft_for(&pool, acct, id, "Autosaved content", "tweet", ts)
+        .await
+        .expect("autosave");
+    assert!(
+        result.is_some(),
+        "autosave should succeed with correct timestamp"
+    );
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.content, "Autosaved content");
+}
+
+#[tokio::test]
+async fn autosave_draft_fails_with_stale_timestamp() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_for(&pool, acct, "tweet", "Initial", "manual")
+        .await
+        .expect("insert");
+
+    // Use a stale timestamp that doesn't match
+    let result = autosave_draft_for(
+        &pool,
+        acct,
+        id,
+        "Stale write",
+        "tweet",
+        "1999-01-01T00:00:00",
+    )
+    .await
+    .expect("autosave");
+    assert!(
+        result.is_none(),
+        "autosave should fail with stale timestamp"
+    );
+
+    // Content should be unchanged
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.content, "Initial");
+}
+
+// ============================================================================
+// QA fields
+// ============================================================================
+
+#[tokio::test]
+async fn update_qa_fields_stores_all_fields() {
+    let pool = init_test_db().await.expect("init db");
+
+    let id = insert(&pool, "tweet", "QA test", Some("2099-01-01T10:00:00Z"))
+        .await
+        .expect("insert");
+
+    update_qa_fields(
+        &pool,
+        id,
+        r#"{"summary":"good"}"#,
+        r#"["no_link"]"#,
+        r#"["too_short"]"#,
+        r#"["add_emoji"]"#,
+        78.5,
+    )
+    .await
+    .expect("update qa");
+
+    let item = get_by_id(&pool, id).await.expect("get").expect("exists");
+    assert_eq!(item.qa_report, r#"{"summary":"good"}"#);
+    assert_eq!(item.qa_hard_flags, r#"["no_link"]"#);
+    assert_eq!(item.qa_soft_flags, r#"["too_short"]"#);
+    assert_eq!(item.qa_recommendations, r#"["add_emoji"]"#);
+    assert!((item.qa_score - 78.5).abs() < 0.01);
+}
+
+// ============================================================================
+// Draft with provenance
+// ============================================================================
+
+#[tokio::test]
+async fn insert_draft_with_provenance_creates_links() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let refs = vec![crate::storage::provenance::ProvenanceRef {
+        node_id: None,
+        chunk_id: None,
+        seed_id: None,
+        source_path: Some("notes/rust.md".to_string()),
+        heading_path: Some("Testing".to_string()),
+        snippet: Some("Use #[tokio::test]".to_string()),
+    }];
+
+    let id = insert_draft_with_provenance_for(&pool, acct, "tweet", "From vault", "assist", &refs)
+        .await
+        .expect("insert with provenance");
+
+    // Draft should exist
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.content, "From vault");
+    assert_eq!(item.source, "assist");
+
+    // Provenance link should exist
+    let link_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM vault_provenance_links \
+         WHERE entity_type = 'scheduled_content' AND entity_id = ?",
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .expect("count");
+    assert_eq!(link_count.0, 1);
+}
+
+#[tokio::test]
+async fn insert_draft_with_empty_provenance() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let id = insert_draft_with_provenance_for(&pool, acct, "tweet", "No refs", "manual", &[])
+        .await
+        .expect("insert with empty provenance");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.content, "No refs");
+
+    let link_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM vault_provenance_links \
+         WHERE entity_type = 'scheduled_content' AND entity_id = ?",
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .expect("count");
+    assert_eq!(link_count.0, 0);
+}
+
+// ============================================================================
+// Tags: list_draft_tags_for
+// ============================================================================
+
+#[tokio::test]
+async fn list_draft_tags_returns_assigned_tags() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let draft_id = insert_draft_for(&pool, acct, "tweet", "Tagged", "manual")
+        .await
+        .expect("insert");
+    let tag1 = create_tag_for(&pool, acct, "alpha", Some("#00ff00"))
+        .await
+        .expect("tag1");
+    let tag2 = create_tag_for(&pool, acct, "beta", None)
+        .await
+        .expect("tag2");
+    let _tag3 = create_tag_for(&pool, acct, "gamma", None)
+        .await
+        .expect("tag3");
+
+    assign_tag_for(&pool, draft_id, tag1)
+        .await
+        .expect("assign1");
+    assign_tag_for(&pool, draft_id, tag2)
+        .await
+        .expect("assign2");
+    // tag3 not assigned
+
+    let tags = list_draft_tags_for(&pool, acct, draft_id)
+        .await
+        .expect("list tags");
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0].name, "alpha");
+    assert_eq!(tags[1].name, "beta");
+}
+
+// ============================================================================
+// Revisions: get_revision_for
+// ============================================================================
+
+#[tokio::test]
+async fn get_revision_by_id() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let draft_id = insert_draft_for(&pool, acct, "tweet", "Current", "manual")
+        .await
+        .expect("insert");
+
+    let rev_id = insert_revision_for(&pool, acct, draft_id, "Snapshot v1", "tweet", "manual")
+        .await
+        .expect("rev");
+
+    let rev = get_revision_for(&pool, acct, draft_id, rev_id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(rev.content, "Snapshot v1");
+    assert_eq!(rev.trigger_kind, "manual");
+    assert_eq!(rev.content_id, draft_id);
+}
+
+#[tokio::test]
+async fn get_revision_wrong_content_id_returns_none() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    let draft_id = insert_draft_for(&pool, acct, "tweet", "Content", "manual")
+        .await
+        .expect("insert");
+
+    let rev_id = insert_revision_for(&pool, acct, draft_id, "Rev", "tweet", "manual")
+        .await
+        .expect("rev");
+
+    // Query with wrong content_id
+    let rev = get_revision_for(&pool, acct, 99999, rev_id)
+        .await
+        .expect("get");
+    assert!(rev.is_none());
+}
