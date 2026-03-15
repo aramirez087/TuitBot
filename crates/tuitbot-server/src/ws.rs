@@ -101,7 +101,7 @@ pub struct WsQuery {
     pub token: Option<String>,
 }
 
-/// Extract the session cookie value from headers.
+/// Extract the session cookie value from headers (exported for tests).
 fn extract_session_cookie(headers: &HeaderMap) -> Option<String> {
     headers
         .get("cookie")
@@ -180,6 +180,290 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
             Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                 break;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- WsEvent serialization (tagged enum) ---
+
+    #[test]
+    fn action_performed_serializes_with_type_tag() {
+        let event = WsEvent::ActionPerformed {
+            action_type: "reply".into(),
+            target: "@user".into(),
+            content: "Hello!".into(),
+            timestamp: "2026-03-15T12:00:00Z".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "ActionPerformed");
+        assert_eq!(json["action_type"], "reply");
+        assert_eq!(json["target"], "@user");
+    }
+
+    #[test]
+    fn approval_queued_serializes() {
+        let event = WsEvent::ApprovalQueued {
+            id: 42,
+            action_type: "tweet".into(),
+            content: "Draft tweet".into(),
+            media_paths: vec!["img.png".into()],
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "ApprovalQueued");
+        assert_eq!(json["id"], 42);
+        assert_eq!(json["media_paths"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn approval_updated_serializes_with_optional_actor() {
+        let event = WsEvent::ApprovalUpdated {
+            id: 1,
+            status: "approved".into(),
+            action_type: "tweet".into(),
+            actor: Some("admin".into()),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["actor"], "admin");
+
+        let event_no_actor = WsEvent::ApprovalUpdated {
+            id: 1,
+            status: "rejected".into(),
+            action_type: "tweet".into(),
+            actor: None,
+        };
+        let json2 = serde_json::to_value(&event_no_actor).unwrap();
+        assert!(
+            json2.get("actor").is_none(),
+            "actor should be skipped when None"
+        );
+    }
+
+    #[test]
+    fn follower_update_serializes() {
+        let event = WsEvent::FollowerUpdate {
+            count: 1500,
+            change: 25,
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "FollowerUpdate");
+        assert_eq!(json["count"], 1500);
+        assert_eq!(json["change"], 25);
+    }
+
+    #[test]
+    fn runtime_status_serializes() {
+        let event = WsEvent::RuntimeStatus {
+            running: true,
+            active_loops: vec!["mentions".into(), "discovery".into()],
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "RuntimeStatus");
+        assert_eq!(json["running"], true);
+        assert_eq!(json["active_loops"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn tweet_discovered_serializes() {
+        let event = WsEvent::TweetDiscovered {
+            tweet_id: "123456".into(),
+            author: "user1".into(),
+            score: 0.95,
+            timestamp: "2026-03-15T12:00:00Z".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "TweetDiscovered");
+        assert_eq!(json["score"], 0.95);
+    }
+
+    #[test]
+    fn action_skipped_serializes() {
+        let event = WsEvent::ActionSkipped {
+            action_type: "reply".into(),
+            reason: "rate limited".into(),
+            timestamp: "2026-03-15T12:00:00Z".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "ActionSkipped");
+        assert_eq!(json["reason"], "rate limited");
+    }
+
+    #[test]
+    fn content_scheduled_serializes() {
+        let event = WsEvent::ContentScheduled {
+            id: 7,
+            content_type: "tweet".into(),
+            scheduled_for: Some("2026-03-16T09:00:00Z".into()),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "ContentScheduled");
+        assert_eq!(json["id"], 7);
+        assert!(json["scheduled_for"].is_string());
+    }
+
+    #[test]
+    fn circuit_breaker_tripped_serializes() {
+        let event = WsEvent::CircuitBreakerTripped {
+            state: "open".into(),
+            error_count: 5,
+            cooldown_remaining_seconds: 120,
+            timestamp: "2026-03-15T12:00:00Z".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "CircuitBreakerTripped");
+        assert_eq!(json["error_count"], 5);
+        assert_eq!(json["cooldown_remaining_seconds"], 120);
+    }
+
+    #[test]
+    fn error_event_serializes() {
+        let event = WsEvent::Error {
+            message: "something broke".into(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["type"], "Error");
+        assert_eq!(json["message"], "something broke");
+    }
+
+    // --- AccountWsEvent flattening ---
+
+    #[test]
+    fn account_ws_event_flattens_correctly() {
+        let event = AccountWsEvent {
+            account_id: "acct-123".into(),
+            event: WsEvent::FollowerUpdate {
+                count: 100,
+                change: 5,
+            },
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["account_id"], "acct-123");
+        assert_eq!(json["type"], "FollowerUpdate");
+        assert_eq!(json["count"], 100);
+    }
+
+    #[test]
+    fn account_ws_event_roundtrip() {
+        let original = AccountWsEvent {
+            account_id: "acct-456".into(),
+            event: WsEvent::Error {
+                message: "test error".into(),
+            },
+        };
+        let json_str = serde_json::to_string(&original).unwrap();
+        let deserialized: AccountWsEvent = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(deserialized.account_id, "acct-456");
+        match deserialized.event {
+            WsEvent::Error { message } => assert_eq!(message, "test error"),
+            _ => panic!("expected Error variant"),
+        }
+    }
+
+    // --- extract_session_cookie ---
+
+    #[test]
+    fn extract_session_cookie_present() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "cookie",
+            "other=foo; tuitbot_session=abc123; another=bar"
+                .parse()
+                .unwrap(),
+        );
+        let result = extract_session_cookie(&headers);
+        assert_eq!(result.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn extract_session_cookie_not_present() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", "other=foo; another=bar".parse().unwrap());
+        let result = extract_session_cookie(&headers);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn extract_session_cookie_no_cookie_header() {
+        let headers = HeaderMap::new();
+        let result = extract_session_cookie(&headers);
+        assert!(result.is_none());
+    }
+
+    // --- WsEvent deserialization ---
+
+    #[test]
+    fn ws_event_deserializes_from_json() {
+        let json = r#"{"type":"Error","message":"test"}"#;
+        let event: WsEvent = serde_json::from_str(json).unwrap();
+        match event {
+            WsEvent::Error { message } => assert_eq!(message, "test"),
+            _ => panic!("expected Error variant"),
+        }
+    }
+
+    #[test]
+    fn all_event_variants_serialize_without_panic() {
+        let events: Vec<WsEvent> = vec![
+            WsEvent::ActionPerformed {
+                action_type: "reply".into(),
+                target: "t".into(),
+                content: "c".into(),
+                timestamp: "ts".into(),
+            },
+            WsEvent::ApprovalQueued {
+                id: 1,
+                action_type: "tweet".into(),
+                content: "c".into(),
+                media_paths: vec![],
+            },
+            WsEvent::ApprovalUpdated {
+                id: 1,
+                status: "s".into(),
+                action_type: "a".into(),
+                actor: None,
+            },
+            WsEvent::FollowerUpdate {
+                count: 0,
+                change: 0,
+            },
+            WsEvent::RuntimeStatus {
+                running: false,
+                active_loops: vec![],
+            },
+            WsEvent::TweetDiscovered {
+                tweet_id: "t".into(),
+                author: "a".into(),
+                score: 0.0,
+                timestamp: "ts".into(),
+            },
+            WsEvent::ActionSkipped {
+                action_type: "a".into(),
+                reason: "r".into(),
+                timestamp: "ts".into(),
+            },
+            WsEvent::ContentScheduled {
+                id: 1,
+                content_type: "tweet".into(),
+                scheduled_for: None,
+            },
+            WsEvent::CircuitBreakerTripped {
+                state: "open".into(),
+                error_count: 0,
+                cooldown_remaining_seconds: 0,
+                timestamp: "ts".into(),
+            },
+            WsEvent::Error {
+                message: "err".into(),
+            },
+        ];
+        for event in events {
+            let json = serde_json::to_string(&event).unwrap();
+            assert!(!json.is_empty());
+            // Round-trip
+            let _: WsEvent = serde_json::from_str(&json).unwrap();
         }
     }
 }

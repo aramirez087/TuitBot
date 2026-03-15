@@ -1139,4 +1139,98 @@ mod tests {
     fn url_encode_empty() {
         assert_eq!(url_encode(""), "");
     }
+
+    // --- resolve_db_path ---
+
+    #[test]
+    fn resolve_db_path_nonexistent_config_falls_back() {
+        let result = resolve_db_path("/nonexistent/path/to/config.toml");
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.to_string_lossy().contains("tuitbot.db"));
+    }
+
+    #[test]
+    fn resolve_db_path_valid_config() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[storage]\ndb_path = \"~/.tuitbot/custom.db\"\n",
+        )
+        .expect("write config");
+        let result = resolve_db_path(config_path.to_str().unwrap());
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.to_string_lossy().contains("custom.db"));
+    }
+
+    #[test]
+    fn resolve_db_path_empty_db_path_in_config() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(&config_path, "[storage]\ndb_path = \"\"\n").expect("write config");
+        let result = resolve_db_path(config_path.to_str().unwrap());
+        assert!(result.is_err());
+    }
+
+    // --- StartupError Io variant ---
+
+    #[test]
+    fn startup_error_io_display() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "missing");
+        let startup_err = StartupError::Io(io_err);
+        let msg = startup_err.to_string();
+        assert!(msg.contains("missing"), "got: {msg}");
+    }
+
+    // --- StoredTokens: scope analysis with required scopes ---
+
+    #[test]
+    fn stored_tokens_analyze_scopes_missing_scopes() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: vec!["tweet.read".to_string()], // missing several required
+        };
+        let analysis = tokens.analyze_scopes();
+        assert!(!analysis.missing.is_empty(), "should have missing scopes");
+        assert!(!analysis.granted.is_empty(), "should have granted scopes");
+    }
+
+    #[test]
+    fn stored_tokens_analyze_scopes_all_granted() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: REQUIRED_SCOPES.iter().map(|s| s.to_string()).collect(),
+        };
+        let analysis = tokens.analyze_scopes();
+        assert!(analysis.missing.is_empty(), "all scopes should be granted");
+    }
+
+    // --- load_tokens_from_file error cases (without touching real ~/.tuitbot) ---
+
+    #[test]
+    fn save_and_load_roundtrip_via_file_io() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("tokens.json");
+        let tokens = StoredTokens {
+            access_token: "at".to_string(),
+            refresh_token: Some("rt".to_string()),
+            expires_at: Some(chrono::Utc::now() + chrono::TimeDelta::hours(1)),
+            scopes: vec!["offline.access".to_string()],
+        };
+        let json = serde_json::to_string_pretty(&tokens).expect("serialize");
+        std::fs::write(&path, &json).expect("write");
+
+        let loaded_json = std::fs::read_to_string(&path).expect("read");
+        let loaded: StoredTokens = serde_json::from_str(&loaded_json).expect("parse");
+        assert_eq!(loaded.access_token, "at");
+        assert_eq!(loaded.refresh_token.as_deref(), Some("rt"));
+        assert!(loaded.has_scope("offline.access"));
+        assert!(!loaded.is_expired());
+    }
 }

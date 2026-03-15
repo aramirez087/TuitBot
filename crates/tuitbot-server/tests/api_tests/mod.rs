@@ -27,6 +27,7 @@ mod deep_handler_coverage; // Deep happy-path integration tests for large handle
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
 mod draft_studio_coverage; // Additional draft studio error-path coverage
+mod final_coverage; // Final coverage push: drafts CRUD, scheduled, strategy, vault, sources, x-auth, LAN, state
 mod mcp_policy; // Task 3.8: /api/mcp/* policy + telemetry coverage
 mod route_coverage_extra; // Extra compose, onboarding, media, ingest, assist, draft-studio coverage
 mod settings_accounts; // Settings, accounts, activity, connectors, vault, content, and misc route coverage
