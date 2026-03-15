@@ -682,6 +682,51 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[test]
+    fn contains_banned_phrase_empty_list() {
+        assert_eq!(contains_banned_phrase("anything", &[]), None);
+    }
+
+    #[test]
+    fn contains_banned_phrase_empty_text() {
+        let banned = vec!["check out".to_string()];
+        assert_eq!(contains_banned_phrase("", &banned), None);
+    }
+
+    #[test]
+    fn denial_reason_display_all_variants() {
+        // Verify all variants produce non-empty display strings
+        let variants = vec![
+            DenialReason::RateLimited {
+                action_type: "search".to_string(),
+                current: 5,
+                max: 5,
+            },
+            DenialReason::AlreadyReplied {
+                tweet_id: "t1".to_string(),
+            },
+            DenialReason::SimilarPhrasing,
+            DenialReason::BannedPhrase {
+                phrase: "buy now".to_string(),
+            },
+            DenialReason::AuthorLimitReached,
+            DenialReason::SelfReply,
+        ];
+        for variant in &variants {
+            assert!(!variant.to_string().is_empty());
+        }
+    }
+
+    #[test]
+    fn denial_reason_equality() {
+        assert_eq!(DenialReason::SelfReply, DenialReason::SelfReply);
+        assert_eq!(
+            DenialReason::AuthorLimitReached,
+            DenialReason::AuthorLimitReached
+        );
+        assert_ne!(DenialReason::SelfReply, DenialReason::SimilarPhrasing);
+    }
+
     #[tokio::test]
     async fn safety_guard_exposes_rate_limiter_and_dedup() {
         let (_pool, guard) = setup_guard().await;

@@ -302,3 +302,39 @@ fn is_headless_environment() -> bool {
 
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── validate_callback_state ──────────────────────────────────────
+
+    #[test]
+    fn validate_callback_state_matching() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123&state=mystate";
+        assert!(validate_callback_state(url, "mystate").is_ok());
+    }
+
+    #[test]
+    fn validate_callback_state_mismatch() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123&state=wrong";
+        let err = validate_callback_state(url, "expected").unwrap_err();
+        assert!(err.to_string().contains("state mismatch"));
+    }
+
+    #[test]
+    fn validate_callback_state_missing_state() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123";
+        let err = validate_callback_state(url, "expected").unwrap_err();
+        assert!(err.to_string().contains("missing"));
+    }
+
+    // ── is_headless_environment ──────────────────────────────────────
+
+    #[test]
+    fn is_headless_returns_bool() {
+        // We can't easily control env vars in tests, but we can at least
+        // ensure the function doesn't panic and returns a bool.
+        let _result = is_headless_environment();
+    }
+}

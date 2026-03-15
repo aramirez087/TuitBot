@@ -290,3 +290,181 @@ pub(super) fn format_toml_array(items: &[String]) -> String {
         .collect();
     format!("[{}]", inner.join(", "))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── escape_toml ──────────────────────────────────────────────────
+
+    #[test]
+    fn escape_toml_plain_string() {
+        assert_eq!(escape_toml("hello world"), "hello world");
+    }
+
+    #[test]
+    fn escape_toml_backslash() {
+        assert_eq!(escape_toml(r"C:\Users\test"), r"C:\\Users\\test");
+    }
+
+    #[test]
+    fn escape_toml_double_quotes() {
+        assert_eq!(escape_toml(r#"say "hi""#), r#"say \"hi\""#);
+    }
+
+    #[test]
+    fn escape_toml_newlines_tabs() {
+        assert_eq!(escape_toml("line1\nline2\ttab"), r"line1\nline2\ttab");
+    }
+
+    #[test]
+    fn escape_toml_carriage_return() {
+        assert_eq!(escape_toml("cr\rhere"), r"cr\rhere");
+    }
+
+    #[test]
+    fn escape_toml_combined_special_chars() {
+        assert_eq!(escape_toml("a\\b\"c\nd\re\tf"), r#"a\\b\"c\nd\re\tf"#);
+    }
+
+    #[test]
+    fn escape_toml_empty_string() {
+        assert_eq!(escape_toml(""), "");
+    }
+
+    // ── format_toml_array ────────────────────────────────────────────
+
+    #[test]
+    fn format_toml_array_empty() {
+        let items: Vec<String> = vec![];
+        assert_eq!(format_toml_array(&items), "[]");
+    }
+
+    #[test]
+    fn format_toml_array_single() {
+        let items = vec!["hello".to_string()];
+        assert_eq!(format_toml_array(&items), r#"["hello"]"#);
+    }
+
+    #[test]
+    fn format_toml_array_multiple() {
+        let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        assert_eq!(format_toml_array(&items), r#"["a", "b", "c"]"#);
+    }
+
+    #[test]
+    fn format_toml_array_with_special_chars() {
+        let items = vec!["say \"hi\"".to_string(), "path\\to".to_string()];
+        assert_eq!(format_toml_array(&items), r#"["say \"hi\"", "path\\to"]"#);
+    }
+
+    // ── parse_csv ────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_csv_empty_string() {
+        assert!(parse_csv("").is_empty());
+    }
+
+    #[test]
+    fn parse_csv_whitespace_only() {
+        assert!(parse_csv("   ,  ,  ").is_empty());
+    }
+
+    #[test]
+    fn parse_csv_single_value() {
+        assert_eq!(parse_csv("hello"), vec!["hello"]);
+    }
+
+    #[test]
+    fn parse_csv_trims_whitespace() {
+        assert_eq!(parse_csv("  a , b , c  "), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn parse_csv_filters_empty_entries() {
+        assert_eq!(parse_csv("a,,b, ,c"), vec!["a", "b", "c"]);
+    }
+
+    // ── parse_bool ───────────────────────────────────────────────────
+
+    #[test]
+    fn parse_bool_case_insensitive() {
+        assert!(parse_bool("TRUE").unwrap());
+        assert!(parse_bool("Yes").unwrap());
+        assert!(parse_bool("ON").unwrap());
+        assert!(!parse_bool("FALSE").unwrap());
+        assert!(!parse_bool("No").unwrap());
+        assert!(!parse_bool("OFF").unwrap());
+    }
+
+    #[test]
+    fn parse_bool_invalid_returns_error() {
+        let err = parse_bool("maybe").unwrap_err();
+        assert!(err.to_string().contains("Invalid boolean value"));
+    }
+
+    // ── parse_duration_input ─────────────────────────────────────────
+
+    #[test]
+    fn parse_duration_input_zero_minutes() {
+        assert_eq!(parse_duration_input("0").unwrap(), 0);
+    }
+
+    #[test]
+    fn parse_duration_input_with_whitespace() {
+        assert_eq!(parse_duration_input("  15  ").unwrap(), 900);
+    }
+
+    #[test]
+    fn parse_duration_input_hours_with_whitespace() {
+        assert_eq!(parse_duration_input("  3h  ").unwrap(), 10800);
+    }
+
+    #[test]
+    fn parse_duration_input_days_value() {
+        assert_eq!(parse_duration_input("1d").unwrap(), 86400);
+        assert_eq!(parse_duration_input("7d").unwrap(), 604800);
+    }
+
+    #[test]
+    fn parse_duration_input_invalid() {
+        assert!(parse_duration_input("abc").is_err());
+        assert!(parse_duration_input("").is_err());
+    }
+
+    // ── ChangeTracker ────────────────────────────────────────────────
+
+    #[test]
+    fn change_tracker_new_is_empty() {
+        let tracker = ChangeTracker::new();
+        assert!(tracker.changes.is_empty());
+    }
+
+    #[test]
+    fn change_tracker_records_different_values() {
+        let mut tracker = ChangeTracker::new();
+        tracker.record("s1", "f1", "old1", "new1");
+        tracker.record("s2", "f2", "old2", "new2");
+        assert_eq!(tracker.changes.len(), 2);
+        assert_eq!(tracker.changes[0].section, "s1");
+        assert_eq!(tracker.changes[0].field, "f1");
+        assert_eq!(tracker.changes[0].old_value, "old1");
+        assert_eq!(tracker.changes[0].new_value, "new1");
+    }
+
+    #[test]
+    fn change_tracker_skips_identical_values() {
+        let mut tracker = ChangeTracker::new();
+        tracker.record("s", "f", "same", "same");
+        assert!(tracker.changes.is_empty());
+    }
+
+    #[test]
+    fn change_tracker_empty_string_values() {
+        let mut tracker = ChangeTracker::new();
+        tracker.record("s", "f", "", "new");
+        assert_eq!(tracker.changes.len(), 1);
+        tracker.record("s", "f", "", "");
+        assert_eq!(tracker.changes.len(), 1); // no change for "" -> ""
+    }
+}

@@ -139,6 +139,156 @@ fn patch_approval_mode(doc: &mut DocumentMut, approval_mode: bool) {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_toml_array_empty() {
+        let arr = to_toml_array(&[]);
+        assert_eq!(arr.len(), 0);
+    }
+
+    #[test]
+    fn to_toml_array_single_item() {
+        let items = vec!["hello".to_string()];
+        let arr = to_toml_array(&items);
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr.get(0).unwrap().as_str().unwrap(), "hello");
+    }
+
+    #[test]
+    fn to_toml_array_multiple_items() {
+        let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let arr = to_toml_array(&items);
+        assert_eq!(arr.len(), 3);
+        assert_eq!(arr.get(0).unwrap().as_str().unwrap(), "a");
+        assert_eq!(arr.get(1).unwrap().as_str().unwrap(), "b");
+        assert_eq!(arr.get(2).unwrap().as_str().unwrap(), "c");
+    }
+
+    #[test]
+    fn to_toml_array_preserves_content() {
+        let items = vec!["rust programming".to_string(), "CLI tools".to_string()];
+        let arr = to_toml_array(&items);
+        assert_eq!(arr.get(0).unwrap().as_str().unwrap(), "rust programming");
+        assert_eq!(arr.get(1).unwrap().as_str().unwrap(), "CLI tools");
+    }
+
+    fn empty_answers() -> UpgradeAnswers {
+        UpgradeAnswers {
+            persona: None,
+            targets: None,
+            approval_mode: None,
+            enhanced_limits: None,
+            deployment_mode: None,
+            connectors: None,
+            content_sources_noticed: false,
+        }
+    }
+
+    #[test]
+    fn patch_config_creates_backup() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let _ = patch_config(&config_path, &[], &empty_answers());
+
+        let backup_path = config_path.with_extension("toml.bak");
+        assert!(backup_path.exists());
+    }
+
+    #[test]
+    fn patch_config_empty_missing_is_noop() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        let original = "[business]\nproduct_name = \"test\"\n";
+        fs::write(&config_path, original).unwrap();
+
+        patch_config(&config_path, &[], &empty_answers()).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert_eq!(result, original);
+    }
+
+    #[test]
+    fn patch_config_adds_approval_mode() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.approval_mode = Some(true);
+
+        patch_config(&config_path, &[UpgradeGroup::ApprovalMode], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("approval_mode = true"));
+    }
+
+    #[test]
+    fn patch_config_adds_targets() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.targets = Some(vec!["user1".to_string(), "user2".to_string()]);
+
+        patch_config(&config_path, &[UpgradeGroup::Targets], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("[targets]"));
+        assert!(result.contains("user1"));
+        assert!(result.contains("user2"));
+    }
+
+    #[test]
+    fn patch_config_adds_persona() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.persona = Some((
+            vec!["strong opinion".to_string()],
+            vec!["built something".to_string()],
+            vec!["dev tools".to_string()],
+        ));
+
+        patch_config(&config_path, &[UpgradeGroup::Persona], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("persona_opinions"));
+        assert!(result.contains("persona_experiences"));
+        assert!(result.contains("content_pillars"));
+    }
+
+    #[test]
+    fn patch_config_adds_enhanced_limits() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[limits]\nmax_replies_per_day = 5\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.enhanced_limits = Some((2, vec!["check out".to_string()], 0.2));
+
+        patch_config(&config_path, &[UpgradeGroup::EnhancedLimits], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("max_replies_per_author_per_day"));
+        assert!(result.contains("banned_phrases"));
+        assert!(result.contains("product_mention_ratio"));
+    }
+}
+
 fn patch_enhanced_limits(doc: &mut DocumentMut, max_replies: u32, banned: &[String], ratio: f32) {
     // Ensure [limits] table exists
     if doc.get("limits").is_none() {

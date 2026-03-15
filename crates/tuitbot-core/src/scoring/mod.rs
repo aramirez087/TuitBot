@@ -642,6 +642,99 @@ mod tests {
         assert!(output.contains("40/100"));
     }
 
+    // --- ScoringEngine accessors ---
+
+    #[test]
+    fn engine_keywords_accessor() {
+        let keywords = vec!["rust".to_string(), "cli".to_string()];
+        let engine = ScoringEngine::new(default_scoring_config(), keywords.clone());
+        assert_eq!(engine.keywords(), &keywords);
+    }
+
+    #[test]
+    fn engine_config_accessor() {
+        let config = default_scoring_config();
+        let engine = ScoringEngine::new(config.clone(), vec![]);
+        assert_eq!(engine.config().threshold, 60);
+        assert!((engine.config().keyword_relevance_max - 25.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn score_text_only_higher_than_media() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+
+        let text_tweet = test_tweet(now);
+        let mut media_tweet = test_tweet(now);
+        media_tweet.has_media = true;
+
+        let text_score = engine.score_tweet_at(&text_tweet, now);
+        let media_score = engine.score_tweet_at(&media_tweet, now);
+        assert!(text_score.total > media_score.total);
+    }
+
+    #[test]
+    fn score_recent_tweet_higher_than_old() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+
+        let recent_tweet = test_tweet(now); // 10 min old
+        let mut old_tweet = test_tweet(now);
+        old_tweet.created_at = (now - Duration::hours(8)).to_rfc3339();
+
+        let recent_score = engine.score_tweet_at(&recent_tweet, now);
+        let old_score = engine.score_tweet_at(&old_tweet, now);
+        assert!(recent_score.recency > old_score.recency);
+    }
+
+    // --- find_matched_keywords edge cases ---
+
+    #[test]
+    fn find_matched_case_insensitive() {
+        let keywords = vec!["RUST".to_string()];
+        let matched = find_matched_keywords("rust is great", &keywords);
+        assert_eq!(matched, vec!["RUST".to_string()]);
+    }
+
+    #[test]
+    fn find_matched_empty_keywords() {
+        let matched = find_matched_keywords("some text", &[]);
+        assert!(matched.is_empty());
+    }
+
+    // --- format_follower_count edge cases ---
+
+    #[test]
+    fn format_followers_zero() {
+        assert_eq!(format_follower_count(0), "0");
+    }
+
+    #[test]
+    fn format_followers_exact_1k() {
+        assert_eq!(format_follower_count(1000), "1.0K");
+    }
+
+    #[test]
+    fn format_followers_exact_1m() {
+        assert_eq!(format_follower_count(1_000_000), "1.0M");
+    }
+
+    // --- truncate_text edge cases ---
+
+    #[test]
+    fn truncate_exact_length() {
+        assert_eq!(truncate_text("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_empty() {
+        assert_eq!(truncate_text("", 10), "");
+    }
+
     // --- Display impl tests ---
 
     #[test]

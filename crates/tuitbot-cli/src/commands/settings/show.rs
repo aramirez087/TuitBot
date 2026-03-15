@@ -344,3 +344,87 @@ pub(super) fn format_duration(seconds: u64) -> String {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── format_list ──────────────────────────────────────────────────
+
+    #[test]
+    fn format_list_empty_returns_none_label() {
+        assert_eq!(format_list(&[]), "(none)");
+    }
+
+    #[test]
+    fn format_list_single_item() {
+        let items = vec!["hello".to_string()];
+        assert_eq!(format_list(&items), "hello");
+    }
+
+    #[test]
+    fn format_list_multiple_items() {
+        let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        assert_eq!(format_list(&items), "a, b, c");
+    }
+
+    // ── format_duration ──────────────────────────────────────────────
+
+    #[test]
+    fn format_duration_zero() {
+        assert_eq!(format_duration(0), "0 seconds");
+    }
+
+    #[test]
+    fn format_duration_1_second() {
+        assert_eq!(format_duration(1), "1 seconds");
+    }
+
+    #[test]
+    fn format_duration_59_seconds() {
+        assert_eq!(format_duration(59), "59 seconds");
+    }
+
+    #[test]
+    fn format_duration_exact_minutes() {
+        assert_eq!(format_duration(60), "1 min");
+        assert_eq!(format_duration(120), "2 min");
+        assert_eq!(format_duration(300), "5 min");
+    }
+
+    #[test]
+    fn format_duration_minutes_with_seconds() {
+        assert_eq!(format_duration(90), "1 min 30 sec");
+        assert_eq!(format_duration(150), "2 min 30 sec");
+    }
+
+    #[test]
+    fn format_duration_exact_hours() {
+        assert_eq!(format_duration(3600), "1 hour");
+        assert_eq!(format_duration(7200), "2 hours");
+    }
+
+    #[test]
+    fn format_duration_hours_with_minutes() {
+        assert_eq!(format_duration(5400), "1 hour 30 min");
+        assert_eq!(format_duration(9000), "2 hours 30 min");
+    }
+
+    #[test]
+    fn format_duration_exact_days() {
+        assert_eq!(format_duration(86400), "1 day");
+        assert_eq!(format_duration(172800), "2 days");
+    }
+
+    #[test]
+    fn format_duration_days_with_hours() {
+        assert_eq!(format_duration(90000), "1 day 1 hour");
+        assert_eq!(format_duration(176400), "2 days 1 hour");
+        assert_eq!(format_duration(180000), "2 days 2 hours");
+    }
+
+    #[test]
+    fn format_duration_one_week() {
+        assert_eq!(format_duration(604800), "7 days");
+    }
+}

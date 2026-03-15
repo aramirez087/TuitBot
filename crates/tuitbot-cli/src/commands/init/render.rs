@@ -239,3 +239,166 @@ active_days = {active_days}
         active_days = format_toml_array(&r.active_days),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── optional_toml_string ─────────────────────────────────────────
+
+    #[test]
+    fn optional_toml_string_with_value() {
+        let val = Some("hello".to_string());
+        let result = optional_toml_string("key", &val, "placeholder");
+        assert_eq!(result, r#"key = "hello""#);
+    }
+
+    #[test]
+    fn optional_toml_string_none() {
+        let result = optional_toml_string("brand_voice", &None, "Friendly expert");
+        assert_eq!(result, r#"# brand_voice = "Friendly expert""#);
+    }
+
+    #[test]
+    fn optional_toml_string_with_special_chars() {
+        let val = Some("say \"hi\"".to_string());
+        let result = optional_toml_string("key", &val, "placeholder");
+        assert_eq!(result, r#"key = "say \"hi\"""#);
+    }
+
+    // ── optional_toml_array ──────────────────────────────────────────
+
+    #[test]
+    fn optional_toml_array_with_items() {
+        let items = vec!["a".to_string(), "b".to_string()];
+        let result = optional_toml_array("topics", &items, "Your topic");
+        assert_eq!(result, r#"topics = ["a", "b"]"#);
+    }
+
+    #[test]
+    fn optional_toml_array_empty() {
+        let result = optional_toml_array("topics", &[], "Your topic");
+        assert_eq!(result, r#"# topics = ["Your topic"]"#);
+    }
+
+    // ── render_config_toml ───────────────────────────────────────────
+
+    #[test]
+    fn render_config_toml_minimal() {
+        let r = WizardResult {
+            client_id: "test-client".to_string(),
+            client_secret: None,
+            product_name: "MyApp".to_string(),
+            product_description: String::new(),
+            product_url: None,
+            target_audience: String::new(),
+            product_keywords: vec!["rust".to_string()],
+            industry_topics: vec![],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            approval_mode: true,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec!["Mon".to_string(), "Tue".to_string()],
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: Some("http://localhost:11434/v1".to_string()),
+        };
+
+        let toml_str = render_config_toml(&r);
+
+        assert!(toml_str.contains("approval_mode = true"));
+        assert!(toml_str.contains(r#"client_id = "test-client""#));
+        assert!(toml_str.contains(r#"product_name = "MyApp""#));
+        assert!(toml_str.contains(r#"["rust"]"#));
+        assert!(toml_str.contains(r#"provider = "ollama""#));
+        assert!(toml_str.contains(r#"model = "llama3.2""#));
+        assert!(toml_str.contains(r#"timezone = "UTC""#));
+        // Optional fields should be commented out
+        assert!(toml_str.contains("# product_url"));
+        assert!(toml_str.contains("# brand_voice"));
+    }
+
+    #[test]
+    fn render_config_toml_full() {
+        let r = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: Some("secret".to_string()),
+            product_name: "FullApp".to_string(),
+            product_description: "Complete app".to_string(),
+            product_url: Some("https://example.com".to_string()),
+            target_audience: "developers".to_string(),
+            product_keywords: vec!["test".to_string()],
+            industry_topics: vec!["topic1".to_string()],
+            brand_voice: Some("Friendly".to_string()),
+            reply_style: Some("Helpful".to_string()),
+            content_style: Some("Practical".to_string()),
+            persona_opinions: vec!["opinion".to_string()],
+            persona_experiences: vec!["experience".to_string()],
+            content_pillars: vec!["pillar".to_string()],
+            target_accounts: vec!["user1".to_string()],
+            approval_mode: false,
+            timezone: "America/New_York".to_string(),
+            active_hours_start: 9,
+            active_hours_end: 21,
+            active_days: vec!["Mon".to_string()],
+            llm_provider: "openai".to_string(),
+            llm_api_key: Some("sk-test".to_string()),
+            llm_model: "gpt-4o-mini".to_string(),
+            llm_base_url: None,
+        };
+
+        let toml_str = render_config_toml(&r);
+
+        assert!(toml_str.contains("approval_mode = false"));
+        assert!(toml_str.contains(r#"product_url = "https://example.com""#));
+        assert!(toml_str.contains(r#"brand_voice = "Friendly""#));
+        assert!(toml_str.contains(r#"reply_style = "Helpful""#));
+        assert!(toml_str.contains(r#"content_style = "Practical""#));
+        assert!(toml_str.contains("persona_opinions"));
+        assert!(toml_str.contains("[targets]"));
+        assert!(toml_str.contains("user1"));
+    }
+
+    #[test]
+    fn render_config_toml_with_targets_creates_section() {
+        let r = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: String::new(),
+            product_url: None,
+            target_audience: String::new(),
+            product_keywords: vec!["kw".to_string()],
+            industry_topics: vec![],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec!["alice".to_string(), "bob".to_string()],
+            approval_mode: true,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec!["Mon".to_string()],
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: None,
+        };
+
+        let toml_str = render_config_toml(&r);
+        assert!(toml_str.contains("[targets]"));
+        assert!(toml_str.contains("alice"));
+        assert!(toml_str.contains("bob"));
+    }
+}
