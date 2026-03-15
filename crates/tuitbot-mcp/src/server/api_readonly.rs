@@ -591,4 +591,100 @@ mod tests {
         let r = kernel::read::get_tweet_liking_users(&p, "t1", 5, None).await;
         assert!(!r.is_empty());
     }
+
+    // ── Server construction & ServerHandler ──────────────────────────────
+
+    #[test]
+    fn api_readonly_server_construction() {
+        let state = make_state();
+        let _server = super::ApiReadonlyMcpServer::new(state);
+    }
+
+    #[test]
+    fn api_readonly_server_info_has_instructions() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::ApiReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.instructions.is_some());
+        let instructions = info.instructions.unwrap();
+        assert!(
+            instructions.contains("Read-Only"),
+            "instructions should mention Read-Only"
+        );
+    }
+
+    #[test]
+    fn api_readonly_server_info_has_tool_capabilities() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::ApiReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.capabilities.tools.is_some());
+    }
+
+    #[test]
+    fn api_readonly_server_clones() {
+        let state = make_state();
+        let server = super::ApiReadonlyMcpServer::new(state);
+        let _clone = server.clone();
+    }
+
+    // ── Utils via kernel (pure, exercising tool surface) ─────────────────
+
+    #[tokio::test]
+    async fn api_readonly_get_me() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::utils::get_me(&p).await;
+        assert!(!r.is_empty());
+    }
+
+    // ── Config & scoring tools ───────────────────────────────────────────
+
+    #[test]
+    fn api_readonly_get_config() {
+        let state = make_state();
+        let result = crate::tools::config::get_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn api_readonly_validate_config() {
+        let state = make_state();
+        let result = crate::tools::config::validate_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn api_readonly_score_tweet() {
+        let state = make_state();
+        let input = crate::tools::scoring::ScoreTweetInput {
+            text: "Rust is amazing",
+            author_username: "rustacean",
+            author_followers: 5000,
+            likes: 20,
+            retweets: 5,
+            replies: 3,
+            created_at: "2026-01-01T00:00:00Z",
+        };
+        let result = crate::tools::scoring::score_tweet(&state.config, &input);
+        assert!(!result.is_empty());
+    }
+
+    // ── Meta tools (capabilities, mode) ──────────────────────────────────
+
+    #[test]
+    fn api_readonly_mode_string() {
+        let state = make_state();
+        let mode = state.config.mode.to_string();
+        assert!(!mode.is_empty());
+    }
+
+    #[test]
+    fn api_readonly_effective_approval_mode() {
+        let state = make_state();
+        // effective_approval_mode returns a bool
+        let _approval = state.config.effective_approval_mode();
+    }
 }

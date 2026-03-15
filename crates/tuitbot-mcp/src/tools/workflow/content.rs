@@ -162,3 +162,163 @@ pub async fn generate_thread(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tools::idempotency::IdempotencyStore;
+    use tuitbot_core::config::Config;
+    use tuitbot_core::error::XApiError;
+    use tuitbot_core::storage;
+    use tuitbot_core::x_api::types::*;
+    use tuitbot_core::x_api::XApiClient;
+
+    struct NullX;
+
+    #[async_trait::async_trait]
+    impl XApiClient for NullX {
+        async fn search_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_mentions(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<MentionResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn post_tweet(&self, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn reply_to_tweet(&self, _: &str, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_tweet(&self, _: &str) -> Result<Tweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_me(&self) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_by_username(&self, _: &str) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+    }
+
+    async fn make_state() -> Arc<crate::state::AppState> {
+        let pool = storage::init_test_db().await.expect("init test db");
+        storage::rate_limits::init_mcp_rate_limit(
+            &pool,
+            Config::default().mcp_policy.max_mutations_per_hour,
+        )
+        .await
+        .expect("init rate limits");
+        Arc::new(crate::state::AppState {
+            pool,
+            config: Config::default(),
+            llm_provider: None,
+            x_client: Some(Box::new(NullX)),
+            authenticated_user_id: Some("u1".to_string()),
+            granted_scopes: vec![],
+            idempotency: Arc::new(IdempotencyStore::new()),
+        })
+    }
+
+    #[test]
+    fn arc_provider_name_without_llm() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let state = rt.block_on(make_state());
+        let provider = ArcProvider {
+            state: Arc::clone(&state),
+        };
+        assert_eq!(provider.name(), "none");
+    }
+
+    #[tokio::test]
+    async fn arc_provider_complete_without_llm_returns_not_configured() {
+        let state = make_state().await;
+        let provider = ArcProvider {
+            state: Arc::clone(&state),
+        };
+        let params = GenerationParams::default();
+        let result = provider.complete("system", "user", &params).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn arc_provider_health_check_without_llm_returns_not_configured() {
+        let state = make_state().await;
+        let provider = ArcProvider {
+            state: Arc::clone(&state),
+        };
+        let result = provider.health_check().await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn generate_reply_without_llm_returns_error_json() {
+        let state = make_state().await;
+        let result = generate_reply(
+            &state,
+            &state.config.business,
+            "This is a great tweet about Rust!",
+            "rustacean",
+            false,
+            &state.config,
+        )
+        .await;
+        assert!(!result.is_empty());
+        assert!(result.contains("error") || result.contains("Error"));
+    }
+
+    #[tokio::test]
+    async fn generate_tweet_without_llm_returns_error_json() {
+        let state = make_state().await;
+        let result = generate_tweet(
+            &state,
+            &state.config.business,
+            "Rust programming",
+            &state.config,
+        )
+        .await;
+        assert!(!result.is_empty());
+        assert!(result.contains("error") || result.contains("Error"));
+    }
+
+    #[tokio::test]
+    async fn generate_thread_without_llm_returns_error_json() {
+        let state = make_state().await;
+        let result = generate_thread(
+            &state,
+            &state.config.business,
+            "CLI tools in Rust",
+            &state.config,
+        )
+        .await;
+        assert!(!result.is_empty());
+        assert!(result.contains("error") || result.contains("Error"));
+    }
+
+    #[test]
+    fn tool_response_llm_not_configured() {
+        let result = ToolResponse::llm_not_configured().to_json();
+        assert!(!result.is_empty());
+    }
+}

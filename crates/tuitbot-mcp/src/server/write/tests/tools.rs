@@ -235,3 +235,70 @@ fn write_validate_config() {
     let result = crate::tools::config::validate_config(&config);
     assert!(!result.is_empty());
 }
+
+// ── WriteMcpServer construction & ServerHandler ──────────────────────
+
+#[tokio::test]
+async fn write_server_construction() {
+    let state = make_state().await;
+    let _server = super::super::WriteMcpServer::new(state);
+}
+
+#[tokio::test]
+async fn write_server_info_has_instructions() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::super::WriteMcpServer::new(state);
+    let info = server.get_info();
+    assert!(info.instructions.is_some());
+    let instructions = info.instructions.unwrap();
+    assert!(
+        instructions.contains("Write"),
+        "instructions should mention Write"
+    );
+}
+
+#[tokio::test]
+async fn write_server_info_has_tool_capabilities() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::super::WriteMcpServer::new(state);
+    let info = server.get_info();
+    assert!(info.capabilities.tools.is_some());
+}
+
+#[tokio::test]
+async fn write_server_clones() {
+    let state = make_state().await;
+    let server = super::super::WriteMcpServer::new(state);
+    let _clone = server.clone();
+}
+
+// ── Capabilities workflow ────────────────────────────────────────────
+
+#[tokio::test]
+async fn write_get_capabilities() {
+    let state = make_state().await;
+    let result = workflow::capabilities::get_capabilities(
+        &state.pool,
+        &state.config,
+        state.llm_provider.is_some(),
+        state.x_client.is_some(),
+        state.authenticated_user_id.as_deref(),
+        &state.granted_scopes,
+    )
+    .await;
+    assert!(!result.is_empty());
+}
+
+// ── Mode tool ────────────────────────────────────────────────────────
+
+#[test]
+fn write_mode_and_approval() {
+    let config = tuitbot_core::config::Config::default();
+    let mode = config.mode.to_string();
+    let approval = config.effective_approval_mode();
+    assert!(!mode.is_empty());
+    // approval_mode is a bool
+    let _ = approval;
+}

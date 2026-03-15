@@ -700,4 +700,126 @@ mod tests {
         let r = toolkit::engage::unbookmark_tweet(state.x_client.as_ref(), "u1", "123").await;
         assert!(r.is_err());
     }
+
+    // ── Server construction & ServerHandler ──────────────────────────────
+
+    #[test]
+    fn utility_write_server_construction() {
+        let state = make_state();
+        let _server = super::UtilityWriteMcpServer::new(state);
+    }
+
+    #[test]
+    fn utility_write_server_info_has_instructions() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::UtilityWriteMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.instructions.is_some());
+        let instructions = info.instructions.unwrap();
+        assert!(
+            instructions.contains("Utility Write"),
+            "instructions should mention Utility Write"
+        );
+    }
+
+    #[test]
+    fn utility_write_server_info_has_tool_capabilities() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::UtilityWriteMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.capabilities.tools.is_some());
+    }
+
+    #[test]
+    fn utility_write_server_clones() {
+        let state = make_state();
+        let server = super::UtilityWriteMcpServer::new(state);
+        let _clone = server.clone();
+    }
+
+    // ── Config & scoring tools (pure, no X API needed) ───────────────────
+
+    #[test]
+    fn utility_write_get_config() {
+        let state = make_state();
+        let result = crate::tools::config::get_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn utility_write_validate_config() {
+        let state = make_state();
+        let result = crate::tools::config::validate_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn utility_write_score_tweet() {
+        let state = make_state();
+        let input = crate::tools::scoring::ScoreTweetInput {
+            text: "Rust is amazing for building CLI tools",
+            author_username: "rustacean",
+            author_followers: 5000,
+            likes: 20,
+            retweets: 5,
+            replies: 3,
+            created_at: "2026-01-01T00:00:00Z",
+        };
+        let result = crate::tools::scoring::score_tweet(&state.config, &input);
+        assert!(!result.is_empty());
+    }
+
+    // ── Extended read toolkit calls ──────────────────────────────────────
+
+    #[tokio::test]
+    async fn utility_write_search_tweets_error() {
+        let state = make_state();
+        let r = toolkit::read::search_tweets(state.x_client.as_ref(), "rust", 10, None, None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_get_mentions_error() {
+        let state = make_state();
+        let r = toolkit::read::get_mentions(state.x_client.as_ref(), "u1", None, None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_get_user_tweets_error() {
+        let state = make_state();
+        let r = toolkit::read::get_user_tweets(state.x_client.as_ref(), "u1", 10, None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_get_home_timeline_error() {
+        let state = make_state();
+        let r = toolkit::read::get_home_timeline(state.x_client.as_ref(), "u1", 20, None).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_get_user_by_id_error() {
+        let state = make_state();
+        let r = toolkit::read::get_user_by_id(state.x_client.as_ref(), "u1").await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_get_me_error() {
+        let state = make_state();
+        let r = toolkit::read::get_me(state.x_client.as_ref()).await;
+        assert!(r.is_err());
+    }
+
+    #[tokio::test]
+    async fn utility_write_post_thread_error() {
+        let state = make_state();
+        let tweets = vec!["tweet 1".to_string(), "tweet 2".to_string()];
+        let r = toolkit::write::post_thread(state.x_client.as_ref(), &tweets, None).await;
+        assert!(r.is_err());
+    }
 }

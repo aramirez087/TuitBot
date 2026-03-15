@@ -351,4 +351,74 @@ mod tests {
             toolkit::read::get_home_timeline(state.x_client.as_ref(), "u1", 10, None).await;
         assert!(result.is_err());
     }
+
+    // ── Server construction & ServerHandler ──────────────────────────────
+
+    #[test]
+    fn utility_readonly_server_construction() {
+        let state = make_state();
+        let _server = super::UtilityReadonlyMcpServer::new(state);
+    }
+
+    #[test]
+    fn utility_readonly_server_info_has_instructions() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::UtilityReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.instructions.is_some());
+        let instructions = info.instructions.unwrap();
+        assert!(
+            instructions.contains("Utility Read-Only"),
+            "instructions should mention Utility Read-Only"
+        );
+    }
+
+    #[test]
+    fn utility_readonly_server_info_has_tool_capabilities() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::UtilityReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.capabilities.tools.is_some());
+    }
+
+    #[test]
+    fn utility_readonly_server_clones() {
+        let state = make_state();
+        let server = super::UtilityReadonlyMcpServer::new(state);
+        let _clone = server.clone();
+    }
+
+    // ── Config & scoring ─────────────────────────────────────────────────
+
+    #[test]
+    fn utility_readonly_get_config() {
+        let state = make_state();
+        let result = crate::tools::config::get_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn utility_readonly_validate_config() {
+        let state = make_state();
+        let result = crate::tools::config::validate_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn utility_readonly_score_tweet() {
+        let state = make_state();
+        let input = crate::tools::scoring::ScoreTweetInput {
+            text: "Building with Rust",
+            author_username: "builder",
+            author_followers: 2000,
+            likes: 10,
+            retweets: 3,
+            replies: 1,
+            created_at: "2026-01-01T00:00:00Z",
+        };
+        let result = crate::tools::scoring::score_tweet(&state.config, &input);
+        assert!(!result.is_empty());
+    }
 }

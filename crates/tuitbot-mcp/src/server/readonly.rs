@@ -364,4 +364,67 @@ mod tests {
         let result = kernel::read::get_user_by_id(&p, "u1").await;
         assert!(!result.is_empty());
     }
+
+    // ── Server construction & ServerHandler ──────────────────────────────
+
+    #[test]
+    fn readonly_server_construction() {
+        let state = make_state();
+        let _server = super::ReadonlyMcpServer::new(state);
+    }
+
+    #[test]
+    fn readonly_server_info_has_instructions() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::ReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.instructions.is_some());
+        let instructions = info.instructions.unwrap();
+        assert!(
+            instructions.contains("Readonly"),
+            "instructions should mention Readonly"
+        );
+    }
+
+    #[test]
+    fn readonly_server_info_has_tool_capabilities() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::ReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.capabilities.tools.is_some());
+    }
+
+    #[test]
+    fn readonly_server_clones() {
+        let state = make_state();
+        let server = super::ReadonlyMcpServer::new(state);
+        let _clone = server.clone();
+    }
+
+    // ── Config & scoring ─────────────────────────────────────────────────
+
+    #[test]
+    fn readonly_get_config() {
+        let state = make_state();
+        let result = crate::tools::config::get_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn readonly_score_tweet() {
+        let state = make_state();
+        let input = crate::tools::scoring::ScoreTweetInput {
+            text: "Rust is great",
+            author_username: "alice",
+            author_followers: 1000,
+            likes: 5,
+            retweets: 2,
+            replies: 1,
+            created_at: "2026-01-01T00:00:00Z",
+        };
+        let result = crate::tools::scoring::score_tweet(&state.config, &input);
+        assert!(!result.is_empty());
+    }
 }
