@@ -626,4 +626,190 @@ mod tests {
         let parsed: PostTweetRequest = serde_json::from_str(&json).expect("deserialize");
         assert!(parsed.media.is_none());
     }
+
+    // ── ProcessingInfo deserialization ─────────────────────────────
+
+    #[test]
+    fn processing_info_pending() {
+        let json = r#"{"state": "pending", "check_after_secs": 10}"#;
+        let info: ProcessingInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.state, "pending");
+        assert_eq!(info.check_after_secs, Some(10));
+        assert!(info.error.is_none());
+    }
+
+    #[test]
+    fn processing_info_in_progress() {
+        let json = r#"{"state": "in_progress", "check_after_secs": 5}"#;
+        let info: ProcessingInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.state, "in_progress");
+    }
+
+    #[test]
+    fn processing_info_succeeded_no_extras() {
+        let json = r#"{"state": "succeeded"}"#;
+        let info: ProcessingInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.state, "succeeded");
+        assert!(info.check_after_secs.is_none());
+        assert!(info.error.is_none());
+    }
+
+    #[test]
+    fn processing_info_failed_with_message() {
+        let json = r#"{
+            "state": "failed",
+            "error": {"message": "InvalidMedia: unsupported format"}
+        }"#;
+        let info: ProcessingInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.state, "failed");
+        let err = info.error.unwrap();
+        assert_eq!(
+            err.message.as_deref(),
+            Some("InvalidMedia: unsupported format")
+        );
+    }
+
+    #[test]
+    fn processing_info_failed_no_message() {
+        let json = r#"{"state": "failed", "error": {}}"#;
+        let info: ProcessingInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.state, "failed");
+        assert!(info.error.unwrap().message.is_none());
+    }
+
+    // ── ProcessingError deserialization ────────────────────────────
+
+    #[test]
+    fn processing_error_empty() {
+        let json = r#"{}"#;
+        let err: ProcessingError = serde_json::from_str(json).unwrap();
+        assert!(err.message.is_none());
+    }
+
+    #[test]
+    fn processing_error_with_message() {
+        let json = r#"{"message": "file too large"}"#;
+        let err: ProcessingError = serde_json::from_str(json).unwrap();
+        assert_eq!(err.message.as_deref(), Some("file too large"));
+    }
+
+    // ── MediaUploadResponse edge cases ────────────────────────────
+
+    #[test]
+    fn media_upload_response_with_unknown_state() {
+        let json = r#"{
+            "media_id_string": "999",
+            "processing_info": {
+                "state": "unknown_state",
+                "check_after_secs": 3
+            }
+        }"#;
+        let resp: MediaUploadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.media_id_string, "999");
+        let info = resp.processing_info.unwrap();
+        assert_eq!(info.state, "unknown_state");
+    }
+
+    #[test]
+    fn media_upload_response_large_media_id() {
+        let json = r#"{"media_id_string": "1234567890123456789"}"#;
+        let resp: MediaUploadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.media_id_string, "1234567890123456789");
+    }
+
+    // ── Constants ─────────────────────────────────────────────────
+
+    #[test]
+    fn chunk_size_is_5mb() {
+        assert_eq!(CHUNK_SIZE, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn max_processing_wait_is_300s() {
+        assert_eq!(MAX_PROCESSING_WAIT_SECS, 300);
+    }
+
+    // ── MediaType tests ───────────────────────────────────────────
+
+    #[test]
+    fn media_type_requires_chunked() {
+        use crate::x_api::types::ImageFormat;
+        // Images < 5MB should not require chunked
+        assert!(!MediaType::Image(ImageFormat::Jpeg).requires_chunked(1024));
+        // GIF always requires chunked
+        assert!(MediaType::Gif.requires_chunked(1024));
+        // Video always requires chunked
+        assert!(MediaType::Video.requires_chunked(1024));
+    }
+
+    #[test]
+    fn media_type_max_size() {
+        use crate::x_api::types::ImageFormat;
+        assert!(MediaType::Image(ImageFormat::Jpeg).max_size() > 0);
+        assert!(MediaType::Gif.max_size() > 0);
+        assert!(MediaType::Video.max_size() > MediaType::Gif.max_size());
+    }
+
+    #[test]
+    fn media_type_mime_type() {
+        use crate::x_api::types::ImageFormat;
+        assert_eq!(
+            MediaType::Image(ImageFormat::Jpeg).mime_type(),
+            "image/jpeg"
+        );
+        assert_eq!(MediaType::Image(ImageFormat::Png).mime_type(), "image/png");
+        assert_eq!(
+            MediaType::Image(ImageFormat::Webp).mime_type(),
+            "image/webp"
+        );
+        assert_eq!(MediaType::Gif.mime_type(), "image/gif");
+        assert_eq!(MediaType::Video.mime_type(), "video/mp4");
+    }
+
+    #[test]
+    fn media_type_media_category() {
+        use crate::x_api::types::ImageFormat;
+        assert_eq!(
+            MediaType::Image(ImageFormat::Jpeg).media_category(),
+            "tweet_image"
+        );
+        assert_eq!(MediaType::Gif.media_category(), "tweet_gif");
+        assert_eq!(MediaType::Video.media_category(), "tweet_video");
+    }
+
+    // ── PostTweetRequest with quote_tweet_id ──────────────────────
+
+    #[test]
+    fn post_tweet_request_with_quote() {
+        use crate::x_api::types::PostTweetRequest;
+
+        let req = PostTweetRequest {
+            text: "Check this out".to_string(),
+            reply: None,
+            media: None,
+            quote_tweet_id: Some("999".to_string()),
+        };
+
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("quote_tweet_id"));
+        assert!(json.contains("999"));
+    }
+
+    #[test]
+    fn post_tweet_request_with_reply() {
+        use crate::x_api::types::{PostTweetRequest, ReplyTo};
+
+        let req = PostTweetRequest {
+            text: "Great point!".to_string(),
+            reply: Some(ReplyTo {
+                in_reply_to_tweet_id: "456".to_string(),
+            }),
+            media: None,
+            quote_tweet_id: None,
+        };
+
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("in_reply_to_tweet_id"));
+        assert!(json.contains("456"));
+    }
 }

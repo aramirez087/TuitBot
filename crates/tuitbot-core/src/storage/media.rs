@@ -746,4 +746,186 @@ mod tests {
         );
         assert_eq!(found.status, "ready");
     }
+
+    // ── uuid_v4 format ───────────────────────────────────────────
+
+    #[test]
+    fn uuid_v4_format() {
+        let id = uuid_v4();
+        // UUID format: 8-4-4-4-12
+        let parts: Vec<&str> = id.split('-').collect();
+        assert_eq!(parts.len(), 5, "uuid should have 5 parts");
+        assert_eq!(parts[0].len(), 8);
+        assert_eq!(parts[1].len(), 4);
+        assert_eq!(parts[2].len(), 4);
+        assert_eq!(parts[3].len(), 4);
+        assert_eq!(parts[4].len(), 12);
+    }
+
+    #[test]
+    fn uuid_v4_unique() {
+        let a = uuid_v4();
+        let b = uuid_v4();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn uuid_v4_hex_chars_only() {
+        let id = uuid_v4();
+        let without_dashes = id.replace('-', "");
+        assert!(
+            without_dashes.chars().all(|c| c.is_ascii_hexdigit()),
+            "uuid should contain only hex chars and dashes"
+        );
+    }
+
+    // ── detect_media_type comprehensive ───────────────────────────
+
+    #[test]
+    fn detect_media_type_content_type_overrides_extension() {
+        // Content type "image/gif" should win over ".jpg" extension
+        assert_eq!(
+            detect_media_type("photo.jpg", Some("image/gif")),
+            Some(MediaType::Gif)
+        );
+    }
+
+    #[test]
+    fn detect_media_type_unknown_content_type_unknown_ext() {
+        assert_eq!(detect_media_type("file.xyz", Some("application/pdf")), None);
+    }
+
+    #[test]
+    fn detect_media_type_dot_only() {
+        assert_eq!(detect_media_type(".", None), None);
+    }
+
+    #[test]
+    fn detect_media_type_hidden_file() {
+        assert_eq!(
+            detect_media_type(".jpg", None),
+            Some(MediaType::Image(ImageFormat::Jpeg))
+        );
+    }
+
+    // ── is_safe_media_path additional ──────────────────────────────
+
+    #[test]
+    fn is_safe_media_path_existing_file_under_media() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        // Canonicalize the base dir to match what canonicalize returns (macOS /private/var/...)
+        let canonical_base = dir.path().canonicalize().expect("canonicalize base");
+        let media_dir = canonical_base.join("media");
+        std::fs::create_dir_all(&media_dir).expect("mkdir");
+        let file_path = media_dir.join("existing.jpg");
+        std::fs::write(&file_path, b"test").expect("write");
+        assert!(is_safe_media_path(
+            file_path.to_str().unwrap(),
+            &canonical_base
+        ));
+    }
+
+    #[test]
+    fn is_safe_media_path_completely_outside() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        // Path clearly outside this temp dir entirely
+        let other_dir = tempfile::tempdir().expect("other dir");
+        let bad_path = other_dir.path().join("evil.jpg");
+        assert!(!is_safe_media_path(bad_path.to_str().unwrap(), dir.path()));
+    }
+
+    // ── LocalMedia struct ─────────────────────────────────────────
+
+    #[test]
+    fn local_media_clone_and_debug() {
+        let media = LocalMedia {
+            path: "/test/img.jpg".to_string(),
+            media_type: MediaType::Image(ImageFormat::Jpeg),
+            size: 1024,
+        };
+        let cloned = media.clone();
+        assert_eq!(cloned.path, "/test/img.jpg");
+        assert_eq!(cloned.size, 1024);
+        let debug = format!("{:?}", cloned);
+        assert!(debug.contains("img.jpg"));
+    }
+
+    // ── MediaUploadRecord fields ──────────────────────────────────
+
+    #[tokio::test]
+    async fn media_upload_record_fields() {
+        let pool = crate::storage::init_test_db().await.expect("db");
+        let hash = compute_file_hash(b"field test");
+
+        let id = insert_media_upload(
+            &pool,
+            &hash,
+            "video.mp4",
+            10_000_000,
+            "video/mp4",
+            "chunked",
+            5,
+        )
+        .await
+        .expect("insert");
+
+        finalize_media_upload(&pool, id, "x_media_vid_1", Some("A cool video"))
+            .await
+            .expect("finalize");
+
+        let found = find_ready_upload_by_hash(&pool, &hash)
+            .await
+            .expect("find")
+            .expect("should exist");
+
+        assert_eq!(found.file_hash, hash);
+        assert_eq!(found.file_name, "video.mp4");
+        assert_eq!(found.file_size_bytes, 10_000_000);
+        assert_eq!(found.media_type, "video/mp4");
+        assert_eq!(found.upload_strategy, "chunked");
+        assert_eq!(found.segment_count, 5);
+        assert_eq!(found.status, "ready");
+        assert_eq!(found.alt_text.as_deref(), Some("A cool video"));
+        assert!(found.finalized_at.is_some());
+        assert!(found.expires_at.is_some());
+        assert!(found.error_message.is_none());
+    }
+
+    // ── CLEANUP_THRESHOLD_BYTES ───────────────────────────────────
+
+    #[test]
+    fn cleanup_threshold_is_200mb() {
+        assert_eq!(CLEANUP_THRESHOLD_BYTES, 200 * 1024 * 1024);
+    }
+
+    // ── compute_file_hash large data ──────────────────────────────
+
+    #[test]
+    fn compute_file_hash_large_data() {
+        let data = vec![0xABu8; 1024 * 1024]; // 1MB
+        let hash = compute_file_hash(&data);
+        assert_eq!(hash.len(), 64);
+        // Same data should give same hash
+        assert_eq!(hash, compute_file_hash(&data));
+    }
+
+    // ── store_media creates media dir ─────────────────────────────
+
+    #[tokio::test]
+    async fn store_media_creates_media_directory() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let media_dir = dir.path().join("media");
+        assert!(!media_dir.exists());
+
+        let _media = store_media(
+            dir.path(),
+            b"test data",
+            "test.jpg",
+            MediaType::Image(ImageFormat::Jpeg),
+        )
+        .await
+        .expect("store");
+
+        assert!(media_dir.exists());
+    }
 }

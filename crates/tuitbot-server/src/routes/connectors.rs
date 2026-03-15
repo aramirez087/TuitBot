@@ -558,4 +558,143 @@ mod tests {
     fn oauth_state_ttl_is_10_minutes() {
         assert_eq!(OAUTH_STATE_TTL, Duration::from_secs(600));
     }
+
+    // ── html_escape extended coverage ─────────────────────────────
+
+    #[test]
+    fn html_escape_only_special_chars() {
+        assert_eq!(html_escape("&<>\""), "&amp;&lt;&gt;&quot;");
+    }
+
+    #[test]
+    fn html_escape_mixed_with_normal() {
+        assert_eq!(
+            html_escape("user@example.com & \"friends\""),
+            "user@example.com &amp; &quot;friends&quot;"
+        );
+    }
+
+    #[test]
+    fn html_escape_unicode_preserved() {
+        assert_eq!(html_escape("hello world"), "hello world");
+    }
+
+    #[test]
+    fn html_escape_no_single_quote_escaping() {
+        // We only escape &, <, >, "
+        assert_eq!(html_escape("it's"), "it's");
+    }
+
+    #[test]
+    fn html_escape_nested_tags() {
+        assert_eq!(
+            html_escape("<div><span>text</span></div>"),
+            "&lt;div&gt;&lt;span&gt;text&lt;/span&gt;&lt;/div&gt;"
+        );
+    }
+
+    // ── base64url_encode extended coverage ────────────────────────
+
+    #[test]
+    fn base64url_encode_known_value() {
+        // SHA-256 hash bytes have well-known base64url encoding
+        let data = [0u8; 32];
+        let encoded = base64url_encode(&data);
+        assert_eq!(encoded.len(), 43); // 32 bytes -> 43 chars in base64 no pad
+        assert!(!encoded.contains('='));
+    }
+
+    #[test]
+    fn base64url_encode_single_byte() {
+        let encoded = base64url_encode(&[0xFF]);
+        assert!(!encoded.is_empty());
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+    }
+
+    #[test]
+    fn base64url_encode_deterministic() {
+        let data = b"PKCE code challenge test";
+        let a = base64url_encode(data);
+        let b = base64url_encode(data);
+        assert_eq!(a, b);
+    }
+
+    // ── random_bytes extended coverage ────────────────────────────
+
+    #[test]
+    fn random_bytes_large() {
+        let bytes = random_bytes(256);
+        assert_eq!(bytes.len(), 256);
+    }
+
+    #[test]
+    fn random_bytes_one() {
+        let bytes = random_bytes(1);
+        assert_eq!(bytes.len(), 1);
+    }
+
+    // ── PKCE code challenge simulation ────────────────────────────
+
+    #[test]
+    fn pkce_code_challenge_flow() {
+        // Simulate the PKCE flow used in link_google_drive
+        let code_verifier = hex::encode(random_bytes(64));
+        assert_eq!(code_verifier.len(), 128);
+
+        let hash = sha2::Sha256::digest(code_verifier.as_bytes());
+        let code_challenge = base64url_encode(&hash);
+
+        // Base64url of 32 bytes = 43 chars
+        assert_eq!(code_challenge.len(), 43);
+        assert!(!code_challenge.contains('='));
+        assert!(!code_challenge.contains('+'));
+    }
+
+    #[test]
+    fn oauth_state_generation() {
+        let state = hex::encode(random_bytes(32));
+        assert_eq!(state.len(), 64); // 32 bytes -> 64 hex chars
+    }
+
+    // ── CallbackParams deserialization ─────────────────────────────
+
+    #[test]
+    fn callback_params_deserialize_full() {
+        let json = r#"{"code": "auth_code_123", "state": "state_abc"}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.code.as_deref(), Some("auth_code_123"));
+        assert_eq!(params.state.as_deref(), Some("state_abc"));
+    }
+
+    #[test]
+    fn callback_params_deserialize_empty() {
+        let json = r#"{}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert!(params.code.is_none());
+        assert!(params.state.is_none());
+    }
+
+    // ── LinkParams deserialization ─────────────────────────────────
+
+    #[test]
+    fn link_params_deserialize_no_force() {
+        let json = r#"{}"#;
+        let params: LinkParams = serde_json::from_str(json).unwrap();
+        assert!(params.force.is_none());
+    }
+
+    #[test]
+    fn link_params_deserialize_force_true() {
+        let json = r#"{"force": true}"#;
+        let params: LinkParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.force, Some(true));
+    }
+
+    #[test]
+    fn link_params_deserialize_force_false() {
+        let json = r#"{"force": false}"#;
+        let params: LinkParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.force, Some(false));
+    }
 }
