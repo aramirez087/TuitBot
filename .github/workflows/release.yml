@@ -463,6 +463,36 @@ jobs:
               --repo "$GH_REPO"
           fi
 
+      - name: Import GPG key
+        if: ${{ env.GPG_PRIVATE_KEY != '' }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          echo "$GPG_PRIVATE_KEY" | gpg --import --batch --no-tty
+          # Configure git to use GPG for signing (optional; for future signed commits)
+          git config --global user.signingkey $(gpg --list-keys --with-colons | grep fpr | head -1 | cut -d: -f10)
+
+      - name: Sign release artifacts with GPG
+        if: ${{ env.GPG_PRIVATE_KEY != '' }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cd dist
+          # Sign each artifact with detached signature (.asc)
+          for artifact in *; do
+            if [ -f "$artifact" ] && [ ! "$artifact" = *.asc ]; then
+              echo "Signing $artifact..."
+              gpg --batch --no-tty --passphrase "$GPG_PASSPHRASE" \
+                --detach-sign --armor "$artifact" || \
+                echo "Warning: Failed to sign $artifact (GPG may not be configured)"
+            fi
+          done
+          ls -la *.asc 2>/dev/null | wc -l | xargs echo "Generated signatures:"
+
       - name: Upload assets to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -470,4 +500,5 @@ jobs:
           TAG: ${{ needs.release.outputs.release_tag }}
         run: |
           set -euo pipefail
+          # Upload all artifacts (binaries + signatures)
           gh release upload "$TAG" dist/* --clobber --repo "$GH_REPO"
