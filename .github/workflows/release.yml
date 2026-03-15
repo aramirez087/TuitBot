@@ -484,9 +484,9 @@ jobs:
           cd dist
           # Sign each artifact with detached signature (.asc)
           for artifact in *; do
-            if [ -f "$artifact" ] && [[ ! "$artifact" =~ \.asc$ ]]; then
+            if [ -f "$artifact" ] && [[ "$artifact" != *.asc ]]; then
               echo "Signing $artifact..."
-              gpg --batch --no-tty --passphrase "$GPG_PASSPHRASE" \
+              gpg --batch --no-tty --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
                 --detach-sign --armor "$artifact" || \
                 echo "Warning: Failed to sign $artifact (GPG may not be configured)"
             fi
