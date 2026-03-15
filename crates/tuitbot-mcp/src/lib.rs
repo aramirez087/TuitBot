@@ -551,4 +551,126 @@ mod tests {
         let result: Result<Profile, _> = "nonexistent".parse();
         assert!(result.is_err());
     }
+
+    // ── Provider backend parsing ───────────────────────────────────
+
+    #[test]
+    fn parse_backend_scraper() {
+        assert_eq!(
+            provider::parse_backend("scraper"),
+            provider::ProviderBackend::Scraper
+        );
+    }
+
+    #[test]
+    fn parse_backend_scraper_uppercase() {
+        assert_eq!(
+            provider::parse_backend("SCRAPER"),
+            provider::ProviderBackend::Scraper
+        );
+    }
+
+    #[test]
+    fn parse_backend_x_api() {
+        assert_eq!(
+            provider::parse_backend("x_api"),
+            provider::ProviderBackend::XApi
+        );
+    }
+
+    #[test]
+    fn parse_backend_empty_defaults_to_x_api() {
+        assert_eq!(provider::parse_backend(""), provider::ProviderBackend::XApi);
+    }
+
+    #[test]
+    fn parse_backend_unknown_defaults_to_x_api() {
+        assert_eq!(
+            provider::parse_backend("something_else"),
+            provider::ProviderBackend::XApi
+        );
+    }
+
+    // ── Provider backend display ───────────────────────────────────
+
+    #[test]
+    fn provider_backend_display_x_api() {
+        assert_eq!(provider::ProviderBackend::XApi.to_string(), "x_api");
+    }
+
+    #[test]
+    fn provider_backend_display_scraper() {
+        assert_eq!(provider::ProviderBackend::Scraper.to_string(), "scraper");
+    }
+
+    // ── inject_provider_backend ────────────────────────────────────
+
+    #[test]
+    fn inject_backend_into_json_with_meta() {
+        let input = r#"{"data":{},"meta":{"elapsed":5}}"#;
+        let result = provider::inject_provider_backend(input, "scraper");
+        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(v["meta"]["provider_backend"], "scraper");
+        assert_eq!(v["meta"]["elapsed"], 5);
+    }
+
+    #[test]
+    fn inject_backend_into_json_without_meta() {
+        let input = r#"{"data":{}}"#;
+        let result = provider::inject_provider_backend(input, "x_api");
+        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(v["meta"]["provider_backend"], "x_api");
+    }
+
+    #[test]
+    fn inject_backend_invalid_json_returns_input() {
+        let input = "not valid json";
+        let result = provider::inject_provider_backend(input, "x_api");
+        assert_eq!(result, "not valid json");
+    }
+
+    // ── Profile equality and copy ──────────────────────────────────
+
+    #[test]
+    fn profile_equality() {
+        assert_eq!(Profile::Write, Profile::Write);
+        assert_ne!(Profile::Write, Profile::Admin);
+        assert_ne!(Profile::Readonly, Profile::ApiReadonly);
+    }
+
+    #[test]
+    fn profile_clone() {
+        let p = Profile::UtilityWrite;
+        let p2 = p;
+        assert_eq!(p, p2);
+    }
+
+    #[test]
+    fn profile_debug_format() {
+        let debug = format!("{:?}", Profile::Admin);
+        assert_eq!(debug, "Admin");
+    }
+
+    // ── Readonly state x_available checks ──────────────────────────
+
+    #[tokio::test]
+    async fn readonly_state_x_not_available_without_tokens() {
+        let config = Config::default();
+        let state = init_readonly_state(config, Profile::Readonly)
+            .await
+            .unwrap();
+        assert!(!state.x_available);
+        assert!(state.authenticated_user_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn readonly_state_config_preserved() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+        config.business.product_name = "TestBrand".to_string();
+        let state = init_readonly_state(config, Profile::Readonly)
+            .await
+            .unwrap();
+        assert_eq!(state.config.business.product_name, "TestBrand");
+    }
 }

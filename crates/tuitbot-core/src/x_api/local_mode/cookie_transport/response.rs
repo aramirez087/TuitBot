@@ -845,4 +845,264 @@ mod tests {
         let item = json!({"item": {}});
         assert!(extract_tweet_from_module_item(&item).is_none());
     }
+
+    // ── parse_timeline edge cases ──────────────────────────────────
+
+    #[test]
+    fn parse_timeline_replace_entry_type() {
+        let body = json!({
+            "data": {
+                "tl": {
+                    "instructions": [{
+                        "type": "TimelineReplaceEntry",
+                        "entries": [{
+                            "entryId": "tweet-replace-1",
+                            "content": {
+                                "itemContent": {
+                                    "tweet_results": {
+                                        "result": {
+                                            "rest_id": "replaced_1",
+                                            "legacy": {
+                                                "full_text": "replaced tweet",
+                                                "user_id_str": "7"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }]
+                    }]
+                }
+            }
+        });
+        let (tweets, _cursor) = parse_timeline(&body, &["data", "tl"]);
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0].id, "replaced_1");
+    }
+
+    #[test]
+    fn parse_timeline_unknown_instruction_type_ignored() {
+        let body = json!({
+            "data": {
+                "tl": {
+                    "instructions": [
+                        {"type": "TimelineClearCache"},
+                        {"type": "TimelineTerminateTimeline"}
+                    ]
+                }
+            }
+        });
+        let (tweets, cursor) = parse_timeline(&body, &["data", "tl"]);
+        assert!(tweets.is_empty());
+        assert!(cursor.is_none());
+    }
+
+    #[test]
+    fn parse_timeline_tombstone_entry_skipped() {
+        let body = json!({
+            "data": {
+                "tl": {
+                    "instructions": [{
+                        "type": "TimelineAddEntries",
+                        "entries": [{
+                            "entryId": "tweet-tomb-1",
+                            "content": {
+                                "itemContent": {
+                                    "tweet_results": {
+                                        "result": {
+                                            "__typename": "TweetTombstone"
+                                        }
+                                    }
+                                }
+                            }
+                        }]
+                    }]
+                }
+            }
+        });
+        let (tweets, _) = parse_timeline(&body, &["data", "tl"]);
+        assert!(tweets.is_empty());
+    }
+
+    #[test]
+    fn parse_timeline_mixed_tweets_and_cursor() {
+        let body = json!({
+            "data": {
+                "s": {
+                    "instructions": [{
+                        "type": "TimelineAddEntries",
+                        "entries": [
+                            {
+                                "entryId": "cursor-top-1",
+                                "content": {"value": "top_cursor"}
+                            },
+                            {
+                                "entryId": "tweet-1",
+                                "content": {
+                                    "itemContent": {
+                                        "tweet_results": {
+                                            "result": {
+                                                "rest_id": "t1",
+                                                "legacy": {"full_text": "a", "user_id_str": "1"}
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "entryId": "tweet-2",
+                                "content": {
+                                    "itemContent": {
+                                        "tweet_results": {
+                                            "result": {
+                                                "rest_id": "t2",
+                                                "legacy": {"full_text": "b", "user_id_str": "2"}
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "entryId": "cursor-bottom-1",
+                                "content": {"value": "bottom_cursor"}
+                            }
+                        ]
+                    }]
+                }
+            }
+        });
+        let (tweets, cursor) = parse_timeline(&body, &["data", "s"]);
+        assert_eq!(tweets.len(), 2);
+        assert_eq!(tweets[0].id, "t1");
+        assert_eq!(tweets[1].id, "t2");
+        assert_eq!(cursor, Some("bottom_cursor".to_string()));
+    }
+
+    // ── parse_user_list edge cases ─────────────────────────────────
+
+    #[test]
+    fn parse_user_list_skips_non_timeline_add() {
+        let body = json!({
+            "data": {
+                "u": {
+                    "instructions": [
+                        {"type": "TimelineClearCache"},
+                        {"type": "TimelineAddEntries", "entries": []}
+                    ]
+                }
+            }
+        });
+        let (users, cursor) = parse_user_list(&body, &["data", "u"]);
+        assert!(users.is_empty());
+        assert!(cursor.is_none());
+    }
+
+    #[test]
+    fn parse_user_list_cursor_top_skipped() {
+        let body = json!({
+            "data": {
+                "u": {
+                    "instructions": [{
+                        "type": "TimelineAddEntries",
+                        "entries": [
+                            {"entryId": "cursor-top-1", "content": {"value": "top"}},
+                            {"entryId": "cursor-bottom-1", "content": {"value": "bottom"}}
+                        ]
+                    }]
+                }
+            }
+        });
+        let (users, cursor) = parse_user_list(&body, &["data", "u"]);
+        assert!(users.is_empty());
+        assert_eq!(cursor, Some("bottom".to_string()));
+    }
+
+    // ── parse_user edge cases ──────────────────────────────────────
+
+    #[test]
+    fn parse_user_no_optional_fields() {
+        let result = json!({
+            "rest_id": "50",
+            "legacy": {
+                "screen_name": "minimal",
+                "name": "Min"
+            }
+        });
+        let u = parse_user(&result).unwrap();
+        assert_eq!(u.id, "50");
+        assert_eq!(u.username, "minimal");
+        assert!(u.profile_image_url.is_none());
+        assert!(u.description.is_none());
+        assert!(u.location.is_none());
+        assert!(u.url.is_none());
+    }
+
+    #[test]
+    fn parse_user_empty_url_filtered() {
+        let result = json!({
+            "rest_id": "51",
+            "legacy": {
+                "screen_name": "u",
+                "name": "U",
+                "url": ""
+            }
+        });
+        let u = parse_user(&result).unwrap();
+        assert!(u.url.is_none());
+    }
+
+    #[test]
+    fn parse_user_profile_image_normal_replaced() {
+        let result = json!({
+            "rest_id": "52",
+            "legacy": {
+                "screen_name": "u",
+                "name": "U",
+                "profile_image_url_https": "https://pbs.twimg.com/profile_images/123_normal.jpg"
+            }
+        });
+        let u = parse_user(&result).unwrap();
+        let url = u.profile_image_url.unwrap();
+        assert!(url.contains("_400x400"));
+        assert!(!url.contains("_normal"));
+    }
+
+    // ── parse_create_tweet_response edge cases ─────────────────────
+
+    #[test]
+    fn parse_create_tweet_missing_text_uses_default() {
+        let body = json!({
+            "data": {
+                "create_tweet": {
+                    "tweet_results": {
+                        "result": {
+                            "rest_id": "no_text_tweet",
+                            "legacy": {}
+                        }
+                    }
+                }
+            }
+        });
+        let posted = parse_create_tweet_response(&body).unwrap();
+        assert_eq!(posted.id, "no_text_tweet");
+        assert_eq!(posted.text, "");
+    }
+
+    // ── navigate_to_array edge cases ───────────────────────────────
+
+    #[test]
+    fn navigate_to_array_empty_path() {
+        let body = json!({"instructions": [{"type": "test"}]});
+        let result = navigate_to_array(&body, &[]);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn navigate_to_array_deeply_nested() {
+        let body = json!({
+            "a": {"b": {"c": {"instructions": [{"x": 1}]}}}
+        });
+        let result = navigate_to_array(&body, &["a", "b", "c"]);
+        assert_eq!(result.len(), 1);
+    }
 }

@@ -1093,4 +1093,193 @@ mod tests {
         assert_eq!(deserialized[0].id, "a");
         assert_eq!(deserialized[0].media_paths.len(), 1);
     }
+
+    // ── thread block validation edge cases ─────────────────────────
+
+    #[test]
+    fn validate_empty_blocks_fails() {
+        let blocks: Vec<ThreadBlock> = vec![];
+        let result = tuitbot_core::content::validate_thread_blocks(&blocks);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_single_block_fails() {
+        // Threads require at least 2 blocks
+        let blocks = vec![ThreadBlock {
+            id: "a".to_string(),
+            text: "Solo tweet".to_string(),
+            media_paths: vec![],
+            order: 0,
+        }];
+        assert!(tuitbot_core::content::validate_thread_blocks(&blocks).is_err());
+    }
+
+    #[test]
+    fn validate_block_with_empty_text_fails() {
+        let blocks = vec![ThreadBlock {
+            id: "a".to_string(),
+            text: "   ".to_string(),
+            media_paths: vec![],
+            order: 0,
+        }];
+        let result = tuitbot_core::content::validate_thread_blocks(&blocks);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_block_over_280_chars_fails() {
+        let blocks = vec![ThreadBlock {
+            id: "a".to_string(),
+            text: "x".repeat(281),
+            media_paths: vec![],
+            order: 0,
+        }];
+        let result = tuitbot_core::content::validate_thread_blocks(&blocks);
+        assert!(result.is_err());
+    }
+
+    // ── compose_tweet_request edge cases ───────────────────────────
+
+    #[test]
+    fn compose_tweet_request_with_empty_provenance() {
+        let json = r#"{"text": "Hello", "provenance": []}"#;
+        let req: ComposeTweetRequest = serde_json::from_str(json).unwrap();
+        assert!(req.provenance.unwrap().is_empty());
+    }
+
+    // ── compose_request edge cases ─────────────────────────────────
+
+    #[test]
+    fn compose_request_with_empty_blocks() {
+        let json = r#"{
+            "content_type": "thread",
+            "content": "",
+            "blocks": []
+        }"#;
+        let req: ComposeRequest = serde_json::from_str(json).unwrap();
+        assert!(req.blocks.unwrap().is_empty());
+    }
+
+    #[test]
+    fn compose_request_with_scheduled_for() {
+        let json = r#"{
+            "content_type": "tweet",
+            "content": "scheduled tweet",
+            "scheduled_for": "2026-06-01T12:00:00Z"
+        }"#;
+        let req: ComposeRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.scheduled_for.as_deref(), Some("2026-06-01T12:00:00Z"));
+    }
+
+    #[test]
+    fn compose_request_with_provenance() {
+        let json = r#"{
+            "content_type": "tweet",
+            "content": "text",
+            "provenance": [{"node_id": 5, "chunk_id": 10}]
+        }"#;
+        let req: ComposeRequest = serde_json::from_str(json).unwrap();
+        let prov = req.provenance.unwrap();
+        assert_eq!(prov.len(), 1);
+        assert_eq!(prov[0].node_id, Some(5));
+        assert_eq!(prov[0].chunk_id, Some(10));
+    }
+
+    // ── build_provenance_input detailed ────────────────────────────
+
+    #[test]
+    fn build_provenance_input_all_none_fields() {
+        let refs = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: None,
+            heading_path: None,
+            snippet: None,
+        }];
+        let result = build_provenance_input(Some(&refs)).unwrap();
+        assert!(result.source_node_id.is_none());
+        assert!(result.source_seed_id.is_none());
+        assert_eq!(result.refs.len(), 1);
+        // source_chunks_json should be valid JSON
+        let parsed: Vec<ProvenanceRef> = serde_json::from_str(&result.source_chunks_json).unwrap();
+        assert_eq!(parsed.len(), 1);
+    }
+
+    // ── tweet_weighted_len boundary tests ──────────────────────────
+
+    #[test]
+    fn tweet_len_exactly_280() {
+        let text = "a".repeat(280);
+        assert_eq!(tuitbot_core::content::tweet_weighted_len(&text), 280);
+    }
+
+    #[test]
+    fn tweet_len_with_url() {
+        // URLs count as 23 chars in X's weighted length
+        let text = "Check out https://example.com/some/long/path/here";
+        let len = tuitbot_core::content::tweet_weighted_len(text);
+        // Should be less than the raw char count due to URL shortening
+        assert!(len < text.len(), "URL should be shortened in weighted len");
+    }
+
+    // ── thread block media aggregation ─────────────────────────────
+
+    #[test]
+    fn block_media_aggregation() {
+        let blocks = vec![
+            ThreadBlock {
+                id: "a".to_string(),
+                text: "First".to_string(),
+                media_paths: vec!["img1.jpg".to_string()],
+                order: 0,
+            },
+            ThreadBlock {
+                id: "b".to_string(),
+                text: "Second".to_string(),
+                media_paths: vec!["img2.png".to_string(), "img3.gif".to_string()],
+                order: 1,
+            },
+            ThreadBlock {
+                id: "c".to_string(),
+                text: "Third".to_string(),
+                media_paths: vec![],
+                order: 2,
+            },
+        ];
+        let mut sorted = blocks.clone();
+        sorted.sort_by_key(|b| b.order);
+        let all_media: Vec<String> = sorted.iter().flat_map(|b| b.media_paths.clone()).collect();
+        assert_eq!(all_media.len(), 3);
+        assert_eq!(all_media[0], "img1.jpg");
+        assert_eq!(all_media[1], "img2.png");
+        assert_eq!(all_media[2], "img3.gif");
+    }
+
+    // ── legacy thread content parsing ──────────────────────────────
+
+    #[test]
+    fn legacy_thread_single_tweet() {
+        let content = r#"["Only tweet"]"#;
+        let tweets: Vec<String> = serde_json::from_str(content).unwrap();
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0], "Only tweet");
+    }
+
+    #[test]
+    fn legacy_thread_with_special_chars() {
+        let content = r#"["Hello \"world\"", "Tweet with\nnewline"]"#;
+        let tweets: Vec<String> = serde_json::from_str(content).unwrap();
+        assert_eq!(tweets.len(), 2);
+        assert!(tweets[0].contains('"'));
+    }
+
+    #[test]
+    fn legacy_thread_combined_separator() {
+        let tweets = vec!["First".to_string(), "Second".to_string()];
+        let combined = tweets.join("\n---\n");
+        assert_eq!(combined, "First\n---\nSecond");
+        assert!(combined.contains("---"));
+    }
 }

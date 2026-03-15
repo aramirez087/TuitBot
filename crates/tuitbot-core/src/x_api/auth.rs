@@ -1193,4 +1193,137 @@ mod tests {
     }
 
     use chrono::Datelike;
+
+    // -------------------------------------------------------------------
+    // REFRESH_WINDOW_SECS constant
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn refresh_window_is_5_minutes() {
+        assert_eq!(REFRESH_WINDOW_SECS, 300);
+    }
+
+    // -------------------------------------------------------------------
+    // AUTH_URL and TOKEN_URL constants
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn auth_url_is_valid() {
+        assert!(AUTH_URL.starts_with("https://"));
+        assert!(AUTH_URL.contains("oauth2/authorize"));
+    }
+
+    #[test]
+    fn token_url_is_valid() {
+        assert!(TOKEN_URL.starts_with("https://"));
+        assert!(TOKEN_URL.contains("oauth2/token"));
+    }
+
+    // -------------------------------------------------------------------
+    // Tokens edge cases
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn tokens_empty_access_token() {
+        let tokens = Tokens {
+            access_token: String::new(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        assert!(tokens.access_token.is_empty());
+    }
+
+    #[test]
+    fn tokens_with_unicode_scope() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec!["tweet.read".into(), "users.read".into()],
+        };
+        let json = serde_json::to_string(&tokens).unwrap();
+        let back: Tokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.scopes, tokens.scopes);
+    }
+
+    // -------------------------------------------------------------------
+    // save_tokens error handling
+    // -------------------------------------------------------------------
+
+    #[cfg(unix)]
+    #[test]
+    fn save_tokens_to_readonly_dir_fails() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().expect("temp dir");
+        let readonly_dir = dir.path().join("readonly");
+        std::fs::create_dir(&readonly_dir).expect("create dir");
+        std::fs::set_permissions(&readonly_dir, std::fs::Permissions::from_mode(0o444))
+            .expect("set perms");
+
+        let path = readonly_dir.join("tokens.json");
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+
+        let result = save_tokens(&tokens, &path);
+        assert!(result.is_err());
+
+        // Cleanup: restore permissions so tempdir can be deleted
+        std::fs::set_permissions(&readonly_dir, std::fs::Permissions::from_mode(0o755))
+            .expect("restore perms");
+    }
+
+    // -------------------------------------------------------------------
+    // load_tokens error path
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn load_tokens_invalid_json_key() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        // Valid JSON but wrong structure
+        std::fs::write(&path, r#"{"wrong_key": "value"}"#).expect("write");
+        let result = load_tokens(&path);
+        assert!(result.is_err());
+    }
+
+    // -------------------------------------------------------------------
+    // TokenManager construction
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn token_manager_new_sets_fields() {
+        let tokens = Tokens {
+            access_token: "test_tok".into(),
+            refresh_token: "test_ref".into(),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+            scopes: vec!["s1".into()],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let manager = TokenManager::new(tokens, "my_client".into(), path.clone());
+        assert_eq!(manager.client_id, "my_client");
+        assert_eq!(manager.token_path, path);
+    }
+
+    // -------------------------------------------------------------------
+    // build_oauth_client
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn build_oauth_client_with_ip_host() {
+        let client = build_oauth_client("cid", "http://127.0.0.1:9999/callback");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn build_oauth_client_with_custom_path() {
+        let client = build_oauth_client("cid", "http://localhost/auth/callback");
+        assert!(client.is_ok());
+    }
 }
