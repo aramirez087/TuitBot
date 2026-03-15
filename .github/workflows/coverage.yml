@@ -47,7 +47,7 @@ jobs:
             --out xml \
             --output-dir coverage/ \
             -- \
-            --skip session09_expanded_benchmark
+            --skip tools::benchmark
         env:
           RUSTFLAGS: "-D warnings"
           TUITBOT_SKIP_DASHBOARD_BUILD: '1'
