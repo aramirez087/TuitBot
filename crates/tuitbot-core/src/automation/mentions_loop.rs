@@ -869,6 +869,61 @@ mod tests {
         assert!(since_id.is_none());
     }
 
+    #[tokio::test]
+    async fn run_once_posting_failure_returns_failed() {
+        struct FailingPoster;
+
+        #[async_trait::async_trait]
+        impl PostSender for FailingPoster {
+            async fn send_reply(&self, _tweet_id: &str, _content: &str) -> Result<(), LoopError> {
+                Err(LoopError::Other("network error".to_string()))
+            }
+        }
+
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![test_tweet("100", "alice")],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(FailingPoster),
+            false, // not dry_run — will actually try to post
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, _) = mentions_loop.run_once(None, None, &storage).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(&results[0], MentionResult::Failed { error, .. } if error.contains("network error"))
+        );
+    }
+
+    #[tokio::test]
+    async fn run_once_multiple_mentions_tracks_max_id() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![
+                    test_tweet("50", "alice"),
+                    test_tweet("200", "bob"),
+                    test_tweet("100", "carol"),
+                ],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hey".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, since_id) = mentions_loop.run_once(None, None, &storage).await.unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(since_id, Some("200".to_string()));
+    }
+
     #[test]
     fn mention_result_debug() {
         let result = MentionResult::Replied {

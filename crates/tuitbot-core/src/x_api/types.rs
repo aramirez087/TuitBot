@@ -1042,6 +1042,103 @@ mod tests {
     }
 
     #[test]
+    fn image_format_copy() {
+        let a = ImageFormat::Jpeg;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn media_type_eq_and_copy() {
+        let a = MediaType::Image(ImageFormat::Jpeg);
+        let b = a;
+        assert_eq!(a, b);
+        assert_ne!(a, MediaType::Gif);
+    }
+
+    #[test]
+    fn media_type_image_requires_chunked_boundary() {
+        let jpeg = MediaType::Image(ImageFormat::Jpeg);
+        // Exact boundary: 5MB should not require chunked
+        assert!(!jpeg.requires_chunked(5 * 1024 * 1024));
+        // Just over: requires chunked
+        assert!(jpeg.requires_chunked(5 * 1024 * 1024 + 1));
+    }
+
+    #[test]
+    fn deserialize_tweet_with_only_some_metrics() {
+        let json = r#"{
+            "id": "1",
+            "text": "t",
+            "author_id": "a",
+            "public_metrics": {
+                "like_count": 42
+            }
+        }"#;
+        let tweet: Tweet = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(tweet.public_metrics.like_count, 42);
+        assert_eq!(tweet.public_metrics.retweet_count, 0);
+        assert_eq!(tweet.public_metrics.bookmark_count, 0);
+    }
+
+    #[test]
+    fn deserialize_search_response_no_includes() {
+        let json = r#"{
+            "data": [{"id":"1","text":"t","author_id":"a"}],
+            "meta": {"result_count": 1}
+        }"#;
+        let resp: SearchResponse = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(resp.data.len(), 1);
+        assert!(resp.includes.is_none());
+    }
+
+    #[test]
+    fn x_api_error_response_partial_fields() {
+        let json = r#"{"detail": "Not Found"}"#;
+        let err: XApiErrorResponse = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(err.detail.as_deref(), Some("Not Found"));
+        assert!(err.title.is_none());
+        assert!(err.status.is_none());
+        assert!(err.error_type.is_none());
+    }
+
+    #[test]
+    fn single_tweet_response_with_includes() {
+        let json = r#"{
+            "data": {"id":"1","text":"hi","author_id":"2"},
+            "includes": {"users": [{"id":"2","username":"u","name":"N"}]}
+        }"#;
+        let resp: SingleTweetResponse = serde_json::from_str(json).expect("deserialize");
+        let includes = resp.includes.expect("includes");
+        assert_eq!(includes.users.len(), 1);
+        assert_eq!(includes.users[0].username, "u");
+    }
+
+    #[test]
+    fn delete_tweet_response_not_deleted() {
+        let json = r#"{"data": {"deleted": false}}"#;
+        let resp: DeleteTweetResponse = serde_json::from_str(json).expect("deserialize");
+        assert!(!resp.data.deleted);
+    }
+
+    #[test]
+    fn rate_limit_info_none_values() {
+        let info = RateLimitInfo {
+            remaining: None,
+            reset_at: None,
+        };
+        assert!(info.remaining.is_none());
+        assert!(info.reset_at.is_none());
+    }
+
+    #[test]
+    fn media_id_debug() {
+        let id = MediaId("test_id".into());
+        let debug = format!("{id:?}");
+        assert!(debug.contains("test_id"));
+    }
+
+    #[test]
     fn rate_limit_info_construction() {
         let info = RateLimitInfo {
             remaining: Some(100),

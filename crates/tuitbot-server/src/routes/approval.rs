@@ -597,3 +597,133 @@ fn read_config(state: &AppState) -> Config {
         .and_then(|s| toml::from_str(&s).ok())
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escape_csv_no_special_chars() {
+        assert_eq!(escape_csv("hello"), "hello");
+        assert_eq!(escape_csv("simple text"), "simple text");
+    }
+
+    #[test]
+    fn escape_csv_with_comma() {
+        assert_eq!(escape_csv("hello, world"), "\"hello, world\"");
+    }
+
+    #[test]
+    fn escape_csv_with_quotes() {
+        assert_eq!(escape_csv(r#"say "hi""#), r#""say ""hi""""#);
+    }
+
+    #[test]
+    fn escape_csv_with_newline() {
+        assert_eq!(escape_csv("line1\nline2"), "\"line1\nline2\"");
+    }
+
+    #[test]
+    fn escape_csv_empty() {
+        assert_eq!(escape_csv(""), "");
+    }
+
+    #[test]
+    fn escape_csv_with_all_special() {
+        let result = escape_csv("a,b\"c\nd");
+        assert!(result.starts_with('"'));
+        assert!(result.ends_with('"'));
+    }
+
+    #[test]
+    fn default_status_is_pending() {
+        assert_eq!(default_status(), "pending");
+    }
+
+    #[test]
+    fn default_editor_is_dashboard() {
+        assert_eq!(default_editor(), "dashboard");
+    }
+
+    #[test]
+    fn default_csv_is_csv() {
+        assert_eq!(default_csv(), "csv");
+    }
+
+    #[test]
+    fn default_export_status_includes_all() {
+        let status = default_export_status();
+        assert!(status.contains("pending"));
+        assert!(status.contains("approved"));
+        assert!(status.contains("rejected"));
+        assert!(status.contains("posted"));
+    }
+
+    #[test]
+    fn approval_query_deserialize_defaults() {
+        let json = r#"{}"#;
+        let query: ApprovalQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.status, "pending");
+        assert!(query.action_type.is_none());
+        assert!(query.reviewed_by.is_none());
+        assert!(query.since.is_none());
+    }
+
+    #[test]
+    fn approval_query_deserialize_with_type() {
+        let json = r#"{"type": "reply"}"#;
+        let query: ApprovalQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.action_type.as_deref(), Some("reply"));
+    }
+
+    #[test]
+    fn edit_content_request_deserialize() {
+        let json = r#"{"content": "new text"}"#;
+        let req: EditContentRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.content, "new text");
+        assert!(req.media_paths.is_none());
+        assert_eq!(req.editor, "dashboard");
+    }
+
+    #[test]
+    fn edit_content_request_with_media() {
+        let json = r#"{"content": "text", "media_paths": ["a.png"], "editor": "cli"}"#;
+        let req: EditContentRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.media_paths.as_ref().unwrap().len(), 1);
+        assert_eq!(req.editor, "cli");
+    }
+
+    #[test]
+    fn batch_approve_request_deserialize_defaults() {
+        let json = r#"{}"#;
+        let req: BatchApproveRequest = serde_json::from_str(json).unwrap();
+        assert!(req.max.is_none());
+        assert!(req.ids.is_none());
+        assert!(req.review.actor.is_none());
+    }
+
+    #[test]
+    fn batch_approve_request_with_ids() {
+        let json = r#"{"ids": [1, 2, 3], "review": {"actor": "admin"}}"#;
+        let req: BatchApproveRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.ids.as_ref().unwrap().len(), 3);
+        assert_eq!(req.review.actor.as_deref(), Some("admin"));
+    }
+
+    #[test]
+    fn export_query_deserialize_defaults() {
+        let json = r#"{}"#;
+        let query: ExportQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.format, "csv");
+        assert!(query.status.contains("pending"));
+        assert!(query.action_type.is_none());
+    }
+
+    #[test]
+    fn export_query_json_format() {
+        let json = r#"{"format": "json", "type": "tweet"}"#;
+        let query: ExportQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.format, "json");
+        assert_eq!(query.action_type.as_deref(), Some("tweet"));
+    }
+}

@@ -420,4 +420,124 @@ mod tests {
         let result = truncate_text("hello", 5);
         assert_eq!(result, "hello");
     }
+
+    #[test]
+    fn truncate_text_empty_string() {
+        assert_eq!(truncate_text("", 10), "");
+    }
+
+    #[test]
+    fn truncate_text_zero_max() {
+        let result = truncate_text("hello", 0);
+        // max_len=0, sub(3) saturates to 0, so "..."
+        assert_eq!(result, "...");
+    }
+
+    #[test]
+    fn citations_to_provenance_refs_empty() {
+        let refs = citations_to_provenance_refs(&[]);
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn citations_to_chunks_json_multiple() {
+        let citations = vec![
+            VaultCitation {
+                chunk_id: 1,
+                node_id: 10,
+                heading_path: "# A".to_string(),
+                source_path: "a.md".to_string(),
+                source_title: None,
+                snippet: "".to_string(),
+                retrieval_boost: 1.0,
+            },
+            VaultCitation {
+                chunk_id: 2,
+                node_id: 20,
+                heading_path: "# B".to_string(),
+                source_path: "b.md".to_string(),
+                source_title: Some("B".to_string()),
+                snippet: "".to_string(),
+                retrieval_boost: 2.0,
+            },
+        ];
+        let json_str = citations_to_chunks_json(&citations);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0]["chunk_id"], 1);
+        assert_eq!(parsed[1]["chunk_id"], 2);
+    }
+
+    #[test]
+    fn format_fragments_with_source_title() {
+        let f = FragmentContext {
+            chunk_text: "CLI tool for managing bots".to_string(),
+            citation: VaultCitation {
+                chunk_id: 1,
+                node_id: 10,
+                heading_path: "".to_string(),
+                source_path: "vault/cli.md".to_string(),
+                source_title: Some("CLI Guide".to_string()),
+                snippet: "CLI tool...".to_string(),
+                retrieval_boost: 1.0,
+            },
+        };
+        let result = format_fragments_prompt(&[f]);
+        assert!(result.contains("CLI Guide"));
+        assert!(!result.contains("vault/cli.md")); // title takes precedence
+    }
+
+    #[test]
+    fn fragment_from_chunk_with_context_builds_correctly() {
+        use crate::storage::watchtower::{ChunkWithNodeContext, ContentChunk};
+
+        let cwc = ChunkWithNodeContext {
+            chunk: ContentChunk {
+                id: 42,
+                account_id: "acct".to_string(),
+                node_id: 100,
+                heading_path: "# Title".to_string(),
+                chunk_text: "Some chunk text for testing purposes".to_string(),
+                chunk_hash: "hash".to_string(),
+                chunk_index: 0,
+                retrieval_boost: 1.5,
+                status: "active".to_string(),
+                created_at: "2026-01-01".to_string(),
+                updated_at: "2026-01-01".to_string(),
+            },
+            relative_path: "notes/test.md".to_string(),
+            source_title: Some("Test Note".to_string()),
+        };
+
+        let frag = fragment_from_chunk_with_context(cwc);
+        assert_eq!(frag.citation.chunk_id, 42);
+        assert_eq!(frag.citation.node_id, 100);
+        assert_eq!(frag.citation.source_path, "notes/test.md");
+        assert_eq!(frag.citation.source_title, Some("Test Note".to_string()));
+        assert_eq!(frag.citation.heading_path, "# Title");
+        assert!((frag.citation.retrieval_boost - 1.5).abs() < 0.001);
+        assert_eq!(frag.chunk_text, "Some chunk text for testing purposes");
+    }
+
+    #[test]
+    fn vault_citation_clone() {
+        let c = sample_citation();
+        let c2 = c.clone();
+        assert_eq!(c.chunk_id, c2.chunk_id);
+        assert_eq!(c.heading_path, c2.heading_path);
+    }
+
+    #[test]
+    fn fragment_context_clone() {
+        let f = sample_fragment();
+        let f2 = f.clone();
+        assert_eq!(f.chunk_text, f2.chunk_text);
+        assert_eq!(f.citation.chunk_id, f2.citation.chunk_id);
+    }
+
+    #[test]
+    fn constants_have_expected_values() {
+        assert_eq!(MAX_FRAGMENT_CHARS, 1000);
+        assert_eq!(MAX_FRAGMENTS, 5);
+    }
 }

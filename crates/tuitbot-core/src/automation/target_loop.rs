@@ -937,6 +937,88 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn skips_when_safety_cant_reply() {
+        let tweets = vec![test_tweet("tw1", "alice")];
+        let storage = Arc::new(MockTargetStorage::new());
+        let poster = Arc::new(MockPoster::new());
+        let user_mgr = Arc::new(MockUserManager {
+            users: vec![(
+                "alice".to_string(),
+                "uid_alice".to_string(),
+                "alice".to_string(),
+            )],
+        });
+
+        let target_loop = TargetLoop::new(
+            Arc::new(MockFetcher { tweets }),
+            user_mgr,
+            Arc::new(MockGenerator {
+                reply: "Great!".to_string(),
+            }),
+            Arc::new(MockSafety::new(false)), // can_reply = false
+            storage,
+            poster.clone(),
+            default_config(),
+        );
+
+        let results = target_loop.run_iteration().await.expect("iteration");
+        assert_eq!(results.len(), 1);
+        assert!(matches!(
+            &results[0],
+            TargetResult::Skipped { reason, .. } if reason == "rate limited"
+        ));
+        assert_eq!(poster.sent_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn skips_when_already_replied() {
+        let tweets = vec![test_tweet("tw1", "alice")];
+        let storage = Arc::new(MockTargetStorage::new());
+        let poster = Arc::new(MockPoster::new());
+        let safety = Arc::new(MockSafety::new(true));
+        // Pre-mark tw1 as replied
+        safety.record_reply("tw1", "already replied").await.unwrap();
+
+        let user_mgr = Arc::new(MockUserManager {
+            users: vec![(
+                "alice".to_string(),
+                "uid_alice".to_string(),
+                "alice".to_string(),
+            )],
+        });
+
+        let target_loop = TargetLoop::new(
+            Arc::new(MockFetcher { tweets }),
+            user_mgr,
+            Arc::new(MockGenerator {
+                reply: "Great!".to_string(),
+            }),
+            safety,
+            storage,
+            poster.clone(),
+            default_config(),
+        );
+
+        let results = target_loop.run_iteration().await.expect("iteration");
+        assert_eq!(results.len(), 1);
+        assert!(matches!(
+            &results[0],
+            TargetResult::Skipped { reason, .. } if reason == "already replied"
+        ));
+        assert_eq!(poster.sent_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn no_tweets_returns_empty_results() {
+        let storage = Arc::new(MockTargetStorage::new());
+        let (target_loop, poster) = build_loop(vec![], default_config(), storage);
+
+        let results = target_loop.run_iteration().await.expect("iteration");
+        assert!(results.is_empty());
+        assert_eq!(poster.sent_count(), 0);
+    }
+
+    #[tokio::test]
     async fn non_auth_error_continues_iteration() {
         let user_mgr = Arc::new(MockPartialFailUserManager {
             call_count: AtomicU32::new(0),

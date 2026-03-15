@@ -1282,4 +1282,42 @@ mod tests {
         assert_eq!(combined, "First\n---\nSecond");
         assert!(combined.contains("---"));
     }
+
+    #[test]
+    fn thread_block_request_into_core() {
+        let req = ThreadBlockRequest {
+            id: "uuid-1".to_string(),
+            text: "Hello".to_string(),
+            media_paths: vec!["img.png".to_string()],
+            order: 0,
+        };
+        let core = req.into_core();
+        assert_eq!(core.id, "uuid-1");
+        assert_eq!(core.text, "Hello");
+        assert_eq!(core.media_paths.len(), 1);
+        assert_eq!(core.order, 0);
+    }
+
+    #[test]
+    fn thread_block_request_default_media_paths() {
+        let json = r#"{"id":"u1","text":"t","order":0}"#;
+        let req: ThreadBlockRequest = serde_json::from_str(json).unwrap();
+        assert!(req.media_paths.is_empty());
+    }
+
+    #[test]
+    fn compose_tweet_request_text_only() {
+        let json = r#"{"text":"Hello world"}"#;
+        let req: ComposeTweetRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.text, "Hello world");
+        assert!(req.scheduled_for.is_none());
+        assert!(req.provenance.is_none());
+    }
+
+    #[test]
+    fn compose_tweet_request_scheduled() {
+        let json = r#"{"text":"Later","scheduled_for":"2026-04-01T10:00:00Z"}"#;
+        let req: ComposeTweetRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.scheduled_for.as_deref(), Some("2026-04-01T10:00:00Z"));
+    }
 }

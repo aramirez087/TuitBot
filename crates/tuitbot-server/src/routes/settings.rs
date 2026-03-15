@@ -1119,4 +1119,193 @@ mod tests {
     fn factory_reset_phrase_is_expected_value() {
         assert_eq!(FACTORY_RESET_PHRASE, "RESET TUITBOT");
     }
+
+    // ── json_to_toml edge cases ────────────────────────────────────────
+
+    #[test]
+    fn json_to_toml_empty_object() {
+        let json = serde_json::json!({});
+        let toml = json_to_toml(&json).unwrap();
+        let table = toml.as_table().unwrap();
+        assert!(table.is_empty());
+    }
+
+    #[test]
+    fn json_to_toml_empty_array() {
+        let json = serde_json::json!([]);
+        let toml = json_to_toml(&json).unwrap();
+        let arr = toml.as_array().unwrap();
+        assert!(arr.is_empty());
+    }
+
+    #[test]
+    fn json_to_toml_deeply_nested() {
+        let json = serde_json::json!({
+            "a": { "b": { "c": "deep" } }
+        });
+        let toml = json_to_toml(&json).unwrap();
+        let val = toml.get("a").unwrap().get("b").unwrap().get("c").unwrap();
+        assert_eq!(val, &toml::Value::String("deep".to_string()));
+    }
+
+    #[test]
+    fn json_to_toml_null_in_array_member_rejected() {
+        let json = serde_json::json!(["a", null, "b"]);
+        let result = json_to_toml(&json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn json_to_toml_mixed_array() {
+        let json = serde_json::json!([1, 2, 3]);
+        let toml = json_to_toml(&json).unwrap();
+        let arr = toml.as_array().unwrap();
+        assert_eq!(arr.len(), 3);
+        assert_eq!(arr[0], toml::Value::Integer(1));
+    }
+
+    #[test]
+    fn json_to_toml_boolean_false() {
+        let json = serde_json::json!(false);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Boolean(false));
+    }
+
+    // ── merge_toml edge cases ──────────────────────────────────────────
+
+    #[test]
+    fn merge_toml_scalar_replaces_table() {
+        let mut base: toml::Value = toml::from_str(
+            r#"
+            [section]
+            key = "value"
+            "#,
+        )
+        .unwrap();
+        // Replace entire section with scalar
+        let patch: toml::Value = toml::from_str(r#"section = "scalar""#).unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(
+            base.get("section").unwrap(),
+            &toml::Value::String("scalar".to_string())
+        );
+    }
+
+    #[test]
+    fn merge_toml_empty_patch_no_change() {
+        let mut base: toml::Value = toml::from_str(r#"key = "value""#).unwrap();
+        let patch: toml::Value = toml::from_str("").unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(
+            base.get("key").unwrap(),
+            &toml::Value::String("value".to_string())
+        );
+    }
+
+    // ── redact edge cases ──────────────────────────────────────────────
+
+    #[test]
+    fn redact_service_account_keys_empty_sources_array() {
+        let mut json = serde_json::json!({
+            "content_sources": {
+                "sources": []
+            }
+        });
+        redact_service_account_keys(&mut json);
+        assert!(json["content_sources"]["sources"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn redact_service_account_keys_missing_content_sources() {
+        let mut json = serde_json::json!({"other": "data"});
+        // Should not panic
+        redact_service_account_keys(&mut json);
+        assert_eq!(json["other"], "data");
+    }
+
+    // ── config_errors_to_response edge cases ───────────────────────────
+
+    #[test]
+    fn config_errors_to_response_parse_error_variant() {
+        // Produce a real toml parse error
+        let parse_err: toml::de::Error =
+            toml::from_str::<toml::Value>("invalid [[[").expect_err("should fail");
+        let errors = vec![ConfigError::ParseError { source: parse_err }];
+        let items = config_errors_to_response(errors);
+        assert_eq!(items.len(), 1);
+        assert!(items[0].field.is_empty());
+        assert!(!items[0].message.is_empty());
+    }
+
+    #[test]
+    fn config_errors_to_response_empty() {
+        let items = config_errors_to_response(vec![]);
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn config_errors_to_response_multiple() {
+        let errors = vec![
+            ConfigError::MissingField {
+                field: "a".to_string(),
+            },
+            ConfigError::InvalidValue {
+                field: "b".to_string(),
+                message: "too large".to_string(),
+            },
+        ];
+        let items = config_errors_to_response(errors);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].field, "a");
+        assert_eq!(items[1].field, "b");
+    }
+
+    // ── delete_all_credentials edge cases ──────────────────────────────
+
+    #[test]
+    fn delete_all_credentials_partial_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // Only create one of the two credential files
+        std::fs::write(dir.path().join("tokens.json"), "{}").expect("write");
+
+        let deleted = delete_all_credentials(dir.path());
+        assert!(deleted);
+        assert!(!dir.path().join("tokens.json").exists());
+    }
+
+    // ── Deserialization tests for request types ────────────────────────
+
+    #[test]
+    fn test_llm_request_deserialize() {
+        let json = r#"{"provider": "openai", "model": "gpt-4"}"#;
+        let req: TestLlmRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.provider, "openai");
+        assert_eq!(req.model, "gpt-4");
+        assert!(req.api_key.is_none());
+        assert!(req.base_url.is_none());
+    }
+
+    #[test]
+    fn test_llm_request_with_all_fields() {
+        let json = r#"{
+            "provider": "ollama",
+            "api_key": "sk-test",
+            "model": "llama2",
+            "base_url": "http://localhost:11434"
+        }"#;
+        let req: TestLlmRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.provider, "ollama");
+        assert_eq!(req.api_key.as_deref(), Some("sk-test"));
+        assert_eq!(req.base_url.as_deref(), Some("http://localhost:11434"));
+    }
+
+    #[test]
+    fn factory_reset_request_deserialize() {
+        let json = r#"{"confirmation": "RESET TUITBOT"}"#;
+        let req: FactoryResetRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.confirmation, "RESET TUITBOT");
+    }
 }

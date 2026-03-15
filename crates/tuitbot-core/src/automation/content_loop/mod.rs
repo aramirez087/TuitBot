@@ -449,4 +449,70 @@ mod tests_content_loop {
         );
         assert!(content.topics.is_empty());
     }
+
+    #[test]
+    fn content_loop_with_thread_poster() {
+        use crate::automation::loop_helpers::ThreadPoster;
+        use crate::automation::ContentLoopError;
+
+        struct MockThreadPoster;
+
+        #[async_trait::async_trait]
+        impl ThreadPoster for MockThreadPoster {
+            async fn post_tweet(&self, _content: &str) -> Result<String, ContentLoopError> {
+                Ok("tweet_id_1".to_string())
+            }
+            async fn reply_to_tweet(
+                &self,
+                _in_reply_to: &str,
+                _content: &str,
+            ) -> Result<String, ContentLoopError> {
+                Ok("reply_id_1".to_string())
+            }
+        }
+
+        let poster = Arc::new(MockThreadPoster);
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "t".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            14400,
+            false,
+        )
+        .with_thread_poster(poster);
+
+        assert!(content.thread_poster.is_some());
+    }
+
+    #[test]
+    fn mock_storage_counts() {
+        let storage = MockStorage::new(None);
+        assert_eq!(storage.posted_count(), 0);
+        assert_eq!(storage.action_count(), 0);
+    }
+
+    #[test]
+    fn content_loop_dry_run_false() {
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "t".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            3600,
+            false,
+        );
+        assert!(!content.dry_run);
+        assert_eq!(content.post_window_secs, 3600);
+    }
 }
