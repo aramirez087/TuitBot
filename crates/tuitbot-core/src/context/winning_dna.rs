@@ -680,6 +680,129 @@ mod tests {
         assert!(w < 0.1, "got {w}");
     }
 
+    #[test]
+    fn retrieval_weight_zero_half_life() {
+        // Zero half-life → no decay
+        let w = compute_retrieval_weight(0.8, 100.0, 0.0);
+        assert!((w - 0.8).abs() < 0.001);
+    }
+
+    #[test]
+    fn retrieval_weight_negative_half_life() {
+        let w = compute_retrieval_weight(0.5, 10.0, -1.0);
+        assert!((w - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn engagement_score_negative_max() {
+        // Negative max_score treated as cold-start
+        assert!((compute_engagement_score(50.0, -10.0) - COLD_START_WEIGHT).abs() < 0.001);
+    }
+
+    // --- classify_for_row ---
+
+    #[test]
+    fn classify_for_row_reply() {
+        assert_eq!(
+            classify_for_row("reply", "How did you do that?"),
+            "ask_question"
+        );
+    }
+
+    #[test]
+    fn classify_for_row_tweet() {
+        assert_eq!(
+            classify_for_row("tweet", "What's your favorite tool?"),
+            "question"
+        );
+    }
+
+    #[test]
+    fn classify_for_row_unknown_type_defaults_to_tweet() {
+        let result = classify_for_row("other", "Some content");
+        assert_eq!(result, "storytelling");
+    }
+
+    // --- compute_days_since ---
+
+    #[test]
+    fn compute_days_since_recent() {
+        let now = chrono::Utc::now();
+        let posted = now.to_rfc3339();
+        let days = compute_days_since(&posted, &now);
+        assert!(days < 0.1, "should be ~0 days, got {days}");
+    }
+
+    #[test]
+    fn compute_days_since_invalid_date() {
+        let now = chrono::Utc::now();
+        let days = compute_days_since("not-a-date", &now);
+        assert!((days - 30.0).abs() < 0.1, "should default to 30 days");
+    }
+
+    #[test]
+    fn compute_days_since_sqlite_format() {
+        let now = chrono::Utc::now();
+        let one_day_ago = now - chrono::Duration::hours(24);
+        let posted = one_day_ago.format("%Y-%m-%d %H:%M:%S").to_string();
+        let days = compute_days_since(&posted, &now);
+        assert!((days - 1.0).abs() < 0.1, "should be ~1 day, got {days}");
+    }
+
+    // --- truncate_at_char_boundary ---
+
+    #[test]
+    fn truncate_at_char_boundary_short() {
+        assert_eq!(truncate_at_char_boundary("hello", 100), "hello");
+    }
+
+    #[test]
+    fn truncate_at_char_boundary_exact() {
+        assert_eq!(truncate_at_char_boundary("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_at_char_boundary_truncates() {
+        let result = truncate_at_char_boundary("hello world", 5);
+        assert_eq!(result, "hello");
+    }
+
+    // --- combine_prompt_blocks ---
+
+    #[test]
+    fn combine_prompt_blocks_under_limit() {
+        let a = "short ancestor";
+        let f = "short fragment";
+        let result = combine_prompt_blocks(a, f);
+        assert_eq!(result, "short ancestorshort fragment");
+    }
+
+    // --- format_seeds_prompt ---
+
+    #[test]
+    fn format_seeds_with_title() {
+        let seeds = vec![ContentSeedContext {
+            seed_text: "Test seed".into(),
+            source_title: Some("My Notes".into()),
+            archetype_suggestion: None,
+            engagement_weight: 0.5,
+        }];
+        let block = format_seeds_prompt(&seeds);
+        assert!(block.contains("(from: My Notes)"));
+    }
+
+    #[test]
+    fn format_seeds_without_title() {
+        let seeds = vec![ContentSeedContext {
+            seed_text: "Test seed".into(),
+            source_title: None,
+            archetype_suggestion: None,
+            engagement_weight: 0.5,
+        }];
+        let block = format_seeds_prompt(&seeds);
+        assert!(!block.contains("(from:"));
+    }
+
     // --- Prompt formatting tests ---
 
     #[test]

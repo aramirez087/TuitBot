@@ -370,4 +370,201 @@ mod tests {
         insert_discovered_tweet(&pool, &tweet).await.expect("ins");
         assert!(tweet_exists(&pool, "exists_test").await.expect("check"));
     }
+
+    #[tokio::test]
+    async fn discovery_feed_returns_ordered_by_discovered_at() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut t1 = sample_tweet("feed_1", Some(80.0));
+        t1.discovered_at = "2026-02-21T12:00:00Z".to_string();
+        let mut t2 = sample_tweet("feed_2", Some(90.0));
+        t2.discovered_at = "2026-02-21T13:00:00Z".to_string();
+
+        insert_discovered_tweet(&pool, &t1).await.expect("ins1");
+        insert_discovered_tweet(&pool, &t2).await.expect("ins2");
+
+        let feed = get_discovery_feed(&pool, 70.0, 10).await.expect("feed");
+        assert_eq!(feed.len(), 2);
+        assert_eq!(feed[0].id, "feed_2", "newest should be first");
+    }
+
+    #[tokio::test]
+    async fn discovery_feed_respects_min_score() {
+        let pool = init_test_db().await.expect("init db");
+
+        insert_discovered_tweet(&pool, &sample_tweet("low_1", Some(30.0)))
+            .await
+            .expect("ins");
+        insert_discovered_tweet(&pool, &sample_tweet("high_1", Some(80.0)))
+            .await
+            .expect("ins");
+
+        let feed = get_discovery_feed(&pool, 50.0, 10).await.expect("feed");
+        assert_eq!(feed.len(), 1);
+        assert_eq!(feed[0].id, "high_1");
+    }
+
+    #[tokio::test]
+    async fn discovery_feed_respects_limit() {
+        let pool = init_test_db().await.expect("init db");
+
+        for i in 0..5 {
+            insert_discovered_tweet(&pool, &sample_tweet(&format!("lim_{i}"), Some(80.0)))
+                .await
+                .expect("ins");
+        }
+
+        let feed = get_discovery_feed(&pool, 0.0, 3).await.expect("feed");
+        assert_eq!(feed.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn discovery_feed_filtered_with_max_score() {
+        let pool = init_test_db().await.expect("init db");
+
+        insert_discovered_tweet(&pool, &sample_tweet("f_low", Some(30.0)))
+            .await
+            .expect("ins");
+        insert_discovered_tweet(&pool, &sample_tweet("f_mid", Some(60.0)))
+            .await
+            .expect("ins");
+        insert_discovered_tweet(&pool, &sample_tweet("f_high", Some(90.0)))
+            .await
+            .expect("ins");
+
+        let feed = get_discovery_feed_filtered(&pool, 40.0, Some(70.0), None, 10)
+            .await
+            .expect("feed");
+        assert_eq!(feed.len(), 1);
+        assert_eq!(feed[0].id, "f_mid");
+    }
+
+    #[tokio::test]
+    async fn discovery_feed_filtered_with_keyword() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut t1 = sample_tweet("kw_1", Some(80.0));
+        t1.matched_keyword = Some("rust".to_string());
+        let mut t2 = sample_tweet("kw_2", Some(80.0));
+        t2.matched_keyword = Some("python".to_string());
+
+        insert_discovered_tweet(&pool, &t1).await.expect("ins");
+        insert_discovered_tweet(&pool, &t2).await.expect("ins");
+
+        let feed = get_discovery_feed_filtered(&pool, 0.0, None, Some("rust"), 10)
+            .await
+            .expect("feed");
+        assert_eq!(feed.len(), 1);
+        assert_eq!(feed[0].id, "kw_1");
+    }
+
+    #[tokio::test]
+    async fn get_distinct_keywords_returns_unique_sorted() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut t1 = sample_tweet("dk_1", Some(80.0));
+        t1.matched_keyword = Some("rust".to_string());
+        let mut t2 = sample_tweet("dk_2", Some(80.0));
+        t2.matched_keyword = Some("python".to_string());
+        let mut t3 = sample_tweet("dk_3", Some(80.0));
+        t3.matched_keyword = Some("rust".to_string());
+
+        insert_discovered_tweet(&pool, &t1).await.expect("ins");
+        insert_discovered_tweet(&pool, &t2).await.expect("ins");
+        insert_discovered_tweet(&pool, &t3).await.expect("ins");
+
+        let keywords = get_distinct_keywords(&pool).await.expect("keywords");
+        assert_eq!(keywords.len(), 2);
+        assert_eq!(keywords[0], "python");
+        assert_eq!(keywords[1], "rust");
+    }
+
+    #[tokio::test]
+    async fn get_distinct_keywords_excludes_null_and_empty() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut t1 = sample_tweet("dk_null", Some(80.0));
+        t1.matched_keyword = None;
+        let mut t2 = sample_tweet("dk_empty", Some(80.0));
+        t2.matched_keyword = Some(String::new());
+        let mut t3 = sample_tweet("dk_valid", Some(80.0));
+        t3.matched_keyword = Some("valid".to_string());
+
+        insert_discovered_tweet(&pool, &t1).await.expect("ins");
+        insert_discovered_tweet(&pool, &t2).await.expect("ins");
+        insert_discovered_tweet(&pool, &t3).await.expect("ins");
+
+        let keywords = get_distinct_keywords(&pool).await.expect("keywords");
+        assert_eq!(keywords.len(), 1);
+        assert_eq!(keywords[0], "valid");
+    }
+
+    #[tokio::test]
+    async fn insert_and_retrieve_tweet_for_account() {
+        let pool = init_test_db().await.expect("init db");
+        let tweet = sample_tweet("acct_t1", Some(75.0));
+
+        insert_discovered_tweet_for(&pool, "acct_a", &tweet)
+            .await
+            .expect("ins");
+
+        // Should not be found under default account
+        let result = get_tweet_by_id(&pool, "acct_t1").await.expect("get");
+        assert!(result.is_none());
+
+        // Should be found under acct_a
+        let result = get_tweet_by_id_for(&pool, "acct_a", "acct_t1")
+            .await
+            .expect("get");
+        assert!(result.is_some());
+    }
+
+    #[tokio::test]
+    async fn tweet_exists_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+        let tweet = sample_tweet("iso_t1", Some(50.0));
+
+        insert_discovered_tweet_for(&pool, "acct_x", &tweet)
+            .await
+            .expect("ins");
+
+        assert!(tweet_exists_for(&pool, "acct_x", "iso_t1")
+            .await
+            .expect("check"));
+        assert!(!tweet_exists_for(&pool, "acct_y", "iso_t1")
+            .await
+            .expect("check"));
+    }
+
+    #[tokio::test]
+    async fn mark_tweet_replied_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+        let tweet = sample_tweet("mr_t1", Some(80.0));
+
+        insert_discovered_tweet_for(&pool, "acct_r", &tweet)
+            .await
+            .expect("ins");
+        mark_tweet_replied_for(&pool, "acct_r", "mr_t1")
+            .await
+            .expect("mark");
+
+        let fetched = get_tweet_by_id_for(&pool, "acct_r", "mr_t1")
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(fetched.replied_to, 1);
+    }
+
+    #[tokio::test]
+    async fn sample_tweet_with_none_score() {
+        let pool = init_test_db().await.expect("init db");
+        let tweet = sample_tweet("none_score", None);
+
+        insert_discovered_tweet(&pool, &tweet).await.expect("ins");
+        let fetched = get_tweet_by_id(&pool, "none_score")
+            .await
+            .expect("get")
+            .expect("exists");
+        assert!(fetched.relevance_score.is_none());
+    }
 }

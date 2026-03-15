@@ -359,4 +359,142 @@ mod tests {
         assert!(ts.ends_with('Z'));
         assert!(ts.contains('T'));
     }
+
+    #[test]
+    fn since_timestamp_zero_hours_is_now() {
+        let ts = since_timestamp(0);
+        assert!(ts.ends_with('Z'));
+        // Should be close to current time
+        assert!(ts.starts_with("20"));
+    }
+
+    #[test]
+    fn since_timestamp_large_hours() {
+        let ts = since_timestamp(8760); // 1 year
+        assert!(ts.ends_with('Z'));
+        assert!(ts.contains('T'));
+    }
+
+    #[test]
+    fn since_timestamp_format_correct() {
+        let ts = since_timestamp(48);
+        // Should match YYYY-MM-DDTHH:MM:SSZ
+        assert_eq!(ts.len(), 20);
+        assert_eq!(&ts[4..5], "-");
+        assert_eq!(&ts[7..8], "-");
+        assert_eq!(&ts[10..11], "T");
+        assert_eq!(&ts[13..14], ":");
+        assert_eq!(&ts[16..17], ":");
+    }
+
+    // --- merge_toml ---
+
+    #[test]
+    fn merge_toml_adds_new_keys() {
+        let mut base: toml::Value = "key1 = \"value1\"".parse().unwrap();
+        let patch: toml::Value = "key2 = \"value2\"".parse().unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(
+            base.as_table().unwrap().get("key2").unwrap().as_str(),
+            Some("value2")
+        );
+    }
+
+    #[test]
+    fn merge_toml_overwrites_existing() {
+        let mut base: toml::Value = "key = \"old\"".parse().unwrap();
+        let patch: toml::Value = "key = \"new\"".parse().unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(
+            base.as_table().unwrap().get("key").unwrap().as_str(),
+            Some("new")
+        );
+    }
+
+    #[test]
+    fn merge_toml_deep_merge() {
+        let mut base: toml::Value = "[section]\na = 1".parse().unwrap();
+        let patch: toml::Value = "[section]\nb = 2".parse().unwrap();
+        merge_toml(&mut base, &patch);
+        let section = base.as_table().unwrap().get("section").unwrap();
+        assert_eq!(section.get("a").unwrap().as_integer(), Some(1));
+        assert_eq!(section.get("b").unwrap().as_integer(), Some(2));
+    }
+
+    // --- json_to_toml ---
+
+    #[test]
+    fn json_to_toml_string() {
+        let json = serde_json::json!("hello");
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml.as_str(), Some("hello"));
+    }
+
+    #[test]
+    fn json_to_toml_integer() {
+        let json = serde_json::json!(42);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml.as_integer(), Some(42));
+    }
+
+    #[test]
+    fn json_to_toml_float() {
+        let json = serde_json::json!(3.14);
+        let toml = json_to_toml(&json).unwrap();
+        assert!((toml.as_float().unwrap() - 3.14).abs() < 0.001);
+    }
+
+    #[test]
+    fn json_to_toml_boolean() {
+        let json = serde_json::json!(true);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml.as_bool(), Some(true));
+    }
+
+    #[test]
+    fn json_to_toml_array() {
+        let json = serde_json::json!([1, 2, 3]);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml.as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn json_to_toml_object() {
+        let json = serde_json::json!({"key": "value"});
+        let toml = json_to_toml(&json).unwrap();
+        assert!(toml.as_table().is_some());
+    }
+
+    #[test]
+    fn json_to_toml_skips_null_in_objects() {
+        let json = serde_json::json!({"key": "value", "null_key": null});
+        let toml = json_to_toml(&json).unwrap();
+        let table = toml.as_table().unwrap();
+        assert!(table.contains_key("key"));
+        assert!(!table.contains_key("null_key"));
+    }
+
+    #[test]
+    fn json_to_toml_null_in_array_errors() {
+        let json = serde_json::json!([null]);
+        assert!(json_to_toml(&json).is_err());
+    }
+
+    // --- TimeWindowQuery defaults ---
+
+    #[test]
+    fn time_window_query_defaults() {
+        let json = "{}";
+        let q: TimeWindowQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.hours, 24);
+    }
+
+    // --- RecentQuery defaults ---
+
+    #[test]
+    fn recent_query_defaults() {
+        let json = "{}";
+        let q: RecentQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.limit, 50);
+    }
 }

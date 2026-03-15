@@ -287,6 +287,121 @@ mod tests {
         assert!(result.contains("banned_phrases"));
         assert!(result.contains("product_mention_ratio"));
     }
+
+    #[test]
+    fn patch_config_adds_deployment_mode() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.deployment_mode = Some("self_host".to_string());
+
+        patch_config(&config_path, &[UpgradeGroup::DeploymentMode], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("deployment_mode = \"self_host\""));
+    }
+
+    #[test]
+    fn patch_config_adds_connectors() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.connectors = Some(Some(("cid".to_string(), "csecret".to_string())));
+
+        patch_config(&config_path, &[UpgradeGroup::Connectors], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("[connectors"));
+        assert!(result.contains("client_id"));
+    }
+
+    #[test]
+    fn patch_config_adds_content_sources() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.content_sources_noticed = true;
+
+        patch_config(&config_path, &[UpgradeGroup::ContentSources], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("[content_sources]"));
+    }
+
+    #[test]
+    fn patch_config_skips_connectors_when_none() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.connectors = Some(None); // User skipped
+
+        patch_config(&config_path, &[UpgradeGroup::Connectors], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(!result.contains("[connectors"));
+    }
+
+    #[test]
+    fn patch_config_multiple_groups() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(&config_path, "[business]\nproduct_name = \"test\"\n").unwrap();
+
+        let mut answers = empty_answers();
+        answers.approval_mode = Some(false);
+        answers.deployment_mode = Some("desktop".to_string());
+
+        patch_config(
+            &config_path,
+            &[UpgradeGroup::ApprovalMode, UpgradeGroup::DeploymentMode],
+            &answers,
+        )
+        .unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(result.contains("approval_mode = false"));
+        assert!(result.contains("deployment_mode = \"desktop\""));
+    }
+
+    #[test]
+    fn patch_config_preserves_existing_persona() {
+        use std::fs;
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        fs::write(
+            &config_path,
+            "[business]\nproduct_name = \"test\"\npersona_opinions = [\"existing\"]\n",
+        )
+        .unwrap();
+
+        let mut answers = empty_answers();
+        answers.persona = Some((
+            vec!["new opinion".to_string()],
+            vec!["new exp".to_string()],
+            vec!["new pillar".to_string()],
+        ));
+
+        patch_config(&config_path, &[UpgradeGroup::Persona], &answers).unwrap();
+
+        let result = fs::read_to_string(&config_path).unwrap();
+        assert!(
+            result.contains("existing"),
+            "should preserve existing opinions"
+        );
+    }
 }
 
 fn patch_enhanced_limits(doc: &mut DocumentMut, max_replies: u32, banned: &[String], ratio: f32) {

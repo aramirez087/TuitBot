@@ -98,6 +98,90 @@ fn load_config(state: &AppState) -> Result<Config, ApiError> {
     Ok(config)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_history_limit_is_12() {
+        assert_eq!(default_history_limit(), 12);
+    }
+
+    #[test]
+    fn history_query_default_limit() {
+        let json = "{}";
+        let q: HistoryQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.limit, 12);
+    }
+
+    #[test]
+    fn history_query_custom_limit() {
+        let json = r#"{"limit": 5}"#;
+        let q: HistoryQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.limit, 5);
+    }
+
+    #[test]
+    fn report_to_json_parses_arrays() {
+        let report = strategy::StrategyReportRow {
+            id: 1,
+            week_start: "2026-03-09".into(),
+            week_end: "2026-03-15".into(),
+            replies_sent: 10,
+            tweets_posted: 5,
+            threads_posted: 2,
+            target_replies: 3,
+            follower_start: 100,
+            follower_end: 120,
+            follower_delta: 20,
+            avg_reply_score: 75.0,
+            avg_tweet_score: 80.0,
+            reply_acceptance_rate: 0.85,
+            estimated_follow_conversion: 0.02,
+            top_topics_json: r#"["rust","wasm"]"#.into(),
+            bottom_topics_json: "[]".into(),
+            top_content_json: "[]".into(),
+            recommendations_json: r#"["post more"]"#.into(),
+            created_at: "2026-03-15T10:00:00Z".into(),
+        };
+        let val = report_to_json(report);
+        assert_eq!(val["replies_sent"], 10);
+        assert_eq!(val["follower_delta"], 20);
+        assert!(val["top_topics"].is_array());
+        assert_eq!(val["top_topics"][0], "rust");
+        assert!(val["recommendations"].is_array());
+    }
+
+    #[test]
+    fn report_to_json_handles_invalid_json() {
+        let report = strategy::StrategyReportRow {
+            id: 1,
+            week_start: "2026-03-09".into(),
+            week_end: "2026-03-15".into(),
+            replies_sent: 0,
+            tweets_posted: 0,
+            threads_posted: 0,
+            target_replies: 0,
+            follower_start: 0,
+            follower_end: 0,
+            follower_delta: 0,
+            avg_reply_score: 0.0,
+            avg_tweet_score: 0.0,
+            reply_acceptance_rate: 0.0,
+            estimated_follow_conversion: 0.0,
+            top_topics_json: "invalid".into(),
+            bottom_topics_json: "also-invalid".into(),
+            top_content_json: "nope".into(),
+            recommendations_json: "bad".into(),
+            created_at: "2026-03-15T10:00:00Z".into(),
+        };
+        let val = report_to_json(report);
+        // Should fall back to empty arrays for invalid JSON
+        assert!(val["top_topics"].is_array());
+        assert_eq!(val["top_topics"].as_array().unwrap().len(), 0);
+    }
+}
+
 fn report_to_json(report: strategy::StrategyReportRow) -> Value {
     let top_topics: Value =
         serde_json::from_str(&report.top_topics_json).unwrap_or_else(|_| json!([]));

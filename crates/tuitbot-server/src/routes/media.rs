@@ -103,3 +103,15 @@ pub async fn serve_file(
 
     Ok(([(header::CONTENT_TYPE, content_type)], data).into_response())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn media_file_query_deserializes() {
+        let json = r#"{"path": "/data/media/image.png"}"#;
+        let q: MediaFileQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.path, "/data/media/image.png");
+    }
+}

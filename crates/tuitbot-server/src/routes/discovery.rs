@@ -276,6 +276,69 @@ mod tests {
         assert!(req.selected_node_ids.is_none());
     }
 
+    // --- FeedQuery deserialization ---
+
+    #[test]
+    fn feed_query_defaults() {
+        let json = "{}";
+        let q: FeedQuery = serde_json::from_str(json).expect("deser");
+        assert!((q.min_score - 50.0).abs() < 0.001);
+        assert!(q.max_score.is_none());
+        assert!(q.keyword.is_none());
+        assert_eq!(q.limit, 20);
+    }
+
+    #[test]
+    fn feed_query_custom() {
+        let json = r#"{"min_score":70.0,"max_score":95.0,"keyword":"rust","limit":10}"#;
+        let q: FeedQuery = serde_json::from_str(json).expect("deser");
+        assert!((q.min_score - 70.0).abs() < 0.001);
+        assert!((q.max_score.unwrap() - 95.0).abs() < 0.001);
+        assert_eq!(q.keyword.as_deref(), Some("rust"));
+        assert_eq!(q.limit, 10);
+    }
+
+    // --- DiscoveryTweet serialization ---
+
+    #[test]
+    fn discovery_tweet_serializes() {
+        let tweet = DiscoveryTweet {
+            id: "t123".into(),
+            author_username: "alice".into(),
+            content: "Hello world".into(),
+            relevance_score: 85.5,
+            matched_keyword: Some("rust".into()),
+            like_count: 10,
+            retweet_count: 3,
+            reply_count: 1,
+            replied_to: false,
+            discovered_at: "2026-03-15T10:00:00Z".into(),
+        };
+        let json = serde_json::to_string(&tweet).expect("serialize");
+        assert!(json.contains("alice"));
+        assert!(json.contains("85.5"));
+        assert!(json.contains("\"replied_to\":false"));
+    }
+
+    // --- ComposeReplyRequest ---
+
+    #[test]
+    fn compose_reply_request_defaults() {
+        let json = "{}";
+        let req: ComposeReplyRequest = serde_json::from_str(json).expect("deser");
+        assert!(!req.mention_product);
+        assert!(req.selected_node_ids.is_none());
+    }
+
+    #[test]
+    fn compose_reply_request_with_node_ids() {
+        let json = r#"{"mention_product":true,"selected_node_ids":[1,2,3]}"#;
+        let req: ComposeReplyRequest = serde_json::from_str(json).expect("deser");
+        assert!(req.mention_product);
+        let ids = req.selected_node_ids.unwrap();
+        assert_eq!(ids.len(), 3);
+    }
+
     #[test]
     fn compose_reply_response_omits_empty_citations() {
         let resp = ComposeReplyResponse {

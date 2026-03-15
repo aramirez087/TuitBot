@@ -191,6 +191,121 @@ pub(super) fn prompt_connectors() -> Result<Option<(String, String)>> {
 // Detection helper (for tests)
 // ---------------------------------------------------------------------------
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn patch_deployment_mode_inserts_when_missing() {
+        let mut doc: DocumentMut = "[business]\nname = \"test\"\n".parse().unwrap();
+        patch_deployment_mode(&mut doc, "desktop");
+        assert_eq!(
+            doc.get("deployment_mode").unwrap().as_str().unwrap(),
+            "desktop"
+        );
+    }
+
+    #[test]
+    fn patch_deployment_mode_noop_when_present() {
+        let mut doc: DocumentMut = "deployment_mode = \"cloud\"\n".parse().unwrap();
+        patch_deployment_mode(&mut doc, "desktop");
+        assert_eq!(
+            doc.get("deployment_mode").unwrap().as_str().unwrap(),
+            "cloud",
+            "should not overwrite existing"
+        );
+    }
+
+    #[test]
+    fn patch_connectors_inserts_when_missing() {
+        let mut doc: DocumentMut = "[business]\nname = \"test\"\n".parse().unwrap();
+        patch_connectors(&mut doc, "my-client-id", "my-secret");
+        let conn = doc.get("connectors").unwrap();
+        let gd = conn.get("google_drive").unwrap();
+        assert_eq!(
+            gd.get("client_id").unwrap().as_str().unwrap(),
+            "my-client-id"
+        );
+        assert_eq!(
+            gd.get("client_secret").unwrap().as_str().unwrap(),
+            "my-secret"
+        );
+    }
+
+    #[test]
+    fn patch_connectors_noop_when_present() {
+        let mut doc: DocumentMut = "[connectors]\nother = \"value\"\n".parse().unwrap();
+        patch_connectors(&mut doc, "id", "secret");
+        // Should not overwrite
+        assert!(doc["connectors"].get("google_drive").is_none());
+    }
+
+    #[test]
+    fn patch_content_sources_inserts_when_missing() {
+        let mut doc: DocumentMut = "[business]\nname = \"test\"\n".parse().unwrap();
+        patch_content_sources(&mut doc);
+        assert!(doc.get("content_sources").is_some());
+    }
+
+    #[test]
+    fn patch_content_sources_noop_when_present() {
+        let mut doc: DocumentMut = "[content_sources]\nsome_key = \"val\"\n".parse().unwrap();
+        patch_content_sources(&mut doc);
+        // Should preserve existing content
+        assert!(doc["content_sources"].get("some_key").is_some());
+    }
+
+    #[test]
+    fn has_legacy_sa_key_detects_legacy() {
+        let toml = r#"
+[content_sources]
+[[content_sources.sources]]
+service_account_key = "key123"
+source_type = "google_drive"
+"#;
+        assert!(has_legacy_sa_key(toml));
+    }
+
+    #[test]
+    fn has_legacy_sa_key_ignores_with_connection_id() {
+        let toml = r#"
+[content_sources]
+[[content_sources.sources]]
+service_account_key = "key123"
+connection_id = 1
+source_type = "google_drive"
+"#;
+        assert!(!has_legacy_sa_key(toml));
+    }
+
+    #[test]
+    fn has_legacy_sa_key_returns_false_for_no_sources() {
+        let toml = "[business]\nname = \"test\"\n";
+        assert!(!has_legacy_sa_key(toml));
+    }
+
+    #[test]
+    fn has_legacy_sa_key_returns_false_for_empty_sa() {
+        let toml = r#"
+[content_sources]
+[[content_sources.sources]]
+service_account_key = ""
+source_type = "google_drive"
+"#;
+        assert!(!has_legacy_sa_key(toml));
+    }
+
+    #[test]
+    fn print_legacy_sa_key_notice_returns_false_for_invalid_toml() {
+        assert!(!print_legacy_sa_key_notice("not valid toml {{{"));
+    }
+
+    #[test]
+    fn print_legacy_sa_key_notice_returns_false_for_no_sources() {
+        assert!(!print_legacy_sa_key_notice("[business]\nname = \"test\"\n"));
+    }
+}
+
 /// Check if a TOML string has any `service_account_key` without `connection_id`.
 /// Exposed for testing.
 #[cfg(test)]

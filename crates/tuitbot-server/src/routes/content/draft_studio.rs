@@ -713,3 +713,176 @@ pub async fn list_draft_activity(
         .map_err(ApiError::Storage)?;
     Ok(Json(activity))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- content_preview tests ---
+
+    #[test]
+    fn content_preview_short_text() {
+        let preview = content_preview("Hello world", "tweet");
+        assert_eq!(preview, "Hello world");
+    }
+
+    #[test]
+    fn content_preview_truncates_long_text() {
+        let long = "a".repeat(100);
+        let preview = content_preview(&long, "tweet");
+        assert_eq!(preview.len(), 60);
+        assert!(preview.ends_with("..."));
+    }
+
+    #[test]
+    fn content_preview_exactly_60_chars() {
+        let text = "a".repeat(60);
+        let preview = content_preview(&text, "tweet");
+        assert_eq!(preview.len(), 60);
+        assert!(!preview.ends_with("..."));
+    }
+
+    #[test]
+    fn content_preview_thread_with_blocks() {
+        let json = r#"{"blocks":[{"text":"First tweet here"}]}"#;
+        let preview = content_preview(json, "thread");
+        assert_eq!(preview, "First tweet here");
+    }
+
+    #[test]
+    fn content_preview_thread_with_legacy_array() {
+        let json = r#"["First tweet","Second tweet"]"#;
+        let preview = content_preview(json, "thread");
+        assert_eq!(preview, "First tweet");
+    }
+
+    #[test]
+    fn content_preview_thread_invalid_json_falls_back() {
+        let preview = content_preview("not json", "thread");
+        assert_eq!(preview, "not json");
+    }
+
+    #[test]
+    fn content_preview_trims_whitespace() {
+        let preview = content_preview("  hello  ", "tweet");
+        assert_eq!(preview, "hello");
+    }
+
+    // --- extract_first_block_text tests ---
+
+    #[test]
+    fn extract_first_block_text_valid_blocks() {
+        let json = r#"{"blocks":[{"text":"Block one"},{"text":"Block two"}]}"#;
+        assert_eq!(extract_first_block_text(json), "Block one");
+    }
+
+    #[test]
+    fn extract_first_block_text_empty_blocks() {
+        let json = r#"{"blocks":[]}"#;
+        assert_eq!(extract_first_block_text(json), json);
+    }
+
+    #[test]
+    fn extract_first_block_text_no_blocks_key() {
+        let json = r#"{"other": "value"}"#;
+        assert_eq!(extract_first_block_text(json), json);
+    }
+
+    #[test]
+    fn extract_first_block_text_legacy_array() {
+        let json = r#"["Tweet 1","Tweet 2"]"#;
+        assert_eq!(extract_first_block_text(json), "Tweet 1");
+    }
+
+    // --- default functions ---
+
+    #[test]
+    fn default_tweet_returns_tweet() {
+        assert_eq!(default_tweet(), "tweet");
+    }
+
+    #[test]
+    fn default_blank_content_returns_space() {
+        assert_eq!(default_blank_content(), " ");
+    }
+
+    #[test]
+    fn default_manual_returns_manual() {
+        assert_eq!(default_manual(), "manual");
+    }
+
+    #[test]
+    fn default_manual_trigger_returns_manual() {
+        assert_eq!(default_manual_trigger(), "manual");
+    }
+
+    // --- request deserialization ---
+
+    #[test]
+    fn draft_list_query_all_none() {
+        let json = "{}";
+        let q: DraftListQuery = serde_json::from_str(json).expect("deser");
+        assert!(q.status.is_none());
+        assert!(q.tag.is_none());
+        assert!(q.search.is_none());
+        assert!(q.archived.is_none());
+    }
+
+    #[test]
+    fn draft_list_query_with_filters() {
+        let json = r#"{"status":"draft","tag":1,"search":"hello","archived":true}"#;
+        let q: DraftListQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.status.as_deref(), Some("draft"));
+        assert_eq!(q.tag, Some(1));
+        assert_eq!(q.search.as_deref(), Some("hello"));
+        assert_eq!(q.archived, Some(true));
+    }
+
+    #[test]
+    fn create_studio_draft_body_defaults() {
+        let json = "{}";
+        let body: CreateStudioDraftBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.content_type, "tweet");
+        assert_eq!(body.content, " ");
+        assert_eq!(body.source, "manual");
+        assert!(body.title.is_none());
+    }
+
+    #[test]
+    fn autosave_patch_body_deserializes() {
+        let json =
+            r#"{"content":"updated","content_type":"tweet","updated_at":"2026-03-15T10:00:00Z"}"#;
+        let body: AutosavePatchBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.content, "updated");
+        assert_eq!(body.content_type, "tweet");
+    }
+
+    #[test]
+    fn meta_patch_body_optional_fields() {
+        let json = r#"{"title":"My Title"}"#;
+        let body: MetaPatchBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.title.as_deref(), Some("My Title"));
+        assert!(body.notes.is_none());
+    }
+
+    #[test]
+    fn schedule_body_deserializes() {
+        let json = r#"{"scheduled_for":"2026-03-15T12:00:00Z"}"#;
+        let body: ScheduleBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.scheduled_for, "2026-03-15T12:00:00Z");
+    }
+
+    #[test]
+    fn reschedule_body_deserializes() {
+        let json = r#"{"scheduled_for":"2026-03-16T14:00:00Z"}"#;
+        let body: RescheduleBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.scheduled_for, "2026-03-16T14:00:00Z");
+    }
+
+    #[test]
+    fn create_revision_body_default_trigger() {
+        let json = "{}";
+        let body: CreateRevisionBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.trigger_kind, "manual");
+    }
+}

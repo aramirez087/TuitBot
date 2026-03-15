@@ -139,3 +139,57 @@ pub async fn reindex_source(
         source_id,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_status_response_serializes() {
+        let resp = SourceStatusResponse {
+            sources: vec![SourceStatusItem {
+                id: 1,
+                source_type: "local_fs".into(),
+                status: "active".into(),
+                error_message: None,
+                sync_cursor: None,
+                created_at: "2026-03-15T10:00:00Z".into(),
+                updated_at: "2026-03-15T10:00:00Z".into(),
+                config_json: "{}".into(),
+            }],
+        };
+        let json = serde_json::to_string(&resp).expect("serialize");
+        assert!(json.contains("local_fs"));
+        assert!(!json.contains("error_message"));
+        assert!(!json.contains("sync_cursor"));
+    }
+
+    #[test]
+    fn source_status_item_with_error() {
+        let item = SourceStatusItem {
+            id: 2,
+            source_type: "google_drive".into(),
+            status: "error".into(),
+            error_message: Some("auth failed".into()),
+            sync_cursor: Some("cursor_123".into()),
+            created_at: "2026-03-15T10:00:00Z".into(),
+            updated_at: "2026-03-15T10:00:00Z".into(),
+            config_json: r#"{"path":"/vault"}"#.into(),
+        };
+        let json = serde_json::to_string(&item).expect("serialize");
+        assert!(json.contains("error_message"));
+        assert!(json.contains("auth failed"));
+        assert!(json.contains("sync_cursor"));
+    }
+
+    #[test]
+    fn reindex_response_serializes() {
+        let resp = ReindexResponse {
+            status: "reindex_started".into(),
+            source_id: 42,
+        };
+        let json = serde_json::to_string(&resp).expect("serialize");
+        assert!(json.contains("reindex_started"));
+        assert!(json.contains("42"));
+    }
+}
