@@ -488,6 +488,146 @@ mod tests {
         assert_eq!(size, 11); // 5 + 6
     }
 
+    // ── is_installed_path ────────────────────────────────────────────
+
+    #[test]
+    fn is_installed_path_cargo_bin() {
+        assert!(is_installed_path(Path::new(
+            "/home/user/.cargo/bin/tuitbot"
+        )));
+    }
+
+    #[test]
+    fn is_installed_path_usr_local_bin() {
+        assert!(is_installed_path(Path::new("/usr/local/bin/tuitbot")));
+    }
+
+    #[test]
+    fn is_installed_path_usr_bin() {
+        assert!(is_installed_path(Path::new("/usr/bin/tuitbot")));
+    }
+
+    #[test]
+    fn is_installed_path_opt() {
+        assert!(is_installed_path(Path::new("/opt/tuitbot/bin/tuitbot")));
+    }
+
+    #[test]
+    fn is_installed_path_bin_tuitbot() {
+        assert!(is_installed_path(Path::new("/bin/tuitbot")));
+    }
+
+    #[test]
+    fn is_installed_path_homebrew() {
+        assert!(is_installed_path(Path::new(
+            "/usr/local/Cellar/tuitbot/0.1.0/bin/tuitbot"
+        )));
+        assert!(is_installed_path(Path::new("/opt/homebrew/bin/tuitbot")));
+    }
+
+    #[test]
+    fn is_installed_path_random_dir_is_false() {
+        assert!(!is_installed_path(Path::new("/tmp/tuitbot")));
+        assert!(!is_installed_path(Path::new(
+            "/home/user/downloads/tuitbot"
+        )));
+        assert!(!is_installed_path(Path::new(
+            "/home/user/projects/tuitbot/target/release/tuitbot"
+        )));
+    }
+
+    // ── shorten_home ──────────────────────────────────────────────────
+
+    #[test]
+    fn shorten_home_with_non_home_path() {
+        let path = Path::new("/tmp/file.txt");
+        let shortened = shorten_home(path);
+        assert_eq!(shortened, "/tmp/file.txt");
+    }
+
+    #[test]
+    fn shorten_home_uses_tilde() {
+        if let Some(home) = dirs::home_dir() {
+            let path = home.join("some/file.txt");
+            let shortened = shorten_home(&path);
+            assert!(shortened.starts_with("~/"));
+            assert!(shortened.contains("some/file.txt"));
+        }
+    }
+
+    // ── is_server_running ─────────────────────────────────────────────
+
+    #[test]
+    fn is_server_running_returns_bool() {
+        // Just verify it doesn't panic. In test env, server is unlikely running.
+        let _running = is_server_running();
+    }
+
+    // ── dir_size recursive ────────────────────────────────────────────
+
+    #[test]
+    fn dir_size_nested_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sub1 = tmp.path().join("sub1");
+        let sub2 = sub1.join("sub2");
+        fs::create_dir_all(&sub2).unwrap();
+        fs::write(sub1.join("a.txt"), "aaa").unwrap();
+        fs::write(sub2.join("b.txt"), "bb").unwrap();
+        let (count, size) = dir_size(tmp.path());
+        assert_eq!(count, 2);
+        assert_eq!(size, 5); // 3 + 2
+    }
+
+    #[test]
+    fn dir_size_nonexistent_dir() {
+        let (count, size) = dir_size(Path::new("/nonexistent/path/unlikely"));
+        assert_eq!(count, 0);
+        assert_eq!(size, 0);
+    }
+
+    // ── DataFile / DataSubdir struct access ────────────────────────────
+
+    #[test]
+    fn data_file_struct_fields() {
+        let f = DataFile {
+            name: "config.toml".to_string(),
+            size: 1024,
+        };
+        assert_eq!(f.name, "config.toml");
+        assert_eq!(f.size, 1024);
+    }
+
+    #[test]
+    fn data_subdir_struct_fields() {
+        let d = DataSubdir {
+            name: "backups/".to_string(),
+            file_count: 3,
+            total_size: 4096,
+        };
+        assert_eq!(d.name, "backups/");
+        assert_eq!(d.file_count, 3);
+        assert_eq!(d.total_size, 4096);
+    }
+
+    // ── UninstallInventory struct access ───────────────────────────────
+
+    #[test]
+    fn uninstall_inventory_nothing_to_remove() {
+        let inv = UninstallInventory {
+            data_dir: PathBuf::from("/tmp/test"),
+            data_dir_exists: false,
+            files: vec![],
+            subdirs: vec![],
+            cli_binary: None,
+            server_binary: None,
+            server_running: false,
+        };
+        assert!(!inv.data_dir_exists);
+        assert!(inv.cli_binary.is_none());
+        assert!(inv.server_binary.is_none());
+        assert!(!inv.server_running);
+    }
+
     #[test]
     fn test_inventory_data_files() {
         let tmp = tempfile::tempdir().unwrap();

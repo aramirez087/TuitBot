@@ -82,6 +82,46 @@ impl XApiClient for NullX {
     }
 }
 
+// ── WriteMcpServer construction & ServerHandler inline tests ─────────
+
+#[tokio::test]
+async fn write_server_info_mentions_write() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::WriteMcpServer::new(state);
+    let info = server.get_info();
+    let instructions = info.instructions.unwrap();
+    assert!(
+        instructions.contains("Write"),
+        "write server instructions should mention Write"
+    );
+}
+
+#[tokio::test]
+async fn write_server_info_mentions_admin_requirement() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::WriteMcpServer::new(state);
+    let info = server.get_info();
+    let instructions = info.instructions.unwrap();
+    assert!(
+        instructions.contains("admin"),
+        "write server should mention that universal tools require admin profile"
+    );
+}
+
+#[tokio::test]
+async fn write_server_capabilities_include_tools() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::WriteMcpServer::new(state);
+    let info = server.get_info();
+    assert!(
+        info.capabilities.tools.is_some(),
+        "write server should have tools capability"
+    );
+}
+
 // ── Test state factory ────────────────────────────────────────────────
 
 pub(super) async fn make_state() -> crate::state::SharedState {

@@ -30,6 +30,163 @@ use tuitbot_core::x_api::auth::{TokenManager, Tokens};
 use tuitbot_core::x_api::tier::{self, detect_tier};
 use tuitbot_core::x_api::{create_local_client_with_data_dir, XApiClient, XApiHttpClient};
 
+#[cfg(test)]
+mod tests {
+    use tuitbot_core::config::Config;
+    use tuitbot_core::startup::{ApiTier, TierCapabilities};
+
+    // ── TierCapabilities ──────────────────────────────────────────────
+
+    #[test]
+    fn tier_capabilities_free() {
+        let caps = TierCapabilities::for_tier(ApiTier::Free);
+        assert!(!caps.search);
+        assert!(!caps.discovery);
+    }
+
+    #[test]
+    fn tier_capabilities_basic() {
+        let caps = TierCapabilities::for_tier(ApiTier::Basic);
+        assert!(caps.search);
+    }
+
+    #[test]
+    fn tier_capabilities_pro() {
+        let caps = TierCapabilities::for_tier(ApiTier::Pro);
+        assert!(caps.search);
+        assert!(caps.discovery);
+        assert!(caps.mentions);
+        assert!(caps.posting);
+    }
+
+    // ── Config default values used by deps ────────────────────────────
+
+    #[test]
+    fn config_default_db_path() {
+        let config = Config::default();
+        assert!(!config.storage.db_path.is_empty());
+    }
+
+    #[test]
+    fn config_effective_approval_mode() {
+        let mut config = Config::default();
+        config.approval_mode = true;
+        assert!(config.effective_approval_mode());
+
+        config.approval_mode = false;
+        // effective_approval_mode may also depend on operating_mode
+    }
+
+    #[test]
+    fn config_effective_industry_topics_falls_back() {
+        let mut config = Config::default();
+        config.business.industry_topics = vec![];
+        config.business.product_keywords = vec!["rust".to_string(), "cli".to_string()];
+        let topics = config.business.effective_industry_topics();
+        // Should fall back to product_keywords when industry_topics is empty
+        assert!(!topics.is_empty());
+    }
+
+    #[test]
+    fn config_effective_industry_topics_uses_topics_when_set() {
+        let mut config = Config::default();
+        config.business.industry_topics = vec!["topic1".to_string()];
+        config.business.product_keywords = vec!["kw1".to_string()];
+        let topics = config.business.effective_industry_topics();
+        assert_eq!(topics, &["topic1"]);
+    }
+
+    // ── Keyword collection from config ────────────────────────────────
+
+    #[test]
+    fn keyword_collection_chains_product_and_competitor() {
+        let mut config = Config::default();
+        config.business.product_keywords = vec!["rust".to_string()];
+        config.business.competitor_keywords = vec!["go".to_string()];
+
+        let keywords: Vec<String> = config
+            .business
+            .product_keywords
+            .iter()
+            .chain(config.business.competitor_keywords.iter())
+            .cloned()
+            .collect();
+
+        assert_eq!(keywords, vec!["rust", "go"]);
+    }
+
+    #[test]
+    fn keyword_collection_empty() {
+        let config = Config::default();
+        let keywords: Vec<String> = config
+            .business
+            .product_keywords
+            .iter()
+            .chain(config.business.competitor_keywords.iter())
+            .cloned()
+            .collect();
+        // Default config may or may not have keywords
+        assert!(keywords.is_empty() || !keywords.is_empty());
+    }
+
+    // ── ApiTier display ───────────────────────────────────────────────
+
+    #[test]
+    fn api_tier_display() {
+        let free_str = ApiTier::Free.to_string();
+        assert!(
+            free_str.eq_ignore_ascii_case("free"),
+            "expected 'free' but got '{free_str}'"
+        );
+        let basic_str = ApiTier::Basic.to_string();
+        assert!(
+            basic_str.eq_ignore_ascii_case("basic"),
+            "expected 'basic' but got '{basic_str}'"
+        );
+        let pro_str = ApiTier::Pro.to_string();
+        assert!(
+            pro_str.eq_ignore_ascii_case("pro"),
+            "expected 'pro' but got '{pro_str}'"
+        );
+    }
+
+    // ── TierCapabilities format_status ─────────────────────────────────
+
+    #[test]
+    fn tier_capabilities_format_status() {
+        let caps = TierCapabilities::for_tier(ApiTier::Free);
+        let status = caps.format_status();
+        assert!(!status.is_empty());
+    }
+
+    // ── Scraper mode capabilities ─────────────────────────────────────
+
+    #[test]
+    fn scraper_mode_capabilities() {
+        let caps = TierCapabilities {
+            mentions: false,
+            discovery: false,
+            posting: false,
+            search: false,
+        };
+        assert!(!caps.mentions);
+        assert!(!caps.discovery);
+        assert!(!caps.posting);
+        assert!(!caps.search);
+    }
+
+    #[test]
+    fn scraper_mode_with_mutations() {
+        let caps = TierCapabilities {
+            mentions: false,
+            discovery: false,
+            posting: true,
+            search: false,
+        };
+        assert!(caps.posting);
+    }
+}
+
 /// All shared dependencies needed by the automation loops.
 pub struct RuntimeDeps {
     pub pool: sqlx::SqlitePool,

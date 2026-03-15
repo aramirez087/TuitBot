@@ -1028,4 +1028,383 @@ mod tests {
         let req: XDeleteRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.path, "/2/tweets/123");
     }
+
+    // --- Debug impls ---
+
+    #[test]
+    fn key_value_debug() {
+        let kv = KeyValue {
+            key: "k".to_string(),
+            value: "v".to_string(),
+        };
+        let debug = format!("{kv:?}");
+        assert!(debug.contains("k"));
+        assert!(debug.contains("v"));
+    }
+
+    #[test]
+    fn key_value_clone() {
+        let kv = KeyValue {
+            key: "k".to_string(),
+            value: "v".to_string(),
+        };
+        let kv2 = kv.clone();
+        assert_eq!(kv2.key, "k");
+        assert_eq!(kv2.value, "v");
+    }
+
+    #[test]
+    fn propose_item_debug_and_clone() {
+        let item = ProposeItem {
+            candidate_id: "c1".to_string(),
+            pre_drafted_text: Some("draft".to_string()),
+        };
+        let debug = format!("{item:?}");
+        assert!(debug.contains("c1"));
+        let clone = item.clone();
+        assert_eq!(clone.candidate_id, "c1");
+    }
+
+    // --- Schema generation ---
+
+    #[test]
+    fn get_stats_request_schema() {
+        let schema = schemars::schema_for!(GetStatsRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("days"));
+    }
+
+    #[test]
+    fn score_tweet_request_schema() {
+        let schema = schemars::schema_for!(ScoreTweetRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("text"));
+        assert!(json.contains("author_username"));
+        assert!(json.contains("author_followers"));
+    }
+
+    #[test]
+    fn key_value_schema() {
+        let schema = schemars::schema_for!(KeyValue);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("key"));
+        assert!(json.contains("value"));
+    }
+
+    #[test]
+    fn x_get_request_schema() {
+        let schema = schemars::schema_for!(XGetRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("path"));
+        assert!(json.contains("auto_paginate"));
+    }
+
+    #[test]
+    fn compose_tweet_request_schema() {
+        let schema = schemars::schema_for!(ComposeTweetRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("content"));
+        assert!(json.contains("content_type"));
+    }
+
+    #[test]
+    fn generate_reply_request_schema() {
+        let schema = schemars::schema_for!(GenerateReplyRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("tweet_text"));
+        assert!(json.contains("mention_product"));
+    }
+
+    #[test]
+    fn find_reply_opportunities_request_schema() {
+        let schema = schemars::schema_for!(FindReplyOpportunitiesRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("query"));
+        assert!(json.contains("min_score"));
+    }
+
+    #[test]
+    fn propose_and_queue_replies_request_schema() {
+        let schema = schemars::schema_for!(ProposeAndQueueRepliesRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("items"));
+    }
+
+    #[test]
+    fn generate_thread_plan_request_schema() {
+        let schema = schemars::schema_for!(GenerateThreadPlanRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("topic"));
+        assert!(json.contains("objective"));
+    }
+
+    #[test]
+    fn x_post_request_schema() {
+        let schema = schemars::schema_for!(XPostRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("path"));
+        assert!(json.contains("body"));
+    }
+
+    #[test]
+    fn x_put_request_schema() {
+        let schema = schemars::schema_for!(XPutRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("path"));
+    }
+
+    #[test]
+    fn x_delete_request_schema() {
+        let schema = schemars::schema_for!(XDeleteRequest);
+        let json = serde_json::to_string(&schema).unwrap();
+        assert!(json.contains("path"));
+    }
+
+    // --- Debug formatting of all request types ---
+
+    #[test]
+    fn all_request_types_debug() {
+        let _ = format!("{:?}", GetStatsRequest { days: Some(7) });
+        let _ = format!("{:?}", GetFollowerTrendRequest { limit: Some(30) });
+        let _ = format!(
+            "{:?}",
+            GetActionLogRequest {
+                since_hours: Some(24),
+                action_type: None,
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            SinceHoursRequest {
+                since_hours: Some(48),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            GetRecentMutationsRequest {
+                limit: Some(20),
+                tool_name: None,
+                status: None,
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            GetMutationDetailRequest {
+                correlation_id: "abc".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            ListUnrepliedTweetsRequest {
+                threshold: Some(0.5),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            DiscoveryFeedRequest {
+                min_score: Some(50.0),
+                limit: Some(10),
+            }
+        );
+        let _ = format!("{:?}", ApprovalIdRequest { id: 1 });
+        let _ = format!(
+            "{:?}",
+            TopicRequest {
+                topic: Some("rust".to_string()),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            TweetIdRequest {
+                tweet_id: "123".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            UsernameRequest {
+                username: "alice".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            RetweetMcpRequest {
+                tweet_id: "rt1".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            UnretweetMcpRequest {
+                tweet_id: "urt1".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            DeleteTweetMcpRequest {
+                tweet_id: "del1".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            PostThreadMcpRequest {
+                tweets: vec!["a".to_string()],
+                media_ids: None,
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            UploadMediaMcpRequest {
+                file_path: "/tmp/img.png".to_string(),
+                alt_text: None,
+                dry_run: false,
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            GetHomeTimelineRequest {
+                max_results: Some(20),
+                pagination_token: None,
+            }
+        );
+        let _ = format!("{:?}", GetXUsageRequest { days: Some(7) });
+        let _ = format!(
+            "{:?}",
+            GetAuthorContextRequest {
+                identifier: "@alice".to_string(),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            RecommendEngagementRequest {
+                author_username: "dev".to_string(),
+                tweet_text: "hello".to_string(),
+                campaign_objective: None,
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            TopicPerformanceSnapshotRequest {
+                lookback_days: Some(30),
+            }
+        );
+        let _ = format!(
+            "{:?}",
+            GetMcpToolMetricsRequest {
+                since_hours: Some(24),
+            }
+        );
+        let _ = format!("{:?}", GetMcpErrorBreakdownRequest { since_hours: None });
+        let _ = format!(
+            "{:?}",
+            DraftRepliesRequest {
+                candidate_ids: vec!["c1".to_string()],
+                archetype: None,
+                mention_product: None,
+            }
+        );
+    }
+
+    // --- X request types with all fields ---
+
+    #[test]
+    fn x_get_request_with_query_and_headers() {
+        let json = r#"{"path": "/2/tweets", "host": "api.x.com", "query": [{"key": "q", "value": "rust"}], "headers": [{"key": "Accept", "value": "application/json"}], "auto_paginate": false}"#;
+        let req: XGetRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.query.as_ref().unwrap().len(), 1);
+        assert_eq!(req.headers.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn x_post_request_with_all_fields() {
+        let json = r#"{"path": "/2/tweets", "host": "api.x.com", "query": [{"key": "a", "value": "1"}], "body": "{}", "headers": [{"key": "X-Custom", "value": "val"}]}"#;
+        let req: XPostRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.path, "/2/tweets");
+        assert!(req.query.is_some());
+        assert!(req.body.is_some());
+        assert!(req.headers.is_some());
+    }
+
+    #[test]
+    fn x_put_request_with_all_fields() {
+        let json =
+            r#"{"path": "/2/lists/1", "body": "{\"name\":\"test\"}", "query": [], "headers": []}"#;
+        let req: XPutRequest = serde_json::from_str(json).unwrap();
+        assert!(req.query.unwrap().is_empty());
+        assert!(req.headers.unwrap().is_empty());
+    }
+
+    #[test]
+    fn x_delete_request_with_all_fields() {
+        let json =
+            r#"{"path": "/2/tweets/99", "host": "api.x.com", "query": null, "headers": null}"#;
+        let req: XDeleteRequest = serde_json::from_str(json).unwrap();
+        assert!(req.query.is_none());
+        assert!(req.headers.is_none());
+    }
+
+    // --- Edge case: compose tweet with scheduled_for ---
+
+    #[test]
+    fn compose_tweet_request_with_schedule() {
+        let json = r#"{"content": "Hi", "content_type": "thread", "scheduled_for": "2026-12-01T12:00:00Z"}"#;
+        let req: ComposeTweetRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.content_type.as_deref(), Some("thread"));
+        assert_eq!(req.scheduled_for.as_deref(), Some("2026-12-01T12:00:00Z"));
+    }
+
+    #[test]
+    fn compose_tweet_request_minimal() {
+        let json = r#"{"content": "Just text"}"#;
+        let req: ComposeTweetRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.content, "Just text");
+        assert!(req.content_type.is_none());
+        assert!(req.scheduled_for.is_none());
+    }
+
+    // --- Search tweets request with all optional fields ---
+
+    #[test]
+    fn search_tweets_request_all_fields() {
+        let json =
+            r#"{"query": "q", "max_results": 100, "since_id": "999", "pagination_token": "tok"}"#;
+        let req: SearchTweetsRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.max_results, Some(100));
+        assert_eq!(req.since_id.as_deref(), Some("999"));
+        assert_eq!(req.pagination_token.as_deref(), Some("tok"));
+    }
+
+    // --- Post tweet request with no media ---
+
+    #[test]
+    fn post_tweet_text_request_no_media() {
+        let json = r#"{"text": "Hello"}"#;
+        let req: PostTweetTextRequest = serde_json::from_str(json).unwrap();
+        assert!(req.media_ids.is_none());
+    }
+
+    // --- Followers/following with pagination ---
+
+    #[test]
+    fn get_followers_request_with_pagination() {
+        let json = r#"{"user_id": "u1", "max_results": 500, "pagination_token": "next"}"#;
+        let req: GetFollowersRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.max_results, Some(500));
+        assert_eq!(req.pagination_token.as_deref(), Some("next"));
+    }
+
+    #[test]
+    fn get_following_request_with_pagination() {
+        let json = r#"{"user_id": "u1", "max_results": 200, "pagination_token": "next2"}"#;
+        let req: GetFollowingRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.max_results, Some(200));
+        assert_eq!(req.pagination_token.as_deref(), Some("next2"));
+    }
+
+    // --- Generate reply without mention_product ---
+
+    #[test]
+    fn generate_reply_request_no_mention() {
+        let json = r#"{"tweet_text": "Hello", "tweet_author": "bob"}"#;
+        let req: GenerateReplyRequest = serde_json::from_str(json).unwrap();
+        assert!(req.mention_product.is_none());
+    }
 }

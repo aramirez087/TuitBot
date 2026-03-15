@@ -199,6 +199,60 @@ async fn make_state_creates_valid_state() {
 }
 
 #[tokio::test]
+async fn admin_server_clones() {
+    let state = make_state().await;
+    let server = super::AdminMcpServer::new(state);
+    let _clone = server.clone();
+}
+
+#[tokio::test]
+async fn admin_server_instructions_mention_universal_tools() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::AdminMcpServer::new(state);
+    let info = server.get_info();
+    let instructions = info.instructions.unwrap();
+    assert!(
+        instructions.contains("x_get") || instructions.contains("universal"),
+        "admin instructions should mention universal request tools"
+    );
+}
+
+#[test]
+fn kv_to_tuples_preserves_order() {
+    use crate::requests::KeyValue;
+    let kv = vec![
+        KeyValue {
+            key: "z".to_string(),
+            value: "3".to_string(),
+        },
+        KeyValue {
+            key: "a".to_string(),
+            value: "1".to_string(),
+        },
+        KeyValue {
+            key: "m".to_string(),
+            value: "2".to_string(),
+        },
+    ];
+    let result = super::kv_to_tuples(Some(&kv)).unwrap();
+    assert_eq!(result[0].0, "z");
+    assert_eq!(result[1].0, "a");
+    assert_eq!(result[2].0, "m");
+}
+
+#[test]
+fn kv_to_tuples_unicode_values() {
+    use crate::requests::KeyValue;
+    let kv = vec![KeyValue {
+        key: "emoji".to_string(),
+        value: "\u{1F600}".to_string(),
+    }];
+    let result = super::kv_to_tuples(Some(&kv)).unwrap();
+    assert_eq!(result[0].1, "\u{1F600}");
+}
+
+#[tokio::test]
 async fn null_x_client_returns_auth_expired() {
     let client = NullX;
     let result = client.search_tweets("test", 10, None, None).await;

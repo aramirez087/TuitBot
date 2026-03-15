@@ -870,6 +870,110 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn approval_mode_queues_thread_tweets() {
+        let executor = Arc::new(MockExecutor::new());
+        let approval = Arc::new(MockApprovalQueue::new());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let approval_clone = approval.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue_with_approval(
+                rx,
+                exec_clone,
+                Some(approval_clone),
+                Duration::ZERO,
+                Duration::ZERO,
+                None,
+                cancel_clone,
+            )
+            .await;
+        });
+
+        let (result_tx, result_rx) = oneshot::channel();
+        tx.send(PostAction::ThreadTweet {
+            content: "thread part 2".to_string(),
+            in_reply_to: "prev-id".to_string(),
+            media_ids: vec![],
+            result_tx: Some(result_tx),
+        })
+        .await
+        .expect("send");
+
+        let result = result_rx.await.expect("recv");
+        assert!(result.is_ok());
+        assert!(result.unwrap().starts_with("queued:"));
+
+        assert_eq!(executor.call_count(), 0);
+        assert_eq!(approval.item_count(), 1);
+
+        cancel.cancel();
+        handle.await.expect("join");
+    }
+
+    #[test]
+    fn is_rate_limit_error_case_insensitive() {
+        assert!(is_rate_limit_error("RATE LIMIT"));
+        assert!(is_rate_limit_error("Rate Limit Exceeded"));
+        assert!(is_rate_limit_error("TOO MANY REQUESTS"));
+        assert!(is_rate_limit_error("FORBIDDEN"));
+    }
+
+    #[test]
+    fn is_rate_limit_error_partial_match() {
+        assert!(is_rate_limit_error(
+            "error: rate limit exceeded for endpoint"
+        ));
+        assert!(is_rate_limit_error("HTTP 429 Too Many Requests from API"));
+        assert!(is_rate_limit_error("403 Forbidden: write scope missing"));
+    }
+
+    #[test]
+    fn is_rate_limit_error_unrelated() {
+        assert!(!is_rate_limit_error("success"));
+        assert!(!is_rate_limit_error(""));
+        assert!(!is_rate_limit_error("network timeout"));
+        assert!(!is_rate_limit_error("invalid json"));
+    }
+
+    #[test]
+    fn randomized_delay_zero_min_nonzero_max() {
+        let min = Duration::ZERO;
+        let max = Duration::from_millis(100);
+        // This edge case: min.is_zero() && max.is_zero() is false, min < max
+        let d = randomized_delay(min, max);
+        assert!(d <= max);
+    }
+
+    #[test]
+    fn queue_capacity_is_100() {
+        assert_eq!(QUEUE_CAPACITY, 100);
+    }
+
+    #[test]
+    fn create_posting_queue_returns_valid_channel() {
+        let (tx, _rx) = create_posting_queue();
+        // Verify the sender is usable
+        assert!(!tx.is_closed());
+    }
+
+    #[test]
+    fn post_action_debug_reply_with_media() {
+        let action = PostAction::Reply {
+            tweet_id: "t1".to_string(),
+            content: "hello".to_string(),
+            media_ids: vec!["m1".to_string(), "m2".to_string()],
+            result_tx: None,
+        };
+        let debug = format!("{action:?}");
+        assert!(debug.contains("Reply"));
+        assert!(debug.contains("media_count"));
+        assert!(debug.contains("2"));
+    }
+
+    #[tokio::test]
     async fn approval_mode_queues_tweets() {
         let executor = Arc::new(MockExecutor::new());
         let approval = Arc::new(MockApprovalQueue::new());

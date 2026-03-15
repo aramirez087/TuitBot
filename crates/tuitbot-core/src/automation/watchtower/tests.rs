@@ -1107,6 +1107,28 @@ async fn ingest_content_with_front_matter_stores_metadata() {
 }
 
 #[tokio::test]
+async fn ingest_content_plain_text_no_front_matter() {
+    let pool = init_test_db().await.expect("init db");
+    let source_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    let content = "Just plain text without any front-matter.\n";
+    let result = ingest_content(&pool, source_id, "plain.md", content, false)
+        .await
+        .unwrap();
+    assert_eq!(result, store::UpsertResult::Inserted);
+
+    let nodes = store::get_nodes_for_source(&pool, source_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert!(nodes[0].title.is_none());
+    assert!(nodes[0].tags.is_none());
+    assert!(nodes[0].front_matter_json.is_none());
+}
+
+#[tokio::test]
 async fn ingest_content_force_always_updates() {
     let pool = init_test_db().await.expect("init db");
     let source_id = store::insert_source_context(&pool, "local_fs", "{}")

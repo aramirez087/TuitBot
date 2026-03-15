@@ -220,6 +220,261 @@ async fn print_engagement_rates(pool: &storage::DbPool) {
     eprintln!();
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── FollowerSnapshotJson ──────────────────────────────────────────
+
+    #[test]
+    fn follower_snapshot_json_serializes() {
+        let snap = FollowerSnapshotJson {
+            date: "2025-01-15".to_string(),
+            follower_count: 1000,
+            following_count: 500,
+            tweet_count: 200,
+        };
+        let json = serde_json::to_string(&snap).unwrap();
+        assert!(json.contains("\"date\":\"2025-01-15\""));
+        assert!(json.contains("\"follower_count\":1000"));
+        assert!(json.contains("\"following_count\":500"));
+        assert!(json.contains("\"tweet_count\":200"));
+    }
+
+    #[test]
+    fn follower_snapshot_json_zero_counts() {
+        let snap = FollowerSnapshotJson {
+            date: "2025-01-01".to_string(),
+            follower_count: 0,
+            following_count: 0,
+            tweet_count: 0,
+        };
+        let json = serde_json::to_string(&snap).unwrap();
+        assert!(json.contains("\"follower_count\":0"));
+    }
+
+    // ── TopicJson ─────────────────────────────────────────────────────
+
+    #[test]
+    fn topic_json_serializes() {
+        let topic = TopicJson {
+            topic: "rust".to_string(),
+            format: "tweet".to_string(),
+            total_posts: 15,
+            avg_performance: 72.5,
+        };
+        let json = serde_json::to_string(&topic).unwrap();
+        assert!(json.contains("\"topic\":\"rust\""));
+        assert!(json.contains("\"format\":\"tweet\""));
+        assert!(json.contains("\"total_posts\":15"));
+        assert!(json.contains("72.5"));
+    }
+
+    #[test]
+    fn topic_json_empty_format() {
+        let topic = TopicJson {
+            topic: "general".to_string(),
+            format: String::new(),
+            total_posts: 0,
+            avg_performance: 0.0,
+        };
+        let json = serde_json::to_string(&topic).unwrap();
+        assert!(json.contains("\"format\":\"\""));
+    }
+
+    // ── EngagementJson ────────────────────────────────────────────────
+
+    #[test]
+    fn engagement_json_serializes() {
+        let engagement = EngagementJson {
+            avg_reply_score: 45.2,
+            avg_tweet_score: 67.8,
+        };
+        let json = serde_json::to_string(&engagement).unwrap();
+        assert!(json.contains("45.2"));
+        assert!(json.contains("67.8"));
+    }
+
+    #[test]
+    fn engagement_json_zeros() {
+        let engagement = EngagementJson {
+            avg_reply_score: 0.0,
+            avg_tweet_score: 0.0,
+        };
+        let json = serde_json::to_string(&engagement).unwrap();
+        assert!(json.contains("\"avg_reply_score\":0.0"));
+        assert!(json.contains("\"avg_tweet_score\":0.0"));
+    }
+
+    // ── ContentMeasuredJson ───────────────────────────────────────────
+
+    #[test]
+    fn content_measured_json_serializes() {
+        let content = ContentMeasuredJson {
+            replies: 42,
+            tweets: 10,
+        };
+        let json = serde_json::to_string(&content).unwrap();
+        assert!(json.contains("\"replies\":42"));
+        assert!(json.contains("\"tweets\":10"));
+    }
+
+    // ── StatsOutput ───────────────────────────────────────────────────
+
+    #[test]
+    fn stats_output_serializes_empty() {
+        let stats = StatsOutput {
+            follower_trend: vec![],
+            net_follower_change: None,
+            top_topics: vec![],
+            engagement: EngagementJson {
+                avg_reply_score: 0.0,
+                avg_tweet_score: 0.0,
+            },
+            content_measured: ContentMeasuredJson {
+                replies: 0,
+                tweets: 0,
+            },
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"follower_trend\":[]"));
+        assert!(json.contains("\"net_follower_change\":null"));
+        assert!(json.contains("\"top_topics\":[]"));
+    }
+
+    #[test]
+    fn stats_output_serializes_with_data() {
+        let stats = StatsOutput {
+            follower_trend: vec![
+                FollowerSnapshotJson {
+                    date: "2025-01-01".to_string(),
+                    follower_count: 100,
+                    following_count: 50,
+                    tweet_count: 20,
+                },
+                FollowerSnapshotJson {
+                    date: "2025-01-02".to_string(),
+                    follower_count: 110,
+                    following_count: 52,
+                    tweet_count: 22,
+                },
+            ],
+            net_follower_change: Some(10),
+            top_topics: vec![TopicJson {
+                topic: "rust".to_string(),
+                format: "thread".to_string(),
+                total_posts: 5,
+                avg_performance: 80.0,
+            }],
+            engagement: EngagementJson {
+                avg_reply_score: 65.0,
+                avg_tweet_score: 70.0,
+            },
+            content_measured: ContentMeasuredJson {
+                replies: 30,
+                tweets: 15,
+            },
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"net_follower_change\":10"));
+        assert!(json.contains("\"rust\""));
+    }
+
+    // ── Net follower change computation ───────────────────────────────
+
+    #[test]
+    fn net_follower_change_positive() {
+        let snapshots = vec![
+            FollowerSnapshotJson {
+                date: "d1".to_string(),
+                follower_count: 110,
+                following_count: 0,
+                tweet_count: 0,
+            },
+            FollowerSnapshotJson {
+                date: "d2".to_string(),
+                follower_count: 100,
+                following_count: 0,
+                tweet_count: 0,
+            },
+        ];
+        // Newest first in the snapshots vec
+        let diff = snapshots[0].follower_count - snapshots[snapshots.len() - 1].follower_count;
+        assert_eq!(diff, 10);
+    }
+
+    #[test]
+    fn net_follower_change_negative() {
+        let snapshots = vec![
+            FollowerSnapshotJson {
+                date: "d1".to_string(),
+                follower_count: 90,
+                following_count: 0,
+                tweet_count: 0,
+            },
+            FollowerSnapshotJson {
+                date: "d2".to_string(),
+                follower_count: 100,
+                following_count: 0,
+                tweet_count: 0,
+            },
+        ];
+        let diff = snapshots[0].follower_count - snapshots[snapshots.len() - 1].follower_count;
+        assert_eq!(diff, -10);
+    }
+
+    #[test]
+    fn net_follower_change_sign_formatting() {
+        let diff = 10i64;
+        let sign = if diff >= 0 { "+" } else { "" };
+        assert_eq!(format!("{sign}{diff}"), "+10");
+
+        let diff = -5i64;
+        let sign = if diff >= 0 { "+" } else { "" };
+        assert_eq!(format!("{sign}{diff}"), "-5");
+    }
+
+    // ── Topic display formatting ──────────────────────────────────────
+
+    #[test]
+    fn topic_format_dash_for_empty() {
+        let format = "";
+        let display = if format.is_empty() { "-" } else { format };
+        assert_eq!(display, "-");
+    }
+
+    #[test]
+    fn topic_format_shows_value() {
+        let format = "thread";
+        let display = if format.is_empty() { "-" } else { format };
+        assert_eq!(display, "thread");
+    }
+
+    // ── JSON round-trip ───────────────────────────────────────────────
+
+    #[test]
+    fn stats_output_json_round_trip() {
+        let stats = StatsOutput {
+            follower_trend: vec![],
+            net_follower_change: Some(42),
+            top_topics: vec![],
+            engagement: EngagementJson {
+                avg_reply_score: 1.0,
+                avg_tweet_score: 2.0,
+            },
+            content_measured: ContentMeasuredJson {
+                replies: 3,
+                tweets: 4,
+            },
+        };
+        let json_str = serde_json::to_string(&stats).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(parsed["net_follower_change"], 42);
+        assert_eq!(parsed["content_measured"]["replies"], 3);
+        assert_eq!(parsed["content_measured"]["tweets"], 4);
+    }
+}
+
 async fn print_performance_counts(pool: &storage::DbPool) {
     eprintln!("--- Content Measured ---");
 

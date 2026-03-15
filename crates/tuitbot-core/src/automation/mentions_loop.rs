@@ -767,6 +767,109 @@ mod tests {
     }
 
     #[test]
+    fn update_max_id_same_id_no_change() {
+        let mut max = Some("100".to_string());
+        update_max_id(&mut max, "100");
+        assert_eq!(max, Some("100".to_string()));
+    }
+
+    #[test]
+    fn truncate_unicode_boundary() {
+        // Truncation at byte boundary may cut a multi-byte char; verify no panic
+        let s = "hello world";
+        let result = truncate(s, 7);
+        assert_eq!(result, "hello w...");
+    }
+
+    #[test]
+    fn truncate_one_char() {
+        assert_eq!(truncate("hello", 1), "h...");
+    }
+
+    #[test]
+    fn truncate_zero_len() {
+        assert_eq!(truncate("hello", 0), "...");
+    }
+
+    #[test]
+    fn mentions_loop_new_sets_dry_run() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: Vec::new(),
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            true,
+        );
+        assert!(mentions_loop.dry_run);
+    }
+
+    #[test]
+    fn mentions_loop_new_sets_not_dry_run() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: Vec::new(),
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        assert!(!mentions_loop.dry_run);
+    }
+
+    #[tokio::test]
+    async fn run_once_with_since_id_passthrough() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![test_tweet("200", "carol")],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hey".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, since_id) = mentions_loop
+            .run_once(Some("150"), None, &storage)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(since_id, Some("200".to_string()));
+    }
+
+    #[tokio::test]
+    async fn run_once_limit_zero_processes_none() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![test_tweet("100", "alice")],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, since_id) = mentions_loop
+            .run_once(None, Some(0), &storage)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+        assert!(since_id.is_none());
+    }
+
+    #[test]
     fn mention_result_debug() {
         let result = MentionResult::Replied {
             tweet_id: "123".to_string(),

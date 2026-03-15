@@ -893,6 +893,49 @@ mod tests {
         assert_eq!(truncate("", 10), "");
     }
 
+    #[test]
+    fn truncate_zero() {
+        assert_eq!(truncate("hello", 0), "...");
+    }
+
+    #[test]
+    fn truncate_one_char() {
+        assert_eq!(truncate("hello", 1), "h...");
+    }
+
+    #[test]
+    fn target_loop_config_default_values() {
+        let config = TargetLoopConfig {
+            accounts: vec![],
+            max_target_replies_per_day: 0,
+            dry_run: true,
+        };
+        assert!(config.accounts.is_empty());
+        assert_eq!(config.max_target_replies_per_day, 0);
+        assert!(config.dry_run);
+    }
+
+    #[tokio::test]
+    async fn replies_only_to_first_tweet_per_account() {
+        // TargetLoop replies to only one tweet per account per iteration.
+        let tweets = vec![
+            test_tweet("tw1", "alice"),
+            test_tweet("tw2", "alice"),
+            test_tweet("tw3", "alice"),
+        ];
+        let storage = Arc::new(MockTargetStorage::new());
+        let (target_loop, poster) = build_loop(tweets, default_config(), storage);
+
+        let results = target_loop.run_iteration().await.expect("iteration");
+        // Only 1 reply per account — first tweet gets replied, loop breaks
+        let replied = results
+            .iter()
+            .filter(|r| matches!(r, TargetResult::Replied { .. }))
+            .count();
+        assert_eq!(replied, 1);
+        assert_eq!(poster.sent_count(), 1);
+    }
+
     #[tokio::test]
     async fn non_auth_error_continues_iteration() {
         let user_mgr = Arc::new(MockPartialFailUserManager {
