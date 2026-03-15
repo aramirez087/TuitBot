@@ -950,3 +950,320 @@ async fn batch_approve_empty_queue() {
     let ids = batch_approve(&pool, 10, &review).await.expect("batch");
     assert!(ids.is_empty());
 }
+
+// ── Account-scoped `_for` variant isolation tests ───────────────────
+
+#[tokio::test]
+async fn enqueue_with_context_for_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct_a = "ctx-acct-a";
+    let acct_b = "ctx-acct-b";
+    crate::storage::accounts::create_account(&pool, acct_a, "A")
+        .await
+        .expect("create a");
+    crate::storage::accounts::create_account(&pool, acct_b, "B")
+        .await
+        .expect("create b");
+
+    let id_a = enqueue_with_context_for(
+        &pool,
+        acct_a,
+        "reply",
+        "t1",
+        "@author",
+        "Content A",
+        "Tech",
+        "Helpful",
+        80.0,
+        "[]",
+        Some("score_gate"),
+        Some(r#"["risk_a"]"#),
+        Some("2099-06-01T10:00:00Z"),
+    )
+    .await
+    .expect("enqueue a");
+
+    let id_b = enqueue_with_context_for(
+        &pool,
+        acct_b,
+        "tweet",
+        "",
+        "",
+        "Content B",
+        "General",
+        "",
+        50.0,
+        "[]",
+        None,
+        None,
+        None,
+    )
+    .await
+    .expect("enqueue b");
+
+    // Each account only sees its own item
+    let item_a = get_by_id_for(&pool, acct_a, id_a)
+        .await
+        .expect("get a")
+        .expect("found");
+    assert_eq!(item_a.reason.as_deref(), Some("score_gate"));
+    assert_eq!(
+        item_a.scheduled_for.as_deref(),
+        Some("2099-06-01T10:00:00Z")
+    );
+
+    let cross = get_by_id_for(&pool, acct_a, id_b).await.expect("cross");
+    assert!(cross.is_none(), "acct_a should not see acct_b's item");
+}
+
+#[tokio::test]
+async fn update_status_with_review_for_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct = "review-acct";
+    crate::storage::accounts::create_account(&pool, acct, "Review")
+        .await
+        .expect("create");
+
+    let id = enqueue_for(
+        &pool, acct, "tweet", "", "", "Hello", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    let review = ReviewAction {
+        actor: Some("reviewer_x".to_string()),
+        notes: Some("LGTM".to_string()),
+    };
+    update_status_with_review_for(&pool, acct, id, "approved", &review)
+        .await
+        .expect("review");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("found");
+    assert_eq!(item.status, "approved");
+    assert_eq!(item.reviewed_by.as_deref(), Some("reviewer_x"));
+    assert_eq!(item.review_notes.as_deref(), Some("LGTM"));
+}
+
+#[tokio::test]
+async fn get_by_statuses_for_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct_a = "stat-acct-a";
+    let acct_b = "stat-acct-b";
+    crate::storage::accounts::create_account(&pool, acct_a, "A")
+        .await
+        .expect("create a");
+    crate::storage::accounts::create_account(&pool, acct_b, "B")
+        .await
+        .expect("create b");
+
+    let id_a = enqueue_for(
+        &pool, acct_a, "tweet", "", "", "A1", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue a");
+    enqueue_for(
+        &pool, acct_a, "reply", "t1", "@u", "A2", "Rust", "", 50.0, "[]",
+    )
+    .await
+    .expect("enqueue a2");
+    enqueue_for(
+        &pool, acct_b, "tweet", "", "", "B1", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue b");
+
+    update_status_for(&pool, acct_a, id_a, "approved")
+        .await
+        .expect("approve a");
+
+    // acct_a: 1 approved + 1 pending
+    let items = get_by_statuses_for(&pool, acct_a, &["pending", "approved"], None)
+        .await
+        .expect("get a");
+    assert_eq!(items.len(), 2);
+
+    // Filter by action_type within account
+    let replies = get_by_statuses_for(&pool, acct_a, &["pending"], Some("reply"))
+        .await
+        .expect("replies a");
+    assert_eq!(replies.len(), 1);
+    assert_eq!(replies[0].action_type, "reply");
+
+    // acct_b: only 1 pending
+    let items_b = get_by_statuses_for(&pool, acct_b, &["pending", "approved"], None)
+        .await
+        .expect("get b");
+    assert_eq!(items_b.len(), 1);
+    assert_eq!(items_b[0].generated_content, "B1");
+}
+
+#[tokio::test]
+async fn update_content_for_approval_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct_a = "upd-content-a";
+    let acct_b = "upd-content-b";
+    crate::storage::accounts::create_account(&pool, acct_a, "A")
+        .await
+        .expect("create a");
+    crate::storage::accounts::create_account(&pool, acct_b, "B")
+        .await
+        .expect("create b");
+
+    let id_a = enqueue_for(
+        &pool, acct_a, "tweet", "", "", "Original", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue a");
+
+    // Cross-account update should be no-op (different account_id)
+    super::update_content_for(&pool, acct_b, id_a, "Hacked!")
+        .await
+        .expect("cross update");
+    let item = get_by_id_for(&pool, acct_a, id_a)
+        .await
+        .expect("get a")
+        .expect("found");
+    assert_eq!(item.generated_content, "Original");
+
+    // Same-account update works
+    super::update_content_for(&pool, acct_a, id_a, "Edited")
+        .await
+        .expect("update a");
+    let item = get_by_id_for(&pool, acct_a, id_a)
+        .await
+        .expect("get a")
+        .expect("found");
+    assert_eq!(item.generated_content, "Edited");
+    assert_eq!(item.status, "pending"); // status preserved
+}
+
+#[tokio::test]
+async fn update_qa_fields_for_approval_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct = "qa-fields-acct";
+    crate::storage::accounts::create_account(&pool, acct, "QA")
+        .await
+        .expect("create");
+
+    let id = enqueue_for(
+        &pool, acct, "tweet", "", "", "Draft", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    super::update_qa_fields_for(
+        &pool,
+        acct,
+        id,
+        r#"{"score":{"overall":72.0}}"#,
+        r#"[{"code":"lang_mismatch"}]"#,
+        r#"[{"code":"short"}]"#,
+        r#"["Expand content"]"#,
+        72.0,
+        true,
+    )
+    .await
+    .expect("update qa");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("found");
+    assert_eq!(item.qa_score, 72.0);
+    assert!(item.qa_requires_override);
+    assert_eq!(item.qa_hard_flags, r#"[{"code":"lang_mismatch"}]"#);
+}
+
+#[tokio::test]
+async fn set_and_clear_qa_override_for_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct = "override-acct";
+    crate::storage::accounts::create_account(&pool, acct, "Override")
+        .await
+        .expect("create");
+
+    let id = enqueue_for(
+        &pool, acct, "tweet", "", "", "Draft", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    // Set override
+    set_qa_override_for(&pool, acct, id, "admin", "Validated manually")
+        .await
+        .expect("set override");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("found");
+    assert_eq!(item.qa_override_by.as_deref(), Some("admin"));
+    assert_eq!(item.qa_override_note.as_deref(), Some("Validated manually"));
+    assert!(item.qa_override_at.is_some());
+
+    // Clear override
+    clear_qa_override_for(&pool, acct, id)
+        .await
+        .expect("clear override");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("found");
+    assert!(item.qa_override_by.is_none());
+    assert!(item.qa_override_note.is_none());
+    assert!(item.qa_override_at.is_none());
+}
+
+#[tokio::test]
+async fn mark_failed_for_account_isolation() {
+    let pool = init_test_db().await.expect("init db");
+
+    let acct = "fail-acct";
+    crate::storage::accounts::create_account(&pool, acct, "Fail")
+        .await
+        .expect("create");
+
+    let id = enqueue_for(
+        &pool, acct, "tweet", "", "", "Hello", "General", "", 0.0, "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    // Set to approved first (mark_failed only works on approved items)
+    sqlx::query("UPDATE approval_queue SET status = 'approved' WHERE id = ? AND account_id = ?")
+        .bind(id)
+        .bind(acct)
+        .execute(&pool)
+        .await
+        .expect("raw approve");
+
+    mark_failed_for(&pool, acct, id, "API timeout")
+        .await
+        .expect("mark failed");
+
+    let item = get_by_id_for(&pool, acct, id)
+        .await
+        .expect("get")
+        .expect("found");
+    assert_eq!(item.status, "failed");
+    assert!(item
+        .review_notes
+        .as_deref()
+        .unwrap()
+        .contains("API timeout"));
+
+    // Stats should reflect failed count
+    let stats = get_stats_for(&pool, acct).await.expect("stats");
+    assert_eq!(stats.failed, 1);
+    assert_eq!(stats.approved, 0);
+}

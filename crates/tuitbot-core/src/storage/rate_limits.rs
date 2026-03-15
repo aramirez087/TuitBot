@@ -1074,4 +1074,167 @@ mod tests {
             .expect("reply b");
         assert_eq!(reply_b.request_count, 0, "account b should be unaffected");
     }
+
+    // ================================================================
+    // Account-scoped `_for` variant isolation tests
+    // ================================================================
+
+    #[tokio::test]
+    async fn check_rate_limit_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+
+        init_rate_limits_for(
+            &pool,
+            "acct_rl_a",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init a");
+        init_rate_limits_for(
+            &pool,
+            "acct_rl_b",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init b");
+
+        // Fill acct_a's reply limit (max = 3)
+        for _ in 0..3 {
+            increment_rate_limit_for(&pool, "acct_rl_a", "reply")
+                .await
+                .expect("inc a");
+        }
+
+        // acct_a should be blocked
+        assert!(!check_rate_limit_for(&pool, "acct_rl_a", "reply")
+            .await
+            .expect("check a"));
+
+        // acct_b should still be allowed
+        assert!(check_rate_limit_for(&pool, "acct_rl_b", "reply")
+            .await
+            .expect("check b"));
+    }
+
+    #[tokio::test]
+    async fn get_daily_usage_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+
+        init_rate_limits_for(
+            &pool,
+            "acct_du_a",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init a");
+        init_rate_limits_for(
+            &pool,
+            "acct_du_b",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init b");
+
+        // Increment acct_a's reply and tweet counters
+        increment_rate_limit_for(&pool, "acct_du_a", "reply")
+            .await
+            .expect("inc a reply");
+        increment_rate_limit_for(&pool, "acct_du_a", "reply")
+            .await
+            .expect("inc a reply2");
+        increment_rate_limit_for(&pool, "acct_du_a", "tweet")
+            .await
+            .expect("inc a tweet");
+
+        // Increment acct_b's thread counter
+        increment_rate_limit_for(&pool, "acct_du_b", "thread")
+            .await
+            .expect("inc b thread");
+
+        let usage_a = get_daily_usage_for(&pool, "acct_du_a")
+            .await
+            .expect("usage a");
+        assert_eq!(usage_a.replies.used, 2);
+        assert_eq!(usage_a.replies.max, 3);
+        assert_eq!(usage_a.tweets.used, 1);
+        assert_eq!(usage_a.tweets.max, 2);
+        assert_eq!(usage_a.threads.used, 0);
+
+        let usage_b = get_daily_usage_for(&pool, "acct_du_b")
+            .await
+            .expect("usage b");
+        assert_eq!(usage_b.replies.used, 0);
+        assert_eq!(usage_b.tweets.used, 0);
+        assert_eq!(usage_b.threads.used, 1);
+        assert_eq!(usage_b.threads.max, 1);
+    }
+
+    #[tokio::test]
+    async fn check_and_increment_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+
+        init_rate_limits_for(
+            &pool,
+            "acct_ci_a",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init a");
+        init_rate_limits_for(
+            &pool,
+            "acct_ci_b",
+            &test_limits_config(),
+            &test_intervals_config(),
+        )
+        .await
+        .expect("init b");
+
+        // Exhaust acct_a's tweet limit (max = 2)
+        assert!(
+            check_and_increment_rate_limit_for(&pool, "acct_ci_a", "tweet")
+                .await
+                .expect("1")
+        );
+        assert!(
+            check_and_increment_rate_limit_for(&pool, "acct_ci_a", "tweet")
+                .await
+                .expect("2")
+        );
+        assert!(
+            !check_and_increment_rate_limit_for(&pool, "acct_ci_a", "tweet")
+                .await
+                .expect("3")
+        );
+
+        // acct_b should still be allowed
+        assert!(
+            check_and_increment_rate_limit_for(&pool, "acct_ci_b", "tweet")
+                .await
+                .expect("b1")
+        );
+
+        // Verify counts
+        let limits_a = get_all_rate_limits_for(&pool, "acct_ci_a")
+            .await
+            .expect("get a");
+        let tweet_a = limits_a
+            .iter()
+            .find(|l| l.action_type == "tweet")
+            .expect("tweet a");
+        assert_eq!(tweet_a.request_count, 2);
+
+        let limits_b = get_all_rate_limits_for(&pool, "acct_ci_b")
+            .await
+            .expect("get b");
+        let tweet_b = limits_b
+            .iter()
+            .find(|l| l.action_type == "tweet")
+            .expect("tweet b");
+        assert_eq!(tweet_b.request_count, 1);
+    }
 }

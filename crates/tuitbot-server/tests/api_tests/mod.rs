@@ -21,6 +21,7 @@ mod compose;
 mod content;
 mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + schedule
 mod coverage_gaps;
+mod deep_handler_coverage; // Deep happy-path integration tests for large handlers
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
 mod draft_studio_coverage; // Additional draft studio error-path coverage
