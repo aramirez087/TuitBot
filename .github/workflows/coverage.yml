@@ -43,8 +43,7 @@ jobs:
             --out Xml \
             --output-dir coverage/ \
             --fail-under 75 \
-            --timeout 120 \
-            --skip-clean
+            --timeout 300
         env:
           RUSTFLAGS: "-D warnings"
 
