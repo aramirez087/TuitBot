@@ -74,10 +74,10 @@ jobs:
           echo "## 📦 Bundle Size Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           cd dashboard && du -sh build/ 2>/dev/null | awk '{print "- Total: **" $1 "**"}' >> $GITHUB_STEP_SUMMARY
-          find build -type f -name "*.js" -o -name "*.css" 2>/dev/null | while read f; do
+          find build -type f \( -name "*.js" -o -name "*.css" \) 2>/dev/null | head -10 | while read f; do
             size=$(du -h "$f" | cut -f1)
             echo "- $f: $size"
-          done | head -10 >> $GITHUB_STEP_SUMMARY
+          done >> $GITHUB_STEP_SUMMARY
         shell: bash
 
       - name: Upload bundle artifacts
