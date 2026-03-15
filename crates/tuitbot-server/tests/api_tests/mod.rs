@@ -22,6 +22,7 @@ mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + sch
 mod coverage_gaps;
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
+mod mcp_policy; // Task 3.8: /api/mcp/* policy + telemetry coverage
 mod x_auth; // X OAuth unlink tests // Task 3.8: integration tests for 0%-coverage server routes
 
 /// The test API token used across all tests.
