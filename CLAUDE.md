@@ -41,6 +41,12 @@ cargo clippy --workspace -- -D warnings
 - Always run `cargo fmt --all` — never assume hand-formatted code is correct.
 - All warnings are release blockers. Do not finish until this passes.
 
+## Cross-Platform Testing
+CI runs on **macOS, Linux, and Windows**. All tests must pass on all three:
+- **Never hardcode Unix paths** like `/tmp` in tests. Use `std::env::temp_dir()` for a directory that exists, or `tempfile::tempdir()` for a throwaway dir.
+- **Never assume `/` path separators.** Use `std::path::PathBuf` or `Path::join()`.
+- **Never assume Unix line endings.** Use `.trim()` or `.lines()` when comparing text output.
+
 ## Constraints
 
 ### File Size Limits
