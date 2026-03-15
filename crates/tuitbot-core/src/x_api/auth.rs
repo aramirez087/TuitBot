@@ -770,4 +770,182 @@ mod tests {
         let token = manager.tokens.read().await;
         assert_eq!(token.access_token, "old_token");
     }
+
+    // -------------------------------------------------------------------
+    // build_oauth_client tests (pure URL construction)
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn build_oauth_client_valid() {
+        let client = build_oauth_client("my_client_id", "http://localhost:9090/callback");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn build_oauth_client_invalid_redirect() {
+        // Completely malformed URI
+        let result = build_oauth_client("cid", "not a url at all ://");
+        assert!(result.is_err());
+    }
+
+    // -------------------------------------------------------------------
+    // Token expiry calculations
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn tokens_is_expired_when_past() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() - chrono::Duration::hours(1),
+            scopes: vec![],
+        };
+        let seconds_until_expiry = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(
+            seconds_until_expiry < 0,
+            "expired token should have negative seconds"
+        );
+    }
+
+    #[test]
+    fn tokens_not_expired_when_far_future() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::hours(24),
+            scopes: vec![],
+        };
+        let seconds_until_expiry = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(seconds_until_expiry > REFRESH_WINDOW_SECS);
+    }
+
+    #[test]
+    fn tokens_within_refresh_window() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::seconds(60),
+            scopes: vec![],
+        };
+        let seconds_until_expiry = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(
+            seconds_until_expiry < REFRESH_WINDOW_SECS,
+            "60s remaining should be within the 300s refresh window"
+        );
+    }
+
+    // -------------------------------------------------------------------
+    // TokenRefreshResponse deserialization
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn token_refresh_response_deserialize() {
+        let json = r#"{
+            "access_token": "new_acc",
+            "refresh_token": "new_ref",
+            "expires_in": 7200,
+            "scope": "tweet.read tweet.write users.read"
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.access_token, "new_acc");
+        assert_eq!(resp.refresh_token, "new_ref");
+        assert_eq!(resp.expires_in, 7200);
+        let scopes: Vec<&str> = resp.scope.split_whitespace().collect();
+        assert_eq!(scopes.len(), 3);
+    }
+
+    // -------------------------------------------------------------------
+    // save_tokens / load_tokens edge cases
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn save_tokens_overwrites_existing() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        let t1 = Tokens {
+            access_token: "first".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&t1, &path).expect("save");
+
+        let t2 = Tokens {
+            access_token: "second".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&t2, &path).expect("save overwrite");
+
+        let loaded = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(loaded.access_token, "second");
+    }
+
+    #[test]
+    fn load_tokens_from_nonexistent_dir_returns_none() {
+        let path = std::env::temp_dir()
+            .join("tuitbot_test_nonexistent_dir_xyzzy")
+            .join("tokens.json");
+        let result = load_tokens(&path).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn tokens_with_many_scopes() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![
+                "tweet.read".into(),
+                "tweet.write".into(),
+                "users.read".into(),
+                "follows.read".into(),
+                "follows.write".into(),
+                "offline.access".into(),
+            ],
+        };
+        let json = serde_json::to_string(&tokens).unwrap();
+        let back: Tokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.scopes.len(), 6);
+    }
+
+    #[test]
+    fn tokens_debug_format() {
+        let tokens = Tokens {
+            access_token: "debug_test".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        let debug = format!("{tokens:?}");
+        assert!(debug.contains("debug_test"));
+    }
+
+    #[tokio::test]
+    async fn token_manager_get_access_token_returns_current() {
+        let tokens = Tokens {
+            access_token: "current_token".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let manager = TokenManager::new(tokens, "cid".into(), path);
+
+        let tok = manager.get_access_token().await.unwrap();
+        assert_eq!(tok, "current_token");
+    }
 }

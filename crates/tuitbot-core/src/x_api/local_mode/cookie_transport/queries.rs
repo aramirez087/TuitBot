@@ -299,7 +299,10 @@ impl CookieTransport {
 }
 
 /// Build a `SearchResponse` from parsed tweets and cursor.
-fn build_search_response(tweets: Vec<Tweet>, next_cursor: Option<String>) -> SearchResponse {
+pub(super) fn build_search_response(
+    tweets: Vec<Tweet>,
+    next_cursor: Option<String>,
+) -> SearchResponse {
     let result_count = tweets.len() as u32;
     let newest_id = tweets.first().map(|t| t.id.clone());
     let oldest_id = tweets.last().map(|t| t.id.clone());
@@ -317,7 +320,7 @@ fn build_search_response(tweets: Vec<Tweet>, next_cursor: Option<String>) -> Sea
 }
 
 /// Build a `UsersResponse` from parsed users and cursor.
-fn build_users_response(users: Vec<User>, next_cursor: Option<String>) -> UsersResponse {
+pub(super) fn build_users_response(users: Vec<User>, next_cursor: Option<String>) -> UsersResponse {
     let result_count = users.len() as u32;
 
     UsersResponse {

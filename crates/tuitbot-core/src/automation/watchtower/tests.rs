@@ -908,3 +908,220 @@ fn ingest_summary_debug() {
     assert!(debug.contains("3"));
     assert!(debug.contains("fail"));
 }
+
+// ---------------------------------------------------------------------------
+// Additional coverage: walk_directory edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn walk_directory_multiple_patterns() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("note.md"), "md").unwrap();
+    std::fs::write(dir.path().join("readme.txt"), "txt").unwrap();
+    std::fs::write(dir.path().join("image.png"), "png").unwrap();
+
+    let patterns = vec!["*.md".to_string(), "*.txt".to_string()];
+    let mut paths = Vec::new();
+    WatchtowerLoop::walk_directory(dir.path(), dir.path(), &patterns, &mut paths).unwrap();
+
+    assert_eq!(paths.len(), 2);
+    assert!(paths.contains(&"note.md".to_string()));
+    assert!(paths.contains(&"readme.txt".to_string()));
+}
+
+#[test]
+fn walk_directory_empty_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    let patterns = vec!["*.md".to_string()];
+    let mut paths = Vec::new();
+    WatchtowerLoop::walk_directory(dir.path(), dir.path(), &patterns, &mut paths).unwrap();
+    assert!(paths.is_empty());
+}
+
+#[test]
+fn walk_directory_deeply_nested() {
+    let dir = tempfile::tempdir().unwrap();
+    let deep = dir.path().join("a").join("b").join("c");
+    std::fs::create_dir_all(&deep).unwrap();
+    std::fs::write(deep.join("deep.md"), "deep").unwrap();
+
+    let patterns = vec!["*.md".to_string()];
+    let mut paths = Vec::new();
+    WatchtowerLoop::walk_directory(dir.path(), dir.path(), &patterns, &mut paths).unwrap();
+
+    assert_eq!(paths.len(), 1);
+    assert_eq!(paths[0], "a/b/c/deep.md");
+}
+
+#[test]
+fn walk_directory_nonexistent_returns_error() {
+    let patterns = vec!["*.md".to_string()];
+    let mut paths = Vec::new();
+    let result = WatchtowerLoop::walk_directory(
+        Path::new("/nonexistent_watchtower_dir_xyz"),
+        Path::new("/nonexistent_watchtower_dir_xyz"),
+        &patterns,
+        &mut paths,
+    );
+    assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: CooldownSet edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cooldown_multiple_paths() {
+    let mut cd = CooldownSet::new(Duration::from_secs(60));
+    let p1 = PathBuf::from(std::env::temp_dir().join("cooldown_a.md"));
+    let p2 = PathBuf::from(std::env::temp_dir().join("cooldown_b.md"));
+
+    cd.mark(p1.clone());
+    cd.mark(p2.clone());
+
+    assert!(cd.is_cooling(&p1));
+    assert!(cd.is_cooling(&p2));
+    assert!(!cd.is_cooling(&std::env::temp_dir().join("cooldown_c.md")));
+}
+
+#[test]
+fn cooldown_cleanup_retains_fresh_entries() {
+    let mut cd = CooldownSet::new(Duration::from_secs(60));
+    let p = PathBuf::from(std::env::temp_dir().join("fresh.md"));
+    cd.mark(p.clone());
+    cd.cleanup();
+    // With 60s TTL, entry should still be present after cleanup
+    assert!(cd.is_cooling(&p));
+    assert_eq!(cd.entries.len(), 1);
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: matches_patterns edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn matches_patterns_multiple_extensions() {
+    let patterns = vec!["*.md".to_string(), "*.txt".to_string(), "*.rst".to_string()];
+    assert!(matches_patterns(Path::new("doc.rst"), &patterns));
+    assert!(!matches_patterns(Path::new("doc.html"), &patterns));
+}
+
+#[test]
+fn matches_patterns_invalid_glob() {
+    // An invalid glob pattern should be silently skipped
+    let patterns = vec!["[invalid".to_string(), "*.md".to_string()];
+    assert!(matches_patterns(Path::new("note.md"), &patterns));
+}
+
+#[test]
+fn matches_patterns_exact_filename() {
+    let patterns = vec!["README.md".to_string()];
+    assert!(matches_patterns(Path::new("README.md"), &patterns));
+    assert!(!matches_patterns(Path::new("readme.md"), &patterns));
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: relative_path_string edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn relative_path_string_empty() {
+    let p = Path::new("");
+    // Empty path should produce empty string
+    assert_eq!(relative_path_string(p), "");
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: parse_front_matter edge cases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_front_matter_empty_tags_sequence() {
+    let content = "---\ntitle: Test\ntags: []\n---\nBody.\n";
+    let (fm, _body) = parse_front_matter(content);
+    assert_eq!(fm.title.as_deref(), Some("Test"));
+    // Empty sequence should produce no tags
+    assert!(fm.tags.is_none());
+}
+
+#[test]
+fn parse_front_matter_non_string_tag_values() {
+    let content = "---\ntags:\n  - 42\n  - true\n---\nBody.\n";
+    let (fm, _body) = parse_front_matter(content);
+    // Non-string values in tags sequence are filtered out by filter_map(as_str)
+    assert!(fm.tags.is_none());
+}
+
+#[test]
+fn parse_front_matter_extra_fields_ignored() {
+    let content = "---\ntitle: Note\nauthor: Alice\ndate: 2026-01-01\n---\nBody.\n";
+    let (fm, body) = parse_front_matter(content);
+    assert_eq!(fm.title.as_deref(), Some("Note"));
+    assert!(fm.tags.is_none());
+    assert!(fm.raw_yaml.is_some());
+    assert_eq!(body, "Body.\n");
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: WatchtowerError variants
+// ---------------------------------------------------------------------------
+
+#[test]
+fn watchtower_error_io() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file gone");
+    let e = WatchtowerError::from(io_err);
+    assert!(e.to_string().contains("IO error"));
+}
+
+#[test]
+fn watchtower_error_debug() {
+    let e = WatchtowerError::Config("test config error".to_string());
+    let debug = format!("{e:?}");
+    assert!(debug.contains("Config"));
+    assert!(debug.contains("test config error"));
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage: ingest_content hash behavior
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn ingest_content_with_front_matter_stores_metadata() {
+    let pool = init_test_db().await.expect("init db");
+    let source_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    let content = "---\ntitle: Test Title\ntags:\n  - alpha\n  - beta\n---\nContent body here.\n";
+    let result = ingest_content(&pool, source_id, "test.md", content, false)
+        .await
+        .unwrap();
+    assert_eq!(result, store::UpsertResult::Inserted);
+
+    let nodes = store::get_nodes_for_source(&pool, source_id, None)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].title.as_deref(), Some("Test Title"));
+    assert_eq!(nodes[0].tags.as_deref(), Some("alpha,beta"));
+}
+
+#[tokio::test]
+async fn ingest_content_force_always_updates() {
+    let pool = init_test_db().await.expect("init db");
+    let source_id = store::insert_source_context(&pool, "local_fs", "{}")
+        .await
+        .unwrap();
+
+    let content = "Same content.\n";
+    let r1 = ingest_content(&pool, source_id, "forced.md", content, false)
+        .await
+        .unwrap();
+    assert_eq!(r1, store::UpsertResult::Inserted);
+
+    // Force flag should cause update even with same content
+    let r2 = ingest_content(&pool, source_id, "forced.md", content, true)
+        .await
+        .unwrap();
+    assert_eq!(r2, store::UpsertResult::Updated);
+}

@@ -18,6 +18,7 @@ mod approval;
 mod approval_coverage; // Additional approval queue edge-case coverage
 mod approval_workflow; // Task 3.4: approval happy-path mutations (approve/reject/bulk/history)
 mod compose;
+mod connectors_coverage; // Connector routes (link, status, disconnect) coverage
 mod content;
 mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + schedule
 mod coverage_gaps;
