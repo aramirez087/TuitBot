@@ -1,4 +1,7 @@
-name: Build Desktop App
+# ⚠️ DEPRECATED: This workflow has been consolidated into release.yml
+# For desktop app builds triggered on app-v* tags, see release.yml build-desktop job.
+# This file is kept for backward compatibility; delete after migration complete.
+name: Build Desktop App (DEPRECATED)
 on:
   push:
     tags: ['app-v*']
