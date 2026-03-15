@@ -740,4 +740,155 @@ mod tests {
             .expect("phrases");
         assert!(phrases.is_empty());
     }
+
+    // -----------------------------------------------------------------------
+    // Additional safety coverage tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn rate_limiter_can_tweet_and_record() {
+        let pool = init_test_db().await.expect("init db");
+        rate_limits::init_rate_limits(&pool, &test_limits(), &test_intervals())
+            .await
+            .expect("init");
+
+        let limiter = RateLimiter::new(pool);
+        assert!(limiter.can_tweet().await.expect("check"));
+        limiter.record_tweet().await.expect("record");
+        limiter.record_tweet().await.expect("record");
+        // max_tweets_per_day = 2
+        assert!(!limiter.can_tweet().await.expect("check"));
+    }
+
+    #[tokio::test]
+    async fn rate_limiter_can_thread_and_record() {
+        let pool = init_test_db().await.expect("init db");
+        rate_limits::init_rate_limits(&pool, &test_limits(), &test_intervals())
+            .await
+            .expect("init");
+
+        let limiter = RateLimiter::new(pool);
+        assert!(limiter.can_thread().await.expect("check"));
+        limiter.record_thread().await.expect("record");
+        // max_threads_per_week = 1
+        assert!(!limiter.can_thread().await.expect("check"));
+    }
+
+    #[tokio::test]
+    async fn rate_limiter_can_search_and_record() {
+        let pool = init_test_db().await.expect("init db");
+        rate_limits::init_rate_limits(&pool, &test_limits(), &test_intervals())
+            .await
+            .expect("init");
+
+        let limiter = RateLimiter::new(pool);
+        assert!(limiter.can_search().await.expect("check"));
+        limiter.record_search().await.expect("record");
+    }
+
+    #[test]
+    fn contains_banned_phrase_multiple_matches_returns_first() {
+        let banned = vec!["check out".to_string(), "link in bio".to_string()];
+        let result = contains_banned_phrase("check out the link in bio", &banned);
+        assert_eq!(result, Some("check out".to_string()));
+    }
+
+    #[test]
+    fn contains_banned_phrase_substring_match() {
+        let banned = vec!["buy now".to_string()];
+        // "buy now" appears as substring
+        assert_eq!(
+            contains_banned_phrase("Go buy now and save!", &banned),
+            Some("buy now".to_string())
+        );
+    }
+
+    #[test]
+    fn is_self_reply_whitespace_ids() {
+        // Whitespace strings are non-empty and equal, so this is a self-reply
+        assert!(is_self_reply(" ", " "));
+        // Different whitespace strings: not a self-reply
+        assert!(!is_self_reply("user_123", " "));
+    }
+
+    #[test]
+    fn denial_reason_clone_and_debug() {
+        let reason = DenialReason::BannedPhrase {
+            phrase: "test".to_string(),
+        };
+        let cloned = reason.clone();
+        assert_eq!(reason, cloned);
+        let debug = format!("{:?}", reason);
+        assert!(debug.contains("BannedPhrase"));
+    }
+
+    #[test]
+    fn check_banned_phrases_empty_list_allows() {
+        let result = SafetyGuard::check_banned_phrases("anything goes here", &[]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_banned_phrases_case_insensitive() {
+        let banned = vec!["CHECK OUT".to_string()];
+        let result = SafetyGuard::check_banned_phrases("check out this", &banned);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn safety_guard_record_tweet_works() {
+        let (_pool, guard) = setup_guard().await;
+        guard.record_tweet().await.expect("record tweet");
+    }
+
+    #[tokio::test]
+    async fn safety_guard_record_thread_works() {
+        let (_pool, guard) = setup_guard().await;
+        guard.record_thread().await.expect("record thread");
+    }
+
+    #[tokio::test]
+    async fn safety_guard_can_reply_to_with_unique_reply() {
+        let (_pool, guard) = setup_guard().await;
+        let result = guard
+            .can_reply_to("unique_tweet", Some("A completely unique reply text here"))
+            .await
+            .expect("check");
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn safety_guard_multiple_author_interactions() {
+        let (_pool, guard) = setup_guard().await;
+        // First interaction OK
+        let result = guard.check_author_limit("a1", 2).await.expect("check");
+        assert!(result.is_ok());
+
+        // Record two interactions
+        guard
+            .record_author_interaction("a1", "alice")
+            .await
+            .expect("record 1");
+        guard
+            .record_author_interaction("a1", "alice")
+            .await
+            .expect("record 2");
+
+        // Now should be blocked (limit=2)
+        let result = guard.check_author_limit("a1", 2).await.expect("check");
+        assert_eq!(result, Err(DenialReason::AuthorLimitReached));
+    }
+
+    #[tokio::test]
+    async fn safety_guard_different_authors_independent() {
+        let (_pool, guard) = setup_guard().await;
+        guard
+            .record_author_interaction("a1", "alice")
+            .await
+            .expect("record");
+
+        // Different author should still be allowed
+        let result = guard.check_author_limit("a2", 1).await.expect("check");
+        assert!(result.is_ok());
+    }
 }

@@ -522,4 +522,179 @@ mod tests {
             false,
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Additional thread planner coverage tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_once_with_specific_topic() {
+        let poster = Arc::new(MockPoster::new());
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            poster.clone(),
+            make_topics(),
+            604800,
+            false,
+        );
+
+        let result = loop_.run_once(Some("CLI tools"), None).await;
+        assert!(matches!(result, ThreadResult::Posted { .. }));
+        if let ThreadResult::Posted { topic, .. } = result {
+            assert_eq!(topic, "CLI tools");
+        }
+    }
+
+    #[tokio::test]
+    async fn run_once_with_custom_count() {
+        let poster = Arc::new(MockPoster::new());
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            poster.clone(),
+            make_topics(),
+            604800,
+            false,
+        );
+
+        // count=20 should clamp to 15
+        let result = loop_.run_once(Some("Rust"), Some(20)).await;
+        assert!(matches!(result, ThreadResult::Posted { .. }));
+    }
+
+    #[tokio::test]
+    async fn run_iteration_rate_limited() {
+        let now = chrono::Utc::now();
+        let last_thread = now - chrono::Duration::days(8);
+        let storage = Arc::new(MockStorage::new(Some(last_thread)));
+
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: false, // rate limited
+            }),
+            storage,
+            Arc::new(MockPoster::new()),
+            make_topics(),
+            604800,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::thread_rng();
+        let result = loop_.run_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ThreadResult::RateLimited));
+    }
+
+    #[tokio::test]
+    async fn run_iteration_posts_when_no_previous_thread() {
+        let storage = Arc::new(MockStorage::new(None)); // No last thread
+        let poster = Arc::new(MockPoster::new());
+
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            poster.clone(),
+            make_topics(),
+            604800,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::thread_rng();
+        let result = loop_.run_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ThreadResult::Posted { .. }));
+        assert_eq!(recent.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn run_iteration_caps_recent_topics() {
+        let now = chrono::Utc::now();
+        let last_thread = now - chrono::Duration::days(8);
+        let storage = Arc::new(MockStorage::new(Some(last_thread)));
+        let poster = Arc::new(MockPoster::new());
+
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            poster,
+            make_topics(),
+            604800,
+            false,
+        );
+
+        let mut recent = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        let max_recent = 3;
+        let mut rng = rand::thread_rng();
+        let result = loop_.run_iteration(&mut recent, max_recent, &mut rng).await;
+        if matches!(result, ThreadResult::Posted { .. }) {
+            assert_eq!(recent.len(), max_recent);
+        }
+    }
+
+    #[test]
+    fn log_thread_result_dry_run_true() {
+        // Verify dry_run flag doesn't cause panics
+        ThreadLoop::log_thread_result(
+            &ThreadResult::Posted {
+                topic: "Rust".to_string(),
+                tweet_count: 5,
+                thread_id: "t2".to_string(),
+            },
+            true,
+        );
+    }
+
+    #[tokio::test]
+    async fn run_once_random_topic() {
+        let poster = Arc::new(MockPoster::new());
+        let loop_ = ThreadLoop::new(
+            Arc::new(MockThreadGenerator {
+                tweets: make_thread_tweets(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            poster,
+            make_topics(),
+            604800,
+            false,
+        );
+
+        let result = loop_.run_once(None, None).await;
+        assert!(matches!(result, ThreadResult::Posted { .. }));
+        if let ThreadResult::Posted { topic, .. } = result {
+            assert!(make_topics().contains(&topic));
+        }
+    }
 }

@@ -283,4 +283,133 @@ mod tests {
         let phrases = checker.get_recent_reply_phrases(5).await.expect("get");
         assert_eq!(phrases.len(), 2);
     }
+
+    // -----------------------------------------------------------------------
+    // Additional dedup coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tokenize_mixed_punctuation() {
+        let tokens = tokenize("Hello! World? This... is (a) test.");
+        assert!(tokens.contains("hello"));
+        assert!(tokens.contains("world"));
+        assert!(tokens.contains("this"));
+        assert!(tokens.contains("a"));
+        assert!(tokens.contains("test"));
+    }
+
+    #[test]
+    fn tokenize_duplicate_words() {
+        // HashSet deduplicates
+        let tokens = tokenize("hello hello hello world");
+        assert_eq!(tokens.len(), 2);
+    }
+
+    #[test]
+    fn tokenize_only_punctuation() {
+        let tokens = tokenize("!!! ... ???");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn tokenize_single_word() {
+        let tokens = tokenize("hello");
+        assert_eq!(tokens.len(), 1);
+        assert!(tokens.contains("hello"));
+    }
+
+    #[test]
+    fn tokenize_case_normalization() {
+        let tokens = tokenize("Hello HELLO hello");
+        assert_eq!(tokens.len(), 1);
+        assert!(tokens.contains("hello"));
+    }
+
+    #[test]
+    fn jaccard_one_empty_one_not() {
+        let a: HashSet<String> = HashSet::new();
+        let b: HashSet<String> = ["hello"].iter().map(|s| s.to_string()).collect();
+        assert!((jaccard_similarity(&a, &b) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn jaccard_single_element_match() {
+        let a: HashSet<String> = ["hello"].iter().map(|s| s.to_string()).collect();
+        let b: HashSet<String> = ["hello"].iter().map(|s| s.to_string()).collect();
+        assert!((jaccard_similarity(&a, &b) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn jaccard_superset() {
+        let a: HashSet<String> = ["hello", "world", "foo"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let b: HashSet<String> = ["hello", "world"].iter().map(|s| s.to_string()).collect();
+        // intersection=2, union=3 => 0.667
+        let sim = jaccard_similarity(&a, &b);
+        assert!((sim - 2.0 / 3.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn jaccard_high_overlap_threshold() {
+        // 8 common words out of 10 total = 0.8
+        let common: Vec<String> = (0..8).map(|i| format!("word{i}")).collect();
+        let mut a: HashSet<String> = common.iter().cloned().collect();
+        a.insert("unique_a".to_string());
+        let mut b: HashSet<String> = common.iter().cloned().collect();
+        b.insert("unique_b".to_string());
+        let sim = jaccard_similarity(&a, &b);
+        assert!(sim >= 0.8);
+    }
+
+    #[tokio::test]
+    async fn has_replied_to_multiple_tweets() {
+        let pool = init_test_db().await.expect("init db");
+        let checker = DedupChecker::new(pool.clone());
+
+        let r1 = sample_reply("tweet_100", "Reply 1");
+        let r2 = sample_reply("tweet_200", "Reply 2");
+        insert_reply(&pool, &r1).await.expect("ins1");
+        insert_reply(&pool, &r2).await.expect("ins2");
+
+        assert!(checker.has_replied_to("tweet_100").await.expect("check"));
+        assert!(checker.has_replied_to("tweet_200").await.expect("check"));
+        assert!(!checker.has_replied_to("tweet_300").await.expect("check"));
+    }
+
+    #[tokio::test]
+    async fn get_recent_reply_phrases_respects_limit() {
+        let pool = init_test_db().await.expect("init db");
+        let checker = DedupChecker::new(pool.clone());
+
+        for i in 0..5 {
+            let reply = sample_reply(&format!("t{i}"), &format!("Reply content {i}"));
+            insert_reply(&pool, &reply).await.expect("insert");
+        }
+
+        let phrases = checker.get_recent_reply_phrases(3).await.expect("get");
+        assert_eq!(phrases.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn is_phrasing_similar_moderate_overlap_not_triggered() {
+        let pool = init_test_db().await.expect("init db");
+        let checker = DedupChecker::new(pool.clone());
+
+        let reply = sample_reply(
+            "t1",
+            "Rust has an amazing type system with lifetimes and borrowing rules",
+        );
+        insert_reply(&pool, &reply).await.expect("insert");
+
+        // Moderate overlap (some words shared) — should NOT trigger (< 0.8)
+        assert!(!checker
+            .is_phrasing_similar(
+                "Python has dynamic typing with duck typing and runtime checks",
+                20,
+            )
+            .await
+            .expect("check"));
+    }
 }

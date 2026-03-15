@@ -253,4 +253,141 @@ mod tests {
         assert_eq!(format!("{}", EnrichmentStage::Persona), "Persona");
         assert_eq!(format!("{}", EnrichmentStage::Targeting), "Targeting");
     }
+
+    // -----------------------------------------------------------------------
+    // Additional enrichment coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn enrichment_stage_labels() {
+        assert_eq!(EnrichmentStage::Voice.label(), "Voice");
+        assert_eq!(EnrichmentStage::Persona.label(), "Persona");
+        assert_eq!(EnrichmentStage::Targeting.label(), "Targeting");
+    }
+
+    #[test]
+    fn enrichment_stage_descriptions_non_empty() {
+        for stage in EnrichmentStage::all() {
+            assert!(!stage.description().is_empty());
+        }
+    }
+
+    #[test]
+    fn enrichment_stage_all_order() {
+        let all = EnrichmentStage::all();
+        assert_eq!(all[0], EnrichmentStage::Voice);
+        assert_eq!(all[1], EnrichmentStage::Persona);
+        assert_eq!(all[2], EnrichmentStage::Targeting);
+    }
+
+    #[test]
+    fn enrichment_stage_debug_and_clone() {
+        let stage = EnrichmentStage::Voice;
+        let cloned = stage;
+        assert_eq!(stage, cloned);
+        let debug = format!("{:?}", stage);
+        assert!(debug.contains("Voice"));
+    }
+
+    #[test]
+    fn enrichment_stage_copy_trait() {
+        let a = EnrichmentStage::Persona;
+        let b = a; // Copy
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn profile_completeness_total_count() {
+        let config = empty_config();
+        let pc = config.profile_completeness();
+        assert_eq!(pc.total_count(), 3);
+    }
+
+    #[test]
+    fn persona_stage_complete_when_experiences_set() {
+        let mut config = empty_config();
+        config.business.persona_experiences = vec!["Built CLI tools".to_string()];
+        let pc = config.profile_completeness();
+        assert!(pc.stages[1].1);
+    }
+
+    #[test]
+    fn persona_stage_complete_when_pillars_set() {
+        let mut config = empty_config();
+        config.business.content_pillars = vec!["DevOps".to_string()];
+        let pc = config.profile_completeness();
+        assert!(pc.stages[1].1);
+    }
+
+    #[test]
+    fn next_incomplete_skips_completed() {
+        let mut config = empty_config();
+        config.business.brand_voice = Some("witty".to_string());
+        config.business.persona_opinions = vec!["types are good".to_string()];
+        // Voice and Persona complete, Targeting missing
+        let pc = config.profile_completeness();
+        assert_eq!(pc.next_incomplete(), Some(EnrichmentStage::Targeting));
+    }
+
+    #[test]
+    fn one_line_summary_all_incomplete() {
+        let config = empty_config();
+        let pc = config.profile_completeness();
+        assert_eq!(pc.one_line_summary(), "Voice --  Persona --  Targeting --");
+    }
+
+    #[test]
+    fn one_line_summary_all_complete() {
+        let mut config = empty_config();
+        config.business.brand_voice = Some("witty".to_string());
+        config.business.persona_opinions = vec!["opinion".to_string()];
+        config.targets.accounts = vec!["target".to_string()];
+        let pc = config.profile_completeness();
+        assert_eq!(pc.one_line_summary(), "Voice OK  Persona OK  Targeting OK");
+    }
+
+    #[test]
+    fn completed_count_partial() {
+        let mut config = empty_config();
+        config.business.brand_voice = Some("witty".to_string());
+        let pc = config.profile_completeness();
+        assert_eq!(pc.completed_count(), 1);
+        assert!(!pc.is_fully_enriched());
+    }
+
+    #[test]
+    fn voice_with_only_content_style() {
+        let mut config = empty_config();
+        config.business.content_style = Some("Technical".to_string());
+        let pc = config.profile_completeness();
+        assert!(pc.stages[0].1);
+        assert_eq!(pc.completed_count(), 1);
+    }
+
+    #[test]
+    fn targeting_both_accounts_and_competitors() {
+        let mut config = empty_config();
+        config.targets.accounts = vec!["target".to_string()];
+        config.business.competitor_keywords = vec!["rival".to_string()];
+        let pc = config.profile_completeness();
+        assert!(pc.stages[2].1);
+    }
+
+    #[test]
+    fn enrichment_stage_description_voice() {
+        let desc = EnrichmentStage::Voice.description();
+        assert!(desc.contains("LLM"));
+    }
+
+    #[test]
+    fn enrichment_stage_description_persona() {
+        let desc = EnrichmentStage::Persona.description();
+        assert!(desc.contains("authentic"));
+    }
+
+    #[test]
+    fn enrichment_stage_description_targeting() {
+        let desc = EnrichmentStage::Targeting.description();
+        assert!(desc.contains("discovery"));
+    }
 }

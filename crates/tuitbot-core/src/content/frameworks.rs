@@ -476,4 +476,110 @@ mod tests {
             );
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Additional frameworks coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn reply_archetype_prompt_fragment_content() {
+        // Verify each prompt fragment contains relevant guidance words
+        let frag = ReplyArchetype::AgreeAndExpand.prompt_fragment();
+        assert!(frag.contains("Agree"));
+        let frag = ReplyArchetype::RespectfulDisagree.prompt_fragment();
+        assert!(frag.contains("alternative"));
+        let frag = ReplyArchetype::AddData.prompt_fragment();
+        assert!(frag.contains("data"));
+        let frag = ReplyArchetype::AskQuestion.prompt_fragment();
+        assert!(frag.contains("question"));
+        let frag = ReplyArchetype::ShareExperience.prompt_fragment();
+        assert!(frag.contains("experience"));
+    }
+
+    #[test]
+    fn tweet_format_prompt_fragment_content() {
+        let frag = TweetFormat::List.prompt_fragment();
+        assert!(frag.contains("list"));
+        let frag = TweetFormat::ContrarianTake.prompt_fragment();
+        assert!(frag.contains("challenge"));
+        let frag = TweetFormat::Storytelling.prompt_fragment();
+        assert!(frag.contains("story"));
+        let frag = TweetFormat::BeforeAfter.prompt_fragment();
+        assert!(frag.contains("Before"));
+        let frag = TweetFormat::Question.prompt_fragment();
+        assert!(frag.contains("question"));
+        let frag = TweetFormat::Tip.prompt_fragment();
+        assert!(frag.contains("tip"));
+    }
+
+    #[test]
+    fn thread_structure_prompt_fragment_content() {
+        let frag = ThreadStructure::Transformation.prompt_fragment();
+        assert!(frag.contains("transformation"));
+        let frag = ThreadStructure::Framework.prompt_fragment();
+        assert!(frag.contains("framework"));
+        let frag = ThreadStructure::Mistakes.prompt_fragment();
+        assert!(frag.contains("mistakes"));
+        let frag = ThreadStructure::Analysis.prompt_fragment();
+        assert!(frag.contains("analysis"));
+    }
+
+    #[test]
+    fn tweet_format_all_count() {
+        assert_eq!(TweetFormat::ALL.len(), 7);
+    }
+
+    #[test]
+    fn thread_structure_all_count() {
+        assert_eq!(ThreadStructure::ALL.len(), 4);
+    }
+
+    #[test]
+    fn reply_archetype_equality() {
+        assert_eq!(ReplyArchetype::AddData, ReplyArchetype::AddData);
+        assert_ne!(ReplyArchetype::AddData, ReplyArchetype::AskQuestion);
+    }
+
+    #[test]
+    fn tweet_format_equality() {
+        assert_eq!(TweetFormat::Tip, TweetFormat::Tip);
+        assert_ne!(TweetFormat::Tip, TweetFormat::List);
+    }
+
+    #[test]
+    fn thread_structure_equality() {
+        assert_eq!(ThreadStructure::Analysis, ThreadStructure::Analysis);
+        assert_ne!(ThreadStructure::Analysis, ThreadStructure::Framework);
+    }
+
+    #[test]
+    fn tweet_format_empty_recent() {
+        let mut rng = rand::thread_rng();
+        let format = TweetFormat::select(&[], &mut rng);
+        assert!(TweetFormat::ALL.contains(&format));
+    }
+
+    #[test]
+    fn thread_structure_debug() {
+        let debug = format!("{:?}", ThreadStructure::Transformation);
+        assert!(debug.contains("Transformation"));
+    }
+
+    #[test]
+    fn tweet_format_debug() {
+        let debug = format!("{:?}", TweetFormat::List);
+        assert!(debug.contains("List"));
+    }
+
+    #[test]
+    fn reply_archetype_debug() {
+        let debug = format!("{:?}", ReplyArchetype::AddData);
+        assert!(debug.contains("AddData"));
+    }
+
+    #[test]
+    fn tweet_format_most_people_think_x_prompt() {
+        let frag = TweetFormat::MostPeopleThinkX.prompt_fragment();
+        assert!(frag.contains("Most people"));
+    }
 }

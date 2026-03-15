@@ -342,3 +342,111 @@ pub(super) mod test_mocks {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests_content_loop {
+    use super::test_mocks::{make_topics, MockGenerator, MockSafety, MockStorage, MockTopicScorer};
+    use super::{ContentLoop, ContentResult, EXPLOIT_RATIO};
+    use std::sync::Arc;
+
+    #[test]
+    fn exploit_ratio_value() {
+        assert!((EXPLOIT_RATIO - 0.8).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn content_loop_new_fields() {
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            14400,
+            true,
+        );
+
+        assert!(content.dry_run);
+        assert_eq!(content.post_window_secs, 14400);
+        assert_eq!(content.topics.len(), 4);
+        assert!(content.topic_scorer.is_none());
+        assert!(content.thread_poster.is_none());
+    }
+
+    #[test]
+    fn content_loop_with_topic_scorer() {
+        let scorer = Arc::new(MockTopicScorer {
+            top_topics: vec!["Rust".to_string()],
+        });
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "t".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            14400,
+            false,
+        )
+        .with_topic_scorer(scorer);
+
+        assert!(content.topic_scorer.is_some());
+    }
+
+    #[test]
+    fn content_result_debug() {
+        let posted = ContentResult::Posted {
+            topic: "Rust".to_string(),
+            content: "hello".to_string(),
+        };
+        let debug = format!("{:?}", posted);
+        assert!(debug.contains("Posted"));
+
+        let too_soon = ContentResult::TooSoon {
+            elapsed_secs: 10,
+            window_secs: 3600,
+        };
+        let debug = format!("{:?}", too_soon);
+        assert!(debug.contains("TooSoon"));
+
+        let rate_limited = ContentResult::RateLimited;
+        let debug = format!("{:?}", rate_limited);
+        assert!(debug.contains("RateLimited"));
+
+        let no_topics = ContentResult::NoTopics;
+        let debug = format!("{:?}", no_topics);
+        assert!(debug.contains("NoTopics"));
+
+        let failed = ContentResult::Failed {
+            error: "oops".to_string(),
+        };
+        let debug = format!("{:?}", failed);
+        assert!(debug.contains("Failed"));
+    }
+
+    #[test]
+    fn content_loop_empty_topics() {
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "t".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            vec![],
+            14400,
+            false,
+        );
+        assert!(content.topics.is_empty());
+    }
+}
