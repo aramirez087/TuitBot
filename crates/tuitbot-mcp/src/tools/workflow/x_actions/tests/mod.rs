@@ -3,6 +3,7 @@
 //! Split into submodules by domain: read, write, engage.
 
 mod engage;
+mod media;
 mod read;
 mod write;
 

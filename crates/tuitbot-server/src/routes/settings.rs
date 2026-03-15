@@ -897,3 +897,226 @@ fn json_to_toml(json: &serde_json::Value) -> Result<toml::Value, String> {
         serde_json::Value::Null => Err("null values are not supported in TOML arrays".to_string()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── json_to_toml tests ────────────────────────────────────────────
+
+    #[test]
+    fn json_to_toml_string() {
+        let json = serde_json::json!("hello");
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::String("hello".to_string()));
+    }
+
+    #[test]
+    fn json_to_toml_integer() {
+        let json = serde_json::json!(42);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Integer(42));
+    }
+
+    #[test]
+    fn json_to_toml_float() {
+        let json = serde_json::json!(3.14);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Float(3.14));
+    }
+
+    #[test]
+    fn json_to_toml_bool() {
+        let json = serde_json::json!(true);
+        let toml = json_to_toml(&json).unwrap();
+        assert_eq!(toml, toml::Value::Boolean(true));
+    }
+
+    #[test]
+    fn json_to_toml_null_in_array_rejected() {
+        let json = serde_json::json!(null);
+        let err = json_to_toml(&json);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().contains("null"));
+    }
+
+    #[test]
+    fn json_to_toml_object_skips_null_values() {
+        let json = serde_json::json!({
+            "key": "value",
+            "null_key": null,
+            "number": 1
+        });
+        let toml = json_to_toml(&json).unwrap();
+        let table = toml.as_table().unwrap();
+        assert_eq!(table.len(), 2); // null_key skipped
+        assert!(table.contains_key("key"));
+        assert!(table.contains_key("number"));
+        assert!(!table.contains_key("null_key"));
+    }
+
+    #[test]
+    fn json_to_toml_array() {
+        let json = serde_json::json!(["a", "b", "c"]);
+        let toml = json_to_toml(&json).unwrap();
+        let arr = toml.as_array().unwrap();
+        assert_eq!(arr.len(), 3);
+    }
+
+    #[test]
+    fn json_to_toml_nested_object() {
+        let json = serde_json::json!({
+            "outer": {
+                "inner": "value"
+            }
+        });
+        let toml = json_to_toml(&json).unwrap();
+        let outer = toml.get("outer").unwrap().as_table().unwrap();
+        assert_eq!(
+            outer.get("inner").unwrap(),
+            &toml::Value::String("value".to_string())
+        );
+    }
+
+    // ── merge_toml tests ──────────────────────────────────────────────
+
+    #[test]
+    fn merge_toml_overwrites_scalar() {
+        let mut base: toml::Value = toml::from_str(r#"key = "old""#).unwrap();
+        let patch: toml::Value = toml::from_str(r#"key = "new""#).unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(
+            base.get("key").unwrap(),
+            &toml::Value::String("new".to_string())
+        );
+    }
+
+    #[test]
+    fn merge_toml_adds_new_key() {
+        let mut base: toml::Value = toml::from_str(r#"existing = 1"#).unwrap();
+        let patch: toml::Value = toml::from_str(r#"new_key = 2"#).unwrap();
+        merge_toml(&mut base, &patch);
+        assert_eq!(base.get("new_key").unwrap(), &toml::Value::Integer(2));
+        assert_eq!(base.get("existing").unwrap(), &toml::Value::Integer(1));
+    }
+
+    #[test]
+    fn merge_toml_deep_merge_tables() {
+        let mut base: toml::Value = toml::from_str(
+            r#"
+            [section]
+            a = 1
+            b = 2
+            "#,
+        )
+        .unwrap();
+        let patch: toml::Value = toml::from_str(
+            r#"
+            [section]
+            b = 3
+            c = 4
+            "#,
+        )
+        .unwrap();
+        merge_toml(&mut base, &patch);
+        let section = base.get("section").unwrap().as_table().unwrap();
+        assert_eq!(section.get("a").unwrap(), &toml::Value::Integer(1));
+        assert_eq!(section.get("b").unwrap(), &toml::Value::Integer(3));
+        assert_eq!(section.get("c").unwrap(), &toml::Value::Integer(4));
+    }
+
+    // ── redact_service_account_keys tests ─────────────────────────────
+
+    #[test]
+    fn redact_service_account_keys_replaces_values() {
+        let mut json = serde_json::json!({
+            "content_sources": {
+                "sources": [
+                    { "path": "/a", "service_account_key": "secret123" },
+                    { "path": "/b", "service_account_key": null },
+                    { "path": "/c" }
+                ]
+            }
+        });
+        redact_service_account_keys(&mut json);
+
+        let sources = json["content_sources"]["sources"].as_array().unwrap();
+        assert_eq!(sources[0]["service_account_key"], "[redacted]");
+        assert!(sources[1]["service_account_key"].is_null()); // null preserved
+        assert!(sources[2].get("service_account_key").is_none());
+    }
+
+    #[test]
+    fn redact_service_account_keys_no_sources() {
+        let mut json = serde_json::json!({
+            "business": { "name": "test" }
+        });
+        // Should not panic.
+        redact_service_account_keys(&mut json);
+    }
+
+    // ── config_errors_to_response tests ───────────────────────────────
+
+    #[test]
+    fn config_errors_to_response_missing_field() {
+        let errors = vec![ConfigError::MissingField {
+            field: "api_key".to_string(),
+        }];
+        let items = config_errors_to_response(errors);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].field, "api_key");
+        assert!(items[0].message.contains("required"));
+    }
+
+    #[test]
+    fn config_errors_to_response_invalid_value() {
+        let errors = vec![ConfigError::InvalidValue {
+            field: "port".to_string(),
+            message: "must be positive".to_string(),
+        }];
+        let items = config_errors_to_response(errors);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].field, "port");
+        assert_eq!(items[0].message, "must be positive");
+    }
+
+    // ── delete_all_credentials tests ──────────────────────────────────
+
+    #[test]
+    fn delete_all_credentials_empty_dir() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let deleted = delete_all_credentials(dir.path());
+        assert!(!deleted, "nothing to delete");
+    }
+
+    #[test]
+    fn delete_all_credentials_with_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("scraper_session.json"), "{}").expect("write");
+        std::fs::write(dir.path().join("tokens.json"), "{}").expect("write");
+
+        let deleted = delete_all_credentials(dir.path());
+        assert!(deleted, "should delete credential files");
+        assert!(!dir.path().join("scraper_session.json").exists());
+        assert!(!dir.path().join("tokens.json").exists());
+    }
+
+    #[test]
+    fn delete_all_credentials_with_accounts_dir() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let accounts_dir = dir.path().join("accounts");
+        std::fs::create_dir_all(accounts_dir.join("uuid1")).expect("create");
+        std::fs::write(accounts_dir.join("uuid1").join("tokens.json"), "{}").expect("write");
+
+        let deleted = delete_all_credentials(dir.path());
+        assert!(deleted, "should delete accounts dir");
+        assert!(!accounts_dir.exists());
+    }
+
+    // ── FACTORY_RESET_PHRASE test ─────────────────────────────────────
+
+    #[test]
+    fn factory_reset_phrase_is_expected_value() {
+        assert_eq!(FACTORY_RESET_PHRASE, "RESET TUITBOT");
+    }
+}

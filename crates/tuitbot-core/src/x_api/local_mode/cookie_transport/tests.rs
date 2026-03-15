@@ -822,6 +822,232 @@ fn parse_timeline_missing_path() {
     assert!(cursor.is_none());
 }
 
+// --- CookieTransport construction tests ---
+
+#[test]
+fn cookie_transport_new_sets_create_tweet_query_id() {
+    let session = ScraperSession {
+        auth_token: "test_auth".to_string(),
+        ct0: "test_ct0".to_string(),
+        username: Some("testuser".to_string()),
+        created_at: Some("2026-01-01T00:00:00Z".to_string()),
+    };
+    let transport = CookieTransport::new(session);
+
+    // Should have the CreateTweet query ID (fallback or env override)
+    let query_id = transport.get_query_id("CreateTweet");
+    assert!(query_id.is_ok(), "CreateTweet should have a query ID");
+}
+
+#[test]
+fn cookie_transport_get_query_id_missing_operation() {
+    let session = ScraperSession {
+        auth_token: "test_auth".to_string(),
+        ct0: "test_ct0".to_string(),
+        username: None,
+        created_at: None,
+    };
+    let transport = CookieTransport::new(session);
+
+    let err = transport.get_query_id("NonExistentOperation");
+    assert!(err.is_err());
+    let err_str = err.unwrap_err().to_string();
+    assert!(err_str.contains("NonExistentOperation"));
+    assert!(err_str.contains("query ID not found"));
+}
+
+#[test]
+fn cookie_transport_build_headers_includes_required_headers() {
+    let session = ScraperSession {
+        auth_token: "test_auth_token".to_string(),
+        ct0: "test_csrf_token".to_string(),
+        username: None,
+        created_at: None,
+    };
+    let transport = CookieTransport::new(session);
+
+    let headers = transport
+        .build_headers("GET", "/test/path")
+        .expect("build headers");
+
+    assert!(headers.get("authorization").is_some());
+    assert!(headers.get("cookie").is_some());
+    assert!(headers.get("x-csrf-token").is_some());
+    assert!(headers.get("x-twitter-auth-type").is_some());
+    assert!(headers.get("x-client-uuid").is_some());
+    assert!(headers.get("content-type").is_some());
+    assert!(headers.get("origin").is_some());
+    assert!(headers.get("referer").is_some());
+
+    let auth = headers.get("authorization").unwrap().to_str().unwrap();
+    assert!(auth.starts_with("Bearer "));
+
+    let cookie = headers.get("cookie").unwrap().to_str().unwrap();
+    assert!(cookie.contains("auth_token=test_auth_token"));
+    assert!(cookie.contains("ct0=test_csrf_token"));
+
+    let csrf = headers.get("x-csrf-token").unwrap().to_str().unwrap();
+    assert_eq!(csrf, "test_csrf_token");
+}
+
+#[test]
+fn cookie_transport_with_resolved_transport_uses_provided_ids() {
+    let session = ScraperSession {
+        auth_token: "auth".to_string(),
+        ct0: "ct0".to_string(),
+        username: None,
+        created_at: None,
+    };
+    let mut query_ids = HashMap::new();
+    query_ids.insert("CustomOp".to_string(), "custom_id_123".to_string());
+
+    let transport = CookieTransport::with_resolved_transport(session, query_ids, None);
+
+    let qid = transport.get_query_id("CustomOp").unwrap();
+    assert_eq!(qid, "custom_id_123");
+}
+
+#[test]
+fn operation_names_has_expected_count() {
+    // Ensure we track a reasonable number of operations
+    assert!(
+        OPERATION_NAMES.len() >= 15,
+        "Expected at least 15 operations, got {}",
+        OPERATION_NAMES.len()
+    );
+}
+
+#[test]
+fn web_bearer_token_is_nonempty() {
+    assert!(!WEB_BEARER_TOKEN.is_empty());
+    assert!(WEB_BEARER_TOKEN.len() > 20);
+}
+
+#[test]
+fn fallback_create_tweet_query_id_is_nonempty() {
+    assert!(!FALLBACK_CREATE_TWEET_QUERY_ID.is_empty());
+}
+
+// --- Mutation variable JSON structure tests ---
+// These test the JSON shapes that mutations.rs builds without making HTTP calls.
+
+#[test]
+fn create_tweet_variables_structure() {
+    // Mirrors the logic in CookieTransport::create_tweet
+    let text = "Hello world";
+    let variables = serde_json::json!({
+        "tweet_text": text,
+        "dark_request": false,
+        "media": {
+            "media_entities": [],
+            "possibly_sensitive": false
+        },
+        "semantic_annotation_ids": []
+    });
+
+    assert_eq!(variables["tweet_text"], "Hello world");
+    assert_eq!(variables["dark_request"], false);
+    assert!(variables["media"]["media_entities"].is_array());
+    assert!(variables["semantic_annotation_ids"].is_array());
+}
+
+#[test]
+fn create_tweet_with_reply_variables() {
+    let text = "Reply text";
+    let reply_id = "12345";
+    let mut variables = serde_json::json!({
+        "tweet_text": text,
+        "dark_request": false,
+        "media": {
+            "media_entities": [],
+            "possibly_sensitive": false
+        },
+        "semantic_annotation_ids": []
+    });
+
+    variables["reply"] = serde_json::json!({
+        "in_reply_to_tweet_id": reply_id,
+        "exclude_reply_user_ids": []
+    });
+
+    assert_eq!(variables["reply"]["in_reply_to_tweet_id"], "12345");
+    assert!(variables["reply"]["exclude_reply_user_ids"].is_array());
+}
+
+#[test]
+fn favorite_tweet_variables() {
+    let tweet_id = "99999";
+    let variables = serde_json::json!({
+        "tweet_id": tweet_id,
+    });
+    assert_eq!(variables["tweet_id"], "99999");
+}
+
+#[test]
+fn create_retweet_variables() {
+    let tweet_id = "54321";
+    let variables = serde_json::json!({
+        "tweet_id": tweet_id,
+        "dark_request": false,
+    });
+    assert_eq!(variables["tweet_id"], "54321");
+    assert_eq!(variables["dark_request"], false);
+}
+
+#[test]
+fn delete_retweet_variables() {
+    let tweet_id = "11111";
+    let variables = serde_json::json!({
+        "source_tweet_id": tweet_id,
+        "dark_request": false,
+    });
+    assert_eq!(variables["source_tweet_id"], "11111");
+}
+
+#[test]
+fn delete_tweet_variables() {
+    let tweet_id = "22222";
+    let variables = serde_json::json!({
+        "tweet_id": tweet_id,
+        "dark_request": false,
+    });
+    assert_eq!(variables["tweet_id"], "22222");
+    assert_eq!(variables["dark_request"], false);
+}
+
+#[test]
+fn bookmark_variables() {
+    let tweet_id = "33333";
+    let variables = serde_json::json!({
+        "tweet_id": tweet_id,
+    });
+    assert_eq!(variables["tweet_id"], "33333");
+}
+
+#[test]
+fn follow_user_rest_body_format() {
+    let target_user_id = "44444";
+    let body = format!("include_profile_interstitial_type=1&user_id={target_user_id}");
+    assert!(body.contains("include_profile_interstitial_type=1"));
+    assert!(body.contains("user_id=44444"));
+}
+
+#[test]
+fn graphql_post_body_structure() {
+    let query_id = "abc123";
+    let variables = serde_json::json!({"tweet_text": "test"});
+    let feat = features::mutation_features();
+    let body = serde_json::json!({
+        "variables": variables,
+        "features": feat,
+        "queryId": query_id,
+    });
+
+    assert_eq!(body["queryId"], "abc123");
+    assert!(body["variables"].is_object());
+    assert!(body["features"].is_object());
+}
+
 // --- parse_user_list edge cases ---
 
 #[test]

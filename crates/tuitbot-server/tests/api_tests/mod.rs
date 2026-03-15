@@ -22,6 +22,7 @@ mod connectors_coverage; // Connector routes (link, status, disconnect) coverage
 mod content;
 mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + schedule
 mod coverage_gaps;
+mod coverage_sprint1; // Sprint-1 coverage push: compose, connectors, settings, factory reset
 mod deep_handler_coverage; // Deep happy-path integration tests for large handlers
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes

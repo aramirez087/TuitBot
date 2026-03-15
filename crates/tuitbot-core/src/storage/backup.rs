@@ -553,4 +553,227 @@ mod tests {
         assert_eq!(count.0, 1);
         restored_pool.close().await;
     }
+
+    // ── Additional coverage tests ────────────────────────────────────
+
+    #[tokio::test]
+    async fn validate_backup_too_small_file() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let tiny_file = dir.path().join("tiny.db");
+        std::fs::write(&tiny_file, b"small").expect("write tiny");
+
+        let result = validate_backup(&tiny_file).await.expect("validate");
+        assert!(!result.valid);
+        assert!(result.messages[0].contains("too small"));
+    }
+
+    #[tokio::test]
+    async fn validate_backup_not_sqlite() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let fake_file = dir.path().join("fake.db");
+        // 16+ bytes but not SQLite header
+        std::fs::write(&fake_file, b"This is not a SQLite database at all!").expect("write fake");
+
+        let result = validate_backup(&fake_file).await.expect("validate");
+        assert!(!result.valid);
+        assert!(result.messages[0].contains("not a valid SQLite"));
+    }
+
+    #[tokio::test]
+    async fn restore_from_invalid_backup_fails() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let bad_backup = dir.path().join("bad.db");
+        std::fs::write(&bad_backup, b"not a database").expect("write bad");
+
+        let target = dir.path().join("target.db");
+        let err = restore_from_backup(&bad_backup, &target).await;
+        assert!(err.is_err(), "restore from invalid backup should fail");
+    }
+
+    #[tokio::test]
+    async fn restore_over_existing_db_creates_safety_backup() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let (pool, db_path) = file_test_db(dir.path()).await;
+
+        // Insert data into the original DB.
+        sqlx::query(
+            "INSERT INTO action_log (action_type, status, message) \
+             VALUES ('original', 'success', 'original data')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert");
+
+        // Create backup.
+        let backup_dir = dir.path().join("backups");
+        let result = create_backup(&pool, &backup_dir).await.expect("backup");
+        pool.close().await;
+
+        // Restore over the existing DB — should create pre_restore_*.db
+        restore_from_backup(&result.path, &db_path)
+            .await
+            .expect("restore");
+
+        // Check that a pre_restore file was created.
+        let entries: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .filter(|e| {
+                e.file_name()
+                    .to_str()
+                    .is_some_and(|n| n.starts_with("pre_restore_"))
+            })
+            .collect();
+        assert!(
+            !entries.is_empty(),
+            "safety backup should be created when restoring over existing DB"
+        );
+    }
+
+    #[test]
+    fn list_backups_empty_dir() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let backups = list_backups(dir.path());
+        assert!(backups.is_empty());
+    }
+
+    #[test]
+    fn list_backups_ignores_non_tuitbot_files() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        std::fs::write(dir.path().join("random_file.db"), "data").expect("write");
+        std::fs::write(dir.path().join("pre_migration_123.db"), "data").expect("write");
+        std::fs::write(dir.path().join("tuitbot_20240101_000001.txt"), "data").expect("write");
+
+        let backups = list_backups(dir.path());
+        assert!(backups.is_empty(), "should skip non-tuitbot_ .db files");
+    }
+
+    #[test]
+    fn list_backups_nonexistent_dir() {
+        let backups = list_backups(Path::new("/nonexistent/directory/xyz"));
+        assert!(backups.is_empty());
+    }
+
+    #[test]
+    fn prune_backups_when_fewer_than_keep() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        std::fs::write(dir.path().join("tuitbot_20240101_000001.db"), "data").expect("write");
+
+        let pruned = prune_backups(dir.path(), 5).expect("prune");
+        assert_eq!(pruned, 0, "nothing should be pruned when fewer than keep");
+    }
+
+    #[test]
+    fn prune_backups_exact_count() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        for i in 1..=3 {
+            let name = format!("tuitbot_20240101_00000{i}.db");
+            std::fs::write(dir.path().join(name), "data").expect("write");
+        }
+
+        let pruned = prune_backups(dir.path(), 3).expect("prune");
+        assert_eq!(pruned, 0, "nothing should be pruned when count == keep");
+    }
+
+    #[tokio::test]
+    async fn create_backup_duration_is_positive() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let (pool, _db_path) = file_test_db(dir.path()).await;
+
+        let backup_dir = dir.path().join("backups");
+        let result = create_backup(&pool, &backup_dir).await.expect("backup");
+        // Duration may be 0 on very fast systems, but should not be negative.
+        assert!(result.duration_ms < 60_000, "backup should be fast");
+        pool.close().await;
+    }
+
+    #[tokio::test]
+    async fn backup_result_has_tuitbot_prefix() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let (pool, _db_path) = file_test_db(dir.path()).await;
+
+        let backup_dir = dir.path().join("backups");
+        let result = create_backup(&pool, &backup_dir).await.expect("backup");
+
+        let filename = result
+            .path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(filename.starts_with("tuitbot_"));
+        assert!(filename.ends_with(".db"));
+
+        pool.close().await;
+    }
+
+    #[tokio::test]
+    async fn preflight_migration_backup_skips_nonexistent_db() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let fake_db = dir.path().join("nonexistent.db");
+
+        let result = preflight_migration_backup(&fake_db)
+            .await
+            .expect("preflight");
+        assert!(result.is_none(), "should skip nonexistent DB");
+    }
+
+    #[tokio::test]
+    async fn preflight_migration_backup_creates_backup() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let (pool, db_path) = file_test_db(dir.path()).await;
+
+        // Insert data so the DB is non-empty.
+        sqlx::query(
+            "INSERT INTO action_log (action_type, status, message) \
+             VALUES ('test', 'success', 'preflight test')",
+        )
+        .execute(&pool)
+        .await
+        .expect("insert");
+        pool.close().await;
+
+        let result = preflight_migration_backup(&db_path)
+            .await
+            .expect("preflight");
+        assert!(result.is_some(), "should create backup for existing DB");
+        let backup_path = result.unwrap();
+        assert!(backup_path.exists());
+        assert!(backup_path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("pre_migration_"));
+    }
+
+    #[tokio::test]
+    async fn validate_backup_with_valid_db() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let (pool, _db_path) = file_test_db(dir.path()).await;
+
+        // Create a backup.
+        let backup_dir = dir.path().join("backups");
+        let result = create_backup(&pool, &backup_dir).await.expect("backup");
+        pool.close().await;
+
+        // Validate.
+        let validation = validate_backup(&result.path).await.expect("validate");
+        assert!(
+            validation.valid,
+            "valid backup should pass: {:?}",
+            validation.messages
+        );
+        assert!(validation.tables.contains(&"action_log".to_string()));
+        assert!(validation.tables.contains(&"rate_limits".to_string()));
+        assert!(
+            validation
+                .messages
+                .iter()
+                .any(|m| m.contains("Valid backup")),
+            "should report valid: {:?}",
+            validation.messages
+        );
+    }
 }

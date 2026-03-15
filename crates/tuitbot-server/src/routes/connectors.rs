@@ -479,3 +479,83 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn html_escape_basic() {
+        assert_eq!(html_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn html_escape_ampersand() {
+        assert_eq!(html_escape("a&b"), "a&amp;b");
+    }
+
+    #[test]
+    fn html_escape_angle_brackets() {
+        assert_eq!(html_escape("<script>"), "&lt;script&gt;");
+    }
+
+    #[test]
+    fn html_escape_quotes() {
+        assert_eq!(html_escape(r#"say "hi""#), "say &quot;hi&quot;");
+    }
+
+    #[test]
+    fn html_escape_all_chars() {
+        assert_eq!(
+            html_escape(r#"<a href="x">a&b</a>"#),
+            "&lt;a href=&quot;x&quot;&gt;a&amp;b&lt;/a&gt;"
+        );
+    }
+
+    #[test]
+    fn html_escape_empty() {
+        assert_eq!(html_escape(""), "");
+    }
+
+    #[test]
+    fn base64url_encode_basic() {
+        // Just verify it produces a non-empty string without padding
+        let data = b"test data for encoding";
+        let encoded = base64url_encode(data);
+        assert!(!encoded.is_empty());
+        assert!(!encoded.contains('='), "no padding in URL-safe base64");
+        assert!(!encoded.contains('+'), "no + in URL-safe base64");
+        assert!(!encoded.contains('/'), "no / in URL-safe base64");
+    }
+
+    #[test]
+    fn base64url_encode_empty() {
+        let encoded = base64url_encode(b"");
+        assert!(encoded.is_empty());
+    }
+
+    #[test]
+    fn random_bytes_correct_length() {
+        let bytes = random_bytes(32);
+        assert_eq!(bytes.len(), 32);
+    }
+
+    #[test]
+    fn random_bytes_zero_length() {
+        let bytes = random_bytes(0);
+        assert!(bytes.is_empty());
+    }
+
+    #[test]
+    fn random_bytes_unique() {
+        let a = random_bytes(32);
+        let b = random_bytes(32);
+        // Very unlikely to be equal
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn oauth_state_ttl_is_10_minutes() {
+        assert_eq!(OAUTH_STATE_TTL, Duration::from_secs(600));
+    }
+}
