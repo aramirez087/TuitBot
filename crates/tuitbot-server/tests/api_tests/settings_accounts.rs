@@ -609,3 +609,348 @@ async fn lan_settings_status() {
     let code = status.as_u16();
     assert!(code == 200 || code == 400, "got {code}: {body}");
 }
+
+// ============================================================
+// Onboarding routes (coverage for onboarding.rs)
+// ============================================================
+
+#[tokio::test]
+async fn onboarding_auth_status_no_tokens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+    let (status, body) = get_json(router, "/api/onboarding/x-auth/status").await;
+    assert_eq!(status, StatusCode::OK, "onboarding status: {body}");
+    assert_eq!(
+        body["connected"], false,
+        "should not be connected without tokens"
+    );
+}
+
+#[tokio::test]
+async fn onboarding_start_auth_no_client_id() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    // Create a state without x_client_id
+    let pool = storage::init_test_db().await.expect("init db");
+    let (event_tx, _) = tokio::sync::broadcast::channel::<AccountWsEvent>(256);
+    let config_path = dir.path().join("config.toml");
+    std::fs::write(&config_path, "[x_api]\nprovider_backend = \"scraper\"\n")
+        .expect("write config");
+
+    let state = Arc::new(AppState {
+        db: pool,
+        config_path,
+        data_dir: dir.path().to_path_buf(),
+        event_tx,
+        api_token: TEST_TOKEN.to_string(),
+        passphrase_hash: tokio::sync::RwLock::new(None),
+        passphrase_hash_mtime: tokio::sync::RwLock::new(None),
+        bind_host: "127.0.0.1".to_string(),
+        bind_port: 3001,
+        login_attempts: Mutex::new(std::collections::HashMap::new()),
+        content_generators: Mutex::new(std::collections::HashMap::new()),
+        runtimes: Mutex::new(std::collections::HashMap::new()),
+        circuit_breaker: None,
+        watchtower_cancel: tokio::sync::RwLock::new(None),
+        content_sources: tokio::sync::RwLock::new(Default::default()),
+        connector_config: Default::default(),
+        deployment_mode: Default::default(),
+        pending_oauth: Mutex::new(std::collections::HashMap::new()),
+        token_managers: Mutex::new(std::collections::HashMap::new()),
+        x_client_id: String::new(), // empty = no client_id
+    });
+    let router = tuitbot_server::build_router(state);
+
+    let (status, body) = post_json(
+        router,
+        "/api/onboarding/x-auth/start",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "should reject without client_id: {body}"
+    );
+}
+
+#[tokio::test]
+async fn onboarding_start_auth_with_client_id() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/onboarding/x-auth/start",
+        serde_json::json!({ "client_id": "test-client-id" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "start auth: {body}");
+    assert!(
+        body["authorization_url"].is_string(),
+        "should return auth URL: {body}"
+    );
+    assert!(body["state"].is_string(), "should return state: {body}");
+}
+
+#[tokio::test]
+async fn onboarding_callback_invalid_state() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/onboarding/x-auth/callback",
+        serde_json::json!({
+            "code": "test-code",
+            "state": "invalid-state-that-doesnt-exist"
+        }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "callback with invalid state: {body}"
+    );
+}
+
+#[tokio::test]
+async fn onboarding_analyze_profile_no_tokens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/onboarding/analyze-profile",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "analyze profile: {body}");
+    assert_eq!(
+        body["status"], "x_api_error",
+        "should report x_api_error without tokens"
+    );
+}
+
+// ============================================================
+// Account CRUD coverage (accounts.rs)
+// ============================================================
+
+#[tokio::test]
+async fn create_and_delete_account() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Create
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/accounts",
+        serde_json::json!({ "label": "deleteme" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create: {body}");
+    let account_id = body["id"].as_str().expect("id").to_string();
+
+    // Delete
+    let (status, body) = delete_json(router, &format!("/api/accounts/{account_id}")).await;
+    assert_eq!(status, StatusCode::OK, "delete: {body}");
+    assert_eq!(body["status"], "archived");
+
+    // Verify account is soft-deleted (status = archived)
+    let acc = tuitbot_core::storage::accounts::get_account(&pool, &account_id)
+        .await
+        .expect("query")
+        .expect("should still exist as archived");
+    assert_eq!(acc.status, "archived", "account should be archived");
+}
+
+#[tokio::test]
+async fn update_account_label() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "original-label").await;
+
+    let (status, body) = patch_json(
+        router,
+        &format!("/api/accounts/{account_id}"),
+        serde_json::json!({ "label": "updated-label" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "update label: {body}");
+    assert_eq!(body["label"], "updated-label");
+}
+
+#[tokio::test]
+async fn update_account_invalid_config_overrides() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "override-test").await;
+
+    let (status, body) = patch_json(
+        router,
+        &format!("/api/accounts/{account_id}"),
+        serde_json::json!({ "config_overrides": "not valid json" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "invalid JSON: {body}");
+}
+
+#[tokio::test]
+async fn update_account_empty_config_overrides_ok() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "empty-override").await;
+
+    let (status, body) = patch_json(
+        router,
+        &format!("/api/accounts/{account_id}"),
+        serde_json::json!({ "config_overrides": "{}" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "empty overrides: {body}");
+}
+
+#[tokio::test]
+async fn set_role_invalid_role() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "role-test").await;
+
+    let (status, body) = post_json(
+        router,
+        &format!("/api/accounts/{account_id}/roles"),
+        serde_json::json!({ "actor": "user1", "role": "INVALID_ROLE" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "invalid role: {body}");
+}
+
+#[tokio::test]
+async fn set_and_list_roles() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "roles-test").await;
+
+    // Set role
+    let (status, body) = post_json(
+        router.clone(),
+        &format!("/api/accounts/{account_id}/roles"),
+        serde_json::json!({ "actor": "agent1", "role": "admin" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "set role: {body}");
+
+    // List roles
+    let (status, body) = get_json(router, &format!("/api/accounts/{account_id}/roles")).await;
+    assert_eq!(status, StatusCode::OK, "list roles: {body}");
+    assert!(body.is_array(), "expected array: {body}");
+}
+
+// ============================================================
+// Content drafts coverage (drafts.rs)
+// ============================================================
+
+#[tokio::test]
+async fn list_drafts_empty() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "drafts-test").await;
+
+    let (status, body) = get_json_for(router, "/api/content/drafts", &account_id).await;
+    assert_eq!(status, StatusCode::OK, "list drafts: {body}");
+}
+
+#[tokio::test]
+async fn create_draft_tweet() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "create-draft").await;
+
+    let (status, body) = post_json_for(
+        router,
+        "/api/content/drafts",
+        &account_id,
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Hello from a draft test!",
+            "source": "test"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create draft: {body}");
+    assert!(body["id"].is_number(), "should return draft id: {body}");
+    assert_eq!(body["status"], "draft");
+}
+
+#[tokio::test]
+async fn create_draft_empty_content_rejected() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "empty-draft").await;
+
+    let (status, body) = post_json_for(
+        router,
+        "/api/content/drafts",
+        &account_id,
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "   ",
+            "source": "test"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "empty content: {body}");
+}
+
+#[tokio::test]
+async fn create_and_delete_draft() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "delete-draft").await;
+
+    // Create
+    let (status, body) = post_json_for(
+        router.clone(),
+        "/api/content/drafts",
+        &account_id,
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Draft to delete",
+            "source": "test"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create: {body}");
+    let draft_id = body["id"].as_i64().expect("id");
+
+    // Delete
+    let (status, body) = delete_json_for(
+        router,
+        &format!("/api/content/drafts/{draft_id}"),
+        &account_id,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "delete: {body}");
+    assert_eq!(body["status"], "cancelled");
+}
+
+#[tokio::test]
+async fn create_draft_too_long_tweet_rejected() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+    let account_id = create_test_account(&pool, "long-draft").await;
+
+    // Create a tweet that exceeds 280 characters
+    let long_text = "A".repeat(300);
+    let (status, body) = post_json_for(
+        router,
+        "/api/content/drafts",
+        &account_id,
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": long_text,
+            "source": "test"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "long tweet: {body}");
+}

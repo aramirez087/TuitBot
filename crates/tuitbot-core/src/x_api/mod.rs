@@ -346,3 +346,313 @@ pub trait XApiClient: Send + Sync {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Minimal concrete impl for testing default trait methods.
+    struct StubClient;
+
+    #[async_trait::async_trait]
+    impl XApiClient for StubClient {
+        async fn search_tweets(
+            &self,
+            _q: &str,
+            _m: u32,
+            _s: Option<&str>,
+            _p: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Ok(SearchResponse {
+                data: vec![],
+                includes: None,
+                meta: SearchMeta {
+                    newest_id: None,
+                    oldest_id: None,
+                    result_count: 0,
+                    next_token: None,
+                },
+            })
+        }
+        async fn get_mentions(
+            &self,
+            _u: &str,
+            _s: Option<&str>,
+            _p: Option<&str>,
+        ) -> Result<MentionResponse, XApiError> {
+            Ok(MentionResponse {
+                data: vec![],
+                includes: None,
+                meta: SearchMeta {
+                    newest_id: None,
+                    oldest_id: None,
+                    result_count: 0,
+                    next_token: None,
+                },
+            })
+        }
+        async fn post_tweet(&self, text: &str) -> Result<PostedTweet, XApiError> {
+            Ok(PostedTweet {
+                id: "stub_id".to_string(),
+                text: text.to_string(),
+            })
+        }
+        async fn reply_to_tweet(
+            &self,
+            text: &str,
+            _reply_to: &str,
+        ) -> Result<PostedTweet, XApiError> {
+            Ok(PostedTweet {
+                id: "reply_id".to_string(),
+                text: text.to_string(),
+            })
+        }
+        async fn get_tweet(&self, _id: &str) -> Result<Tweet, XApiError> {
+            Err(XApiError::ApiError {
+                status: 404,
+                message: "not found".into(),
+            })
+        }
+        async fn get_me(&self) -> Result<User, XApiError> {
+            Ok(User {
+                id: "me".into(),
+                username: "stub".into(),
+                name: "Stub".into(),
+                profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
+                public_metrics: UserMetrics::default(),
+            })
+        }
+        async fn get_user_tweets(
+            &self,
+            _u: &str,
+            _m: u32,
+            _p: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Ok(SearchResponse {
+                data: vec![],
+                includes: None,
+                meta: SearchMeta {
+                    newest_id: None,
+                    oldest_id: None,
+                    result_count: 0,
+                    next_token: None,
+                },
+            })
+        }
+        async fn get_user_by_username(&self, _u: &str) -> Result<User, XApiError> {
+            Err(XApiError::ApiError {
+                status: 404,
+                message: "not found".into(),
+            })
+        }
+    }
+
+    // ── Default trait method tests ──────────────────────────────
+
+    #[tokio::test]
+    async fn upload_media_default_returns_error() {
+        let client = StubClient;
+        let result = client.upload_media(b"data", MediaType::Gif).await;
+        assert!(matches!(result, Err(XApiError::MediaUploadError { .. })));
+    }
+
+    #[tokio::test]
+    async fn post_tweet_with_media_delegates_to_post_tweet() {
+        let client = StubClient;
+        let result = client
+            .post_tweet_with_media("hello", &["media1".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(result.text, "hello");
+        assert_eq!(result.id, "stub_id");
+    }
+
+    #[tokio::test]
+    async fn reply_to_tweet_with_media_delegates_to_reply() {
+        let client = StubClient;
+        let result = client
+            .reply_to_tweet_with_media("reply text", "tweet_123", &["m1".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(result.text, "reply text");
+        assert_eq!(result.id, "reply_id");
+    }
+
+    #[tokio::test]
+    async fn quote_tweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.quote_tweet("text", "quoted_id").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn like_tweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.like_tweet("user1", "tweet1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn follow_user_default_not_implemented() {
+        let client = StubClient;
+        let result = client.follow_user("u1", "u2").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn unfollow_user_default_not_implemented() {
+        let client = StubClient;
+        let result = client.unfollow_user("u1", "u2").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn retweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.retweet("u1", "t1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn unretweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.unretweet("u1", "t1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn delete_tweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.delete_tweet("t1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_home_timeline_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_home_timeline("u1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn unlike_tweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.unlike_tweet("u1", "t1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_followers_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_followers("u1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_following_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_following("u1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_user_by_id_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_user_by_id("u1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_liked_tweets_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_liked_tweets("u1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_bookmarks_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_bookmarks("u1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn bookmark_tweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.bookmark_tweet("u1", "t1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn unbookmark_tweet_default_not_implemented() {
+        let client = StubClient;
+        let result = client.unbookmark_tweet("u1", "t1").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_users_by_ids_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_users_by_ids(&["u1", "u2"]).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn get_tweet_liking_users_default_not_implemented() {
+        let client = StubClient;
+        let result = client.get_tweet_liking_users("t1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn raw_request_default_not_implemented() {
+        let client = StubClient;
+        let result = client.raw_request("GET", "/test", None, None, None).await;
+        assert!(result.is_err());
+    }
+
+    // ── create_local_client tests ───────────────────────────────
+
+    #[tokio::test]
+    async fn create_local_client_non_scraper_returns_none() {
+        let config = XApiConfig::default();
+        let result = create_local_client(&config).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn create_local_client_scraper_returns_some() {
+        let mut config = XApiConfig::default();
+        config.provider_backend = "scraper".to_string();
+        let result = create_local_client(&config).await;
+        assert!(result.is_some());
+    }
+
+    #[tokio::test]
+    async fn create_local_client_with_data_dir_non_scraper() {
+        let config = XApiConfig::default();
+        let dir = tempfile::tempdir().expect("temp dir");
+        let result = create_local_client_with_data_dir(&config, Some(dir.path())).await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn create_local_client_with_data_dir_scraper() {
+        let mut config = XApiConfig::default();
+        config.provider_backend = "scraper".to_string();
+        let dir = tempfile::tempdir().expect("temp dir");
+        let result = create_local_client_with_data_dir(&config, Some(dir.path())).await;
+        assert!(result.is_some());
+    }
+
+    #[tokio::test]
+    async fn create_local_client_with_data_dir_none() {
+        let mut config = XApiConfig::default();
+        config.provider_backend = "scraper".to_string();
+        let result = create_local_client_with_data_dir(&config, None).await;
+        assert!(result.is_some());
+    }
+}

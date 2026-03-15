@@ -423,4 +423,207 @@ mod tests {
         let media = parsed.media.expect("media should be present");
         assert_eq!(media.media_ids.len(), 2);
     }
+
+    // ── MediaUploadResponse deserialization ──────────────────────
+
+    #[test]
+    fn media_upload_response_basic() {
+        let json = r#"{"media_id_string": "12345"}"#;
+        let resp: MediaUploadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.media_id_string, "12345");
+        assert!(resp.processing_info.is_none());
+    }
+
+    #[test]
+    fn media_upload_response_with_processing_info() {
+        let json = r#"{
+            "media_id_string": "67890",
+            "processing_info": {
+                "state": "pending",
+                "check_after_secs": 5
+            }
+        }"#;
+        let resp: MediaUploadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.media_id_string, "67890");
+        let info = resp.processing_info.unwrap();
+        assert_eq!(info.state, "pending");
+        assert_eq!(info.check_after_secs, Some(5));
+    }
+
+    #[test]
+    fn media_upload_response_processing_succeeded() {
+        let json = r#"{
+            "media_id_string": "111",
+            "processing_info": {
+                "state": "succeeded"
+            }
+        }"#;
+        let resp: MediaUploadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.processing_info.unwrap().state, "succeeded");
+    }
+
+    #[test]
+    fn media_upload_response_processing_failed_with_error() {
+        let json = r#"{
+            "media_id_string": "222",
+            "processing_info": {
+                "state": "failed",
+                "error": {
+                    "message": "InvalidMedia"
+                }
+            }
+        }"#;
+        let resp: MediaUploadResponse = serde_json::from_str(json).unwrap();
+        let info = resp.processing_info.unwrap();
+        assert_eq!(info.state, "failed");
+        assert_eq!(info.error.unwrap().message.as_deref(), Some("InvalidMedia"));
+    }
+
+    // ── Size validation tests ───────────────────────────────────
+
+    #[tokio::test]
+    async fn size_validation_gif_under_limit() {
+        // GIF limit is 15MB; 1KB should be fine (but will fail at network level)
+        let client = reqwest::Client::new();
+        let data = vec![0u8; 1024];
+        // GIF requires chunked upload so this will try to POST;
+        // without a server it will fail with network error, not size error
+        let result =
+            upload_media(&client, "http://127.0.0.1:1", "tok", &data, MediaType::Gif).await;
+        assert!(
+            !matches!(
+                result,
+                Err(XApiError::MediaUploadError { ref message }) if message.contains("exceeds maximum")
+            ),
+            "should not reject 1KB GIF for size"
+        );
+    }
+
+    #[tokio::test]
+    async fn size_validation_video_over_limit() {
+        let client = reqwest::Client::new();
+        // Video limit is 512MB; create a fake > 512MB reference
+        // Actually we can't allocate that much, but we can test the boundary
+        // with a smaller type. Image limit is 5MB.
+        let data = vec![0u8; 6 * 1024 * 1024]; // 6MB > 5MB
+        let result = upload_media(
+            &client,
+            "http://unused",
+            "tok",
+            &data,
+            MediaType::Image(crate::x_api::types::ImageFormat::Png),
+        )
+        .await;
+        assert!(matches!(result, Err(XApiError::MediaUploadError { .. })));
+    }
+
+    // ── Chunked upload with mock: multi-segment ─────────────────
+
+    #[tokio::test]
+    async fn chunked_upload_video_multiple_segments() {
+        let server = MockServer::start().await;
+        let client = reqwest::Client::new();
+
+        // 6MB video → 2 segments (5MB + 1MB)
+        Mock::given(method("POST"))
+            .and(path("/media/upload.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "media_id_string": "video_99"
+            })))
+            .expect(4) // INIT + 2x APPEND + FINALIZE
+            .mount(&server)
+            .await;
+
+        let data = vec![0u8; 6 * 1024 * 1024]; // 6MB
+        let result = upload_media(
+            &client,
+            &server.uri(),
+            "test-token",
+            &data,
+            MediaType::Video,
+        )
+        .await;
+
+        let media_id = result.expect("chunked upload should succeed");
+        assert_eq!(media_id.0, "video_99");
+    }
+
+    // ── Processing status: immediate success ────────────────────
+
+    #[tokio::test]
+    async fn chunked_upload_with_processing_succeeded() {
+        let server = MockServer::start().await;
+        let client = reqwest::Client::new();
+
+        // INIT + APPEND → normal response
+        // FINALIZE → response with processing_info.state = "succeeded"
+        Mock::given(method("POST"))
+            .and(path("/media/upload.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "media_id_string": "proc_ok",
+                "processing_info": {
+                    "state": "succeeded"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let data = vec![0u8; 1024];
+        let result =
+            upload_media(&client, &server.uri(), "test-token", &data, MediaType::Gif).await;
+
+        let media_id = result.expect("should succeed");
+        assert_eq!(media_id.0, "proc_ok");
+    }
+
+    // ── Simple upload HTTP error ────────────────────────────────
+
+    #[tokio::test]
+    async fn simple_upload_400_error() {
+        let server = MockServer::start().await;
+        let client = reqwest::Client::new();
+
+        Mock::given(method("POST"))
+            .and(path("/media/upload.json"))
+            .respond_with(ResponseTemplate::new(400).set_body_string("Bad Request: invalid media"))
+            .mount(&server)
+            .await;
+
+        let data = vec![0u8; 1024];
+        let result = upload_media(
+            &client,
+            &server.uri(),
+            "test-token",
+            &data,
+            MediaType::Image(crate::x_api::types::ImageFormat::Jpeg),
+        )
+        .await;
+
+        match result {
+            Err(XApiError::MediaUploadError { message }) => {
+                assert!(message.contains("400"));
+            }
+            other => panic!("expected MediaUploadError, got: {other:?}"),
+        }
+    }
+
+    // ── PostTweetRequest without media ──────────────────────────
+
+    #[test]
+    fn post_tweet_request_no_media() {
+        use crate::x_api::types::PostTweetRequest;
+
+        let req = PostTweetRequest {
+            text: "Just text".to_string(),
+            reply: None,
+            media: None,
+            quote_tweet_id: None,
+        };
+
+        let json = serde_json::to_string(&req).expect("serialize");
+        assert!(json.contains("Just text"));
+
+        let parsed: PostTweetRequest = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.media.is_none());
+    }
 }

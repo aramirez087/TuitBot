@@ -462,4 +462,93 @@ mod tests {
             state.err()
         );
     }
+
+    /// Utility-readonly profile should degrade gracefully without tokens.
+    #[tokio::test]
+    async fn init_readonly_utility_readonly_no_tokens() {
+        let config = Config::default();
+        let state = init_readonly_state(config, Profile::UtilityReadonly).await;
+        assert!(state.is_ok());
+        let state = state.unwrap();
+        assert!(!state.x_available);
+    }
+
+    /// Utility-write profile should degrade gracefully without tokens.
+    #[tokio::test]
+    async fn init_readonly_utility_write_no_tokens() {
+        let config = Config::default();
+        let state = init_readonly_state(config, Profile::UtilityWrite).await;
+        assert!(state.is_ok());
+        let state = state.unwrap();
+        assert!(!state.x_available);
+        assert!(state.authenticated_user_id.is_empty());
+    }
+
+    /// Scraper backend with utility-readonly profile.
+    #[tokio::test]
+    async fn init_readonly_scraper_utility_readonly() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::UtilityReadonly).await;
+        assert!(state.is_ok());
+    }
+
+    /// Scraper backend with utility-write profile.
+    #[tokio::test]
+    async fn init_readonly_scraper_utility_write() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::UtilityWrite).await;
+        assert!(state.is_ok());
+    }
+
+    /// Readonly state has config accessible.
+    #[tokio::test]
+    async fn readonly_state_config_accessible() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::Readonly)
+            .await
+            .unwrap();
+        // Config should be accessible
+        assert_eq!(state.config.x_api.provider_backend, "scraper");
+    }
+
+    /// Profile display covers all variants.
+    #[test]
+    fn profile_display_all_variants() {
+        assert_eq!(format!("{}", Profile::Readonly), "readonly");
+        assert_eq!(format!("{}", Profile::ApiReadonly), "api-readonly");
+        assert_eq!(format!("{}", Profile::Write), "write");
+        assert_eq!(format!("{}", Profile::Admin), "admin");
+        assert_eq!(format!("{}", Profile::UtilityReadonly), "utility-readonly");
+        assert_eq!(format!("{}", Profile::UtilityWrite), "utility-write");
+    }
+
+    /// Profile parse from string.
+    #[test]
+    fn profile_parse_roundtrip() {
+        for profile in [
+            Profile::Readonly,
+            Profile::ApiReadonly,
+            Profile::Write,
+            Profile::Admin,
+            Profile::UtilityReadonly,
+            Profile::UtilityWrite,
+        ] {
+            let s = profile.to_string();
+            let parsed: Profile = s.parse().unwrap();
+            assert_eq!(parsed, profile);
+        }
+    }
+
+    /// Profile parse unknown string.
+    #[test]
+    fn profile_parse_unknown_error() {
+        let result: Result<Profile, _> = "nonexistent".parse();
+        assert!(result.is_err());
+    }
 }

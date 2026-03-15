@@ -118,3 +118,110 @@ fn kv_to_tuples_some() {
     let result = super::kv_to_tuples(Some(&kv)).unwrap();
     assert_eq!(result, vec![("a".to_string(), "b".to_string())]);
 }
+
+#[test]
+fn kv_to_tuples_empty_vec() {
+    use crate::requests::KeyValue;
+    let kv: Vec<KeyValue> = vec![];
+    let result = super::kv_to_tuples(Some(&kv)).unwrap();
+    assert!(result.is_empty());
+}
+
+#[test]
+fn kv_to_tuples_multiple_pairs() {
+    use crate::requests::KeyValue;
+    let kv = vec![
+        KeyValue {
+            key: "x".to_string(),
+            value: "1".to_string(),
+        },
+        KeyValue {
+            key: "y".to_string(),
+            value: "2".to_string(),
+        },
+        KeyValue {
+            key: "z".to_string(),
+            value: "3".to_string(),
+        },
+    ];
+    let result = super::kv_to_tuples(Some(&kv)).unwrap();
+    assert_eq!(result.len(), 3);
+    assert_eq!(result[0], ("x".to_string(), "1".to_string()));
+    assert_eq!(result[2], ("z".to_string(), "3".to_string()));
+}
+
+#[test]
+fn kv_to_tuples_special_characters() {
+    use crate::requests::KeyValue;
+    let kv = vec![KeyValue {
+        key: "Content-Type".to_string(),
+        value: "application/json".to_string(),
+    }];
+    let result = super::kv_to_tuples(Some(&kv)).unwrap();
+    assert_eq!(
+        result[0],
+        ("Content-Type".to_string(), "application/json".to_string())
+    );
+}
+
+// ── AdminMcpServer construction ─────────────────────────────────────
+
+#[tokio::test]
+async fn admin_server_info_has_instructions() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::AdminMcpServer::new(state);
+    let info = server.get_info();
+    assert!(info.instructions.is_some());
+    let instructions = info.instructions.unwrap();
+    assert!(
+        instructions.contains("Admin"),
+        "admin server instructions should mention Admin"
+    );
+}
+
+#[tokio::test]
+async fn admin_server_info_has_tool_capabilities() {
+    use rmcp::ServerHandler;
+    let state = make_state().await;
+    let server = super::AdminMcpServer::new(state);
+    let info = server.get_info();
+    assert!(info.capabilities.tools.is_some());
+}
+
+#[tokio::test]
+async fn make_state_creates_valid_state() {
+    let state = make_state().await;
+    assert!(state.x_client.is_some());
+    assert!(state.llm_provider.is_none());
+    assert_eq!(state.authenticated_user_id.as_deref(), Some("u1"));
+    assert!(state.granted_scopes.is_empty());
+}
+
+#[tokio::test]
+async fn null_x_client_returns_auth_expired() {
+    let client = NullX;
+    let result = client.search_tweets("test", 10, None, None).await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.get_me().await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.post_tweet("hello").await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.get_tweet("123").await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.reply_to_tweet("reply", "123").await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.get_mentions("user1", None, None).await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.get_user_tweets("user1", 10, None).await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+
+    let result = client.get_user_by_username("test").await;
+    assert!(matches!(result, Err(XApiError::AuthExpired)));
+}

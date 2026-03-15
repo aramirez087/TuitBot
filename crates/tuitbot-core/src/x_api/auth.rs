@@ -948,4 +948,249 @@ mod tests {
         let tok = manager.get_access_token().await.unwrap();
         assert_eq!(tok, "current_token");
     }
+
+    // -------------------------------------------------------------------
+    // build_oauth_client edge cases
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn build_oauth_client_different_ports() {
+        let client = build_oauth_client("my_id", "http://localhost:8080/callback");
+        assert!(client.is_ok());
+        let client2 = build_oauth_client("my_id", "http://localhost:3000/callback");
+        assert!(client2.is_ok());
+    }
+
+    #[test]
+    fn build_oauth_client_with_https_redirect() {
+        let client = build_oauth_client("my_id", "https://example.com/callback");
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn build_oauth_client_empty_client_id() {
+        // Empty client ID is valid syntactically
+        let client = build_oauth_client("", "http://localhost/callback");
+        assert!(client.is_ok());
+    }
+
+    // -------------------------------------------------------------------
+    // save_tokens edge cases
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn save_tokens_with_special_characters() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        let tokens = Tokens {
+            access_token: "a+b/c=d&e?f".into(),
+            refresh_token: "r!@#$%^&*()".into(),
+            expires_at: Utc::now(),
+            scopes: vec!["scope with spaces".into()],
+        };
+
+        save_tokens(&tokens, &path).expect("save");
+        let loaded = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(loaded.access_token, "a+b/c=d&e?f");
+        assert_eq!(loaded.refresh_token, "r!@#$%^&*()");
+    }
+
+    #[test]
+    fn save_tokens_large_scopes_list() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        let scopes: Vec<String> = (0..100).map(|i| format!("scope_{i}")).collect();
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: scopes.clone(),
+        };
+
+        save_tokens(&tokens, &path).expect("save");
+        let loaded = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(loaded.scopes.len(), 100);
+        assert_eq!(loaded.scopes[50], "scope_50");
+    }
+
+    #[test]
+    fn load_tokens_empty_file_returns_error() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        std::fs::write(&path, "").expect("write");
+
+        let result = load_tokens(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_tokens_partial_json_returns_error() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        std::fs::write(&path, r#"{"access_token": "a"}"#).expect("write");
+
+        // Missing required fields
+        let result = load_tokens(&path);
+        assert!(result.is_err());
+    }
+
+    // -------------------------------------------------------------------
+    // TokenRefreshResponse edge cases
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn token_refresh_response_single_scope() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_in": 3600,
+            "scope": "tweet.read"
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        let scopes: Vec<&str> = resp.scope.split_whitespace().collect();
+        assert_eq!(scopes.len(), 1);
+        assert_eq!(scopes[0], "tweet.read");
+    }
+
+    #[test]
+    fn token_refresh_response_empty_scope() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_in": 3600,
+            "scope": ""
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        let scopes: Vec<&str> = resp.scope.split_whitespace().collect();
+        assert!(scopes.is_empty());
+    }
+
+    #[test]
+    fn token_refresh_response_zero_expires_in() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_in": 0,
+            "scope": "tweet.read"
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.expires_in, 0);
+    }
+
+    // -------------------------------------------------------------------
+    // Tokens boundary conditions
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn tokens_exactly_at_refresh_boundary() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::seconds(REFRESH_WINDOW_SECS),
+            scopes: vec![],
+        };
+        let seconds_until_expiry = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        // At exactly the boundary, should be approximately equal
+        assert!(
+            (seconds_until_expiry - REFRESH_WINDOW_SECS).abs() <= 1,
+            "should be near boundary"
+        );
+    }
+
+    #[tokio::test]
+    async fn token_manager_get_token_when_expired_fails() {
+        let tokens = Tokens {
+            access_token: "expired_token".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() - chrono::Duration::hours(1), // already expired
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        let manager = TokenManager::new(tokens, "cid".into(), path);
+        // Should fail because refresh will fail (no real server)
+        let result = manager.get_access_token().await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn token_manager_multiple_access_calls_same_token() {
+        let tokens = Tokens {
+            access_token: "stable_token".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        let manager = TokenManager::new(tokens, "cid".into(), path);
+
+        let t1 = manager.get_access_token().await.unwrap();
+        let t2 = manager.get_access_token().await.unwrap();
+        let t3 = manager.get_access_token().await.unwrap();
+        assert_eq!(t1, "stable_token");
+        assert_eq!(t2, "stable_token");
+        assert_eq!(t3, "stable_token");
+    }
+
+    #[test]
+    fn tokens_serde_with_iso8601_date_formats() {
+        // RFC 3339 / ISO 8601 format
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_at": "2026-12-31T23:59:59.999Z"
+        }"#;
+        let tokens: Tokens = serde_json::from_str(json).unwrap();
+        assert_eq!(tokens.expires_at.year(), 2026);
+
+        // With timezone offset
+        let json2 = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_at": "2026-06-15T12:00:00+00:00"
+        }"#;
+        let tokens2: Tokens = serde_json::from_str(json2).unwrap();
+        assert_eq!(tokens2.expires_at.month(), 6);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_tokens_overwrites_preserves_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+
+        let tokens = Tokens {
+            access_token: "first".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&tokens, &path).expect("save first");
+
+        let tokens2 = Tokens {
+            access_token: "second".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&tokens2, &path).expect("save second");
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o600,
+            "permissions should still be 600 after overwrite"
+        );
+    }
+
+    use chrono::Datelike;
 }

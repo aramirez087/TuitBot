@@ -76,3 +76,79 @@ fn not_configured() -> XApiError {
         message: NOT_CONFIGURED.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn null_client_search_tweets() {
+        let client = NullXApiClient;
+        let result = client.search_tweets("query", 10, None, None).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(format!("{err}").contains("not configured"));
+    }
+
+    #[tokio::test]
+    async fn null_client_get_mentions() {
+        let client = NullXApiClient;
+        let result = client.get_mentions("u1", None, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn null_client_post_tweet() {
+        let client = NullXApiClient;
+        let result = client.post_tweet("text").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn null_client_reply_to_tweet() {
+        let client = NullXApiClient;
+        let result = client.reply_to_tweet("text", "123").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn null_client_get_tweet() {
+        let client = NullXApiClient;
+        let result = client.get_tweet("123").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn null_client_get_me() {
+        let client = NullXApiClient;
+        let result = client.get_me().await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn null_client_get_user_tweets() {
+        let client = NullXApiClient;
+        let result = client.get_user_tweets("u1", 10, None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn null_client_get_user_by_username() {
+        let client = NullXApiClient;
+        let result = client.get_user_by_username("testuser").await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn not_configured_error_message() {
+        let err = not_configured();
+        match err {
+            XApiError::ApiError { status, message } => {
+                assert_eq!(status, 0);
+                assert!(message.contains("not configured"));
+                assert!(message.contains("tuitbot auth"));
+            }
+            _ => panic!("expected ApiError"),
+        }
+    }
+}
