@@ -380,4 +380,100 @@ mod tests {
         assert_eq!(ThreadStructure::Mistakes.to_string(), "mistakes");
         assert_eq!(ThreadStructure::Analysis.to_string(), "analysis");
     }
+
+    #[test]
+    fn reply_archetype_all_variants_reachable() {
+        use std::collections::HashSet;
+        let mut rng = rand::thread_rng();
+        let mut seen = HashSet::new();
+        for _ in 0..10_000 {
+            seen.insert(ReplyArchetype::select(&mut rng).to_string());
+        }
+        assert_eq!(
+            seen.len(),
+            5,
+            "expected all 5 reply archetypes, got {seen:?}"
+        );
+    }
+
+    #[test]
+    fn tweet_format_all_variants_reachable() {
+        use std::collections::HashSet;
+        let mut rng = rand::thread_rng();
+        let mut seen = HashSet::new();
+        let recent: Vec<TweetFormat> = vec![];
+        for _ in 0..10_000 {
+            seen.insert(TweetFormat::select(&recent, &mut rng).to_string());
+        }
+        assert_eq!(seen.len(), 7, "expected all 7 tweet formats, got {seen:?}");
+    }
+
+    #[test]
+    fn thread_structure_all_variants_reachable() {
+        use std::collections::HashSet;
+        let mut rng = rand::thread_rng();
+        let mut seen = HashSet::new();
+        for _ in 0..10_000 {
+            seen.insert(ThreadStructure::select(&mut rng).to_string());
+        }
+        assert_eq!(
+            seen.len(),
+            4,
+            "expected all 4 thread structures, got {seen:?}"
+        );
+    }
+
+    #[test]
+    fn tweet_format_display_all_variants() {
+        assert_eq!(TweetFormat::List.to_string(), "list");
+        assert_eq!(TweetFormat::ContrarianTake.to_string(), "contrarian_take");
+        assert_eq!(
+            TweetFormat::MostPeopleThinkX.to_string(),
+            "most_people_think_x"
+        );
+        assert_eq!(TweetFormat::Storytelling.to_string(), "storytelling");
+        assert_eq!(TweetFormat::BeforeAfter.to_string(), "before_after");
+        assert_eq!(TweetFormat::Question.to_string(), "question");
+        assert_eq!(TweetFormat::Tip.to_string(), "tip");
+    }
+
+    #[test]
+    fn reply_archetype_display_all_variants() {
+        assert_eq!(
+            ReplyArchetype::AgreeAndExpand.to_string(),
+            "agree_and_expand"
+        );
+        assert_eq!(
+            ReplyArchetype::RespectfulDisagree.to_string(),
+            "respectful_disagree"
+        );
+        assert_eq!(ReplyArchetype::AddData.to_string(), "add_data");
+        assert_eq!(ReplyArchetype::AskQuestion.to_string(), "ask_question");
+        assert_eq!(
+            ReplyArchetype::ShareExperience.to_string(),
+            "share_experience"
+        );
+    }
+
+    #[test]
+    fn tweet_format_select_single_available() {
+        let mut rng = rand::thread_rng();
+        // Put 6 of 7 in recent — only Storytelling remains.
+        let recent = vec![
+            TweetFormat::List,
+            TweetFormat::ContrarianTake,
+            TweetFormat::MostPeopleThinkX,
+            TweetFormat::BeforeAfter,
+            TweetFormat::Question,
+            TweetFormat::Tip,
+        ];
+        for _ in 0..50 {
+            let picked = TweetFormat::select(&recent, &mut rng);
+            assert_eq!(
+                picked,
+                TweetFormat::Storytelling,
+                "only Storytelling should be available"
+            );
+        }
+    }
 }

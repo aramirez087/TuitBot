@@ -15,6 +15,7 @@ use tuitbot_server::ws::AccountWsEvent;
 mod analytics;
 mod analytics_summary; // Task 3.4: analytics summary + recent-performance endpoints
 mod approval;
+mod approval_coverage; // Additional approval queue edge-case coverage
 mod approval_workflow; // Task 3.4: approval happy-path mutations (approve/reject/bulk/history)
 mod compose;
 mod content;
@@ -22,6 +23,8 @@ mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + sch
 mod coverage_gaps;
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
+mod draft_studio_coverage; // Additional draft studio error-path coverage
+mod settings_accounts; // Settings, accounts, activity, connectors, vault, content, and misc route coverage
 mod x_auth; // X OAuth unlink tests // Task 3.8: integration tests for 0%-coverage server routes
 
 /// The test API token used across all tests.

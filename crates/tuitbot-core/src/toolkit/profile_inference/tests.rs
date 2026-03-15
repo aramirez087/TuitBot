@@ -296,3 +296,181 @@ fn inferred_profile_serializes_to_snake_case() {
     // Enum values should be snake_case.
     assert!(json.contains("\"high\"") || json.contains("\"medium\"") || json.contains("\"low\""));
 }
+
+#[test]
+fn audience_from_bio_helping_pattern() {
+    let user = make_user(
+        "Coach",
+        "coach",
+        Some("Helping startups scale their engineering teams"),
+        None,
+    );
+    let input = ProfileInput {
+        user,
+        tweets: vec![],
+    };
+    let profile = extract_heuristics(&input);
+
+    assert!(
+        profile.target_audience.value.contains("startups"),
+        "expected target_audience to contain 'startups', got: {}",
+        profile.target_audience.value
+    );
+    assert_eq!(profile.target_audience.provenance, Provenance::Bio);
+}
+
+#[test]
+fn audience_from_tweets_our_users() {
+    let user = make_user("Dev", "dev", None, None);
+    let tweets = vec![
+        make_tweet("our users love this feature"),
+        make_tweet("our users are growing fast"),
+        make_tweet("shipping something new today"),
+    ];
+    let input = ProfileInput { user, tweets };
+    let profile = extract_heuristics(&input);
+
+    assert_eq!(profile.target_audience.value, "Users");
+    assert_eq!(profile.target_audience.provenance, Provenance::Tweets);
+}
+
+#[test]
+fn industry_topics_ai_detected() {
+    let user = make_user(
+        "ML Dev",
+        "mldev",
+        Some("building AI tools with machine learning"),
+        None,
+    );
+    let input = ProfileInput {
+        user,
+        tweets: vec![],
+    };
+    let profile = extract_heuristics(&input);
+
+    assert!(
+        profile
+            .industry_topics
+            .value
+            .contains(&"AI & Machine Learning".to_string()),
+        "expected AI & Machine Learning topic, got: {:?}",
+        profile.industry_topics.value
+    );
+}
+
+#[test]
+fn industry_topics_multiple_detected() {
+    let user = make_user(
+        "Founder",
+        "founder",
+        Some("crypto SaaS founder building the future"),
+        None,
+    );
+    let tweets = vec![
+        make_tweet("our marketing growth strategy is working"),
+        make_tweet("scaling our social media marketing efforts"),
+    ];
+    let input = ProfileInput { user, tweets };
+    let profile = extract_heuristics(&input);
+
+    assert!(
+        profile.industry_topics.value.len() >= 2,
+        "expected multiple topics, got: {:?}",
+        profile.industry_topics.value
+    );
+}
+
+#[test]
+fn industry_topics_empty_input() {
+    let user = make_user("X", "x", None, None);
+    let input = ProfileInput {
+        user,
+        tweets: vec![],
+    };
+    let profile = extract_heuristics(&input);
+
+    assert!(profile.industry_topics.value.is_empty());
+    assert_eq!(profile.industry_topics.confidence, Confidence::Low);
+}
+
+#[test]
+fn keywords_frequency_extraction() {
+    let user = make_user("Dev", "dev", Some("software engineer"), None);
+    let tweets = vec![
+        make_tweet("Deploying microservices with containers today"),
+        make_tweet("Microservices architecture is the future of deployment"),
+        make_tweet("Scaling microservices across clusters"),
+    ];
+    let input = ProfileInput { user, tweets };
+    let profile = extract_heuristics(&input);
+
+    assert!(
+        profile
+            .product_keywords
+            .value
+            .iter()
+            .any(|k| k.contains("microservices")),
+        "expected 'microservices' as keyword from frequency, got: {:?}",
+        profile.product_keywords.value
+    );
+}
+
+#[test]
+fn keywords_truncated_at_seven() {
+    let user = make_user(
+        "Tags",
+        "tags",
+        Some("#one #two #three #four #five #six #seven #eight #nine #ten #eleven"),
+        None,
+    );
+    let input = ProfileInput {
+        user,
+        tweets: vec![],
+    };
+    let profile = extract_heuristics(&input);
+
+    assert!(
+        profile.product_keywords.value.len() <= 7,
+        "keywords should be capped at 7, got {}",
+        profile.product_keywords.value.len()
+    );
+}
+
+#[test]
+fn product_name_at_company_pattern() {
+    let user = make_user(
+        "Alex",
+        "alex",
+        Some("CTO @TechCorp building great tools"),
+        None,
+    );
+    let input = ProfileInput {
+        user,
+        tweets: vec![],
+    };
+    let profile = extract_heuristics(&input);
+
+    assert_eq!(profile.product_name.value, "TechCorp");
+    assert_eq!(profile.product_name.confidence, Confidence::High);
+}
+
+#[test]
+fn brand_voice_always_none() {
+    // With tweets
+    let user1 = make_user("A", "a", Some("Prolific writer and thinker"), None);
+    let input1 = ProfileInput {
+        user: user1,
+        tweets: make_tweets(20),
+    };
+    let profile1 = extract_heuristics(&input1);
+    assert!(profile1.brand_voice.value.is_none());
+
+    // Without tweets
+    let user2 = make_user("B", "b", None, None);
+    let input2 = ProfileInput {
+        user: user2,
+        tweets: vec![],
+    };
+    let profile2 = extract_heuristics(&input2);
+    assert!(profile2.brand_voice.value.is_none());
+}
