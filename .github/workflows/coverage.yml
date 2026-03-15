@@ -40,7 +40,6 @@ jobs:
           cargo tarpaulin \
             --workspace \
             --exclude tuitbot-mcp \
-            --ignore-tests \
             --out Xml \
             --output-dir coverage/ \
             --fail-under 75 \
