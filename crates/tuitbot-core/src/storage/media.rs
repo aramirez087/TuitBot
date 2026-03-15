@@ -928,4 +928,98 @@ mod tests {
 
         assert!(media_dir.exists());
     }
+
+    // ── scan_media_files ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn scan_media_files_empty_dir() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let files = scan_media_files(dir.path()).await.expect("scan");
+        assert!(files.is_empty());
+    }
+
+    #[tokio::test]
+    async fn scan_media_files_finds_files() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("a.jpg"), b"img1").expect("write");
+        std::fs::write(dir.path().join("b.png"), b"img2").expect("write");
+        let files = scan_media_files(dir.path()).await.expect("scan");
+        assert_eq!(files.len(), 2);
+        let total_size: u64 = files.iter().map(|f| f.size).sum();
+        assert_eq!(total_size, 8); // 4 + 4 bytes
+    }
+
+    #[tokio::test]
+    async fn scan_media_files_skips_dirs() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir(dir.path().join("subdir")).expect("mkdir");
+        std::fs::write(dir.path().join("file.jpg"), b"data").expect("write");
+        let files = scan_media_files(dir.path()).await.expect("scan");
+        assert_eq!(files.len(), 1);
+    }
+
+    // ── cleanup_if_over_threshold ─────────────────────────────────
+
+    #[tokio::test]
+    async fn cleanup_if_over_threshold_no_media_dir() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let pool = crate::storage::init_test_db().await.expect("db");
+        let deleted = cleanup_if_over_threshold(dir.path(), &pool)
+            .await
+            .expect("cleanup");
+        assert_eq!(deleted, 0);
+    }
+
+    #[tokio::test]
+    async fn cleanup_if_over_threshold_under_limit() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let media_dir = dir.path().join("media");
+        std::fs::create_dir_all(&media_dir).expect("mkdir");
+        std::fs::write(media_dir.join("small.jpg"), b"tiny").expect("write");
+        let pool = crate::storage::init_test_db().await.expect("db");
+        let deleted = cleanup_if_over_threshold(dir.path(), &pool)
+            .await
+            .expect("cleanup");
+        assert_eq!(deleted, 0);
+    }
+
+    // ── is_safe_media_path with traversal ─────────────────────────
+
+    #[test]
+    fn is_safe_media_path_outside_data_dir() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let other = tempfile::tempdir().expect("other dir");
+        let outside_path = format!("{}/evil.jpg", other.path().display());
+        assert!(!is_safe_media_path(&outside_path, dir.path()));
+    }
+
+    // ── store and cleanup round-trip ──────────────────────────────
+
+    #[tokio::test]
+    async fn store_multiple_and_cleanup() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let m1 = store_media(
+            dir.path(),
+            b"img1",
+            "a.jpg",
+            MediaType::Image(ImageFormat::Jpeg),
+        )
+        .await
+        .expect("store 1");
+        let m2 = store_media(
+            dir.path(),
+            b"img2",
+            "b.png",
+            MediaType::Image(ImageFormat::Png),
+        )
+        .await
+        .expect("store 2");
+
+        assert!(std::path::Path::new(&m1.path).exists());
+        assert!(std::path::Path::new(&m2.path).exists());
+
+        cleanup_media(&[m1.path.clone()]).await;
+        assert!(!std::path::Path::new(&m1.path).exists());
+        assert!(std::path::Path::new(&m2.path).exists());
+    }
 }

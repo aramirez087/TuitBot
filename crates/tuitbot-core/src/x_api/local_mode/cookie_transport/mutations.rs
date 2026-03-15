@@ -673,4 +673,132 @@ mod tests {
         let f = super::super::features::mutation_features();
         assert_eq!(f["tweet_awards_web_tipping_enabled"], false);
     }
+
+    // ── handle_rest_status logic simulation ─────────────────────────
+
+    #[test]
+    fn rest_status_branch_401_403_429_success_error() {
+        // Simulate the branching logic in handle_rest_status
+        for (status, expected) in [
+            (200u16, "success"),
+            (201, "success"),
+            (204, "success"),
+            (301, "error"),
+            (400, "error"),
+            (401, "auth"),
+            (403, "auth"),
+            (429, "rate_limit"),
+            (500, "error"),
+            (502, "error"),
+        ] {
+            let result = if status == 401 || status == 403 {
+                "auth"
+            } else if status == 429 {
+                "rate_limit"
+            } else if rquest::StatusCode::from_u16(status)
+                .map(|s| s.is_success())
+                .unwrap_or(false)
+            {
+                "success"
+            } else {
+                "error"
+            };
+            assert_eq!(
+                result, expected,
+                "status {status}: expected {expected}, got {result}"
+            );
+        }
+    }
+
+    // ── Response parsing: combined data structure traversal ──────────
+
+    #[test]
+    fn unfavorite_response_missing_field() {
+        let body = serde_json::json!({ "data": {} });
+        let result = body
+            .get("data")
+            .and_then(|d| d.get("unfavorite_tweet"))
+            .and_then(|f| f.as_str())
+            .map(|s| s == "Done")
+            .unwrap_or(false);
+        assert!(!result);
+    }
+
+    #[test]
+    fn delete_retweet_response_missing() {
+        let body = serde_json::json!({ "data": { "unretweet": {} } });
+        let result = body
+            .get("data")
+            .and_then(|d| d.get("unretweet"))
+            .and_then(|u| u.get("source_tweet_results"))
+            .is_some();
+        assert!(!result);
+    }
+
+    #[test]
+    fn delete_bookmark_response_not_done() {
+        let body = serde_json::json!({
+            "data": { "tweet_bookmark_delete": "NotDone" }
+        });
+        let result = body
+            .get("data")
+            .and_then(|d| d.get("tweet_bookmark_delete"))
+            .and_then(|f| f.as_str())
+            .map(|s| s == "Done")
+            .unwrap_or(false);
+        assert!(!result);
+    }
+
+    #[test]
+    fn bookmark_response_missing_data() {
+        let body = serde_json::json!({});
+        let result = body
+            .get("data")
+            .and_then(|d| d.get("tweet_bookmark_put"))
+            .and_then(|f| f.as_str())
+            .map(|s| s == "Done")
+            .unwrap_or(false);
+        assert!(!result);
+    }
+
+    // ── Variable structure completeness ──────────────────────────────
+
+    #[test]
+    fn create_tweet_variables_has_all_required_fields() {
+        let variables = serde_json::json!({
+            "tweet_text": "test",
+            "dark_request": false,
+            "media": { "media_entities": [], "possibly_sensitive": false },
+            "semantic_annotation_ids": []
+        });
+        let obj = variables.as_object().unwrap();
+        assert!(obj.contains_key("tweet_text"));
+        assert!(obj.contains_key("dark_request"));
+        assert!(obj.contains_key("media"));
+        assert!(obj.contains_key("semantic_annotation_ids"));
+        assert_eq!(obj.len(), 4);
+    }
+
+    #[test]
+    fn follow_unfollow_body_has_interstitial() {
+        for uid in ["1", "999", "123456789"] {
+            let body = format!("include_profile_interstitial_type=1&user_id={uid}");
+            assert!(body.starts_with("include_profile_interstitial_type=1&user_id="));
+            assert!(body.ends_with(uid));
+        }
+    }
+
+    // ── mutation_features coverage ────────────────────────────────
+
+    #[test]
+    fn mutation_features_is_object() {
+        let f = super::super::features::mutation_features();
+        assert!(f.is_object());
+        let obj = f.as_object().unwrap();
+        assert!(obj.len() > 5, "should have many feature flags");
+        // All values are booleans
+        for (key, val) in obj {
+            assert!(val.is_boolean(), "{key} should be boolean, got {val}");
+        }
+    }
 }

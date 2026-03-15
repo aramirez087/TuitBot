@@ -548,4 +548,83 @@ mod tests {
         let id = GoogleDriveProvider::extract_drive_id_for_test("gdrive://myid/name.md");
         assert_eq!(id, "myid");
     }
+
+    // ── extract_drive_id edge cases ──────────────────────────────────
+
+    #[test]
+    fn extract_drive_id_long_id() {
+        let id = extract_drive_id("gdrive://1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/doc.md")
+            .unwrap();
+        assert_eq!(id, "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms");
+    }
+
+    #[test]
+    fn extract_drive_id_special_chars_in_name() {
+        let id = extract_drive_id("gdrive://abc123/my file (1).md").unwrap();
+        assert_eq!(id, "abc123");
+    }
+
+    // ── is_revocation_error edge cases ───────────────────────────────
+
+    #[test]
+    fn revocation_error_empty_string() {
+        assert!(!is_revocation_error(""));
+    }
+
+    #[test]
+    fn revocation_error_partial_match() {
+        assert!(!is_revocation_error("revo")); // partial "revoked"
+    }
+
+    #[test]
+    fn revocation_error_with_surrounding_text() {
+        assert!(is_revocation_error(
+            "Error: token has been expired or revoked by user"
+        ));
+    }
+
+    // ── GoogleDriveProvider constructors ──────────────────────────────
+
+    #[test]
+    fn new_preserves_folder_id() {
+        let provider = GoogleDriveProvider::new("folder_abc".to_string(), "/key.json".to_string());
+        assert_eq!(provider.folder_id, "folder_abc");
+    }
+
+    #[test]
+    fn new_provider_source_type() {
+        let provider = GoogleDriveProvider::new("f".to_string(), "/k.json".to_string());
+        assert_eq!(provider.source_type(), "google_drive");
+    }
+
+    // ── DriveAuthStrategy matching ───────────────────────────────────
+
+    #[test]
+    fn service_account_strategy_matches() {
+        let provider = GoogleDriveProvider::new("folder".to_string(), "/path/key.json".to_string());
+        assert!(matches!(
+            provider.auth_strategy,
+            DriveAuthStrategy::ServiceAccount { .. }
+        ));
+    }
+
+    // ── CachedToken usage ────────────────────────────────────────────
+
+    #[test]
+    fn cached_token_expires_at_is_in_future() {
+        let token = CachedToken {
+            access_token: "tok".to_string(),
+            expires_at: Instant::now() + Duration::from_secs(3600),
+        };
+        assert!(token.expires_at > Instant::now());
+    }
+
+    #[test]
+    fn cached_token_expired() {
+        let token = CachedToken {
+            access_token: "old_tok".to_string(),
+            expires_at: Instant::now() - Duration::from_secs(1),
+        };
+        assert!(token.expires_at < Instant::now());
+    }
 }

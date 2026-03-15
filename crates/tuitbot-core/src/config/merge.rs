@@ -372,4 +372,144 @@ mod tests {
         assert_eq!(parsed["scoring"]["threshold"], 80);
         assert_eq!(parsed["business"]["product_name"], "New");
     }
+
+    // ── json_merge_patch edge cases ───────────────────────────────
+
+    #[test]
+    fn json_merge_patch_replaces_non_object_base() {
+        let mut base = Value::String("hello".into());
+        let patch: Value = serde_json::from_str(r#"{"key": "value"}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert!(base.is_object());
+        assert_eq!(base["key"], "value");
+    }
+
+    #[test]
+    fn json_merge_patch_null_removes_key() {
+        let mut base: Value = serde_json::from_str(r#"{"a": 1, "b": 2}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"a": null}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert!(base.get("a").is_none());
+        assert_eq!(base["b"], 2);
+    }
+
+    #[test]
+    fn json_merge_patch_deep_merge() {
+        let mut base: Value = serde_json::from_str(r#"{"nested": {"a": 1, "b": 2}}"#).unwrap();
+        let patch: Value = serde_json::from_str(r#"{"nested": {"b": 3, "c": 4}}"#).unwrap();
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base["nested"]["a"], 1);
+        assert_eq!(base["nested"]["b"], 3);
+        assert_eq!(base["nested"]["c"], 4);
+    }
+
+    #[test]
+    fn json_merge_patch_non_object_patch_replaces() {
+        let mut base: Value = serde_json::from_str(r#"{"a": 1}"#).unwrap();
+        let patch = Value::String("replaced".into());
+        json_merge_patch(&mut base, &patch);
+        assert_eq!(base, "replaced");
+    }
+
+    // ── split_patch_by_scope edge cases ──────────────────────────
+
+    #[test]
+    fn split_patch_by_scope_non_object() {
+        let patch = Value::String("not an object".into());
+        let (account, rejected) = split_patch_by_scope(&patch);
+        assert!(account.as_object().unwrap().is_empty());
+        assert!(rejected.is_empty());
+    }
+
+    #[test]
+    fn split_patch_by_scope_all_rejected() {
+        let patch: Value = serde_json::from_str(r#"{"llm": {}, "server": {}}"#).unwrap();
+        let (account, rejected) = split_patch_by_scope(&patch);
+        assert!(account.as_object().unwrap().is_empty());
+        assert_eq!(rejected.len(), 2);
+    }
+
+    #[test]
+    fn split_patch_by_scope_all_accepted() {
+        let patch: Value = serde_json::from_str(r#"{"mode": "composer", "scoring": {}}"#).unwrap();
+        let (account, rejected) = split_patch_by_scope(&patch);
+        assert_eq!(account.as_object().unwrap().len(), 2);
+        assert!(rejected.is_empty());
+    }
+
+    // ── effective_config edge cases ──────────────────────────────
+
+    #[test]
+    fn effective_config_whitespace_only_overrides() {
+        let base = base_config();
+        let result = effective_config(&base, "   ").unwrap();
+        assert!(result.overridden_keys.is_empty());
+    }
+
+    #[test]
+    fn effective_config_non_object_overrides() {
+        let base = base_config();
+        let err = effective_config(&base, r#""string value""#).unwrap_err();
+        assert!(err.to_string().contains("must be a JSON object"));
+    }
+
+    // ── ACCOUNT_SCOPED_KEYS ─────────────────────────────────────
+
+    #[test]
+    fn account_scoped_keys_is_nonempty() {
+        assert!(!ACCOUNT_SCOPED_KEYS.is_empty());
+    }
+
+    #[test]
+    fn account_scoped_keys_includes_business() {
+        assert!(ACCOUNT_SCOPED_KEYS.contains(&"business"));
+    }
+
+    #[test]
+    fn account_scoped_keys_excludes_llm() {
+        assert!(!ACCOUNT_SCOPED_KEYS.contains(&"llm"));
+    }
+
+    #[test]
+    fn account_scoped_keys_excludes_server() {
+        assert!(!ACCOUNT_SCOPED_KEYS.contains(&"server"));
+    }
+
+    // ── merge_overrides edge cases ──────────────────────────────
+
+    #[test]
+    fn merge_overrides_empty_object_current() {
+        let patch: Value = serde_json::from_str(r#"{"mode": "composer"}"#).unwrap();
+        let result = merge_overrides("{}", &patch).unwrap();
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["mode"], "composer");
+    }
+
+    #[test]
+    fn merge_overrides_replaces_existing_key() {
+        let current = r#"{"mode": "autopilot"}"#;
+        let patch: Value = serde_json::from_str(r#"{"mode": "composer"}"#).unwrap();
+        let result = merge_overrides(current, &patch).unwrap();
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["mode"], "composer");
+    }
+
+    #[test]
+    fn merge_overrides_invalid_current_json() {
+        let patch: Value = serde_json::from_str(r#"{"mode": "x"}"#).unwrap();
+        let result = merge_overrides("not json", &patch);
+        assert!(result.is_err());
+    }
+
+    // ── EffectiveConfigResult ────────────────────────────────────
+
+    #[test]
+    fn effective_config_result_debug() {
+        let result = EffectiveConfigResult {
+            config: base_config(),
+            overridden_keys: vec!["business".to_string()],
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("business"));
+    }
 }

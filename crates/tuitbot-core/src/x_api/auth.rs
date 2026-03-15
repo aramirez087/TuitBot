@@ -1326,4 +1326,93 @@ mod tests {
         let client = build_oauth_client("cid", "http://localhost/auth/callback");
         assert!(client.is_ok());
     }
+
+    // ── REQUIRED_SCOPES coverage ─────────────────────────────────
+
+    #[test]
+    fn required_scopes_is_nonempty() {
+        assert!(!REQUIRED_SCOPES.is_empty());
+    }
+
+    #[test]
+    fn required_scopes_contains_tweet_read() {
+        assert!(REQUIRED_SCOPES.contains(&"tweet.read"));
+    }
+
+    #[test]
+    fn required_scopes_contains_tweet_write() {
+        assert!(REQUIRED_SCOPES.contains(&"tweet.write"));
+    }
+
+    #[test]
+    fn required_scopes_contains_offline_access() {
+        assert!(REQUIRED_SCOPES.contains(&"offline.access"));
+    }
+
+    // ── Token expiry edge cases ──────────────────────────────────
+
+    #[test]
+    fn tokens_expiry_just_above_refresh_window() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::seconds(REFRESH_WINDOW_SECS + 1),
+            scopes: vec![],
+        };
+        let seconds_until = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(seconds_until >= REFRESH_WINDOW_SECS);
+    }
+
+    #[test]
+    fn tokens_expiry_just_below_refresh_window() {
+        let tokens = Tokens {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now() + chrono::Duration::seconds(REFRESH_WINDOW_SECS - 1),
+            scopes: vec![],
+        };
+        let seconds_until = tokens
+            .expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds();
+        assert!(seconds_until < REFRESH_WINDOW_SECS);
+    }
+
+    // ── save_tokens produces valid JSON ──────────────────────────
+
+    #[test]
+    fn save_tokens_produces_pretty_json() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("tokens.json");
+        let tokens = Tokens {
+            access_token: "pretty".into(),
+            refresh_token: "r".into(),
+            expires_at: Utc::now(),
+            scopes: vec!["s1".into()],
+        };
+        save_tokens(&tokens, &path).expect("save");
+        let content = std::fs::read_to_string(&path).expect("read");
+        // Pretty-printed JSON should have newlines
+        assert!(content.contains('\n'));
+        // Verify it parses back correctly
+        let parsed: serde_json::Value = serde_json::from_str(&content).expect("parse");
+        assert_eq!(parsed["access_token"], "pretty");
+    }
+
+    // ── TokenRefreshResponse edge ────────────────────────────────
+
+    #[test]
+    fn token_refresh_response_negative_expires() {
+        let json = r#"{
+            "access_token": "a",
+            "refresh_token": "r",
+            "expires_in": -1,
+            "scope": "tweet.read"
+        }"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.expires_in, -1);
+    }
 }

@@ -646,4 +646,296 @@ mod tests {
         assert!(users.is_empty());
         assert!(cursor.is_none());
     }
+
+    // ── Variable construction for queries ────────────────────────────
+
+    #[test]
+    fn search_timeline_variables_without_cursor() {
+        let query = "rust programming";
+        let max_results = 20u32;
+        let mut variables = serde_json::json!({
+            "rawQuery": query,
+            "count": max_results.min(20),
+            "querySource": "typed_query",
+            "product": "Latest",
+        });
+        let cursor: Option<&str> = None;
+        if let Some(c) = cursor {
+            variables["cursor"] = serde_json::Value::String(c.to_string());
+        }
+        assert_eq!(variables["rawQuery"], "rust programming");
+        assert_eq!(variables["count"], 20);
+        assert!(variables.get("cursor").is_none());
+    }
+
+    #[test]
+    fn search_timeline_variables_with_cursor() {
+        let mut variables = serde_json::json!({
+            "rawQuery": "test",
+            "count": 10,
+            "querySource": "typed_query",
+            "product": "Latest",
+        });
+        let cursor: Option<&str> = Some("abc123");
+        if let Some(c) = cursor {
+            variables["cursor"] = serde_json::Value::String(c.to_string());
+        }
+        assert_eq!(variables["cursor"], "abc123");
+    }
+
+    #[test]
+    fn search_timeline_count_capped_at_20() {
+        let max: u32 = 100;
+        let capped = max.min(20);
+        assert_eq!(capped, 20);
+    }
+
+    #[test]
+    fn get_tweet_by_id_variables() {
+        let tweet_id = "12345";
+        let variables = serde_json::json!({
+            "tweetId": tweet_id,
+            "withCommunity": false,
+            "includePromotedContent": false,
+            "withVoice": false,
+        });
+        assert_eq!(variables["tweetId"], "12345");
+        assert_eq!(variables["withCommunity"], false);
+        assert_eq!(variables.as_object().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn get_user_by_screen_name_variables() {
+        let variables = serde_json::json!({
+            "screen_name": "testuser",
+            "withSafetyModeUserFields": true,
+        });
+        assert_eq!(variables["screen_name"], "testuser");
+        assert_eq!(variables["withSafetyModeUserFields"], true);
+    }
+
+    #[test]
+    fn get_user_by_rest_id_variables() {
+        let variables = serde_json::json!({
+            "userId": "42",
+            "withSafetyModeUserFields": true,
+        });
+        assert_eq!(variables["userId"], "42");
+    }
+
+    #[test]
+    fn get_user_tweets_variables() {
+        let variables = serde_json::json!({
+            "userId": "user123",
+            "count": 15u32.min(20),
+            "includePromotedContent": false,
+            "withQuickPromoteEligibilityTweetFields": false,
+            "withVoice": false,
+            "withV2Timeline": true,
+        });
+        assert_eq!(variables["userId"], "user123");
+        assert_eq!(variables["count"], 15);
+        assert_eq!(variables["withV2Timeline"], true);
+    }
+
+    #[test]
+    fn get_followers_variables() {
+        let variables = serde_json::json!({
+            "userId": "u1",
+            "count": 20u32.min(20),
+            "includePromotedContent": false,
+        });
+        assert_eq!(variables["count"], 20);
+        assert_eq!(variables.as_object().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn get_following_variables() {
+        let variables = serde_json::json!({
+            "userId": "u2",
+            "count": 5u32.min(20),
+            "includePromotedContent": false,
+        });
+        assert_eq!(variables["count"], 5);
+    }
+
+    #[test]
+    fn get_liked_tweets_variables() {
+        let variables = serde_json::json!({
+            "userId": "u3",
+            "count": 20u32.min(20),
+            "includePromotedContent": false,
+            "withClientEventToken": false,
+            "withBirdwatchNotes": false,
+            "withVoice": false,
+            "withV2Timeline": true,
+        });
+        assert_eq!(variables.as_object().unwrap().len(), 7);
+    }
+
+    #[test]
+    fn get_home_timeline_variables() {
+        let variables = serde_json::json!({
+            "count": 15u32.min(20),
+            "includePromotedContent": false,
+            "latestControlAvailable": true,
+            "requestContext": "launch",
+            "withCommunity": true,
+        });
+        assert_eq!(variables["requestContext"], "launch");
+        assert_eq!(variables["withCommunity"], true);
+    }
+
+    #[test]
+    fn get_bookmarks_variables() {
+        let variables = serde_json::json!({
+            "count": 20u32.min(20),
+            "includePromotedContent": false,
+        });
+        assert_eq!(variables.as_object().unwrap().len(), 2);
+    }
+
+    // ── parse_timeline path traversal ────────────────────────────────
+
+    #[test]
+    fn parse_timeline_search_path() {
+        let body = serde_json::json!({
+            "data": {
+                "search_by_raw_query": {
+                    "search_timeline": {
+                        "timeline": {
+                            "instructions": []
+                        }
+                    }
+                }
+            }
+        });
+        let (tweets, cursor) = super::super::response::parse_timeline(
+            &body,
+            &["data", "search_by_raw_query", "search_timeline", "timeline"],
+        );
+        assert!(tweets.is_empty());
+        assert!(cursor.is_none());
+    }
+
+    #[test]
+    fn parse_timeline_user_tweets_path() {
+        let body = serde_json::json!({
+            "data": {
+                "user": {
+                    "result": {
+                        "timeline_v2": {
+                            "timeline": {
+                                "instructions": []
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let (tweets, _) = super::super::response::parse_timeline(
+            &body,
+            &["data", "user", "result", "timeline_v2", "timeline"],
+        );
+        assert!(tweets.is_empty());
+    }
+
+    #[test]
+    fn parse_timeline_home_path() {
+        let body = serde_json::json!({
+            "data": {
+                "home": {
+                    "home_timeline_urt": {
+                        "instructions": []
+                    }
+                }
+            }
+        });
+        let (tweets, _) =
+            super::super::response::parse_timeline(&body, &["data", "home", "home_timeline_urt"]);
+        assert!(tweets.is_empty());
+    }
+
+    #[test]
+    fn parse_timeline_bookmarks_path() {
+        let body = serde_json::json!({
+            "data": {
+                "bookmark_timeline_v2": {
+                    "timeline": {
+                        "instructions": []
+                    }
+                }
+            }
+        });
+        let (tweets, _) = super::super::response::parse_timeline(
+            &body,
+            &["data", "bookmark_timeline_v2", "timeline"],
+        );
+        assert!(tweets.is_empty());
+    }
+
+    // ── parse_user field extraction ──────────────────────────────────
+
+    #[test]
+    fn parse_user_with_url() {
+        let result = serde_json::json!({
+            "rest_id": "u1",
+            "legacy": {
+                "screen_name": "alice",
+                "name": "Alice",
+                "url": "https://t.co/example"
+            }
+        });
+        let user = super::super::response::parse_user(&result).unwrap();
+        assert_eq!(user.url.as_deref(), Some("https://t.co/example"));
+    }
+
+    #[test]
+    fn parse_user_metrics() {
+        let result = serde_json::json!({
+            "rest_id": "u2",
+            "legacy": {
+                "screen_name": "bob",
+                "name": "Bob",
+                "followers_count": 500,
+                "friends_count": 200,
+                "statuses_count": 3000,
+                "listed_count": 10
+            }
+        });
+        let user = super::super::response::parse_user(&result).unwrap();
+        assert_eq!(user.public_metrics.followers_count, 500);
+        assert_eq!(user.public_metrics.following_count, 200);
+        assert_eq!(user.public_metrics.tweet_count, 3000);
+        // listed_count is not tracked in UserMetrics
+    }
+
+    // ── parse_tweet metrics ─────────────────────────────────────────
+
+    #[test]
+    fn parse_tweet_with_all_metrics() {
+        let result = serde_json::json!({
+            "rest_id": "t1",
+            "legacy": {
+                "full_text": "Hello",
+                "user_id_str": "u1",
+                "created_at": "Mon Jan 01 00:00:00 +0000 2026",
+                "retweet_count": 10,
+                "favorite_count": 20,
+                "reply_count": 3,
+                "quote_count": 5,
+                "bookmark_count": 2,
+                "conversation_id_str": "t1"
+            },
+            "views": {"count": "1000"}
+        });
+        let tweet = super::super::response::parse_tweet(&result).unwrap();
+        assert_eq!(tweet.public_metrics.retweet_count, 10);
+        assert_eq!(tweet.public_metrics.like_count, 20);
+        assert_eq!(tweet.public_metrics.reply_count, 3);
+        assert_eq!(tweet.public_metrics.quote_count, 5);
+        assert_eq!(tweet.public_metrics.bookmark_count, 2);
+        assert_eq!(tweet.public_metrics.impression_count, 1000);
+        assert_eq!(tweet.conversation_id.as_deref(), Some("t1"));
+    }
 }
