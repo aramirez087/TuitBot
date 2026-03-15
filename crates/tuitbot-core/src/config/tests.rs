@@ -1757,7 +1757,7 @@ fn validate_minimum_db_path_is_directory() {
     config.business.product_name = "Test".to_string();
     config.business.product_keywords = vec!["test".to_string()];
     config.business.product_description = "A product".to_string();
-    config.storage.db_path = "/tmp".to_string(); // /tmp is a directory
+    config.storage.db_path = std::env::temp_dir().to_string_lossy().to_string(); // temp dir is always a directory
     let errors = config.validate_minimum().unwrap_err();
     assert!(errors.iter().any(
         |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "storage.db_path")
