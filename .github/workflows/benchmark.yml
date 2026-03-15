@@ -73,8 +73,8 @@ jobs:
         run: |
           echo "## 📦 Bundle Size Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          cd dashboard && du -sh dist/ 2>/dev/null | awk '{print "- Total: **" $1 "**"}' >> $GITHUB_STEP_SUMMARY
-          find dist -type f -name "*.js" -o -name "*.css" 2>/dev/null | while read f; do
+          cd dashboard && du -sh build/ 2>/dev/null | awk '{print "- Total: **" $1 "**"}' >> $GITHUB_STEP_SUMMARY
+          find build -type f -name "*.js" -o -name "*.css" 2>/dev/null | while read f; do
             size=$(du -h "$f" | cut -f1)
             echo "- $f: $size"
           done | head -10 >> $GITHUB_STEP_SUMMARY
@@ -85,5 +85,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-build-${{ github.run_id }}
-          path: dashboard/dist
+          path: dashboard/build
           retention-days: 30
