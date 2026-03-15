@@ -1,11 +1,13 @@
-//! Coverage tests for WriteMcpServer handlers (write/handlers.rs, write/tools.rs, write/mod.rs).
+//! Coverage tests for WriteMcpServer (write/handlers.rs, write/tools.rs, write/mod.rs).
 //!
 //! Tests exercise the workflow layer that the handlers delegate to, using a
 //! minimal AppState backed by an in-memory test DB and a no-op X client.
-//! Tools shared with admin are already covered in admin/tests — these tests
-//! focus on tools unique to the write server profile.
+//! Handler methods are private (proc-macro generated), so tests call the
+//! same workflow functions the handlers call — this covers the dispatch path
+//! and the business logic in one shot.
 
 mod handlers;
+mod tools;
 
 use std::sync::Arc;
 
@@ -18,6 +20,10 @@ use tuitbot_core::x_api::XApiClient;
 use crate::state::AppState;
 
 // ── Minimal no-op X client ────────────────────────────────────────────
+//
+// Only the 8 required (non-default) trait methods need to be implemented.
+// All optional methods already have default impls in XApiClient that return
+// ApiError — those defaults are sufficient for these smoke tests.
 
 pub(super) struct NullX;
 

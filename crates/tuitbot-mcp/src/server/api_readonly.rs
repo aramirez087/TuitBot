@@ -408,3 +408,187 @@ impl ServerHandler for ApiReadonlyMcpServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use tuitbot_core::config::Config;
+    use tuitbot_core::error::XApiError;
+    use tuitbot_core::x_api::types::*;
+    use tuitbot_core::x_api::XApiClient;
+
+    use crate::kernel;
+    use crate::provider::retry::{RetryPolicy, RetryingProvider};
+    use crate::provider::x_api::XApiProvider;
+    use crate::state::ReadonlyState;
+
+    // ── Minimal no-op X client ────────────────────────────────────────────
+    struct NullX;
+
+    #[async_trait::async_trait]
+    impl XApiClient for NullX {
+        async fn search_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_mentions(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<MentionResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn post_tweet(&self, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn reply_to_tweet(&self, _: &str, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_tweet(&self, _: &str) -> Result<Tweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_me(&self) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_by_username(&self, _: &str) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+    }
+
+    fn make_state() -> Arc<ReadonlyState> {
+        Arc::new(ReadonlyState {
+            config: Config::default(),
+            x_client: Box::new(NullX),
+            authenticated_user_id: String::new(),
+            x_available: false,
+        })
+    }
+
+    fn provider(state: &ReadonlyState) -> RetryingProvider<XApiProvider<'_>> {
+        RetryingProvider::new(
+            XApiProvider::new(state.x_client.as_ref()),
+            RetryPolicy::default(),
+        )
+    }
+
+    // ── kernel::read — full api-readonly tool surface ─────────────────────
+
+    #[tokio::test]
+    async fn api_readonly_get_tweet() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_tweet(&p, "123").await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_by_username() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_by_username(&p, "alice").await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_search_tweets() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::search_tweets(&p, "rust lang", 5, None, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_mentions() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_mentions(&p, "u1", None, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_tweets() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_tweets(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_home_timeline() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_home_timeline(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_by_id() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_by_id(&p, "u1").await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_followers() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_followers(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_following() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_following(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_liked_tweets() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_liked_tweets(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_bookmarks() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_bookmarks(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_users_by_ids() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_users_by_ids(&p, &["u1", "u2"]).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_tweet_liking_users() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_tweet_liking_users(&p, "t1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+}

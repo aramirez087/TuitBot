@@ -249,6 +249,25 @@ mod tests {
         }
     }
 
+    fn sample_citation() -> VaultCitation {
+        VaultCitation {
+            chunk_id: 1,
+            node_id: 10,
+            heading_path: "# Guide > ## Setup".to_string(),
+            source_path: "notes/guide.md".to_string(),
+            source_title: Some("Installation Guide".to_string()),
+            snippet: "Install with cargo install".to_string(),
+            retrieval_boost: 1.0,
+        }
+    }
+
+    fn sample_fragment() -> FragmentContext {
+        FragmentContext {
+            chunk_text: "Install the CLI with cargo install tuitbot".to_string(),
+            citation: sample_citation(),
+        }
+    }
+
     #[test]
     fn format_fragments_prompt_empty() {
         let result = format_fragments_prompt(&[]);
@@ -266,14 +285,34 @@ mod tests {
     }
 
     #[test]
+    fn format_fragments_single_with_heading() {
+        let frags = vec![sample_fragment()];
+        let result = format_fragments_prompt(&frags);
+        assert!(result.contains("Relevant knowledge"));
+        assert!(result.contains("Installation Guide"));
+        assert!(result.contains("# Guide > ## Setup"));
+        assert!(result.contains("Reference these insights"));
+    }
+
+    #[test]
     fn format_fragments_prompt_truncates_at_limit() {
-        // Create many large fragments that together exceed MAX_FRAGMENT_CHARS
         let big_text = "A".repeat(300);
         let fragments: Vec<FragmentContext> = (0..20)
             .map(|i| make_fragment(i, &big_text, &format!("notes/{i}.md")))
             .collect();
         let result = format_fragments_prompt(&fragments);
         assert!(result.len() <= MAX_FRAGMENT_CHARS);
+    }
+
+    #[test]
+    fn format_fragments_multiple_items_numbered() {
+        let mut f1 = sample_fragment();
+        f1.citation.source_title = Some("First".to_string());
+        let mut f2 = sample_fragment();
+        f2.citation.source_title = Some("Second".to_string());
+        let result = format_fragments_prompt(&[f1, f2]);
+        assert!(result.contains("1."));
+        assert!(result.contains("2."));
     }
 
     #[test]
@@ -291,6 +330,13 @@ mod tests {
         assert_eq!(citations[0].node_id, 420);
         assert_eq!(citations[0].source_path, "vault/note.md");
         assert_eq!(citations[0].retrieval_boost, 1.0);
+    }
+
+    #[test]
+    fn build_citations_returns_all() {
+        let frags = vec![sample_fragment(), sample_fragment()];
+        let citations = build_citations(&frags);
+        assert_eq!(citations.len(), 2);
     }
 
     #[test]
@@ -345,18 +391,33 @@ mod tests {
 
     #[test]
     fn format_fragments_heading_path_empty() {
-        // Default make_fragment has empty heading_path — no bracket prefix
         let f = make_fragment(1, "some text", "path.md");
         let result = format_fragments_prompt(&[f]);
-        // Should NOT contain "[" before "(from:" since heading_path is empty
         assert!(!result.contains("[] "));
     }
 
     #[test]
     fn format_fragments_source_title_fallback() {
-        // source_title is None — should fall back to source_path
         let f = make_fragment(1, "content here", "vault/fallback.md");
         let result = format_fragments_prompt(&[f]);
         assert!(result.contains("vault/fallback.md"));
+    }
+
+    #[test]
+    fn truncate_text_short_unchanged() {
+        assert_eq!(truncate_text("hello", 10), "hello");
+    }
+
+    #[test]
+    fn truncate_text_long_gets_ellipsis() {
+        let result = truncate_text("hello world this is long", 10);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 13);
+    }
+
+    #[test]
+    fn truncate_text_exact_boundary() {
+        let result = truncate_text("hello", 5);
+        assert_eq!(result, "hello");
     }
 }
