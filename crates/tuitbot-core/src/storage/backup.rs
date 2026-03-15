@@ -591,6 +591,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        target_os = "windows",
+        ignore = "SQLite WAL lock prevents rename on Windows CI"
+    )]
     async fn restore_over_existing_db_creates_safety_backup() {
         let dir = tempfile::tempdir().expect("create temp dir");
         let (pool, db_path) = file_test_db(dir.path()).await;
@@ -607,7 +611,9 @@ mod tests {
         // Create backup.
         let backup_dir = dir.path().join("backups");
         let result = create_backup(&pool, &backup_dir).await.expect("backup");
+        // Fully close and drop the pool so Windows releases the file lock.
         pool.close().await;
+        drop(pool);
 
         // Restore over the existing DB — should create pre_restore_*.db
         restore_from_backup(&result.path, &db_path)
