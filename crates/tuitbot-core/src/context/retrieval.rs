@@ -229,3 +229,130 @@ fn truncate_text(text: &str, max_len: usize) -> String {
         format!("{}...", &text[..end])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_citation() -> VaultCitation {
+        VaultCitation {
+            chunk_id: 1,
+            node_id: 10,
+            heading_path: "# Guide > ## Setup".to_string(),
+            source_path: "notes/guide.md".to_string(),
+            source_title: Some("Installation Guide".to_string()),
+            snippet: "Install with cargo install".to_string(),
+            retrieval_boost: 1.0,
+        }
+    }
+
+    fn sample_fragment() -> FragmentContext {
+        FragmentContext {
+            chunk_text: "Install the CLI with cargo install tuitbot".to_string(),
+            citation: sample_citation(),
+        }
+    }
+
+    #[test]
+    fn format_fragments_empty_returns_empty() {
+        assert_eq!(format_fragments_prompt(&[]), "");
+    }
+
+    #[test]
+    fn format_fragments_single_item() {
+        let frags = vec![sample_fragment()];
+        let result = format_fragments_prompt(&frags);
+        assert!(result.contains("Relevant knowledge"));
+        assert!(result.contains("Installation Guide"));
+        assert!(result.contains("# Guide > ## Setup"));
+        assert!(result.contains("Reference these insights"));
+    }
+
+    #[test]
+    fn format_fragments_multiple_items_numbered() {
+        let mut f1 = sample_fragment();
+        f1.citation.source_title = Some("First".to_string());
+        let mut f2 = sample_fragment();
+        f2.citation.source_title = Some("Second".to_string());
+        let result = format_fragments_prompt(&[f1, f2]);
+        assert!(result.contains("1."));
+        assert!(result.contains("2."));
+    }
+
+    #[test]
+    fn format_fragments_no_heading_path() {
+        let mut frag = sample_fragment();
+        frag.citation.heading_path = String::new();
+        let result = format_fragments_prompt(&[frag]);
+        // Should not contain "[]" for empty heading
+        assert!(!result.contains("[] "));
+    }
+
+    #[test]
+    fn format_fragments_no_title_uses_path() {
+        let mut frag = sample_fragment();
+        frag.citation.source_title = None;
+        let result = format_fragments_prompt(&[frag]);
+        assert!(result.contains("notes/guide.md"));
+    }
+
+    #[test]
+    fn build_citations_returns_all() {
+        let frags = vec![sample_fragment(), sample_fragment()];
+        let citations = build_citations(&frags);
+        assert_eq!(citations.len(), 2);
+        assert_eq!(citations[0].chunk_id, 1);
+    }
+
+    #[test]
+    fn build_citations_empty() {
+        let citations = build_citations(&[]);
+        assert!(citations.is_empty());
+    }
+
+    #[test]
+    fn citations_to_provenance_refs_maps_correctly() {
+        let citations = vec![sample_citation()];
+        let refs = citations_to_provenance_refs(&citations);
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].node_id, Some(10));
+        assert_eq!(refs[0].chunk_id, Some(1));
+        assert_eq!(refs[0].source_path.as_deref(), Some("notes/guide.md"));
+        assert_eq!(refs[0].heading_path.as_deref(), Some("# Guide > ## Setup"));
+        assert!(refs[0].seed_id.is_none());
+    }
+
+    #[test]
+    fn citations_to_chunks_json_roundtrip() {
+        let citations = vec![sample_citation()];
+        let json = citations_to_chunks_json(&citations);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).expect("valid json");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0]["chunk_id"], 1);
+        assert_eq!(parsed[0]["node_id"], 10);
+    }
+
+    #[test]
+    fn citations_to_chunks_json_empty() {
+        let json = citations_to_chunks_json(&[]);
+        assert_eq!(json, "[]");
+    }
+
+    #[test]
+    fn truncate_text_short_unchanged() {
+        assert_eq!(truncate_text("hello", 10), "hello");
+    }
+
+    #[test]
+    fn truncate_text_long_gets_ellipsis() {
+        let result = truncate_text("hello world this is long", 10);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 13); // 10 - 3 + 3 for "..."
+    }
+
+    #[test]
+    fn truncate_text_exact_boundary() {
+        let result = truncate_text("hello", 5);
+        assert_eq!(result, "hello"); // exactly at limit, no truncation
+    }
+}

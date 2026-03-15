@@ -1613,3 +1613,268 @@ watch = false
         "watch=false with no enabled override should be disabled"
     );
 }
+
+// ---------------------------------------------------------------------------
+// validate_minimum — comprehensive coverage (previously 0 tests)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn validate_minimum_passes_on_defaults_with_product_name() {
+    let mut config = Config::default();
+    config.business.product_name = "TestProduct".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.business.product_description = "A product".to_string();
+    // Default db_path should be non-empty and not a directory
+    assert!(
+        config.validate_minimum().is_ok(),
+        "expected minimum validation to pass: {:?}",
+        config.validate_minimum()
+    );
+}
+
+#[test]
+fn validate_minimum_missing_product_name() {
+    let mut config = Config::default();
+    config.business.product_name = String::new();
+    config.business.product_description = "desc".to_string();
+    config.business.product_keywords = vec!["kw".to_string()];
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::MissingField { field } if field == "business.product_name")
+    ));
+}
+
+#[test]
+fn validate_minimum_missing_product_description() {
+    let mut config = Config::default();
+    config.business.product_name = "Product".to_string();
+    config.business.product_keywords = vec!["kw".to_string()];
+    config.business.product_description = String::new();
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::MissingField { field } if field == "business.product_description")
+    ));
+}
+
+#[test]
+fn validate_minimum_missing_keywords() {
+    let mut config = Config::default();
+    config.business.product_name = "Product".to_string();
+    config.business.product_description = "desc".to_string();
+    config.business.product_keywords = vec![];
+    config.business.competitor_keywords = vec![];
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::MissingField { field } if field.contains("product_keywords"))
+    ));
+}
+
+#[test]
+fn validate_minimum_invalid_llm_provider() {
+    let mut config = Config::default();
+    config.business.product_name = "P".to_string();
+    config.business.product_description = "d".to_string();
+    config.business.product_keywords = vec!["k".to_string()];
+    config.llm.provider = "gemini".to_string();
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs
+        .iter()
+        .any(|e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "llm.provider")));
+}
+
+#[test]
+fn validate_minimum_invalid_provider_backend() {
+    let mut config = Config::default();
+    config.business.product_name = "P".to_string();
+    config.business.product_description = "d".to_string();
+    config.business.product_keywords = vec!["k".to_string()];
+    config.x_api.provider_backend = "twitter_v2".to_string();
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "x_api.provider_backend")
+    ));
+}
+
+#[test]
+fn validate_minimum_empty_db_path() {
+    let mut config = Config::default();
+    config.business.product_name = "P".to_string();
+    config.business.product_description = "d".to_string();
+    config.business.product_keywords = vec!["k".to_string()];
+    config.storage.db_path = "   ".to_string(); // whitespace only
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "storage.db_path")
+    ));
+}
+
+#[test]
+fn validate_minimum_db_path_is_directory() {
+    let mut config = Config::default();
+    config.business.product_name = "P".to_string();
+    config.business.product_description = "d".to_string();
+    config.business.product_keywords = vec!["k".to_string()];
+    config.storage.db_path = "/tmp".to_string(); // /tmp is always a directory
+    let errs = config.validate_minimum().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "storage.db_path")
+    ));
+}
+
+#[test]
+fn validate_minimum_valid_provider_backends() {
+    for backend in &["x_api", "scraper", ""] {
+        let mut config = Config::default();
+        config.business.product_name = "P".to_string();
+        config.business.product_description = "d".to_string();
+        config.business.product_keywords = vec!["k".to_string()];
+        config.x_api.provider_backend = backend.to_string();
+        // Should not error on provider_backend field specifically
+        let result = config.validate_minimum();
+        if let Err(ref errs) = result {
+            assert!(
+                !errs
+                    .iter()
+                    .any(|e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "x_api.provider_backend")),
+                "backend '{}' should be valid: {:?}",
+                backend,
+                errs
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// validate — uncovered paths
+// ---------------------------------------------------------------------------
+
+#[test]
+fn validate_invalid_auth_mode() {
+    let mut config = valid_test_config();
+    config.auth.mode = "oauth2".to_string();
+    let errs = config.validate().unwrap_err();
+    assert!(errs
+        .iter()
+        .any(|e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "auth.mode")));
+}
+
+#[test]
+fn validate_valid_auth_modes() {
+    for mode in &["manual", "local_callback", ""] {
+        let mut config = valid_test_config();
+        config.auth.mode = mode.to_string();
+        let result = config.validate();
+        if let Err(ref errs) = result {
+            assert!(
+                !errs.iter().any(
+                    |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "auth.mode")
+                ),
+                "auth mode '{}' should be valid, got: {:?}",
+                mode,
+                errs
+            );
+        }
+    }
+}
+
+#[test]
+fn validate_max_replies_per_day_zero() {
+    let mut config = valid_test_config();
+    config.limits.max_replies_per_day = 0;
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "limits.max_replies_per_day")
+    ));
+}
+
+#[test]
+fn validate_max_tweets_per_day_zero() {
+    let mut config = valid_test_config();
+    config.limits.max_tweets_per_day = 0;
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "limits.max_tweets_per_day")
+    ));
+}
+
+#[test]
+fn validate_max_threads_per_week_zero() {
+    let mut config = valid_test_config();
+    config.limits.max_threads_per_week = 0;
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "limits.max_threads_per_week")
+    ));
+}
+
+#[test]
+fn validate_is_valid_hhmm_edge_cases() {
+    // is_valid_hhmm is private but exercised through preferred_times
+    let mut config = valid_test_config();
+    config.schedule.preferred_times = vec!["00:00".to_string(), "23:59".to_string()];
+    config.limits.max_tweets_per_day = 2;
+    // Valid times — no error for the time format
+    let result = config.validate();
+    if let Err(ref errs) = result {
+        assert!(
+            !errs
+                .iter()
+                .any(|e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.preferred_times" && !e.to_string().contains("3 slots"))),
+        );
+    }
+}
+
+#[test]
+fn validate_preferred_times_invalid_hour() {
+    let mut config = valid_test_config();
+    config.schedule.preferred_times = vec!["24:00".to_string()];
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.preferred_times")
+    ));
+}
+
+#[test]
+fn validate_preferred_times_invalid_minute() {
+    let mut config = valid_test_config();
+    config.schedule.preferred_times = vec!["12:60".to_string()];
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.preferred_times")
+    ));
+}
+
+#[test]
+fn validate_preferred_times_bad_format_no_colon() {
+    let mut config = valid_test_config();
+    config.schedule.preferred_times = vec!["1200".to_string()];
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.preferred_times")
+    ));
+}
+
+#[test]
+fn validate_anthropic_requires_api_key_empty() {
+    let mut config = valid_test_config();
+    config.llm.provider = "anthropic".to_string();
+    config.llm.api_key = Some(String::new()); // empty key
+    let errs = config.validate().unwrap_err();
+    assert!(errs.iter().any(
+        |e| matches!(e, ConfigError::MissingField { field } if field.contains("llm.api_key"))
+    ));
+}
+
+#[test]
+fn validate_anthropic_with_api_key_passes_llm_check() {
+    let mut config = valid_test_config();
+    config.llm.provider = "anthropic".to_string();
+    config.llm.api_key = Some("sk-ant-xxx".to_string());
+    // Should not error on the api_key check
+    let result = config.validate();
+    if let Err(ref errs) = result {
+        assert!(!errs.iter().any(
+            |e| matches!(e, ConfigError::MissingField { field } if field.contains("llm.api_key"))
+        ));
+    }
+}
