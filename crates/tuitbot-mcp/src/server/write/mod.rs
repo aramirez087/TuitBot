@@ -8,6 +8,9 @@
 mod handlers;
 mod tools;
 
+#[cfg(test)]
+mod tests;
+
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::*;

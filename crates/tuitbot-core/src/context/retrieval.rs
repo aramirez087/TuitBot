@@ -229,3 +229,134 @@ fn truncate_text(text: &str, max_len: usize) -> String {
         format!("{}...", &text[..end])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_fragment(chunk_id: i64, text: &str, path: &str) -> FragmentContext {
+        FragmentContext {
+            chunk_text: text.to_string(),
+            citation: VaultCitation {
+                chunk_id,
+                node_id: chunk_id * 10,
+                heading_path: String::new(),
+                source_path: path.to_string(),
+                source_title: None,
+                snippet: text.chars().take(50).collect(),
+                retrieval_boost: 1.0,
+            },
+        }
+    }
+
+    #[test]
+    fn format_fragments_prompt_empty() {
+        let result = format_fragments_prompt(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn format_fragments_prompt_single() {
+        let f = make_fragment(1, "Some interesting insight about Rust", "notes/rust.md");
+        let result = format_fragments_prompt(&[f]);
+        assert!(result.contains("Relevant knowledge from your notes:"));
+        assert!(result.contains("(from: notes/rust.md)"));
+        assert!(result.contains("Some interesting insight about Rust"));
+        assert!(result.contains("Reference these insights"));
+    }
+
+    #[test]
+    fn format_fragments_prompt_truncates_at_limit() {
+        // Create many large fragments that together exceed MAX_FRAGMENT_CHARS
+        let big_text = "A".repeat(300);
+        let fragments: Vec<FragmentContext> = (0..20)
+            .map(|i| make_fragment(i, &big_text, &format!("notes/{i}.md")))
+            .collect();
+        let result = format_fragments_prompt(&fragments);
+        assert!(result.len() <= MAX_FRAGMENT_CHARS);
+    }
+
+    #[test]
+    fn build_citations_empty() {
+        let result = build_citations(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn build_citations_preserves_fields() {
+        let f = make_fragment(42, "chunk text here", "vault/note.md");
+        let citations = build_citations(&[f]);
+        assert_eq!(citations.len(), 1);
+        assert_eq!(citations[0].chunk_id, 42);
+        assert_eq!(citations[0].node_id, 420);
+        assert_eq!(citations[0].source_path, "vault/note.md");
+        assert_eq!(citations[0].retrieval_boost, 1.0);
+    }
+
+    #[test]
+    fn citations_to_provenance_refs_maps_fields() {
+        let citation = VaultCitation {
+            chunk_id: 5,
+            node_id: 50,
+            heading_path: "# Title > ## Section".to_string(),
+            source_path: "docs/guide.md".to_string(),
+            source_title: Some("Guide".to_string()),
+            snippet: "snippet text".to_string(),
+            retrieval_boost: 1.5,
+        };
+        let refs = citations_to_provenance_refs(&[citation]);
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].node_id, Some(50));
+        assert_eq!(refs[0].chunk_id, Some(5));
+        assert_eq!(refs[0].source_path.as_deref(), Some("docs/guide.md"));
+        assert_eq!(
+            refs[0].heading_path.as_deref(),
+            Some("# Title > ## Section")
+        );
+        assert_eq!(refs[0].snippet.as_deref(), Some("snippet text"));
+        assert!(refs[0].seed_id.is_none());
+    }
+
+    #[test]
+    fn citations_to_chunks_json_empty() {
+        let result = citations_to_chunks_json(&[]);
+        assert_eq!(result, "[]");
+    }
+
+    #[test]
+    fn citations_to_chunks_json_valid() {
+        let citation = VaultCitation {
+            chunk_id: 7,
+            node_id: 70,
+            heading_path: "# Intro".to_string(),
+            source_path: "notes/intro.md".to_string(),
+            source_title: None,
+            snippet: "intro text".to_string(),
+            retrieval_boost: 1.0,
+        };
+        let result = citations_to_chunks_json(&[citation]);
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0]["chunk_id"], 7);
+        assert_eq!(parsed[0]["node_id"], 70);
+        assert_eq!(parsed[0]["source_path"], "notes/intro.md");
+        assert_eq!(parsed[0]["heading_path"], "# Intro");
+    }
+
+    #[test]
+    fn format_fragments_heading_path_empty() {
+        // Default make_fragment has empty heading_path — no bracket prefix
+        let f = make_fragment(1, "some text", "path.md");
+        let result = format_fragments_prompt(&[f]);
+        // Should NOT contain "[" before "(from:" since heading_path is empty
+        assert!(!result.contains("[] "));
+    }
+
+    #[test]
+    fn format_fragments_source_title_fallback() {
+        // source_title is None — should fall back to source_path
+        let f = make_fragment(1, "content here", "vault/fallback.md");
+        let result = format_fragments_prompt(&[f]);
+        assert!(result.contains("vault/fallback.md"));
+    }
+}
