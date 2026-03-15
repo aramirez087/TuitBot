@@ -973,6 +973,241 @@ mod tests {
         assert!(debug.contains("2"));
     }
 
+    // =========================================================================
+    // Additional edge case tests for coverage push
+    // =========================================================================
+
+    #[test]
+    fn is_rate_limit_error_empty_string() {
+        assert!(!is_rate_limit_error(""));
+    }
+
+    #[test]
+    fn is_rate_limit_error_whitespace_only() {
+        assert!(!is_rate_limit_error("   "));
+    }
+
+    #[test]
+    fn is_rate_limit_error_mixed_case_429() {
+        assert!(is_rate_limit_error("Error code: 429"));
+        assert!(is_rate_limit_error("Got a 429 response"));
+        assert!(is_rate_limit_error("HTTP/1.1 429 Too Many Requests"));
+    }
+
+    #[test]
+    fn is_rate_limit_error_mixed_case_403() {
+        assert!(is_rate_limit_error("403 Forbidden"));
+        assert!(is_rate_limit_error("Response: 403"));
+    }
+
+    #[test]
+    fn is_rate_limit_error_long_message() {
+        let long = format!(
+            "This is a very long error message that mentions rate limit somewhere in the middle {}",
+            "x".repeat(500)
+        );
+        assert!(is_rate_limit_error(&long));
+    }
+
+    #[test]
+    fn randomized_delay_very_close_values() {
+        let min = Duration::from_millis(99);
+        let max = Duration::from_millis(100);
+        let d = randomized_delay(min, max);
+        assert!(d >= min && d <= max);
+    }
+
+    #[test]
+    fn randomized_delay_large_range() {
+        let min = Duration::from_millis(1);
+        let max = Duration::from_millis(10000);
+        for _ in 0..50 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min && d <= max);
+        }
+    }
+
+    #[test]
+    fn post_action_debug_reply_empty_media() {
+        let action = PostAction::Reply {
+            tweet_id: "tweet-abc".to_string(),
+            content: "reply content here".to_string(),
+            media_ids: vec![],
+            result_tx: None,
+        };
+        let debug = format!("{action:?}");
+        assert!(debug.contains("Reply"));
+        assert!(debug.contains("tweet-abc"));
+        assert!(debug.contains("content_len"));
+        assert!(debug.contains("media_count"));
+    }
+
+    #[test]
+    fn post_action_debug_tweet_with_multiple_media() {
+        let action = PostAction::Tweet {
+            content: "test".to_string(),
+            media_ids: vec!["m1".to_string(), "m2".to_string(), "m3".to_string()],
+            result_tx: None,
+        };
+        let debug = format!("{action:?}");
+        assert!(debug.contains("Tweet"));
+        assert!(debug.contains("3"));
+    }
+
+    #[test]
+    fn post_action_debug_thread_tweet_long_content() {
+        let content = "x".repeat(500);
+        let action = PostAction::ThreadTweet {
+            content: content.clone(),
+            in_reply_to: "prev".to_string(),
+            media_ids: vec![],
+            result_tx: None,
+        };
+        let debug = format!("{action:?}");
+        assert!(debug.contains("ThreadTweet"));
+        assert!(debug.contains("500"));
+    }
+
+    #[tokio::test]
+    async fn failed_reply_sends_error_back() {
+        let executor = Arc::new(MockExecutor::failing());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
+        });
+
+        let (result_tx, result_rx) = oneshot::channel();
+        tx.send(PostAction::Reply {
+            tweet_id: "t1".to_string(),
+            content: "will fail".to_string(),
+            media_ids: vec![],
+            result_tx: Some(result_tx),
+        })
+        .await
+        .expect("send");
+
+        let result = result_rx.await.expect("recv");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "mock error");
+
+        cancel.cancel();
+        handle.await.expect("join");
+    }
+
+    #[tokio::test]
+    async fn failed_thread_tweet_sends_error_back() {
+        let executor = Arc::new(MockExecutor::failing());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
+        });
+
+        let (result_tx, result_rx) = oneshot::channel();
+        tx.send(PostAction::ThreadTweet {
+            content: "thread will fail".to_string(),
+            in_reply_to: "prev-id".to_string(),
+            media_ids: vec![],
+            result_tx: Some(result_tx),
+        })
+        .await
+        .expect("send");
+
+        let result = result_rx.await.expect("recv");
+        assert!(result.is_err());
+
+        cancel.cancel();
+        handle.await.expect("join");
+    }
+
+    #[tokio::test]
+    async fn process_reply_with_media_ids() {
+        let executor = Arc::new(MockExecutor::new());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
+        });
+
+        let (result_tx, result_rx) = oneshot::channel();
+        tx.send(PostAction::Reply {
+            tweet_id: "t1".to_string(),
+            content: "reply with media".to_string(),
+            media_ids: vec!["media-1".to_string(), "media-2".to_string()],
+            result_tx: Some(result_tx),
+        })
+        .await
+        .expect("send");
+
+        let result = result_rx.await.expect("recv");
+        assert!(result.is_ok());
+
+        cancel.cancel();
+        handle.await.expect("join");
+        assert_eq!(executor.call_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn multiple_mixed_actions_processed() {
+        let executor = Arc::new(MockExecutor::new());
+        let (tx, rx) = create_posting_queue();
+        let cancel = CancellationToken::new();
+
+        let cancel_clone = cancel.clone();
+        let exec_clone = executor.clone();
+        let handle = tokio::spawn(async move {
+            run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
+        });
+
+        // Send a mix of action types
+        tx.send(PostAction::Tweet {
+            content: "tweet-1".to_string(),
+            media_ids: vec![],
+            result_tx: None,
+        })
+        .await
+        .expect("send");
+
+        tx.send(PostAction::Reply {
+            tweet_id: "t1".to_string(),
+            content: "reply-1".to_string(),
+            media_ids: vec![],
+            result_tx: None,
+        })
+        .await
+        .expect("send");
+
+        tx.send(PostAction::ThreadTweet {
+            content: "thread-1".to_string(),
+            in_reply_to: "prev".to_string(),
+            media_ids: vec![],
+            result_tx: None,
+        })
+        .await
+        .expect("send");
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        cancel.cancel();
+        handle.await.expect("join");
+
+        let calls = executor.calls();
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0].0, "tweet");
+        assert_eq!(calls[1].0, "reply");
+        assert_eq!(calls[2].0, "reply"); // ThreadTweet uses execute_reply
+    }
+
     #[tokio::test]
     async fn approval_mode_queues_tweets() {
         let executor = Arc::new(MockExecutor::new());
