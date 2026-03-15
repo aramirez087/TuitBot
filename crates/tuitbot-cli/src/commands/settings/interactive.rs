@@ -1248,6 +1248,155 @@ mod tests {
         let masked = mask_optional_secret(&secret);
         assert!(!masked.is_empty());
     }
+
+    // ── Config field formatting patterns ─────────────────────────────
+
+    #[test]
+    fn config_product_url_display_none() {
+        let config = test_config();
+        let display = config
+            .business
+            .product_url
+            .as_deref()
+            .unwrap_or("(not set)");
+        assert!(!display.is_empty());
+    }
+
+    #[test]
+    fn config_brand_voice_display_default() {
+        let config = test_config();
+        let display = config
+            .business
+            .brand_voice
+            .as_deref()
+            .unwrap_or("(default)");
+        assert!(!display.is_empty());
+    }
+
+    #[test]
+    fn config_base_url_display_default() {
+        let config = test_config();
+        let display = config.llm.base_url.as_deref().unwrap_or("(default)");
+        assert_eq!(display, "(default)");
+    }
+
+    #[test]
+    fn config_thread_preferred_day_display() {
+        let config = test_config();
+        let display = config
+            .schedule
+            .thread_preferred_day
+            .as_deref()
+            .unwrap_or("(interval mode)");
+        assert_eq!(display, "(interval mode)");
+    }
+
+    #[test]
+    fn target_accounts_strip_at_empty() {
+        let accounts: Vec<String> = vec![];
+        let cleaned: Vec<String> = accounts
+            .into_iter()
+            .map(|a| a.trim_start_matches('@').to_string())
+            .collect();
+        assert!(cleaned.is_empty());
+    }
+
+    #[test]
+    fn target_accounts_strip_at_mixed() {
+        let accounts = vec![
+            "@alice".to_string(),
+            "bob".to_string(),
+            "@@charlie".to_string(),
+        ];
+        let cleaned: Vec<String> = accounts
+            .into_iter()
+            .map(|a| a.trim_start_matches('@').to_string())
+            .collect();
+        assert_eq!(cleaned, vec!["alice", "bob", "charlie"]);
+    }
+
+    // ── Provider matching ───────────────────────────────────────────
+
+    #[test]
+    fn provider_position_openai() {
+        let providers = &["openai", "anthropic", "ollama"];
+        let current = providers.iter().position(|p| *p == "openai").unwrap_or(0);
+        assert_eq!(current, 0);
+    }
+
+    #[test]
+    fn provider_position_anthropic() {
+        let providers = &["openai", "anthropic", "ollama"];
+        let current = providers
+            .iter()
+            .position(|p| *p == "anthropic")
+            .unwrap_or(0);
+        assert_eq!(current, 1);
+    }
+
+    #[test]
+    fn provider_position_unknown() {
+        let providers = &["openai", "anthropic", "ollama"];
+        let current = providers.iter().position(|p| *p == "unknown").unwrap_or(0);
+        assert_eq!(current, 0);
+    }
+
+    // ── Config field access ─────────────────────────────────────────
+
+    #[test]
+    fn config_scoring_weights_are_positive() {
+        let config = test_config();
+        assert!(config.scoring.keyword_relevance_max >= 0.0);
+        assert!(config.scoring.follower_count_max >= 0.0);
+        assert!(config.scoring.recency_max >= 0.0);
+        assert!(config.scoring.engagement_rate_max >= 0.0);
+        assert!(config.scoring.reply_count_max >= 0.0);
+        assert!(config.scoring.content_type_max >= 0.0);
+    }
+
+    #[test]
+    fn config_limits_are_consistent() {
+        let config = test_config();
+        assert!(config.limits.min_action_delay_seconds <= config.limits.max_action_delay_seconds);
+        assert!(config.limits.max_replies_per_author_per_day > 0);
+    }
+
+    #[test]
+    fn config_intervals_are_positive() {
+        let config = test_config();
+        assert!(config.intervals.mentions_check_seconds > 0);
+        assert!(config.intervals.discovery_search_seconds > 0);
+        assert!(config.intervals.content_post_window_seconds > 0);
+        assert!(config.intervals.thread_interval_seconds > 0);
+    }
+
+    #[test]
+    fn config_storage_defaults() {
+        let config = test_config();
+        assert!(!config.storage.db_path.is_empty());
+        assert!(config.storage.retention_days > 0);
+    }
+
+    #[test]
+    fn format_duration_various_values() {
+        assert_eq!(format_duration(60), "1 min");
+        assert_eq!(format_duration(3600), "1 hour");
+        assert_eq!(format_duration(86400), "1 day");
+        assert_eq!(format_duration(7200), "2 hours");
+    }
+
+    #[test]
+    fn format_list_single_item() {
+        let result = format_list(&["item".to_string()]);
+        assert_eq!(result, "item");
+    }
+
+    #[test]
+    fn format_list_three_items() {
+        let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let result = format_list(&items);
+        assert_eq!(result, "a, b, c");
+    }
 }
 
 pub(super) fn edit_category_storage(

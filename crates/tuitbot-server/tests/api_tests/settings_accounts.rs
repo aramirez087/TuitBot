@@ -954,3 +954,106 @@ async fn create_draft_too_long_tweet_rejected() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "long tweet: {body}");
 }
+
+// ============================================================
+// Additional route coverage — Sprint 2
+// ============================================================
+
+#[tokio::test]
+async fn get_health_returns_ok() {
+    let router = test_router().await;
+    let req = axum::http::Request::builder()
+        .uri("/api/health")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = tower::ServiceExt::oneshot(router, req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn get_approval_queue_empty() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/approval").await;
+    assert_eq!(status, StatusCode::OK, "approval: {body}");
+    assert!(body.is_array(), "expected array: {body}");
+}
+
+#[tokio::test]
+async fn get_approval_stats_returns_ok() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/approval/stats").await;
+    assert_eq!(status, StatusCode::OK, "approval stats: {body}");
+}
+
+#[tokio::test]
+async fn get_analytics_follower_trend() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/analytics/followers").await;
+    assert_eq!(status, StatusCode::OK, "followers: {body}");
+}
+
+#[tokio::test]
+async fn get_analytics_topics() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/analytics/topics").await;
+    assert_eq!(status, StatusCode::OK, "topics: {body}");
+}
+
+#[tokio::test]
+async fn get_analytics_summary() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/analytics/summary").await;
+    assert_eq!(status, StatusCode::OK, "summary: {body}");
+}
+
+#[tokio::test]
+async fn get_content_drafts_empty() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/content/drafts").await;
+    assert_eq!(status, StatusCode::OK, "drafts: {body}");
+    assert!(body.is_array(), "expected array: {body}");
+}
+
+#[tokio::test]
+async fn get_discovery_feed_empty() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/discovery/feed").await;
+    assert_eq!(status, StatusCode::OK, "feed: {body}");
+}
+
+#[tokio::test]
+async fn get_activity_log() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/activity").await;
+    assert_eq!(status, StatusCode::OK, "activity: {body}");
+}
+
+#[tokio::test]
+async fn unauthenticated_request_rejected() {
+    let router = test_router().await;
+    let req = axum::http::Request::builder()
+        .uri("/api/approval")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = tower::ServiceExt::oneshot(router, req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn invalid_token_rejected() {
+    let router = test_router().await;
+    let req = axum::http::Request::builder()
+        .uri("/api/approval")
+        .header("Authorization", "Bearer wrong-token")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = tower::ServiceExt::oneshot(router, req).await.unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn get_recent_performance() {
+    let router = test_router().await;
+    let (status, body) = get_json(router, "/api/analytics/recent-performance").await;
+    assert_eq!(status, StatusCode::OK, "recent perf: {body}");
+}

@@ -628,6 +628,108 @@ mod tests {
         assert!(!inv.server_running);
     }
 
+    // ── format_size additional ────────────────────────────────────────
+
+    #[test]
+    fn format_size_exact_1kb() {
+        assert_eq!(format_size(1024), "1 KB");
+    }
+
+    #[test]
+    fn format_size_exact_1mb() {
+        assert_eq!(format_size(1024 * 1024), "1.0 MB");
+    }
+
+    #[test]
+    fn format_size_exact_1gb() {
+        assert_eq!(format_size(1024 * 1024 * 1024), "1.0 GB");
+    }
+
+    #[test]
+    fn format_size_large_gb() {
+        assert_eq!(format_size(10 * 1024 * 1024 * 1024), "10.0 GB");
+    }
+
+    #[test]
+    fn format_size_fractional_mb() {
+        // 1.5 MB
+        let bytes = 1024 * 1024 + 512 * 1024;
+        let result = format_size(bytes);
+        assert!(result.contains("MB"));
+    }
+
+    // ── is_installed_path additional ────────────────────────────────
+
+    #[test]
+    fn is_installed_path_target_debug() {
+        assert!(!is_installed_path(Path::new(
+            "/home/user/project/target/debug/tuitbot"
+        )));
+    }
+
+    #[test]
+    fn is_installed_path_temp_dir() {
+        let tmp = std::env::temp_dir().join("tuitbot");
+        assert!(!is_installed_path(&tmp));
+    }
+
+    // ── shorten_home additional ────────────────────────────────────
+
+    #[test]
+    fn shorten_home_root_path() {
+        let path = Path::new("/");
+        let shortened = shorten_home(path);
+        assert_eq!(shortened, "/");
+    }
+
+    // ── dir_size additional ─────────────────────────────────────────
+
+    #[test]
+    fn dir_size_single_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("test.txt"), "x").unwrap();
+        let (count, size) = dir_size(tmp.path());
+        assert_eq!(count, 1);
+        assert_eq!(size, 1);
+    }
+
+    #[test]
+    fn dir_size_deeply_nested() {
+        let tmp = tempfile::tempdir().unwrap();
+        let deep = tmp.path().join("a").join("b").join("c");
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(deep.join("file.txt"), "deep content").unwrap();
+        let (count, size) = dir_size(tmp.path());
+        assert_eq!(count, 1);
+        assert_eq!(size, 12); // "deep content".len()
+    }
+
+    // ── UninstallInventory with data ────────────────────────────────
+
+    #[test]
+    fn uninstall_inventory_with_data() {
+        let inv = UninstallInventory {
+            data_dir: PathBuf::from(std::env::temp_dir()),
+            data_dir_exists: true,
+            files: vec![DataFile {
+                name: "config.toml".to_string(),
+                size: 1024,
+            }],
+            subdirs: vec![DataSubdir {
+                name: "backups/".to_string(),
+                file_count: 2,
+                total_size: 4096,
+            }],
+            cli_binary: Some(PathBuf::from("/usr/local/bin/tuitbot")),
+            server_binary: None,
+            server_running: false,
+        };
+        assert!(inv.data_dir_exists);
+        assert_eq!(inv.files.len(), 1);
+        assert_eq!(inv.subdirs.len(), 1);
+        assert!(inv.cli_binary.is_some());
+    }
+
     #[test]
     fn test_inventory_data_files() {
         let tmp = tempfile::tempdir().unwrap();

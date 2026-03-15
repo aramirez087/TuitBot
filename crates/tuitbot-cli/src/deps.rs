@@ -185,6 +185,158 @@ mod tests {
         };
         assert!(caps.posting);
     }
+
+    // ── Config schedule defaults ─────────────────────────────────────
+
+    #[test]
+    fn config_default_schedule_valid() {
+        let config = Config::default();
+        assert!(config.schedule.active_hours_start <= 23);
+        assert!(config.schedule.active_hours_end <= 23);
+        assert!(!config.schedule.timezone.is_empty());
+    }
+
+    #[test]
+    fn config_default_limits_sensible() {
+        let config = Config::default();
+        assert!(config.limits.max_replies_per_day > 0);
+        assert!(config.limits.max_tweets_per_day > 0);
+        assert!(config.limits.min_action_delay_seconds <= config.limits.max_action_delay_seconds);
+        assert!(config.limits.product_mention_ratio >= 0.0);
+        assert!(config.limits.product_mention_ratio <= 1.0);
+    }
+
+    #[test]
+    fn config_default_intervals_positive() {
+        let config = Config::default();
+        assert!(config.intervals.mentions_check_seconds > 0);
+        assert!(config.intervals.discovery_search_seconds > 0);
+        assert!(config.intervals.content_post_window_seconds > 0);
+    }
+
+    #[test]
+    fn config_default_scoring_valid() {
+        let config = Config::default();
+        assert!(config.scoring.threshold <= 100);
+        assert!(config.scoring.keyword_relevance_max >= 0.0);
+        assert!(config.scoring.follower_count_max >= 0.0);
+        assert!(config.scoring.recency_max >= 0.0);
+    }
+
+    // ── TierCapabilities format_status ────────────────────────────────
+
+    #[test]
+    fn tier_capabilities_basic_format_status() {
+        let caps = TierCapabilities::for_tier(ApiTier::Basic);
+        let status = caps.format_status();
+        assert!(!status.is_empty());
+    }
+
+    #[test]
+    fn tier_capabilities_pro_format_status() {
+        let caps = TierCapabilities::for_tier(ApiTier::Pro);
+        let status = caps.format_status();
+        assert!(!status.is_empty());
+    }
+
+    // ── Keyword construction patterns ────────────────────────────────
+
+    #[test]
+    fn keyword_collection_empty_when_no_keywords() {
+        let mut config = Config::default();
+        config.business.product_keywords.clear();
+        config.business.competitor_keywords.clear();
+        let keywords: Vec<String> = config
+            .business
+            .product_keywords
+            .iter()
+            .chain(config.business.competitor_keywords.iter())
+            .cloned()
+            .collect();
+        assert!(keywords.is_empty());
+    }
+
+    #[test]
+    fn keyword_collection_product_only() {
+        let mut config = Config::default();
+        config.business.product_keywords = vec!["rust".to_string(), "cli".to_string()];
+        config.business.competitor_keywords.clear();
+        let keywords: Vec<String> = config
+            .business
+            .product_keywords
+            .iter()
+            .chain(config.business.competitor_keywords.iter())
+            .cloned()
+            .collect();
+        assert_eq!(keywords, vec!["rust", "cli"]);
+    }
+
+    #[test]
+    fn keyword_collection_competitor_only() {
+        let mut config = Config::default();
+        config.business.product_keywords.clear();
+        config.business.competitor_keywords = vec!["go".to_string(), "node".to_string()];
+        let keywords: Vec<String> = config
+            .business
+            .product_keywords
+            .iter()
+            .chain(config.business.competitor_keywords.iter())
+            .cloned()
+            .collect();
+        assert_eq!(keywords, vec!["go", "node"]);
+    }
+
+    // ── ApiTier ──────────────────────────────────────────────────────
+
+    #[test]
+    fn api_tier_free_capabilities_no_search() {
+        let caps = TierCapabilities::for_tier(ApiTier::Free);
+        assert!(!caps.search);
+        assert!(!caps.discovery);
+    }
+
+    #[test]
+    fn api_tier_basic_has_search() {
+        let caps = TierCapabilities::for_tier(ApiTier::Basic);
+        assert!(caps.search);
+    }
+
+    #[test]
+    fn api_tier_pro_has_all() {
+        let caps = TierCapabilities::for_tier(ApiTier::Pro);
+        assert!(caps.search);
+        assert!(caps.discovery);
+        assert!(caps.mentions);
+        assert!(caps.posting);
+    }
+
+    // ── TargetLoopConfig construction ────────────────────────────────
+
+    #[test]
+    fn target_loop_config_from_config() {
+        let mut config = Config::default();
+        config.targets.accounts = vec!["user1".to_string(), "user2".to_string()];
+        config.targets.max_target_replies_per_day = 5;
+
+        let tlc = tuitbot_core::automation::TargetLoopConfig {
+            accounts: config.targets.accounts.clone(),
+            max_target_replies_per_day: config.targets.max_target_replies_per_day,
+            dry_run: false,
+        };
+        assert_eq!(tlc.accounts.len(), 2);
+        assert_eq!(tlc.max_target_replies_per_day, 5);
+        assert!(!tlc.dry_run);
+    }
+
+    #[test]
+    fn target_loop_config_dry_run() {
+        let tlc = tuitbot_core::automation::TargetLoopConfig {
+            accounts: vec![],
+            max_target_replies_per_day: 0,
+            dry_run: true,
+        };
+        assert!(tlc.dry_run);
+    }
 }
 
 /// All shared dependencies needed by the automation loops.

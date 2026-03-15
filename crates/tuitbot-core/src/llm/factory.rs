@@ -214,4 +214,105 @@ mod tests {
         let provider = create_provider(&config).expect("create");
         assert_eq!(provider.name(), "ollama");
     }
+
+    #[test]
+    fn create_anthropic_with_custom_base_url() {
+        let config = LlmConfig {
+            provider: "anthropic".to_string(),
+            api_key: Some("sk-ant-test".to_string()),
+            model: "claude-sonnet-4-5-20250514".to_string(),
+            base_url: Some("https://custom.anthropic.com".to_string()),
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "anthropic");
+    }
+
+    #[test]
+    fn create_openai_empty_api_key_returns_not_configured() {
+        let config = LlmConfig {
+            provider: "openai".to_string(),
+            api_key: Some(String::new()),
+            model: String::new(),
+            base_url: None,
+        };
+        assert!(matches!(
+            create_provider(&config),
+            Err(LlmError::NotConfigured)
+        ));
+    }
+
+    #[test]
+    fn create_anthropic_empty_api_key_returns_not_configured() {
+        let config = LlmConfig {
+            provider: "anthropic".to_string(),
+            api_key: Some(String::new()),
+            model: String::new(),
+            base_url: None,
+        };
+        assert!(matches!(
+            create_provider(&config),
+            Err(LlmError::NotConfigured)
+        ));
+    }
+
+    #[test]
+    fn create_openai_default_model_when_empty() {
+        let config = LlmConfig {
+            provider: "openai".to_string(),
+            api_key: Some("sk-test".to_string()),
+            model: String::new(),
+            base_url: None,
+        };
+        // Should succeed with default model gpt-4o-mini
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "openai");
+    }
+
+    #[test]
+    fn create_ollama_default_model_when_empty() {
+        let config = LlmConfig {
+            provider: "ollama".to_string(),
+            api_key: None,
+            model: String::new(),
+            base_url: None,
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "ollama");
+    }
+
+    #[test]
+    fn create_anthropic_default_model_when_empty() {
+        let config = LlmConfig {
+            provider: "anthropic".to_string(),
+            api_key: Some("sk-ant-key".to_string()),
+            model: String::new(),
+            base_url: None,
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "anthropic");
+    }
+
+    #[test]
+    fn create_openai_empty_base_url_uses_default() {
+        let config = LlmConfig {
+            provider: "openai".to_string(),
+            api_key: Some("sk-test".to_string()),
+            model: "gpt-4o".to_string(),
+            base_url: Some(String::new()),
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "openai");
+    }
+
+    #[test]
+    fn create_anthropic_empty_base_url_uses_default() {
+        let config = LlmConfig {
+            provider: "anthropic".to_string(),
+            api_key: Some("sk-ant-test".to_string()),
+            model: "claude-sonnet-4-5-20250514".to_string(),
+            base_url: Some(String::new()),
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "anthropic");
+    }
 }

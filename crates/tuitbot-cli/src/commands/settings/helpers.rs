@@ -467,4 +467,126 @@ mod tests {
         tracker.record("s", "f", "", "");
         assert_eq!(tracker.changes.len(), 1); // no change for "" -> ""
     }
+
+    // ── parse_duration_input additional cases ────────────────────────
+
+    #[test]
+    fn parse_duration_input_minutes_value() {
+        assert_eq!(parse_duration_input("15").unwrap(), 900);
+        assert_eq!(parse_duration_input("60").unwrap(), 3600);
+        assert_eq!(parse_duration_input("1").unwrap(), 60);
+    }
+
+    #[test]
+    fn parse_duration_input_hours_uppercase() {
+        assert_eq!(parse_duration_input("2H").unwrap(), 7200);
+    }
+
+    #[test]
+    fn parse_duration_input_days_uppercase() {
+        assert_eq!(parse_duration_input("3D").unwrap(), 259200);
+    }
+
+    #[test]
+    fn parse_duration_input_hours_invalid_number() {
+        assert!(parse_duration_input("xh").is_err());
+    }
+
+    #[test]
+    fn parse_duration_input_days_invalid_number() {
+        assert!(parse_duration_input("xd").is_err());
+    }
+
+    #[test]
+    fn parse_duration_input_leading_trailing_spaces() {
+        assert_eq!(parse_duration_input("  30  ").unwrap(), 1800);
+    }
+
+    // ── parse_bool additional cases ─────────────────────────────────
+
+    #[test]
+    fn parse_bool_numeric_values() {
+        assert!(parse_bool("1").unwrap());
+        assert!(!parse_bool("0").unwrap());
+    }
+
+    #[test]
+    fn parse_bool_mixed_case() {
+        assert!(parse_bool("True").unwrap());
+        assert!(parse_bool("YES").unwrap());
+        assert!(!parse_bool("False").unwrap());
+        assert!(!parse_bool("NO").unwrap());
+    }
+
+    #[test]
+    fn parse_bool_on_off() {
+        assert!(parse_bool("on").unwrap());
+        assert!(!parse_bool("off").unwrap());
+    }
+
+    // ── parse_csv additional cases ──────────────────────────────────
+
+    #[test]
+    fn parse_csv_preserves_inner_spaces() {
+        let result = parse_csv("hello world, foo bar");
+        assert_eq!(result, vec!["hello world", "foo bar"]);
+    }
+
+    #[test]
+    fn parse_csv_single_item_no_comma() {
+        assert_eq!(parse_csv("single"), vec!["single"]);
+    }
+
+    // ── escape_toml additional cases ────────────────────────────────
+
+    #[test]
+    fn escape_toml_unicode_preserved() {
+        assert_eq!(escape_toml("emoji 🎉"), "emoji 🎉");
+    }
+
+    #[test]
+    fn escape_toml_all_special_chars_combined() {
+        let input = "a\\b\"c\nd\re\tf";
+        let expected = r#"a\\b\"c\nd\re\tf"#;
+        assert_eq!(escape_toml(input), expected);
+    }
+
+    // ── format_toml_array additional cases ──────────────────────────
+
+    #[test]
+    fn format_toml_array_single_item() {
+        let items = vec!["item".to_string()];
+        assert_eq!(format_toml_array(&items), r#"["item"]"#);
+    }
+
+    #[test]
+    fn format_toml_array_unicode_items() {
+        let items = vec!["café".to_string(), "naïve".to_string()];
+        assert_eq!(format_toml_array(&items), r#"["café", "naïve"]"#);
+    }
+
+    // ── ChangeTracker field access ──────────────────────────────────
+
+    #[test]
+    fn change_fields_are_accessible() {
+        let mut tracker = ChangeTracker::new();
+        tracker.record("section", "field", "old", "new");
+        let change = &tracker.changes[0];
+        assert_eq!(change.section, "section");
+        assert_eq!(change.field, "field");
+        assert_eq!(change.old_value, "old");
+        assert_eq!(change.new_value, "new");
+    }
+
+    #[test]
+    fn change_tracker_multiple_sections() {
+        let mut tracker = ChangeTracker::new();
+        tracker.record("business", "name", "a", "b");
+        tracker.record("llm", "provider", "c", "d");
+        tracker.record("scoring", "threshold", "50", "70");
+        assert_eq!(tracker.changes.len(), 3);
+        assert_eq!(tracker.changes[0].section, "business");
+        assert_eq!(tracker.changes[1].section, "llm");
+        assert_eq!(tracker.changes[2].section, "scoring");
+    }
 }

@@ -524,6 +524,199 @@ async fn exchange_code(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Tokens struct ────────────────────────────────────────────────
+
+    #[test]
+    fn tokens_serde_round_trip() {
+        let tokens = Tokens {
+            access_token: "access123".to_string(),
+            refresh_token: "refresh456".to_string(),
+            expires_at: Utc::now(),
+            scopes: vec!["tweet.read".to_string(), "tweet.write".to_string()],
+        };
+        let json = serde_json::to_string(&tokens).unwrap();
+        let parsed: Tokens = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.access_token, "access123");
+        assert_eq!(parsed.refresh_token, "refresh456");
+        assert_eq!(parsed.scopes.len(), 2);
+    }
+
+    #[test]
+    fn tokens_serde_default_scopes() {
+        // Legacy tokens without scopes field
+        let json =
+            r#"{"access_token":"a","refresh_token":"r","expires_at":"2026-01-01T00:00:00Z"}"#;
+        let tokens: Tokens = serde_json::from_str(json).unwrap();
+        assert!(tokens.scopes.is_empty());
+    }
+
+    #[test]
+    fn tokens_debug_output() {
+        let tokens = Tokens {
+            access_token: "a".to_string(),
+            refresh_token: "r".to_string(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        let debug = format!("{tokens:?}");
+        assert!(debug.contains("Tokens"));
+    }
+
+    #[test]
+    fn tokens_clone() {
+        let tokens = Tokens {
+            access_token: "acc".to_string(),
+            refresh_token: "ref".to_string(),
+            expires_at: Utc::now(),
+            scopes: vec!["scope1".to_string()],
+        };
+        let cloned = tokens.clone();
+        assert_eq!(cloned.access_token, tokens.access_token);
+        assert_eq!(cloned.refresh_token, tokens.refresh_token);
+        assert_eq!(cloned.scopes, tokens.scopes);
+    }
+
+    // ── save_tokens / load_tokens ────────────────────────────────────
+
+    #[test]
+    fn save_and_load_tokens_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tokens.json");
+        let tokens = Tokens {
+            access_token: "test_access".to_string(),
+            refresh_token: "test_refresh".to_string(),
+            expires_at: Utc::now(),
+            scopes: vec!["tweet.read".to_string()],
+        };
+        save_tokens(&tokens, &path).unwrap();
+        let loaded = load_tokens(&path).unwrap().unwrap();
+        assert_eq!(loaded.access_token, "test_access");
+        assert_eq!(loaded.refresh_token, "test_refresh");
+        assert_eq!(loaded.scopes, vec!["tweet.read"]);
+    }
+
+    #[test]
+    fn save_tokens_creates_parent_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sub").join("dir").join("tokens.json");
+        let tokens = Tokens {
+            access_token: "a".to_string(),
+            refresh_token: "r".to_string(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&tokens, &path).unwrap();
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn load_tokens_missing_file_returns_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nonexistent.json");
+        let result = load_tokens(&path).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn load_tokens_invalid_json_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.json");
+        std::fs::write(&path, "not valid json").unwrap();
+        let result = load_tokens(&path);
+        assert!(result.is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_tokens_restricts_permissions() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("restricted.json");
+        let tokens = Tokens {
+            access_token: "a".to_string(),
+            refresh_token: "r".to_string(),
+            expires_at: Utc::now(),
+            scopes: vec![],
+        };
+        save_tokens(&tokens, &path).unwrap();
+        let meta = std::fs::metadata(&path).unwrap();
+        assert_eq!(meta.mode() & 0o777, 0o600);
+    }
+
+    // ── build_oauth_client ───────────────────────────────────────────
+
+    #[test]
+    fn build_oauth_client_valid() {
+        let result = build_oauth_client("client123", "http://127.0.0.1:8080/callback");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn build_oauth_client_invalid_redirect_uri() {
+        let result = build_oauth_client("client123", "not a valid url with spaces");
+        // oauth2 crate is very permissive, this may or may not fail
+        // We just verify no panic
+        let _ = result;
+    }
+
+    // ── TokenManager ─────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn token_manager_new_and_lock() {
+        let tokens = Tokens {
+            access_token: "acc".to_string(),
+            refresh_token: "ref".to_string(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let tm = TokenManager::new(tokens, "cid".to_string(), dir.path().join("tokens.json"));
+        let lock = tm.tokens_lock();
+        let read = lock.read().await;
+        assert_eq!(read.access_token, "acc");
+    }
+
+    #[tokio::test]
+    async fn token_manager_get_access_token_fresh() {
+        let tokens = Tokens {
+            access_token: "fresh_token".to_string(),
+            refresh_token: "ref".to_string(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let tm = TokenManager::new(tokens, "cid".to_string(), dir.path().join("tokens.json"));
+        let token = tm.get_access_token().await.unwrap();
+        assert_eq!(token, "fresh_token");
+    }
+
+    #[tokio::test]
+    async fn token_manager_refresh_if_needed_fresh_is_noop() {
+        let tokens = Tokens {
+            access_token: "acc".to_string(),
+            refresh_token: "ref".to_string(),
+            expires_at: Utc::now() + chrono::Duration::hours(2),
+            scopes: vec![],
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let tm = TokenManager::new(tokens, "cid".to_string(), dir.path().join("tokens.json"));
+        // Should succeed without making any HTTP calls
+        let result = tm.refresh_if_needed().await;
+        assert!(result.is_ok());
+    }
+
+    // ── TokenRefreshResponse ─────────────────────────────────────────
+
+    #[test]
+    fn token_refresh_response_deserialize() {
+        let json = r#"{"access_token":"new","refresh_token":"ref2","expires_in":7200,"scope":"tweet.read tweet.write"}"#;
+        let resp: TokenRefreshResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.access_token, "new");
+        assert_eq!(resp.refresh_token, "ref2");
+        assert_eq!(resp.expires_in, 7200);
+        assert_eq!(resp.scope, "tweet.read tweet.write");
+    }
     use std::path::PathBuf;
 
     #[test]
@@ -602,7 +795,7 @@ mod tests {
     }
 
     #[test]
-    fn save_tokens_creates_parent_dirs() {
+    fn save_tokens_creates_deeply_nested_dirs() {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = dir.path().join("nested").join("dir").join("tokens.json");
 
@@ -691,7 +884,7 @@ mod tests {
     }
 
     #[test]
-    fn tokens_clone() {
+    fn tokens_clone_with_scopes() {
         let tokens = Tokens {
             access_token: "a".into(),
             refresh_token: "r".into(),
@@ -776,7 +969,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn build_oauth_client_valid() {
+    fn build_oauth_client_valid_custom_port() {
         let client = build_oauth_client("my_client_id", "http://localhost:9090/callback");
         assert!(client.is_ok());
     }
@@ -848,7 +1041,7 @@ mod tests {
     // -------------------------------------------------------------------
 
     #[test]
-    fn token_refresh_response_deserialize() {
+    fn token_refresh_response_deserialize_with_scopes() {
         let json = r#"{
             "access_token": "new_acc",
             "refresh_token": "new_ref",

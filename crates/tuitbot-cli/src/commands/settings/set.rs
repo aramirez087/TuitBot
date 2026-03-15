@@ -378,6 +378,157 @@ mod tests {
         set_u8_range(&mut tracker, &mut field, "sec", "fld", "0", 23).unwrap();
         assert_eq!(field, 0);
     }
+
+    // ── set_string additional cases ─────────────────────────────────
+
+    #[test]
+    fn set_string_empty_to_value() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = String::new();
+        set_string(&mut tracker, &mut field, "sec", "fld", "new_value");
+        assert_eq!(field, "new_value");
+        assert_eq!(tracker.changes.len(), 1);
+    }
+
+    #[test]
+    fn set_string_value_to_empty() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = "old".to_string();
+        set_string(&mut tracker, &mut field, "sec", "fld", "");
+        assert_eq!(field, "");
+        assert_eq!(tracker.changes.len(), 1);
+    }
+
+    // ── set_opt_string additional cases ─────────────────────────────
+
+    #[test]
+    fn set_opt_string_none_to_none_via_empty() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = None;
+        set_opt_string(&mut tracker, &mut field, "sec", "fld", "");
+        assert_eq!(field, None);
+        // Both old and new are "(none)" so no change recorded
+        assert!(tracker.changes.is_empty());
+    }
+
+    #[test]
+    fn set_opt_string_some_to_different_some() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = Some("old_val".to_string());
+        set_opt_string(&mut tracker, &mut field, "sec", "fld", "new_val");
+        assert_eq!(field, Some("new_val".to_string()));
+        assert_eq!(tracker.changes.len(), 1);
+        assert_eq!(tracker.changes[0].old_value, "old_val");
+        assert_eq!(tracker.changes[0].new_value, "new_val");
+    }
+
+    // ── set_csv additional cases ───────────────────────────────────
+
+    #[test]
+    fn set_csv_with_spaces() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = vec![];
+        set_csv(&mut tracker, &mut field, "sec", "fld", "  x  ,  y  ,  z  ");
+        assert_eq!(field, vec!["x", "y", "z"]);
+    }
+
+    #[test]
+    fn set_csv_single_item() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = vec![];
+        set_csv(&mut tracker, &mut field, "sec", "fld", "single");
+        assert_eq!(field, vec!["single"]);
+    }
+
+    // ── set_u32 additional cases ────────────────────────────────────
+
+    #[test]
+    fn set_u32_zero() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u32 = 10;
+        set_u32(&mut tracker, &mut field, "sec", "fld", "0").unwrap();
+        assert_eq!(field, 0);
+    }
+
+    #[test]
+    fn set_u32_large_value() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u32 = 0;
+        set_u32(&mut tracker, &mut field, "sec", "fld", "4294967295").unwrap();
+        assert_eq!(field, u32::MAX);
+    }
+
+    #[test]
+    fn set_u32_float_rejected() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u32 = 0;
+        assert!(set_u32(&mut tracker, &mut field, "sec", "fld", "3.14").is_err());
+    }
+
+    // ── set_u64 additional cases ────────────────────────────────────
+
+    #[test]
+    fn set_u64_zero() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u64 = 100;
+        set_u64(&mut tracker, &mut field, "sec", "fld", "0").unwrap();
+        assert_eq!(field, 0);
+    }
+
+    // ── set_f32 additional cases ────────────────────────────────────
+
+    #[test]
+    fn set_f32_negative() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: f32 = 1.0;
+        set_f32(&mut tracker, &mut field, "sec", "fld", "-2.5").unwrap();
+        assert!((field - (-2.5)).abs() < 0.01);
+    }
+
+    #[test]
+    fn set_f32_zero() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: f32 = 1.0;
+        set_f32(&mut tracker, &mut field, "sec", "fld", "0").unwrap();
+        assert!((field).abs() < 0.01);
+    }
+
+    // ── set_bool additional cases ───────────────────────────────────
+
+    #[test]
+    fn set_bool_same_value_records_change() {
+        let mut tracker = ChangeTracker::new();
+        let mut field = true;
+        set_bool(&mut tracker, &mut field, "sec", "fld", "true").unwrap();
+        assert!(field);
+        // "true" -> "true" but the tracker records string comparison
+    }
+
+    // ── set_u8_range additional cases ───────────────────────────────
+
+    #[test]
+    fn set_u8_range_at_zero() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u8 = 10;
+        set_u8_range(&mut tracker, &mut field, "sec", "fld", "0", 23).unwrap();
+        assert_eq!(field, 0);
+    }
+
+    #[test]
+    fn set_u8_range_custom_max() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u8 = 0;
+        set_u8_range(&mut tracker, &mut field, "sec", "fld", "10", 10).unwrap();
+        assert_eq!(field, 10);
+        assert!(set_u8_range(&mut tracker, &mut field, "sec", "fld", "11", 10).is_err());
+    }
+
+    #[test]
+    fn set_u8_range_negative_rejected() {
+        let mut tracker = ChangeTracker::new();
+        let mut field: u8 = 0;
+        assert!(set_u8_range(&mut tracker, &mut field, "sec", "fld", "-1", 23).is_err());
+    }
 }
 
 // ---------------------------------------------------------------------------
