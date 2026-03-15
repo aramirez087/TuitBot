@@ -674,4 +674,188 @@ mod tests {
         let result = ContentGenerator::format_rag_section(Some("context here"));
         assert_eq!(result, "\ncontext here");
     }
+
+    // --- Additional parse_thread edge cases ---
+
+    #[test]
+    fn parse_thread_numbered_with_dots() {
+        let text =
+            "1. First tweet\n2. Second tweet\n3. Third tweet\n4. Fourth tweet\n5. Fifth tweet";
+        let tweets = parse_thread(text);
+        assert!(
+            tweets.len() >= 2,
+            "numbered dot format: got {} tweets",
+            tweets.len()
+        );
+    }
+
+    #[test]
+    fn parse_thread_numbered_with_parens() {
+        let text =
+            "1) First tweet\n2) Second tweet\n3) Third tweet\n4) Fourth tweet\n5) Fifth tweet";
+        let tweets = parse_thread(text);
+        assert!(
+            tweets.len() >= 2,
+            "numbered paren format: got {} tweets",
+            tweets.len()
+        );
+    }
+
+    #[test]
+    fn parse_thread_empty_input() {
+        let tweets = parse_thread("");
+        assert!(tweets.is_empty());
+    }
+
+    #[test]
+    fn parse_thread_only_whitespace() {
+        let tweets = parse_thread("   \n\n   ");
+        assert!(tweets.is_empty());
+    }
+
+    #[test]
+    fn parse_thread_single_tweet_no_delimiters() {
+        let tweets = parse_thread("Just a single tweet with no delimiters");
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0], "Just a single tweet with no delimiters");
+    }
+
+    #[test]
+    fn parse_thread_mixed_content_with_dashes() {
+        let text = "Hook tweet\n---\n  \n---\nMiddle tweet\n---\nFinal tweet";
+        let tweets = parse_thread(text);
+        // Empty sections should be filtered
+        assert_eq!(tweets.len(), 3);
+    }
+
+    // --- Additional generator branch coverage ---
+
+    #[tokio::test]
+    async fn generate_reply_with_archetype() {
+        use crate::content::frameworks::ReplyArchetype;
+
+        let provider = MockProvider::single("I totally agree and would add...");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .generate_reply_with_archetype(
+                "Testing is critical",
+                "devuser",
+                true,
+                Some(ReplyArchetype::AgreeAndExpand),
+            )
+            .await
+            .expect("reply with archetype");
+        assert!(!output.text.is_empty());
+    }
+
+    #[tokio::test]
+    async fn generate_tweet_with_format() {
+        use crate::content::frameworks::TweetFormat;
+
+        let provider =
+            MockProvider::single("1. Test early\n2. Test often\n3. Ship with confidence");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .generate_tweet_with_format("testing", Some(TweetFormat::List))
+            .await
+            .expect("tweet with format");
+        assert!(!output.text.is_empty());
+    }
+
+    #[tokio::test]
+    async fn generate_thread_with_structure() {
+        use crate::content::frameworks::ThreadStructure;
+
+        let thread = "Hook\n---\nStep 1\n---\nStep 2\n---\nStep 3\n---\nStep 4\n---\nSummary";
+        let provider = MockProvider::single(thread);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .generate_thread_with_structure("testing", Some(ThreadStructure::Framework))
+            .await
+            .expect("thread with structure");
+        assert!((5..=8).contains(&output.tweets.len()));
+    }
+
+    #[tokio::test]
+    async fn content_style_custom_for_thread() {
+        let mut biz = test_business();
+        biz.content_style = Some("Deep and technical".to_string());
+        let thread = "Hook\n---\nPoint 1\n---\nPoint 2\n---\nPoint 3\n---\nPoint 4\n---\nSummary";
+        let (provider, captured) = PromptCapturingProvider::new(thread);
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_thread("testing").await.expect("thread");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Deep and technical"));
+    }
+
+    #[tokio::test]
+    async fn content_style_default_for_thread() {
+        let biz = test_business(); // content_style = None
+        let thread = "Hook\n---\nPoint 1\n---\nPoint 2\n---\nPoint 3\n---\nPoint 4\n---\nSummary";
+        let (provider, captured) = PromptCapturingProvider::new(thread);
+        let gen = ContentGenerator::new(Box::new(provider), biz);
+
+        gen.generate_thread("testing").await.expect("thread");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("Be informative, not promotional"));
+    }
+
+    #[tokio::test]
+    async fn improve_draft_empty_tone_cue_ignored() {
+        let (provider, captured) = PromptCapturingProvider::new("Improved draft.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        gen.improve_draft("Draft tweet.", Some(""))
+            .await
+            .expect("improve");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        // Empty tone cue should not add the directive
+        assert!(!system.contains("Tone/style directive"));
+    }
+
+    #[tokio::test]
+    async fn generate_reply_retry_on_too_long_then_succeeds() {
+        let long = "a ".repeat(200); // 400 chars
+        let short = "Short reply.".to_string();
+        let provider = MockProvider::new(vec![long, short]);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .generate_reply("Test tweet", "user", false)
+            .await
+            .expect("reply");
+        assert_eq!(output.text, "Short reply.");
+    }
+
+    #[tokio::test]
+    async fn generate_tweet_retry_on_too_long_then_succeeds() {
+        let long = "b ".repeat(200);
+        let short = "Concise tweet.".to_string();
+        let provider = MockProvider::new(vec![long, short]);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen.generate_tweet("testing").await.expect("tweet");
+        assert_eq!(output.text, "Concise tweet.");
+    }
+
+    #[tokio::test]
+    async fn generate_reply_product_url_in_prompt() {
+        let (provider, captured) = PromptCapturingProvider::new("Reply mentioning product.");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        gen.generate_reply("test", "user", true)
+            .await
+            .expect("reply");
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("https://testapp.com"));
+        assert!(system.contains("TestApp"));
+    }
 }

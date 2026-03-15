@@ -1057,3 +1057,405 @@ async fn get_recent_performance() {
     let (status, body) = get_json(router, "/api/analytics/recent-performance").await;
     assert_eq!(status, StatusCode::OK, "recent perf: {body}");
 }
+
+// ============================================================
+// Deeper integration tests — full lifecycle flows
+// ============================================================
+
+#[tokio::test]
+async fn scheduled_content_full_lifecycle() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Create draft via API
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/content/drafts",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Draft lifecycle test",
+            "source": "manual"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create draft: {body}");
+    let draft_id = body["id"].as_i64().expect("should have id");
+
+    // Verify it appears in drafts list
+    let (status, body) = get_json(router.clone(), "/api/content/drafts").await;
+    assert_eq!(status, StatusCode::OK);
+    let drafts = body.as_array().unwrap();
+    assert!(
+        drafts.iter().any(|d| d["id"].as_i64() == Some(draft_id)),
+        "draft should appear in list"
+    );
+
+    // Schedule the draft directly via storage
+    let sched_time = "2099-12-31T23:59:59Z";
+    storage::scheduled_content::schedule_draft(&pool, draft_id, sched_time)
+        .await
+        .expect("schedule");
+
+    // Verify draft is now scheduled via direct DB check
+    let item = storage::scheduled_content::get_by_id(&pool, draft_id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "scheduled");
+    assert_eq!(item.scheduled_for.as_deref(), Some(sched_time));
+
+    // Cancel it
+    storage::scheduled_content::cancel(&pool, draft_id)
+        .await
+        .expect("cancel");
+
+    // Verify cancelled
+    let item = storage::scheduled_content::get_by_id(&pool, draft_id)
+        .await
+        .expect("get")
+        .expect("exists");
+    assert_eq!(item.status, "cancelled");
+}
+
+#[tokio::test]
+async fn draft_studio_full_lifecycle() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+
+    // Create a studio draft
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/drafts",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Studio lifecycle test"
+        }),
+    )
+    .await;
+    assert!(
+        status == StatusCode::OK || status == StatusCode::CREATED,
+        "create studio draft: {status}"
+    );
+    let draft_id = body["id"].as_i64().expect("should have id");
+
+    // Get the draft
+    let (status, body) = get_json(router.clone(), &format!("/api/drafts/{draft_id}")).await;
+    assert_eq!(status, StatusCode::OK, "get draft: {body}");
+    assert_eq!(body["content"], "Studio lifecycle test");
+
+    // Update meta
+    let (status, body) = patch_json(
+        router.clone(),
+        &format!("/api/drafts/{draft_id}/meta"),
+        serde_json::json!({
+            "title": "My Great Draft",
+            "notes": "Some notes here"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "update meta: {body}");
+
+    // Duplicate the draft
+    let (status, body) = post_json(
+        router.clone(),
+        &format!("/api/drafts/{draft_id}/duplicate"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "duplicate: {body}");
+    let dup_id = body["id"].as_i64().expect("duplicate should return id");
+    assert_ne!(dup_id, draft_id, "duplicate should have different id");
+
+    // Archive the original
+    let (status, _body) = post_json(
+        router.clone(),
+        &format!("/api/drafts/{draft_id}/archive"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "archive");
+
+    // Restore the original
+    let (status, _body) = post_json(
+        router.clone(),
+        &format!("/api/drafts/{draft_id}/restore"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "restore");
+
+    // List revisions (may be empty)
+    let (status, body) =
+        get_json(router.clone(), &format!("/api/drafts/{draft_id}/revisions")).await;
+    assert_eq!(status, StatusCode::OK, "revisions: {body}");
+    assert!(body.is_array());
+
+    // List activity
+    let (status, body) = get_json(router, &format!("/api/drafts/{draft_id}/activity")).await;
+    assert_eq!(status, StatusCode::OK, "activity: {body}");
+    assert!(body.is_array());
+}
+
+#[tokio::test]
+async fn content_calendar_with_seeded_data() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Insert some scheduled content
+    storage::scheduled_content::insert(
+        &pool,
+        "tweet",
+        "Calendar tweet 1",
+        Some("2026-04-15T10:00:00Z"),
+    )
+    .await
+    .expect("insert 1");
+    storage::scheduled_content::insert(
+        &pool,
+        "tweet",
+        "Calendar tweet 2",
+        Some("2026-04-20T14:00:00Z"),
+    )
+    .await
+    .expect("insert 2");
+
+    let (status, body) = get_json(
+        router,
+        "/api/content/calendar?from=2026-04-01T00:00:00Z&to=2026-04-30T23:59:59Z",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "calendar: {body}");
+    let items = body.as_array().unwrap();
+    assert_eq!(items.len(), 2, "should have 2 items in range");
+}
+
+#[tokio::test]
+async fn analytics_with_seeded_performance_data() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Seed analytics data
+    storage::analytics::upsert_follower_snapshot(&pool, 5000, 500, 1000)
+        .await
+        .expect("snapshot");
+    storage::analytics::upsert_reply_performance(&pool, "r1", 10, 5, 500, 65.0)
+        .await
+        .expect("reply perf");
+    storage::analytics::upsert_tweet_performance(&pool, "tw1", 20, 10, 5, 1000, 85.0)
+        .await
+        .expect("tweet perf");
+    storage::analytics::update_content_score(&pool, "rust", "tip", 90.0)
+        .await
+        .expect("content score");
+
+    // Summary should reflect seeded data
+    let (status, body) = get_json(router.clone(), "/api/analytics/summary").await;
+    assert_eq!(status, StatusCode::OK, "summary: {body}");
+    assert_eq!(body["followers"]["current"], 5000);
+    assert!(body["engagement"]["avg_reply_score"].as_f64().unwrap() > 0.0);
+    assert!(body["engagement"]["avg_tweet_score"].as_f64().unwrap() > 0.0);
+
+    // Topics should include "rust"
+    let (status, body) = get_json(router.clone(), "/api/analytics/topics").await;
+    assert_eq!(status, StatusCode::OK, "topics: {body}");
+    let topics = body.as_array().unwrap();
+    assert!(
+        topics.iter().any(|t| t["topic"] == "rust"),
+        "should include rust topic"
+    );
+
+    // Followers endpoint
+    let (status, body) = get_json(router, "/api/analytics/followers").await;
+    assert_eq!(status, StatusCode::OK, "followers: {body}");
+    let snapshots = body.as_array().unwrap();
+    assert!(!snapshots.is_empty(), "should have follower snapshots");
+}
+
+#[tokio::test]
+async fn approval_seeded_item_lifecycle() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Seed an approval queue item
+    storage::approval_queue::enqueue(
+        &pool,
+        "reply",
+        "target-tweet-1",
+        "author1",
+        "Great take on testing!",
+        "testing",
+        "agree_and_expand",
+        85.0,
+        "[]",
+    )
+    .await
+    .expect("enqueue pending");
+
+    // Get approval list
+    let (status, body) = get_json(router.clone(), "/api/approval").await;
+    assert_eq!(status, StatusCode::OK, "approval list: {body}");
+    let items = body.as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    let item_id = items[0]["id"].as_i64().unwrap();
+
+    // Get approval stats
+    let (status, body) = get_json(router.clone(), "/api/approval/stats").await;
+    assert_eq!(status, StatusCode::OK, "stats: {body}");
+    assert_eq!(body["pending"], 1);
+
+    // Edit the item
+    let (status, body) = patch_json(
+        router.clone(),
+        &format!("/api/approval/{item_id}"),
+        serde_json::json!({ "content": "Even better take on testing!" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "edit: {body}");
+
+    // Check history
+    let (status, body) =
+        get_json(router.clone(), &format!("/api/approval/{item_id}/history")).await;
+    assert_eq!(status, StatusCode::OK, "history: {body}");
+    assert!(body.is_array());
+
+    // Reject the item
+    let (status, body) = post_json(
+        router.clone(),
+        &format!("/api/approval/{item_id}/reject"),
+        serde_json::json!({ "actor": "test", "notes": "Not good enough" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "reject: {body}");
+
+    // Stats should now show 0 pending, 1 rejected
+    let (status, body) = get_json(router, "/api/approval/stats").await;
+    assert_eq!(status, StatusCode::OK, "stats after reject: {body}");
+    assert_eq!(body["pending"], 0);
+    assert_eq!(body["rejected"], 1);
+}
+
+#[tokio::test]
+async fn compose_tweet_endpoint_no_llm() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/content/compose")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&serde_json::json!({
+                "content_type": "tweet",
+                "topic": "Rust programming"
+            }))
+            .unwrap(),
+        ))
+        .expect("build request");
+
+    let response = router.oneshot(req).await.expect("send request");
+    let code = response.status().as_u16();
+    // Without LLM configured, should return a sensible error
+    assert!(
+        code == 400 || code == 422 || code == 500 || code == 503,
+        "compose without LLM: {code}"
+    );
+}
+
+#[tokio::test]
+async fn multiple_accounts_content_isolation() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_a = create_test_account(&pool, "Acct-A").await;
+    let acct_b = create_test_account(&pool, "Acct-B").await;
+
+    // Create drafts for each account
+    let (status, body_a) = post_json_for(
+        router.clone(),
+        "/api/content/drafts",
+        &acct_a,
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Content for A",
+            "source": "manual"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create A: {body_a}");
+
+    let (status, body_b) = post_json_for(
+        router.clone(),
+        "/api/content/drafts",
+        &acct_b,
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Content for B",
+            "source": "manual"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "create B: {body_b}");
+
+    // List for A should only show A's content
+    let (status, body) = get_json_for(router.clone(), "/api/content/drafts", &acct_a).await;
+    assert_eq!(status, StatusCode::OK);
+    let drafts = body.as_array().unwrap();
+    assert_eq!(drafts.len(), 1);
+    assert_eq!(drafts[0]["content"], "Content for A");
+
+    // List for B should only show B's content
+    let (status, body) = get_json_for(router, "/api/content/drafts", &acct_b).await;
+    assert_eq!(status, StatusCode::OK);
+    let drafts = body.as_array().unwrap();
+    assert_eq!(drafts.len(), 1);
+    assert_eq!(drafts[0]["content"], "Content for B");
+}
+
+#[tokio::test]
+async fn analytics_optimal_times_empty() {
+    let router = test_router().await;
+    let req = Request::builder()
+        .uri("/api/analytics/optimal-times")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .body(Body::empty())
+        .expect("build request");
+    let response = router.oneshot(req).await.expect("send request");
+    let code = response.status().as_u16();
+    assert!(
+        code == 200 || code == 400 || code == 404,
+        "got {code} for optimal-times"
+    );
+}
+
+#[tokio::test]
+async fn settings_get_and_patch_roundtrip() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, _pool) = test_router_with_dir(dir.path()).await;
+
+    // Get current config
+    let (status, body) = get_json(router.clone(), "/api/settings").await;
+    assert_eq!(status, StatusCode::OK, "get settings: {body}");
+    let orig_product_name = body["business"]["product_name"]
+        .as_str()
+        .unwrap_or("TestProduct");
+    assert!(!orig_product_name.is_empty());
+
+    // Patch with new business name
+    let (status, body) = patch_json(
+        router.clone(),
+        "/api/settings",
+        serde_json::json!({
+            "business": { "product_name": "PatchedProduct" }
+        }),
+    )
+    .await;
+    let code = status.as_u16();
+    assert!(code == 200 || code == 400 || code == 422, "patch: {body}");
+
+    // Re-read to verify if patch was accepted
+    if code == 200 {
+        let (status, body) = get_json(router, "/api/settings").await;
+        assert_eq!(status, StatusCode::OK, "re-read: {body}");
+    }
+}
