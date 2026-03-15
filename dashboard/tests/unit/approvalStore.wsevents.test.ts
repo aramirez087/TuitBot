@@ -13,6 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
+import { approvalItem } from '../helpers/fixtures';
 
 // --- Capture the wsEvents callback via vi.hoisted() -------------------------
 
@@ -49,14 +50,11 @@ import * as store from '../../src/lib/stores/approval';
 
 // --- Fixtures ----------------------------------------------------------------
 
-const ITEM = {
+const ITEM = approvalItem({
 	id: 1,
-	content: 'Test tweet',
-	scheduled_for: null,
 	status: 'pending',
-	source: 'content_loop',
 	created_at: '2026-01-01T00:00:00Z'
-};
+});
 
 // --- Dispatch helper ---------------------------------------------------------
 // The store uses `lastEventCount` to debounce: if the new event array has the

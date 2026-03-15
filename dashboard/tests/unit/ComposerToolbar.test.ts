@@ -108,7 +108,9 @@ describe('ComposerToolbar', () => {
 		const { container } = render(ComposerToolbar, {
 			props: {
 				...defaultProps,
-				attachedMedia: [{ path: '/tmp/img.jpg', mediaType: 'image', altText: '' }]
+				attachedMedia: [
+					{ path: '/tmp/img.jpg', previewUrl: '/tmp/img.jpg', mediaType: 'image', altText: '' }
+				]
 			}
 		});
 		expect(container).toBeTruthy();

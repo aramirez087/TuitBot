@@ -247,7 +247,6 @@ async fn approval_edit_empty_content() {
 // Activity
 // ============================================================
 
-
 // ============================================================
 // X Auth: Unlink
 // ============================================================
@@ -408,8 +407,7 @@ async fn router_with_pool_and_tokens() -> (
         expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
         scopes: vec!["tweet.read".to_string(), "tweet.write".to_string()],
     };
-    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path)
-        .expect("write dummy tokens.json");
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("write dummy tokens.json");
 
     (router, pool, dir)
 }
@@ -418,7 +416,15 @@ async fn router_with_pool_and_tokens() -> (
 async fn approval_approve_item_succeeds() {
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
     let id = tuitbot_core::storage::approval_queue::enqueue(
-        &pool, "tweet", "", "", "Approve me", "General", "", 0.9, "[]",
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Approve me",
+        "General",
+        "",
+        0.9,
+        "[]",
     )
     .await
     .expect("enqueue");
@@ -438,7 +444,15 @@ async fn approval_approve_item_succeeds() {
 async fn approval_approved_item_removed_from_pending_list() {
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
     let id = tuitbot_core::storage::approval_queue::enqueue(
-        &pool, "tweet", "", "", "Pending item", "General", "", 0.8, "[]",
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Pending item",
+        "General",
+        "",
+        0.8,
+        "[]",
     )
     .await
     .expect("enqueue");
@@ -462,7 +476,15 @@ async fn approval_approved_item_removed_from_pending_list() {
 async fn approval_reject_item_succeeds() {
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
     let id = tuitbot_core::storage::approval_queue::enqueue(
-        &pool, "reply", "t1", "@user", "Reject me", "Rust", "", 0.5, "[]",
+        &pool,
+        "reply",
+        "t1",
+        "@user",
+        "Reject me",
+        "Rust",
+        "",
+        0.5,
+        "[]",
     )
     .await
     .expect("enqueue");
@@ -482,7 +504,15 @@ async fn approval_reject_item_succeeds() {
 async fn approval_reject_sets_status_in_db() {
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
     let id = tuitbot_core::storage::approval_queue::enqueue(
-        &pool, "tweet", "", "", "Will be rejected", "Topic", "", 0.3, "[]",
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Will be rejected",
+        "Topic",
+        "",
+        0.3,
+        "[]",
     )
     .await
     .expect("enqueue");
@@ -575,7 +605,15 @@ async fn approval_approve_all_respects_max_limit() {
 async fn approval_edit_history_empty_for_new_item() {
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
     let id = tuitbot_core::storage::approval_queue::enqueue(
-        &pool, "tweet", "", "", "Fresh item", "General", "", 0.8, "[]",
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Fresh item",
+        "General",
+        "",
+        0.8,
+        "[]",
     )
     .await
     .expect("enqueue");
@@ -590,7 +628,15 @@ async fn approval_edit_history_empty_for_new_item() {
 async fn approval_edit_history_records_edits() {
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
     let id = tuitbot_core::storage::approval_queue::enqueue(
-        &pool, "tweet", "", "", "Original content", "General", "", 0.8, "[]",
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Original content",
+        "General",
+        "",
+        0.8,
+        "[]",
     )
     .await
     .expect("enqueue");

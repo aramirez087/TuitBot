@@ -329,7 +329,6 @@ async fn settings_patch_round_trips() {
 // Ingest
 // ============================================================
 
-
 #[tokio::test]
 async fn runtime_isolation_start_stop() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -391,4 +390,3 @@ async fn runtime_isolation_start_stop() {
     let (_, body) = get_json_for(router.clone(), "/api/runtime/status", &acct_b).await;
     assert_eq!(body["running"], true, "B should survive A's stop");
 }
-

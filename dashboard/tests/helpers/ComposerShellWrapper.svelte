@@ -6,6 +6,11 @@
 		focusMode = false,
 		inspectorOpen = false,
 		onclose = () => {}
+	}: {
+		open?: boolean;
+		focusMode?: boolean;
+		inspectorOpen?: boolean;
+		onclose?: () => void;
 	} = $props();
 </script>
 

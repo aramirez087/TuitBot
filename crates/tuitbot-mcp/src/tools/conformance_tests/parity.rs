@@ -12,6 +12,26 @@ mod tests {
     use crate::spec::SPEC_ENDPOINTS;
     use crate::tools::manifest::{generate_manifest, Profile};
 
+    fn write_server_source() -> &'static str {
+        concat!(
+            include_str!("../../server/write/mod.rs"),
+            "\n",
+            include_str!("../../server/write/tools.rs"),
+            "\n",
+            include_str!("../../server/write/handlers.rs"),
+        )
+    }
+
+    fn admin_server_source() -> &'static str {
+        concat!(
+            include_str!("../../server/admin/mod.rs"),
+            "\n",
+            include_str!("../../server/admin/tools.rs"),
+            "\n",
+            include_str!("../../server/admin/handlers.rs"),
+        )
+    }
+
     /// Extract `#[tool]`-annotated function names from a server source file.
     fn extract_tool_fn_names(source: &str) -> BTreeSet<String> {
         let mut names = BTreeSet::new();
@@ -119,13 +139,13 @@ mod tests {
 
     #[test]
     fn write_manifest_runtime_parity() {
-        let source = include_str!("../../server/write.rs");
+        let source = write_server_source();
         assert_parity_for_profile(Profile::Write, source, "write");
     }
 
     #[test]
     fn admin_manifest_runtime_parity() {
-        let source = include_str!("../../server/admin.rs");
+        let source = admin_server_source();
         assert_parity_for_profile(Profile::Admin, source, "admin");
     }
 
@@ -166,8 +186,8 @@ mod tests {
         let all_handlers: BTreeSet<String> = [
             include_str!("../../server/readonly.rs"),
             include_str!("../../server/api_readonly.rs"),
-            include_str!("../../server/write.rs"),
-            include_str!("../../server/admin.rs"),
+            write_server_source(),
+            admin_server_source(),
         ]
         .iter()
         .flat_map(|src| extract_tool_fn_names(src))
@@ -199,8 +219,8 @@ mod tests {
         let all_handlers: BTreeSet<String> = [
             include_str!("../../server/readonly.rs"),
             include_str!("../../server/api_readonly.rs"),
-            include_str!("../../server/write.rs"),
-            include_str!("../../server/admin.rs"),
+            write_server_source(),
+            admin_server_source(),
         ]
         .iter()
         .flat_map(|src| extract_tool_fn_names(src))

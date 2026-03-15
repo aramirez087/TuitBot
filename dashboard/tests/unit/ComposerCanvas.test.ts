@@ -156,7 +156,9 @@ describe('ComposerCanvas', () => {
 		const { container } = render(ComposerCanvas, {
 			props: {
 				...defaultProps,
-				attachedMedia: [{ path: '/tmp/image.jpg', mediaType: 'image', altText: '' }]
+				attachedMedia: [
+					{ path: '/tmp/image.jpg', previewUrl: '/tmp/image.jpg', mediaType: 'image', altText: '' }
+				]
 			}
 		});
 		expect(container).toBeTruthy();

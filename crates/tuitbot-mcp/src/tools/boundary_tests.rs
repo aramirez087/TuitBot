@@ -9,6 +9,26 @@ mod tests {
     use crate::tools::manifest::{generate_manifest, Lane, Profile, ToolCategory};
     use std::collections::HashSet;
 
+    fn write_server_source() -> &'static str {
+        concat!(
+            include_str!("../server/write/mod.rs"),
+            "\n",
+            include_str!("../server/write/tools.rs"),
+            "\n",
+            include_str!("../server/write/handlers.rs"),
+        )
+    }
+
+    fn admin_server_source() -> &'static str {
+        concat!(
+            include_str!("../server/admin/mod.rs"),
+            "\n",
+            include_str!("../server/admin/tools.rs"),
+            "\n",
+            include_str!("../server/admin/handlers.rs"),
+        )
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     /// Hardcoded denylist of tools that perform mutations.
@@ -183,7 +203,7 @@ mod tests {
     /// write.rs must NOT register universal request tool handlers.
     #[test]
     fn write_server_does_not_register_universal_tools() {
-        let source = include_str!("../server/write.rs");
+        let source = write_server_source();
         let fn_names = extract_tool_fn_names(source);
         let admin_tools: HashSet<&str> = admin_only_tools().iter().copied().collect();
         for name in &fn_names {
@@ -197,7 +217,7 @@ mod tests {
     /// admin.rs MUST register all universal request tool handlers.
     #[test]
     fn admin_server_registers_universal_tools() {
-        let source = include_str!("../server/admin.rs");
+        let source = admin_server_source();
         let fn_names: HashSet<String> = extract_tool_fn_names(source).into_iter().collect();
         for &tool in admin_only_tools() {
             assert!(
@@ -554,7 +574,7 @@ mod tests {
 
     #[test]
     fn write_server_tool_count() {
-        let source = include_str!("../server/write.rs");
+        let source = write_server_source();
         let fn_names = extract_tool_fn_names(source);
         // 72 curated - 4 admin-only universal request tools = 68
         assert_eq!(
@@ -568,7 +588,7 @@ mod tests {
 
     #[test]
     fn admin_server_tool_count() {
-        let source = include_str!("../server/admin.rs");
+        let source = admin_server_source();
         let fn_names = extract_tool_fn_names(source);
         // All 72 curated tools including universal request tools
         assert_eq!(

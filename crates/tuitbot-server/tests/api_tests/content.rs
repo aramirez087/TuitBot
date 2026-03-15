@@ -391,7 +391,6 @@ async fn settings_init_with_connection_id() {
 // Connector endpoints
 // ============================================================
 
-
 #[tokio::test]
 async fn content_generator_lazy_init_per_account() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -482,4 +481,3 @@ api_key = "test-key-not-real"
     assert!(Arc::ptr_eq(&gen1, &gen2), "should return cached generator");
     assert_eq!(state.content_generators.lock().await.len(), 2);
 }
-

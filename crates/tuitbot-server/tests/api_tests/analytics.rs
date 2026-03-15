@@ -179,7 +179,6 @@ async fn runtime_start_and_stop() {
 // Settings
 // ============================================================
 
-
 #[tokio::test]
 async fn post_ingest_inline_returns_200() {
     let router = test_router().await;
@@ -376,7 +375,6 @@ async fn config_status_capabilities_match_cloud_mode() {
     );
 }
 
-
 #[tokio::test]
 async fn load_effective_config_per_account() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -478,7 +476,10 @@ async fn analytics_summary_returns_expected_shape() {
     assert_eq!(status, StatusCode::OK);
     // Shape check: must have followers, actions_today, engagement, top_topics.
     assert!(body["followers"].is_object(), "missing followers object");
-    assert!(body["actions_today"].is_object(), "missing actions_today object");
+    assert!(
+        body["actions_today"].is_object(),
+        "missing actions_today object"
+    );
     assert!(body["engagement"].is_object(), "missing engagement object");
     assert!(body["top_topics"].is_array(), "missing top_topics array");
     // Numeric follower fields.

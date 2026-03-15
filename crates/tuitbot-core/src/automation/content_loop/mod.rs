@@ -99,7 +99,7 @@ impl ContentLoop {
 #[cfg(test)]
 pub(super) mod test_mocks {
     use crate::automation::loop_helpers::{
-        ContentSafety, ContentStorage, ThreadPoster, TopicScorer, TweetGenerator,
+        ContentSafety, ContentStorage, TopicScorer, TweetGenerator,
     };
     use crate::automation::ContentLoopError;
     use std::sync::Mutex;
