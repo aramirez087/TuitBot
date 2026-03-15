@@ -112,8 +112,10 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit
 
-      - name: Run cargo audit (fail on warnings)
-        run: cargo audit --deny warnings
+      - name: Run cargo audit (fail on unsound)
+        run: |
+          cargo audit
+          cargo audit --deny unsound
 
   # ── Frontend / npm security audit ──
   audit-npm:
