@@ -1039,8 +1039,9 @@ mod tests {
 
     #[test]
     fn validate_db_path_directory_rejected() {
-        // Use a known existing directory
-        let result = validate_db_path("/tmp");
+        // Use a known existing directory (cross-platform)
+        let tmp = std::env::temp_dir();
+        let result = validate_db_path(tmp.to_str().unwrap());
         assert!(result.is_err());
     }
 
