@@ -117,7 +117,11 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          # npm ci may miss platform-specific optional deps (rollup native bindings)
+          # when the lockfile was generated on a different OS. Re-resolve to fix.
+          npm i --prefer-offline
 
       # E2E tests (Playwright) are not run here: they require a live tuitbot-server
       # backend which is not available in the Coverage job. E2E tests belong in an
