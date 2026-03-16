@@ -399,6 +399,11 @@ jobs:
     if: ${{ !cancelled() && needs.release.outputs.asset_release_ready == 'true' }}
     permissions:
       contents: write
+    env:
+      # Expose secret availability as an env var so step `if:` conditions can
+      # reference it. Secrets context is not valid in step `if:` expressions
+      # during workflow_dispatch validation (GitHub Actions limitation).
+      HAS_GPG: ${{ secrets.GPG_PRIVATE_KEY != '' }}
     steps:
       - name: Download packaged artifacts
         uses: actions/download-artifact@v8
@@ -495,7 +500,7 @@ jobs:
           fi
 
       - name: Import GPG key
-        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        if: env.HAS_GPG == 'true'
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -506,7 +511,7 @@ jobs:
           git config --global user.signingkey $(gpg --list-keys --with-colons | grep fpr | head -1 | cut -d: -f10)
 
       - name: Sign release artifacts with GPG
-        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        if: env.HAS_GPG == 'true'
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
