@@ -127,3 +127,4 @@ jobs:
           files: dashboard/coverage/lcov.info
           flags: frontend
           fail_ci_if_error: false
+
