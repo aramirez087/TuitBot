@@ -77,7 +77,7 @@ jobs:
       #   cargo tarpaulin -p tuitbot-mcp --out Xml --output-dir coverage/ --fail-under 60 --timeout 300
 
       - name: Upload Rust coverage report (artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: rust-coverage-report
@@ -135,7 +135,7 @@ jobs:
         run: npm run test:coverage:ci
 
       - name: Upload frontend coverage report (artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: frontend-coverage-report
