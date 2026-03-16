@@ -5,8 +5,9 @@ use super::{bench_tool, setup_db, ToolRun, P95_THRESHOLD_MS};
 use crate::tools::test_mocks::artifacts_dir;
 
 #[tokio::test]
-#[ignore]  // Flaky on CI: P95 latency threshold (50ms) exceeded intermittently (~62ms on GH Actions).
-           // Runs in conformance gates (ci.yml) when invoked explicitly. Skip in coverage/perf jobs.
+// Flaky on CI: P95 latency threshold (50ms) exceeded intermittently (~62ms on GH Actions).
+// Runs in conformance gates (ci.yml) when invoked explicitly. Skip in coverage/perf jobs.
+#[ignore]
 async fn session09_expanded_benchmark() {
     let pool = setup_db().await;
     let config = Config::default();
