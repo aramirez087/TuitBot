@@ -93,6 +93,23 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Run E2E tests (headless Chromium)
+        # E2E tests verify critical user journeys: auth, compose, approve, safety guardrails.
+        # Uses playwright.config.ts webServer to auto-start vite dev server.
+        # Tests are deterministic and should not flake in CI.
+        env:
+          TEST_PASSPHRASE: ${{ secrets.TEST_PASSPHRASE || 'test test test test' }}
+        run: npm run test:e2e
+
+      - name: Upload E2E test artifacts (on failure)
+        # Capture screenshots, videos, and traces for debugging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: dashboard/test-results/
+          retention-days: 30
+
       - name: Run coverage (thresholds enforced)
         # FRONTEND COVERAGE GATE (Task 4.1): Global 70% lines threshold
         # Enforces minimum 70% line coverage across src/lib/** (global + per-file thresholds).

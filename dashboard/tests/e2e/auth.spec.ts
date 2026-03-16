@@ -6,9 +6,8 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 test.describe('Authentication', () => {
-	// Use a known test passphrase — assumes server is running with this set
-	// In real CI, this would come from test credentials via env var
-	const TEST_PASSPHRASE = 'test test test test';
+	// Use passphrase from environment variable (set in CI or locally)
+	const TEST_PASSPHRASE = process.env.TEST_PASSPHRASE || 'test test test test';
 
 	test('should display login form on initial access', async ({ page }) => {
 		await page.goto('/');
