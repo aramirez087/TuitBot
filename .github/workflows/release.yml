@@ -3,12 +3,19 @@ name: Release
 on:
   push:
     branches: [main]
+    tags:
+      - 'app-v*'  # Desktop app releases
   workflow_dispatch:
     inputs:
       release_tag:
         description: Existing CLI or server release tag to backfill assets for
         required: false
         type: string
+      build_desktop:
+        description: Manually trigger desktop build (for app-v* tags)
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -502,3 +509,61 @@ jobs:
           set -euo pipefail
           # Upload all artifacts (binaries + signatures)
           gh release upload "$TAG" dist/* --clobber --repo "$GH_REPO"
+
+  # ── Desktop app build (Tauri) — triggered on app-v* tags ──
+  build-desktop:
+    name: Build desktop app (${{ matrix.target }})
+    if: startsWith(github.ref, 'refs/tags/app-v') || github.event.inputs.build_desktop == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry and Tauri build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            dashboard/src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.target }}-tauri-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-tauri-
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: cd dashboard && npm ci
+
+      - name: Build Tauri app
+        run: cd dashboard && npm run tauri build -- --target ${{ matrix.target }}
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tuitbot-desktop-${{ matrix.target }}
+          path: dashboard/src-tauri/target/${{ matrix.target }}/release/bundle/
+          retention-days: 30
