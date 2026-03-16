@@ -15,7 +15,7 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -59,5 +59,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: tuitbot-desktop-${{ matrix.target }}
+          name: desktop-bundle-${{ matrix.target }}
           path: dashboard/src-tauri/target/${{ matrix.target }}/release/bundle/
