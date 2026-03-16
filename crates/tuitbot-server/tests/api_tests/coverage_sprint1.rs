@@ -32,6 +32,7 @@ async fn test_router_with_config(
         content_generators: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         runtimes: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        scraper_health: None,
         watchtower_cancel: tokio::sync::RwLock::new(None),
         content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),

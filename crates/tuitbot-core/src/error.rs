@@ -129,6 +129,33 @@ pub enum XApiError {
     },
 }
 
+impl XApiError {
+    /// Returns `true` for transient errors where a retry may succeed.
+    ///
+    /// Non-retryable: auth failures (401/403), scope issues, permanent
+    /// client errors. Retryable: network errors, server errors (5xx),
+    /// rate limits, and scraper transport issues.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            // Transient: retry after a delay.
+            XApiError::RateLimited { .. } => true,
+            XApiError::Network { .. } => true,
+            XApiError::ScraperTransportUnavailable { .. } => true,
+            // Retryable server errors (5xx); non-retryable client errors (4xx).
+            XApiError::ApiError { status, .. } => *status >= 500,
+            // Non-retryable: credentials, permissions, or permanent client errors.
+            XApiError::AuthExpired => false,
+            XApiError::AccountRestricted { .. } => false,
+            XApiError::Forbidden { .. } => false,
+            XApiError::ScopeInsufficient { .. } => false,
+            XApiError::FeatureRequiresAuth { .. } => false,
+            XApiError::ScraperMutationBlocked { .. } => false,
+            XApiError::MediaUploadError { .. } => false,
+            XApiError::MediaProcessingTimeout { .. } => false,
+        }
+    }
+}
+
 /// Errors from interacting with LLM providers (OpenAI, Anthropic, Ollama).
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {

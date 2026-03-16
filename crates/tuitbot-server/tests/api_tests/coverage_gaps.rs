@@ -112,6 +112,7 @@ async fn list_tags_after_create_shows_new_tag() {
         content_generators: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         runtimes: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        scraper_health: None,
         watchtower_cancel: tokio::sync::RwLock::new(None),
         content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),

@@ -9,7 +9,9 @@ pub mod client;
 pub mod local_mode;
 pub mod media;
 pub mod null_client;
+pub mod retry;
 pub mod scopes;
+pub mod scraper_health;
 pub mod tier;
 pub mod types;
 
@@ -17,6 +19,7 @@ pub use client::XApiHttpClient;
 pub use local_mode::session::ScraperSession;
 pub use local_mode::LocalModeXClient;
 pub use null_client::NullXApiClient;
+pub use scraper_health::{new_scraper_health, ScraperHealth, ScraperHealthSnapshot, ScraperState};
 pub use types::*;
 
 use std::path::Path;

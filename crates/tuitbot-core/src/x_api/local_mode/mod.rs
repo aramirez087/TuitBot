@@ -12,6 +12,8 @@ pub mod session;
 use std::path::{Path, PathBuf};
 
 use crate::error::XApiError;
+use crate::x_api::retry::{retry_with_backoff, RetryConfig};
+use crate::x_api::scraper_health::{new_scraper_health, ScraperHealth};
 use crate::x_api::types::{
     MediaId, MediaType, MentionResponse, PostedTweet, RawApiResponse, SearchResponse, Tweet, User,
     UsersResponse,
@@ -21,18 +23,31 @@ use crate::x_api::XApiClient;
 use cookie_transport::CookieTransport;
 use session::ScraperSession;
 
+/// Default retry policy for scraper operations.
+const SCRAPER_RETRY: RetryConfig = RetryConfig {
+    max_attempts: 3,
+    base_delay: std::time::Duration::from_millis(500),
+    max_delay: std::time::Duration::from_secs(8),
+};
+
 /// X API client for local/scraper mode — no OAuth credentials required.
 ///
 /// When a valid `scraper_session.json` exists in the data directory,
 /// operations are dispatched to the cookie-based transport.
 /// Otherwise, they return `ScraperTransportUnavailable`.
+///
+/// All transport calls are wrapped with `retry_with_backoff` so transient
+/// network errors and 5xx responses are retried automatically.  Health
+/// is tracked in `health` and exposed via [`LocalModeXClient::health`].
 pub struct LocalModeXClient {
     allow_mutations: bool,
     cookie_transport: Option<CookieTransport>,
+    /// Shared health tracker — updated after every transport call.
+    health: ScraperHealth,
 }
 
 impl LocalModeXClient {
-    /// Create a new local-mode client.
+    /// Create a new local-mode client (no session — stub mode).
     ///
     /// `allow_mutations` controls whether write operations are attempted
     /// (when `true`) or immediately rejected (when `false`).
@@ -40,6 +55,7 @@ impl LocalModeXClient {
         Self {
             allow_mutations,
             cookie_transport: None,
+            health: new_scraper_health(),
         }
     }
 
@@ -50,6 +66,20 @@ impl LocalModeXClient {
     ///
     /// Auto-detects GraphQL query IDs from X's web client JS bundles at startup.
     pub async fn with_session(allow_mutations: bool, data_dir: &Path) -> Self {
+        Self::with_session_and_health(allow_mutations, data_dir, new_scraper_health()).await
+    }
+
+    /// Create a local-mode client with cookie-auth and a **shared** health handle.
+    ///
+    /// Use this instead of [`with_session`] when you want multiple ephemeral
+    /// clients (e.g. one per HTTP request) to update the same health tracker
+    /// held in `AppState`. Enables the `/health` endpoint to reflect real
+    /// scraper health across the lifetime of the server process.
+    pub async fn with_session_and_health(
+        allow_mutations: bool,
+        data_dir: &Path,
+        health: ScraperHealth,
+    ) -> Self {
         let session_path = data_dir.join("scraper_session.json");
         let session = ScraperSession::load(&session_path).ok().flatten();
 
@@ -68,6 +98,36 @@ impl LocalModeXClient {
         Self {
             allow_mutations,
             cookie_transport,
+            health,
+        }
+    }
+
+    /// Return a clone of the shared health handle.
+    ///
+    /// Callers (e.g. the health endpoint) can snapshot the current state
+    /// without coupling to the client implementation.
+    pub fn health(&self) -> ScraperHealth {
+        self.health.clone()
+    }
+
+    /// Wrap a transport call with retry logic and health tracking.
+    ///
+    /// On success: resets consecutive failure counter.
+    /// On final failure: increments counter and records last error.
+    async fn with_retry_and_health<F, Fut, T>(&self, op: F) -> Result<T, XApiError>
+    where
+        F: FnMut() -> Fut,
+        Fut: std::future::Future<Output = Result<T, XApiError>>,
+    {
+        match retry_with_backoff(SCRAPER_RETRY, op).await {
+            Ok(v) => {
+                self.health.lock().await.record_success();
+                Ok(v)
+            }
+            Err(e) => {
+                self.health.lock().await.record_failure(&e.to_string());
+                Err(e)
+            }
         }
     }
 
@@ -298,11 +358,13 @@ impl XApiClient for LocalModeXClient {
 
     async fn post_tweet(&self, text: &str) -> Result<PostedTweet, XApiError> {
         self.check_mutation("post_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .post_tweet(text)
-            .await
+        let transport = self.cookie_transport.as_ref().unwrap();
+        let text = text.to_string();
+        self.with_retry_and_health(|| {
+            let t = text.clone();
+            async move { transport.post_tweet(&t).await }
+        })
+        .await
     }
 
     async fn reply_to_tweet(
@@ -311,11 +373,15 @@ impl XApiClient for LocalModeXClient {
         in_reply_to_id: &str,
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("reply_to_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .reply_to_tweet(text, in_reply_to_id)
-            .await
+        let transport = self.cookie_transport.as_ref().unwrap();
+        let text = text.to_string();
+        let reply_id = in_reply_to_id.to_string();
+        self.with_retry_and_health(|| {
+            let t = text.clone();
+            let r = reply_id.clone();
+            async move { transport.reply_to_tweet(&t, &r).await }
+        })
+        .await
     }
 
     async fn post_tweet_with_media(
@@ -325,11 +391,13 @@ impl XApiClient for LocalModeXClient {
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("post_tweet_with_media")?;
         // Media upload not yet supported via cookie transport — post text only.
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .post_tweet(text)
-            .await
+        let transport = self.cookie_transport.as_ref().unwrap();
+        let text = text.to_string();
+        self.with_retry_and_health(|| {
+            let t = text.clone();
+            async move { transport.post_tweet(&t).await }
+        })
+        .await
     }
 
     async fn reply_to_tweet_with_media(
@@ -340,11 +408,15 @@ impl XApiClient for LocalModeXClient {
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("reply_to_tweet_with_media")?;
         // Media upload not yet supported via cookie transport — post text only.
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .reply_to_tweet(text, in_reply_to_id)
-            .await
+        let transport = self.cookie_transport.as_ref().unwrap();
+        let text = text.to_string();
+        let reply_id = in_reply_to_id.to_string();
+        self.with_retry_and_health(|| {
+            let t = text.clone();
+            let r = reply_id.clone();
+            async move { transport.reply_to_tweet(&t, &r).await }
+        })
+        .await
     }
 
     async fn quote_tweet(

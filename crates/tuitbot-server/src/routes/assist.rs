@@ -351,6 +351,7 @@ mod tests {
             runtimes: Mutex::new(HashMap::new()),
             content_generators: Mutex::new(HashMap::new()),
             circuit_breaker: None,
+            scraper_health: None,
             watchtower_cancel: RwLock::new(None),
             content_sources: RwLock::new(Default::default()),
             connector_config: Default::default(),

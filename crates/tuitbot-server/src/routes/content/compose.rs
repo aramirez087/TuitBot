@@ -555,11 +555,22 @@ async fn build_x_client(
         "scraper" => {
             let account_data =
                 tuitbot_core::storage::accounts::account_data_dir(&state.data_dir, &ctx.account_id);
-            let client = tuitbot_core::x_api::LocalModeXClient::with_session(
-                config.x_api.scraper_allow_mutations,
-                &account_data,
-            )
-            .await;
+            // Use the shared health handle from AppState so each request's outcome
+            // aggregates into the tracker that /health reads, rather than being discarded.
+            let client = if let Some(ref health) = state.scraper_health {
+                tuitbot_core::x_api::LocalModeXClient::with_session_and_health(
+                    config.x_api.scraper_allow_mutations,
+                    &account_data,
+                    health.clone(),
+                )
+                .await
+            } else {
+                tuitbot_core::x_api::LocalModeXClient::with_session(
+                    config.x_api.scraper_allow_mutations,
+                    &account_data,
+                )
+                .await
+            };
             Ok(Box::new(client))
         }
         "x_api" => {
