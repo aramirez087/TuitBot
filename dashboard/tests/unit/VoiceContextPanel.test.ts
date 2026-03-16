@@ -105,13 +105,18 @@ describe('VoiceContextPanel', () => {
 	});
 
 	it('renders tone cue input field', () => {
-		const { container } = render(VoiceContextPanel, { props: defaultProps });
+		// cue-input is visible in inline mode; in non-inline mode it requires expanded=true
+		const { container } = render(VoiceContextPanel, {
+			props: { ...defaultProps, inline: true }
+		});
 		const cueInput = container.querySelector('.cue-input');
 		expect(cueInput).toBeTruthy();
 	});
 
 	it('has proper placeholder text for cue input', () => {
-		const { container } = render(VoiceContextPanel, { props: defaultProps });
+		const { container } = render(VoiceContextPanel, {
+			props: { ...defaultProps, inline: true }
+		});
 		const cueInput = container.querySelector('.cue-input') as HTMLInputElement;
 		expect(cueInput?.placeholder).toContain('Tone cue');
 	});

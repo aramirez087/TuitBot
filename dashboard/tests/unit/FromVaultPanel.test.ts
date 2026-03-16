@@ -15,16 +15,39 @@ vi.mock('$lib/api', () => ({
 		vault: {
 			searchNotes: vi.fn().mockResolvedValue({
 				notes: [
-					{ id: 1, title: 'Design Patterns', snippet: 'Common patterns in software...' },
-					{ id: 2, title: 'Web Performance', snippet: 'Optimizing web apps...' }
+					{
+						node_id: 1,
+						source_id: 1,
+						title: 'Design Patterns',
+						relative_path: 'design-patterns.md',
+						tags: null,
+						status: 'indexed',
+						chunk_count: 3,
+						updated_at: '2024-01-01T00:00:00Z'
+					},
+					{
+						node_id: 2,
+						source_id: 1,
+						title: 'Web Performance',
+						relative_path: 'web-performance.md',
+						tags: null,
+						status: 'indexed',
+						chunk_count: 2,
+						updated_at: '2024-01-02T00:00:00Z'
+					}
 				]
 			}),
 			noteDetail: vi.fn().mockResolvedValue({
-				id: 1,
+				node_id: 1,
+				source_id: 1,
 				title: 'Design Patterns',
-				content: 'Detailed content...',
+				relative_path: 'design-patterns.md',
+				tags: null,
+				status: 'indexed',
+				ingested_at: '2024-01-01T00:00:00Z',
+				updated_at: '2024-01-01T00:00:00Z',
 				chunks: [
-					{ id: 'chunk-1', heading: 'Section 1', text: 'Chunk content 1' }
+					{ chunk_id: 1, heading_path: 'Section 1', snippet: 'Chunk content 1', retrieval_boost: 1.0 }
 				]
 			}),
 			sources: vi.fn().mockResolvedValue({

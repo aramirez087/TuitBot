@@ -34,7 +34,13 @@
 			const raw = localStorage.getItem(SAVED_CUES_KEY);
 			if (!raw) return [];
 			const parsed = JSON.parse(raw);
-			return Array.isArray(parsed) ? parsed.slice(0, MAX_SAVED_CUES) : [];
+			if (!Array.isArray(parsed)) return [];
+			const clamped = parsed.slice(0, MAX_SAVED_CUES);
+			// Write back trimmed array to prevent unbounded growth from external writes
+			if (clamped.length < parsed.length) {
+				localStorage.setItem(SAVED_CUES_KEY, JSON.stringify(clamped));
+			}
+			return clamped;
 		} catch {
 			return [];
 		}
