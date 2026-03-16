@@ -67,7 +67,7 @@ fn build_browser_client() -> rquest::Client {
 /// Generate a random UUID v4 string for `x-client-uuid`.
 fn generate_client_uuid() -> String {
     let mut buf = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand::rng().fill_bytes(&mut buf);
     buf[6] = (buf[6] & 0x0f) | 0x40;
     buf[8] = (buf[8] & 0x3f) | 0x80;
     format!(

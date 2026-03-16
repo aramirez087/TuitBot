@@ -10,6 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![X API](https://img.shields.io/badge/X_API-Ready-black?style=for-the-badge&logo=x)](https://developer.x.com)
 [![CI](https://img.shields.io/github/actions/workflow/status/aramirez087/TuitBot/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/aramirez087/TuitBot/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/aramirez087/TuitBot/branch/main/graph/badge.svg?style=for-the-badge)](https://codecov.io/gh/aramirez087/TuitBot)
 [![Releases](https://img.shields.io/github/v/release/aramirez087/TuitBot?style=for-the-badge)](https://github.com/aramirez087/TuitBot/releases)
 
 Tuitbot discovers relevant conversations, drafts genuinely helpful replies, and queues everything for your review. When you're ready, flip the switch to let it post autonomously within strict safety guardrails. **Think of it as a growth-focused writing partner** that handles the research so you can focus on building.
