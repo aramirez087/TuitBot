@@ -36,6 +36,9 @@ jobs:
         run: cargo install cargo-tarpaulin --locked
 
       - name: Run tarpaulin
+        # RUST COVERAGE GATE (Task 4.1): --fail-under 75
+        # Enforces minimum 75% line coverage across all Rust crates (excluding tuitbot-mcp).
+        # Note: tuitbot-mcp inclusion is tracked in Task 4.3 (separate gate).
         run: |
           cargo tarpaulin \
             --workspace \
@@ -91,6 +94,10 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run coverage (thresholds enforced)
+        # FRONTEND COVERAGE GATE (Task 4.1): Global 70% lines threshold
+        # Enforces minimum 70% line coverage across src/lib/** (global + per-file thresholds).
+        # Per-file thresholds for core stores: 75% lines.
+        # Failure details are printed in coverage output; CI will fail if threshold dropped.
         run: npm run test:coverage:ci
 
       - name: Upload frontend coverage report (artifact)

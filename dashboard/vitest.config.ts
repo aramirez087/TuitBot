@@ -19,16 +19,21 @@ export default defineConfig({
 			// Broad measurement scope — all lib files appear in reports.
 			include: ['src/lib/**'],
 			exclude: ['src/lib/assets/**', 'src/**/*.d.ts'],
-			// Threshold enforcement: scoped to the four fully-tested writable
-			// stores (approvalStore, analyticsStore, settingsStore, discoveryStore).
-			// draftStudio.svelte.ts uses Svelte-5 runes and is tracked but not
-			// included in the enforceable threshold.
-			// Targets: ≥70% lines/branches, ≥55% functions (WS handlers not
-			// reachable in unit tests).  Raise these as Task 3.2–3.5 land.
-			// Per-file thresholds for the four fully-tested writable stores.
-			// Raised to spec levels (Tasks 3.2–3.5 complete, thresholds now enforced).
-			// Target: statements/lines ≥75%, branches ≥70%, functions ≥75%.
+			// GLOBAL threshold (Task 4.1): Enforce 70% lines coverage across entire frontend.
+			// This is the hard gate for CI — all PRs must meet this minimum.
+			// Per-file thresholds below are stricter for the four fully-tested stores.
+			// Targets: ≥70% lines (global), ≥75% on core stores.
 			thresholds: {
+				// Global thresholds (enforced across all src/lib/**):
+				// Minimum coverage required for any PR to pass CI.
+				lines: 70,
+				statements: 70,
+				branches: 60,
+				functions: 65,
+
+				// Per-file thresholds for the four fully-tested writable stores.
+				// Raised to spec levels (Tasks 3.2–3.5 complete, thresholds now enforced).
+				// Target: statements/lines ≥75%, branches ≥70%, functions ≥75%.
 				'src/lib/stores/approval.ts': {
 					statements: 75,
 					branches: 70,

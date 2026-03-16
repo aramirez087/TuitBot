@@ -78,5 +78,28 @@ release-plz update --config release-plz.toml --allow-dirty
 cargo package --workspace --allow-dirty
 ```
 
+## Coverage Thresholds (Task 4.1)
+
+**Rust Coverage (Cargo Tarpaulin):**
+- Global minimum: **75% lines** (enforced by `cargo tarpaulin --fail-under 75`)
+- Scope: All workspace crates except `tuitbot-mcp` (inclusion tracked in Task 4.3)
+- CI fails if coverage drops below 75%
+- Measurement: `cargo tarpaulin --workspace --exclude tuitbot-mcp --out Xml --fail-under 75`
+
+**Frontend Coverage (Vitest):**
+- Global minimum: **70% lines** (enforced in `dashboard/vitest.config.ts`)
+- Per-file minimums for core stores: **75% lines**
+  - `src/lib/stores/approval.ts`
+  - `src/lib/stores/analytics.ts`
+  - `src/lib/stores/settings.ts`
+  - `src/lib/stores/targets.ts`
+- CI fails if either global or per-file threshold drops
+- Measurement: `npm run test:coverage:ci` in dashboard/
+
+**CI Enforcement:**
+- Coverage workflow (`.github/workflows/coverage.yml`) runs on every push + PR
+- Both Rust and Frontend gates must pass for merge
+- Codecov reports uploaded to tracking history
+
 ## Always Do First
 - **Invoke the `frontend-design` skill** before writing any frontend code, every session, no exceptions.
