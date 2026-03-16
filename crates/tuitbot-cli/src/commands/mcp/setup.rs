@@ -116,7 +116,7 @@ pub async fn run_setup(out: crate::output::CliOutput) -> Result<()> {
 
     let selection = Select::new()
         .with_prompt("MCP profile")
-        .items(&profile_descriptions)
+        .items(profile_descriptions)
         .default(0)
         .interact()?;
 

@@ -63,7 +63,7 @@ impl PostingSlot {
 ///
 /// The output is clamped to at least 0 to prevent negative waits.
 pub fn apply_slot_jitter(wait: Duration) -> Duration {
-    let jitter_secs = rand::thread_rng().gen_range(0..=SLOT_JITTER_SECS * 2);
+    let jitter_secs = rand::rng().random_range(0..=SLOT_JITTER_SECS * 2);
     // offset from -SLOT_JITTER_SECS to +SLOT_JITTER_SECS
     let wait_secs = wait.as_secs() as i64 + jitter_secs as i64 - SLOT_JITTER_SECS as i64;
     Duration::from_secs(wait_secs.max(0) as u64)

@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 use super::error::AuthError;
 
@@ -21,7 +21,7 @@ const BCRYPT_COST: u32 = 12;
 /// Generate a random 4-word passphrase from the EFF short wordlist.
 pub fn generate_passphrase() -> String {
     let words: Vec<&str> = WORDLIST.lines().filter(|l| !l.is_empty()).collect();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let selected: Vec<&&str> = words
         .choose_multiple(&mut rng, PASSPHRASE_WORD_COUNT)
         .collect();

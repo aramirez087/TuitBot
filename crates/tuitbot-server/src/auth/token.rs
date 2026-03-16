@@ -23,7 +23,7 @@ pub fn ensure_api_token(config_dir: &Path) -> anyhow::Result<String> {
 
     // Generate a random 256-bit (32-byte) token and hex-encode it.
     let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     let token = hex::encode(bytes);
 
     // Ensure the directory exists.

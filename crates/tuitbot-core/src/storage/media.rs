@@ -119,8 +119,8 @@ fn extension_for_type(media_type: MediaType) -> &'static str {
 /// Generate a simple UUID v4-like string using rand.
 fn uuid_v4() -> String {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let bytes: [u8; 16] = rng.gen();
+    let mut rng = rand::rng();
+    let bytes: [u8; 16] = rng.random();
     format!(
         "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
         bytes[0], bytes[1], bytes[2], bytes[3],

@@ -52,7 +52,7 @@ impl LoopScheduler {
         } else {
             let min_ms = self.min_delay.as_millis() as u64;
             let max_ms = self.max_delay.as_millis() as u64;
-            Duration::from_millis(rand::thread_rng().gen_range(min_ms..=max_ms))
+            Duration::from_millis(rand::rng().random_range(min_ms..=max_ms))
         };
 
         self.interval + jitter

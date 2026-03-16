@@ -42,7 +42,7 @@ fn hash_token(raw_token: &str) -> String {
 /// Generate a cryptographically random hex string.
 fn random_hex(bytes: usize) -> String {
     let mut buf = vec![0u8; bytes];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand::rng().fill_bytes(&mut buf);
     hex::encode(&buf)
 }
 

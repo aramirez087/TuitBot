@@ -383,7 +383,7 @@ fn randomized_delay(min: Duration, max: Duration) -> Duration {
     }
     let min_ms = min.as_millis() as u64;
     let max_ms = max.as_millis() as u64;
-    Duration::from_millis(rand::thread_rng().gen_range(min_ms..=max_ms))
+    Duration::from_millis(rand::rng().random_range(min_ms..=max_ms))
 }
 
 #[cfg(test)]
