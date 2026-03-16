@@ -22,7 +22,7 @@ oauth2 = { version = "4", default-features = false, features = ["reqwest", "rust
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
-rand = "0.8"
+rand = "0.9"
 async-trait = "0.1"
 dirs = "5"
 sha2 = "0.10"
