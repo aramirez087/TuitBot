@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 /**
  * E2E Tests: Composer / Draft Studio
@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Composer / Draft Studio', () => {
 	const TEST_PASSPHRASE = 'test test test test';
 
-	async function loginBeforeTest(page) {
+	async function loginBeforeTest(page: Page) {
 		await page.goto('/login');
 		const passphraseInput = page.locator('input[id="passphrase"]');
 		await passphraseInput.fill(TEST_PASSPHRASE);
