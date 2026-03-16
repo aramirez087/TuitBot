@@ -24,7 +24,7 @@
 		"@tailwindcss/vite": "^4.2.1",
 		"@tauri-apps/cli": "^2.0.0-rc.18",
 		"@testing-library/svelte": "^5.3.1",
-		"@types/node": "^25.3.0",
+		"@types/node": "^25.5.0",
 		"@vitest/coverage-v8": "^4.1.0",
 		"jsdom": "^28.1.0",
 		"svelte": "^5.51.0",
