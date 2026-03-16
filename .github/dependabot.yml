@@ -1,11 +1,17 @@
 version: 2
 updates:
-  # Rust workspace (root Cargo.toml)
+  # ── Rust / Cargo ──────────────────────────────────────────────────────────
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "06:00"
+      timezone: "America/Costa_Rica"
+    allow:
+      - dependency-type: "direct"
+    reviewers:
+      - "aramirez087"
     labels:
       - "dependencies"
       - "rust"
@@ -13,25 +19,35 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 10
 
-  # GitHub Actions workflows
+  # ── GitHub Actions ────────────────────────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "06:00"
+      timezone: "America/Costa_Rica"
+    reviewers:
+      - "aramirez087"
     labels:
       - "dependencies"
-      - "github-actions"
+      - "ci"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
 
-  # SvelteKit dashboard (dashboard/)
+  # ── Node.js / dashboard ───────────────────────────────────────────────────
   - package-ecosystem: "npm"
     directory: "/dashboard"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "06:00"
+      timezone: "America/Costa_Rica"
+    allow:
+      - dependency-type: "direct"
+    reviewers:
+      - "aramirez087"
     labels:
       - "dependencies"
       - "frontend"
@@ -39,15 +55,21 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 10
 
-  # OpenClaw plugin (plugins/openclaw-tuitbot/)
+  # ── Node.js / openclaw plugin ─────────────────────────────────────────────
   - package-ecosystem: "npm"
     directory: "/plugins/openclaw-tuitbot"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "06:00"
+      timezone: "America/Costa_Rica"
+    allow:
+      - dependency-type: "direct"
+    reviewers:
+      - "aramirez087"
     labels:
       - "dependencies"
       - "plugin"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5

@@ -56,8 +56,8 @@ const mockPerformance: PerformanceItem[] = [
 		replies_received: 3,
 		retweets: 2,
 		impressions: 500,
-		performance_score: 0.8,
-		posted_at: '2026-03-01T10:00:00.000Z'
+		performance_score: 0.82,
+		posted_at: '2026-03-14T00:30:00.000Z'
 	}
 ];
 
