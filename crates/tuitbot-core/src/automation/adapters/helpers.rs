@@ -116,3 +116,235 @@ pub(super) fn parse_datetime(s: &str) -> Option<DateTime<Utc>> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use chrono::Timelike;
+
+    // --- parse_datetime ---
+
+    #[test]
+    fn parse_datetime_rfc3339() {
+        let dt = parse_datetime("2026-03-15T10:30:00+00:00");
+        assert!(dt.is_some());
+        assert_eq!(dt.unwrap().hour(), 10);
+    }
+
+    #[test]
+    fn parse_datetime_rfc3339_with_offset() {
+        let dt = parse_datetime("2026-03-15T10:30:00-05:00");
+        assert!(dt.is_some());
+        // -05:00 → UTC is 15:30
+        assert_eq!(dt.unwrap().hour(), 15);
+    }
+
+    #[test]
+    fn parse_datetime_sqlite_format() {
+        let dt = parse_datetime("2026-03-15 10:30:00");
+        assert!(dt.is_some());
+        assert_eq!(dt.unwrap().hour(), 10);
+    }
+
+    #[test]
+    fn parse_datetime_iso_z_format() {
+        let dt = parse_datetime("2026-03-15T10:30:00Z");
+        assert!(dt.is_some());
+        assert_eq!(dt.unwrap().hour(), 10);
+    }
+
+    #[test]
+    fn parse_datetime_invalid_returns_none() {
+        assert!(parse_datetime("not-a-date").is_none());
+        assert!(parse_datetime("").is_none());
+        assert!(parse_datetime("2026/03/15").is_none());
+    }
+
+    // --- search_response_to_loop_tweets ---
+
+    #[test]
+    fn search_response_to_loop_tweets_empty() {
+        let response = SearchResponse {
+            data: vec![],
+            includes: None,
+            meta: crate::x_api::types::SearchMeta {
+                newest_id: None,
+                oldest_id: None,
+                result_count: 0,
+                next_token: None,
+            },
+        };
+        let tweets = search_response_to_loop_tweets(response);
+        assert!(tweets.is_empty());
+    }
+
+    #[test]
+    fn search_response_to_loop_tweets_with_includes() {
+        use crate::x_api::types::*;
+
+        let response = SearchResponse {
+            data: vec![Tweet {
+                id: "t1".into(),
+                text: "hello world".into(),
+                author_id: "u1".into(),
+                created_at: "2026-03-15T10:00:00Z".into(),
+                public_metrics: PublicMetrics {
+                    like_count: 5,
+                    retweet_count: 2,
+                    reply_count: 1,
+                    impression_count: 100,
+                    ..Default::default()
+                },
+                conversation_id: None,
+            }],
+            includes: Some(Includes {
+                users: vec![User {
+                    id: "u1".into(),
+                    username: "alice".into(),
+                    name: "Alice".into(),
+                    profile_image_url: None,
+                    description: None,
+                    location: None,
+                    url: None,
+                    public_metrics: UserMetrics {
+                        followers_count: 1000,
+                        following_count: 500,
+                        tweet_count: 200,
+                    },
+                }],
+            }),
+            meta: SearchMeta {
+                newest_id: None,
+                oldest_id: None,
+                result_count: 1,
+                next_token: None,
+            },
+        };
+        let tweets = search_response_to_loop_tweets(response);
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0].author_username, "alice");
+        assert_eq!(tweets[0].author_followers, 1000);
+        assert_eq!(tweets[0].likes, 5);
+        assert_eq!(tweets[0].retweets, 2);
+    }
+
+    #[test]
+    fn search_response_to_loop_tweets_without_includes() {
+        use crate::x_api::types::*;
+
+        let response = SearchResponse {
+            data: vec![Tweet {
+                id: "t1".into(),
+                text: "hello".into(),
+                author_id: "u1".into(),
+                created_at: String::new(),
+                public_metrics: PublicMetrics::default(),
+                conversation_id: None,
+            }],
+            includes: None,
+            meta: SearchMeta {
+                newest_id: None,
+                oldest_id: None,
+                result_count: 1,
+                next_token: None,
+            },
+        };
+        let tweets = search_response_to_loop_tweets(response);
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0].author_username, "");
+        assert_eq!(tweets[0].author_followers, 0);
+    }
+
+    // --- error mapping functions ---
+
+    #[test]
+    fn toolkit_to_loop_error_rate_limited() {
+        let err = toolkit_to_loop_error(ToolkitError::XApi(crate::error::XApiError::RateLimited {
+            retry_after: Some(30),
+        }));
+        assert!(matches!(
+            err,
+            LoopError::RateLimited {
+                retry_after: Some(30)
+            }
+        ));
+    }
+
+    #[test]
+    fn toolkit_to_loop_error_auth_expired() {
+        let err = toolkit_to_loop_error(ToolkitError::XApi(crate::error::XApiError::AuthExpired));
+        assert!(matches!(err, LoopError::AuthExpired));
+    }
+
+    #[test]
+    fn toolkit_to_loop_error_other() {
+        let err = toolkit_to_loop_error(ToolkitError::XApi(crate::error::XApiError::ApiError {
+            status: 500,
+            message: "internal".into(),
+        }));
+        assert!(matches!(err, LoopError::Other(_)));
+    }
+
+    #[test]
+    fn toolkit_to_content_error_rate_limited() {
+        let err =
+            toolkit_to_content_error(ToolkitError::XApi(crate::error::XApiError::RateLimited {
+                retry_after: Some(60),
+            }));
+        match err {
+            ContentLoopError::PostFailed(msg) => {
+                assert!(msg.contains("rate limited"));
+                assert!(msg.contains("60"));
+            }
+            other => panic!("expected PostFailed, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn toolkit_to_analytics_error_wraps_message() {
+        let err =
+            toolkit_to_analytics_error(ToolkitError::XApi(crate::error::XApiError::ApiError {
+                status: 404,
+                message: "not found".into(),
+            }));
+        match err {
+            AnalyticsError::ApiError(msg) => assert!(msg.contains("not found")),
+            other => panic!("expected ApiError, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn llm_to_loop_error_wraps() {
+        let err = llm_to_loop_error(crate::error::LlmError::GenerationFailed("bad".into()));
+        assert!(matches!(err, LoopError::LlmFailure(_)));
+    }
+
+    #[test]
+    fn llm_to_content_error_wraps() {
+        let err = llm_to_content_error(crate::error::LlmError::GenerationFailed("bad".into()));
+        assert!(matches!(err, ContentLoopError::LlmFailure(_)));
+    }
+
+    #[test]
+    fn sqlx_to_content_error_wraps() {
+        let err = sqlx_to_content_error(sqlx::Error::RowNotFound);
+        assert!(matches!(err, ContentLoopError::StorageError(_)));
+    }
+
+    #[test]
+    fn storage_to_loop_error_wraps() {
+        let err = storage_to_loop_error(crate::error::StorageError::Query {
+            source: sqlx::Error::RowNotFound,
+        });
+        assert!(matches!(err, LoopError::StorageError(_)));
+    }
+
+    use chrono::TimeZone;
+
+    #[test]
+    fn parse_datetime_returns_utc() {
+        let dt = parse_datetime("2026-01-01T00:00:00Z").unwrap();
+        assert_eq!(dt, Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap());
+    }
+}

@@ -42,7 +42,7 @@ fn hash_token(raw_token: &str) -> String {
 /// Generate a cryptographically random hex string.
 fn random_hex(bytes: usize) -> String {
     let mut buf = vec![0u8; bytes];
-    rand::thread_rng().fill_bytes(&mut buf);
+    rand::rng().fill_bytes(&mut buf);
     hex::encode(&buf)
 }
 
@@ -192,5 +192,101 @@ mod tests {
 
         let removed = cleanup_expired(&pool).await.unwrap();
         assert_eq!(removed, 1);
+    }
+
+    #[tokio::test]
+    async fn cleanup_expired_preserves_active_sessions() {
+        let pool = init_test_db().await.unwrap();
+
+        // Insert an expired session
+        sqlx::query(
+            "INSERT INTO sessions (id, token_hash, csrf_token, created_at, expires_at, last_accessed_at)
+             VALUES ('expired', 'hash1', 'csrf1', '2020-01-01T00:00:00Z', '2020-01-02T00:00:00Z', '2020-01-01T00:00:00Z')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Create a valid session
+        let new = create_session(&pool).await.unwrap();
+
+        let removed = cleanup_expired(&pool).await.unwrap();
+        assert_eq!(removed, 1);
+
+        // Valid session should still work
+        let session = validate_session(&pool, &new.raw_token).await.unwrap();
+        assert!(session.is_some());
+    }
+
+    #[tokio::test]
+    async fn cleanup_expired_returns_zero_when_none_expired() {
+        let pool = init_test_db().await.unwrap();
+        create_session(&pool).await.unwrap();
+
+        let removed = cleanup_expired(&pool).await.unwrap();
+        assert_eq!(removed, 0);
+    }
+
+    #[tokio::test]
+    async fn multiple_sessions_are_independent() {
+        let pool = init_test_db().await.unwrap();
+
+        let s1 = create_session(&pool).await.unwrap();
+        let s2 = create_session(&pool).await.unwrap();
+
+        // Both valid
+        assert!(validate_session(&pool, &s1.raw_token)
+            .await
+            .unwrap()
+            .is_some());
+        assert!(validate_session(&pool, &s2.raw_token)
+            .await
+            .unwrap()
+            .is_some());
+
+        // Delete first, second still valid
+        delete_session(&pool, &s1.raw_token).await.unwrap();
+        assert!(validate_session(&pool, &s1.raw_token)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(validate_session(&pool, &s2.raw_token)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
+    #[tokio::test]
+    async fn delete_nonexistent_session_is_noop() {
+        let pool = init_test_db().await.unwrap();
+        // Should not error
+        delete_session(&pool, "totally-fake-token").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn session_has_unique_tokens() {
+        let pool = init_test_db().await.unwrap();
+        let s1 = create_session(&pool).await.unwrap();
+        let s2 = create_session(&pool).await.unwrap();
+        assert_ne!(s1.raw_token, s2.raw_token);
+        assert_ne!(s1.csrf_token, s2.csrf_token);
+    }
+
+    #[tokio::test]
+    async fn validate_expired_session_returns_none() {
+        let pool = init_test_db().await.unwrap();
+
+        let token_hash = hash_token("my-raw-token");
+        sqlx::query(
+            "INSERT INTO sessions (id, token_hash, csrf_token, created_at, expires_at, last_accessed_at)
+             VALUES ('exp', ?, 'csrf', '2020-01-01T00:00:00Z', '2020-01-02T00:00:00Z', '2020-01-01T00:00:00Z')",
+        )
+        .bind(&token_hash)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let session = validate_session(&pool, "my-raw-token").await.unwrap();
+        assert!(session.is_none(), "expired session should not validate");
     }
 }

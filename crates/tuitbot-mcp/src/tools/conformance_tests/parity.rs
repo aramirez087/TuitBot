@@ -57,7 +57,7 @@ mod tests {
     /// Spec-generated tool names, indexed by which profiles they belong to.
     fn spec_tools_by_profile() -> HashMap<Profile, BTreeSet<String>> {
         let mut map: HashMap<Profile, BTreeSet<String>> = HashMap::new();
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             for profile in ep.profiles {
                 map.entry(*profile)
                     .or_default()
@@ -158,7 +158,7 @@ mod tests {
         let manifest_by_name: BTreeMap<String, &crate::tools::manifest::ToolEntry> =
             manifest.tools.iter().map(|t| (t.name.clone(), t)).collect();
 
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             let entry = manifest_by_name.get(ep.tool_name).unwrap_or_else(|| {
                 panic!("spec endpoint '{}' not found in manifest", ep.tool_name)
             });

@@ -244,3 +244,365 @@ fn merge_llm_into_heuristics(
 
     base
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::toolkit::profile_inference::{
+        Confidence, InferredField, InferredProfile, Provenance,
+    };
+    use crate::x_api::types::{User, UserMetrics};
+
+    fn make_user(bio: Option<&str>, name: &str, username: &str) -> User {
+        User {
+            id: "123".to_string(),
+            username: username.to_string(),
+            name: name.to_string(),
+            profile_image_url: None,
+            description: bio.map(|s| s.to_string()),
+            location: None,
+            url: None,
+            public_metrics: UserMetrics {
+                followers_count: 1000,
+                following_count: 200,
+                tweet_count: 500,
+            },
+        }
+    }
+
+    fn make_input(bio: Option<&str>) -> ProfileInput {
+        ProfileInput {
+            user: make_user(bio, "Test User", "testuser"),
+            tweets: vec![],
+        }
+    }
+
+    fn make_base_profile() -> InferredProfile {
+        InferredProfile {
+            account_type: InferredField {
+                value: "individual".to_string(),
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            product_name: InferredField {
+                value: "Test".to_string(),
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            product_description: InferredField {
+                value: "A test product".to_string(),
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            product_url: InferredField {
+                value: None,
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            target_audience: InferredField {
+                value: "developers".to_string(),
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            product_keywords: InferredField {
+                value: vec!["test".to_string()],
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            industry_topics: InferredField {
+                value: vec!["tech".to_string()],
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+            brand_voice: InferredField {
+                value: None,
+                confidence: Confidence::Low,
+                provenance: Provenance::Default,
+            },
+        }
+    }
+
+    // ── build_llm_prompt ─────────────────────────────────────────
+
+    #[test]
+    fn build_llm_prompt_with_bio() {
+        let input = make_input(Some("Rust developer building cool things"));
+        let (system, user_msg) = build_llm_prompt(&input);
+        assert!(system.contains("analyzing an X"));
+        assert!(user_msg.contains("Rust developer"));
+        assert!(user_msg.contains("@testuser"));
+        assert!(user_msg.contains("Test User"));
+        assert!(user_msg.contains("1000")); // followers
+    }
+
+    #[test]
+    fn build_llm_prompt_without_bio() {
+        let input = make_input(None);
+        let (_, user_msg) = build_llm_prompt(&input);
+        assert!(user_msg.contains("(none)"));
+    }
+
+    #[test]
+    fn build_llm_prompt_with_tweets() {
+        let mut input = make_input(Some("dev"));
+        input.tweets.push(crate::x_api::types::Tweet {
+            id: "1".to_string(),
+            text: "Just shipped a new feature!".to_string(),
+            author_id: "123".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            public_metrics: Default::default(),
+            conversation_id: None,
+        });
+        let (_, user_msg) = build_llm_prompt(&input);
+        assert!(user_msg.contains("shipped a new feature"));
+    }
+
+    #[test]
+    fn build_llm_prompt_no_tweets_placeholder() {
+        let input = make_input(Some("dev"));
+        let (_, user_msg) = build_llm_prompt(&input);
+        assert!(user_msg.contains("no recent tweets available"));
+    }
+
+    #[test]
+    fn build_llm_prompt_system_prompt_instructs_json() {
+        let input = make_input(Some("dev"));
+        let (system, _) = build_llm_prompt(&input);
+        assert!(system.contains("JSON"));
+    }
+
+    // ── parse_llm_response ───────────────────────────────────────
+
+    #[test]
+    fn parse_llm_response_valid_json() {
+        let json = r#"{
+            "account_type": "business",
+            "product_name": "Acme Corp",
+            "product_description": "Cloud hosting",
+            "target_audience": "startups",
+            "product_keywords": ["cloud", "hosting"],
+            "industry_topics": ["SaaS", "DevOps"],
+            "brand_voice": "professional"
+        }"#;
+        let result = parse_llm_response(json).unwrap();
+        assert_eq!(result.account_type.as_deref(), Some("business"));
+        assert_eq!(result.product_name.as_deref(), Some("Acme Corp"));
+        assert_eq!(result.brand_voice.as_deref(), Some("professional"));
+        assert_eq!(result.product_keywords.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn parse_llm_response_with_code_fence() {
+        let json = "```json\n{\"account_type\": \"individual\"}\n```";
+        let result = parse_llm_response(json).unwrap();
+        assert_eq!(result.account_type.as_deref(), Some("individual"));
+    }
+
+    #[test]
+    fn parse_llm_response_with_bare_code_fence() {
+        let json = "```\n{\"account_type\": \"business\"}\n```";
+        let result = parse_llm_response(json).unwrap();
+        assert_eq!(result.account_type.as_deref(), Some("business"));
+    }
+
+    #[test]
+    fn parse_llm_response_invalid_json() {
+        let result = parse_llm_response("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_llm_response_empty_object() {
+        let result = parse_llm_response("{}").unwrap();
+        assert!(result.account_type.is_none());
+        assert!(result.product_name.is_none());
+    }
+
+    #[test]
+    fn parse_llm_response_all_null() {
+        let json = r#"{
+            "account_type": null,
+            "product_name": null,
+            "product_description": null,
+            "target_audience": null,
+            "product_keywords": null,
+            "industry_topics": null,
+            "brand_voice": null
+        }"#;
+        let result = parse_llm_response(json).unwrap();
+        assert!(result.account_type.is_none());
+        assert!(result.product_keywords.is_none());
+    }
+
+    // ── merge_llm_into_heuristics ─────────────────────────────────
+
+    #[test]
+    fn merge_upgrades_account_type() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: Some("business".to_string()),
+            product_name: None,
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let input = make_input(Some("We sell stuff"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.account_type.value, "business");
+    }
+
+    #[test]
+    fn merge_ignores_invalid_account_type() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: Some("unknown_type".to_string()),
+            product_name: None,
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let input = make_input(Some("bio"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.account_type.value, "individual");
+    }
+
+    #[test]
+    fn merge_upgrades_product_name() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: None,
+            product_name: Some("Better Name".to_string()),
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let input = make_input(Some("bio"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.product_name.value, "Better Name");
+    }
+
+    #[test]
+    fn merge_skips_empty_product_name() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: None,
+            product_name: Some(String::new()),
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let input = make_input(Some("bio"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.product_name.value, "Test");
+    }
+
+    #[test]
+    fn merge_brand_voice_high_confidence_with_many_tweets() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: None,
+            product_name: None,
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: Some("witty".to_string()),
+        };
+        let mut input = make_input(Some("bio"));
+        for i in 0..10 {
+            input.tweets.push(crate::x_api::types::Tweet {
+                id: i.to_string(),
+                text: format!("Tweet {i}"),
+                author_id: "123".to_string(),
+                created_at: String::new(),
+                public_metrics: Default::default(),
+                conversation_id: None,
+            });
+        }
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.brand_voice.value, Some("witty".to_string()));
+        assert_eq!(merged.brand_voice.confidence, Confidence::High);
+    }
+
+    #[test]
+    fn merge_brand_voice_low_confidence_few_tweets() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: None,
+            product_name: None,
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: Some("technical".to_string()),
+        };
+        let input = make_input(Some("bio"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.brand_voice.confidence, Confidence::Low);
+    }
+
+    #[test]
+    fn merge_keywords_confidence_scales_with_count() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: None,
+            product_name: None,
+            product_description: None,
+            target_audience: None,
+            product_keywords: Some(vec![
+                "a".into(),
+                "b".into(),
+                "c".into(),
+                "d".into(),
+                "e".into(),
+            ]),
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let input = make_input(Some("bio"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.product_keywords.value.len(), 5);
+    }
+
+    #[test]
+    fn merge_target_audience_from_llm() {
+        let base = make_base_profile();
+        let llm = LlmInferenceResult {
+            account_type: None,
+            product_name: None,
+            product_description: None,
+            target_audience: Some("enterprise CTOs".to_string()),
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let input = make_input(Some("bio"));
+        let merged = merge_llm_into_heuristics(base, llm, &input);
+        assert_eq!(merged.target_audience.value, "enterprise CTOs");
+    }
+
+    // ── LlmInferenceResult struct ────────────────────────────────
+
+    #[test]
+    fn llm_inference_result_debug() {
+        let result = LlmInferenceResult {
+            account_type: Some("business".to_string()),
+            product_name: None,
+            product_description: None,
+            target_audience: None,
+            product_keywords: None,
+            industry_topics: None,
+            brand_voice: None,
+        };
+        let debug = format!("{:?}", result);
+        assert!(debug.contains("business"));
+    }
+}

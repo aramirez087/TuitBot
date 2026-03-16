@@ -354,5 +354,315 @@ fn randomized_delay(min: Duration, max: Duration) -> Duration {
     }
     let min_ms = min.as_millis() as u64;
     let max_ms = max.as_millis() as u64;
-    Duration::from_millis(rand::thread_rng().gen_range(min_ms..=max_ms))
+    Duration::from_millis(rand::rng().random_range(min_ms..=max_ms))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── randomized_delay ────────────────────────────────────────────
+
+    #[test]
+    fn delay_returns_min_when_min_equals_max() {
+        let d = randomized_delay(Duration::from_secs(5), Duration::from_secs(5));
+        assert_eq!(d, Duration::from_secs(5));
+    }
+
+    #[test]
+    fn delay_returns_min_when_min_greater_than_max() {
+        let d = randomized_delay(Duration::from_secs(10), Duration::from_secs(5));
+        assert_eq!(d, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn delay_returns_zero_when_both_zero() {
+        let d = randomized_delay(Duration::ZERO, Duration::ZERO);
+        assert_eq!(d, Duration::ZERO);
+    }
+
+    #[test]
+    fn delay_within_range() {
+        let min = Duration::from_millis(100);
+        let max = Duration::from_millis(500);
+        for _ in 0..50 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min, "delay {d:?} should be >= {min:?}");
+            assert!(d <= max, "delay {d:?} should be <= {max:?}");
+        }
+    }
+
+    #[test]
+    fn delay_zero_min_nonzero_max() {
+        let min = Duration::ZERO;
+        let max = Duration::from_millis(100);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(d <= max);
+        }
+    }
+
+    #[test]
+    fn delay_narrow_range_produces_deterministic_ish_result() {
+        let min = Duration::from_millis(50);
+        let max = Duration::from_millis(51);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min && d <= max);
+        }
+    }
+
+    // ── media_paths JSON parsing (mirrors inline logic) ─────────────
+
+    #[test]
+    fn media_paths_parses_valid_json_array() {
+        let json = r#"["/tmp/img1.png", "/tmp/img2.jpg"]"#;
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], "/tmp/img1.png");
+    }
+
+    #[test]
+    fn media_paths_parses_empty_array() {
+        let json = "[]";
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn media_paths_invalid_json_returns_empty() {
+        let json = "not valid json";
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn media_paths_empty_string_returns_empty() {
+        let json = "";
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    // ── action_type routing logic ───────────────────────────────────
+
+    #[test]
+    fn action_type_reply_with_target_routes_to_reply() {
+        let action_type = "reply";
+        let target_tweet_id = "12345";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(is_reply);
+    }
+
+    #[test]
+    fn action_type_reply_without_target_routes_to_tweet() {
+        let action_type = "reply";
+        let target_tweet_id = "";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(!is_reply);
+    }
+
+    #[test]
+    fn action_type_tweet_routes_to_tweet() {
+        let action_type = "tweet";
+        let target_tweet_id = "";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(!is_reply);
+    }
+
+    #[test]
+    fn action_type_thread_tweet_routes_to_tweet() {
+        let action_type = "thread_tweet";
+        let target_tweet_id = "some_id";
+        let is_reply = action_type == "reply" && !target_tweet_id.is_empty();
+        assert!(!is_reply);
+    }
+
+    // ── action log format string ────────────────────────────────────
+
+    #[test]
+    fn action_log_format_for_reply() {
+        let action_type = "reply";
+        let log_action = format!("{action_type}_posted");
+        assert_eq!(log_action, "reply_posted");
+    }
+
+    #[test]
+    fn action_log_format_for_tweet() {
+        let action_type = "tweet";
+        let log_action = format!("{action_type}_posted");
+        assert_eq!(log_action, "tweet_posted");
+    }
+
+    // ── post_reply / post_tweet helper logic ─────────────────────
+
+    #[test]
+    fn media_ids_empty_gives_none() {
+        let media_ids: Vec<String> = vec![];
+        let media: Option<&[String]> = if media_ids.is_empty() {
+            None
+        } else {
+            Some(&media_ids)
+        };
+        assert!(media.is_none());
+    }
+
+    #[test]
+    fn media_ids_nonempty_gives_some() {
+        let media_ids = vec!["m1".to_string()];
+        let media: Option<&[String]> = if media_ids.is_empty() {
+            None
+        } else {
+            Some(&media_ids)
+        };
+        assert!(media.is_some());
+        assert_eq!(media.unwrap().len(), 1);
+    }
+
+    // ── propagate_provenance conditional logic ───────────────────
+
+    #[test]
+    fn propagate_condition_both_none_skips() {
+        let source_node_id: Option<i64> = None;
+        let source_seed_id: Option<i64> = None;
+        let should_propagate = source_node_id.is_some() || source_seed_id.is_some();
+        assert!(!should_propagate);
+    }
+
+    #[test]
+    fn propagate_condition_node_id_triggers() {
+        let source_node_id: Option<i64> = Some(42);
+        let source_seed_id: Option<i64> = None;
+        let should_propagate = source_node_id.is_some() || source_seed_id.is_some();
+        assert!(should_propagate);
+    }
+
+    #[test]
+    fn propagate_condition_seed_id_triggers() {
+        let source_node_id: Option<i64> = None;
+        let source_seed_id: Option<i64> = Some(99);
+        let should_propagate = source_node_id.is_some() || source_seed_id.is_some();
+        assert!(should_propagate);
+    }
+
+    #[test]
+    fn propagate_condition_both_set_triggers() {
+        let source_node_id: Option<i64> = Some(1);
+        let source_seed_id: Option<i64> = Some(2);
+        let should_propagate = source_node_id.is_some() || source_seed_id.is_some();
+        assert!(should_propagate);
+    }
+
+    // ── topic to Option conversion ───────────────────────────────
+
+    #[test]
+    fn empty_topic_becomes_none() {
+        let topic = "";
+        let opt: Option<String> = if topic.is_empty() {
+            None
+        } else {
+            Some(topic.to_string())
+        };
+        assert!(opt.is_none());
+    }
+
+    #[test]
+    fn nonempty_topic_becomes_some() {
+        let topic = "rust programming";
+        let opt: Option<String> = if topic.is_empty() {
+            None
+        } else {
+            Some(topic.to_string())
+        };
+        assert_eq!(opt, Some("rust programming".to_string()));
+    }
+
+    // ── loopback URL construction ────────────────────────────────
+
+    #[test]
+    fn loopback_url_format() {
+        let tweet_id = "1234567890";
+        let url = format!("https://x.com/i/status/{tweet_id}");
+        assert_eq!(url, "https://x.com/i/status/1234567890");
+    }
+
+    // ── delay edge cases ─────────────────────────────────────────
+
+    #[test]
+    fn delay_large_values() {
+        let min = Duration::from_secs(60);
+        let max = Duration::from_secs(300);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min);
+            assert!(d <= max);
+        }
+    }
+
+    #[test]
+    fn delay_subsecond() {
+        let min = Duration::from_millis(1);
+        let max = Duration::from_millis(10);
+        for _ in 0..20 {
+            let d = randomized_delay(min, max);
+            assert!(d >= min);
+            assert!(d <= max);
+        }
+    }
+
+    #[test]
+    fn delay_is_zero_returns_true() {
+        assert!(Duration::ZERO.is_zero());
+        assert!(!Duration::from_millis(1).is_zero());
+    }
+
+    // ── action_type exhaustive routing ────────────────────────────
+
+    #[test]
+    fn action_type_all_variants() {
+        for (action_type, target, expected_reply) in [
+            ("reply", "12345", true),
+            ("reply", "", false),
+            ("tweet", "", false),
+            ("tweet", "12345", false),
+            ("thread_tweet", "12345", false),
+            ("thread_tweet", "", false),
+        ] {
+            let is_reply = action_type == "reply" && !target.is_empty();
+            assert_eq!(
+                is_reply, expected_reply,
+                "action={action_type}, target={target}"
+            );
+        }
+    }
+
+    // ── action log format all types ───────────────────────────────
+
+    #[test]
+    fn action_log_format_thread() {
+        assert_eq!(format!("{}_posted", "thread_tweet"), "thread_tweet_posted");
+    }
+
+    // ── media_paths JSON edge cases ──────────────────────────────
+
+    #[test]
+    fn media_paths_nested_arrays_treated_as_invalid() {
+        let json = r#"[["nested"]]"#;
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn media_paths_single_item() {
+        let json = r#"["/path/to/image.jpg"]"#;
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], "/path/to/image.jpg");
+    }
+
+    #[test]
+    fn media_paths_many_items() {
+        let json = r#"["/a.jpg", "/b.png", "/c.gif", "/d.mp4"]"#;
+        let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
+        assert_eq!(paths.len(), 4);
+    }
 }

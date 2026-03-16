@@ -41,6 +41,12 @@ cargo clippy --workspace -- -D warnings
 - Always run `cargo fmt --all` — never assume hand-formatted code is correct.
 - All warnings are release blockers. Do not finish until this passes.
 
+## Cross-Platform Testing
+CI runs on **macOS, Linux, and Windows**. All tests must pass on all three:
+- **Never hardcode Unix paths** like `/tmp` in tests. Use `std::env::temp_dir()` for a directory that exists, or `tempfile::tempdir()` for a throwaway dir.
+- **Never assume `/` path separators.** Use `std::path::PathBuf` or `Path::join()`.
+- **Never assume Unix line endings.** Use `.trim()` or `.lines()` when comparing text output.
+
 ## Constraints
 
 ### File Size Limits
@@ -71,6 +77,38 @@ Validate before handoff:
 release-plz update --config release-plz.toml --allow-dirty
 cargo package --workspace --allow-dirty
 ```
+
+## Coverage Thresholds
+
+**Rust Coverage (Cargo Tarpaulin):**
+
+*Core Crates (Task 4.1):*
+- Minimum: **75% lines** (enforced by `cargo tarpaulin --fail-under 75`)
+- Scope: All workspace crates except `tuitbot-mcp` and `tuitbot-cli`
+- CI fails if coverage drops below 75%
+- Measurement: `cargo tarpaulin --workspace --exclude tuitbot-mcp --exclude tuitbot-cli --out Xml --fail-under 75`
+
+*tuitbot-mcp Tools (Task 4.3):*
+- Minimum: **60% lines** (enforced by `cargo tarpaulin -p tuitbot-mcp --fail-under 60`)
+- Scope: MCP tool handlers (manifest, admin, write, workflow, etc.)
+- CI fails if coverage drops below 60%
+- Separate gate due to tool complexity (many small handlers, request validation, etc.)
+- Measurement: `cargo tarpaulin -p tuitbot-mcp --out Xml --fail-under 60`
+
+**Frontend Coverage (Vitest):**
+- Global minimum: **70% lines** (enforced in `dashboard/vitest.config.ts`)
+- Per-file minimums for core stores: **75% lines**
+  - `src/lib/stores/approval.ts`
+  - `src/lib/stores/analytics.ts`
+  - `src/lib/stores/settings.ts`
+  - `src/lib/stores/targets.ts`
+- CI fails if either global or per-file threshold drops
+- Measurement: `npm run test:coverage:ci` in dashboard/
+
+**CI Enforcement:**
+- Coverage workflow (`.github/workflows/coverage.yml`) runs on every push + PR
+- Both Rust and Frontend gates must pass for merge
+- Codecov reports uploaded to tracking history
 
 ## Always Do First
 - **Invoke the `frontend-design` skill** before writing any frontend code, every session, no exceptions.

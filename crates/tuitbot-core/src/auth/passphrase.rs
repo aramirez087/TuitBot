@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 use super::error::AuthError;
 
@@ -21,7 +21,7 @@ const BCRYPT_COST: u32 = 12;
 /// Generate a random 4-word passphrase from the EFF short wordlist.
 pub fn generate_passphrase() -> String {
     let words: Vec<&str> = WORDLIST.lines().filter(|l| !l.is_empty()).collect();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let selected: Vec<&&str> = words
         .choose_multiple(&mut rng, PASSPHRASE_WORD_COUNT)
         .collect();
@@ -313,5 +313,77 @@ mod tests {
         let hash = load_passphrase_hash(dir.path()).unwrap().unwrap();
         assert!(verify_passphrase(&second, &hash).unwrap());
         assert!(!verify_passphrase(&first, &hash).unwrap());
+    }
+
+    #[test]
+    fn load_passphrase_hash_nonexistent_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = load_passphrase_hash(dir.path()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn load_passphrase_hash_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("passphrase_hash"), "").unwrap();
+        let result = load_passphrase_hash(dir.path()).unwrap();
+        assert!(result.is_none(), "empty hash file should return None");
+    }
+
+    #[test]
+    fn load_passphrase_hash_whitespace_only_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("passphrase_hash"), "   \n  ").unwrap();
+        let result = load_passphrase_hash(dir.path()).unwrap();
+        assert!(result.is_none(), "whitespace-only should return None");
+    }
+
+    #[test]
+    fn is_claimed_false_on_empty_hash_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("passphrase_hash"), "").unwrap();
+        assert!(!is_claimed(dir.path()));
+    }
+
+    #[test]
+    fn generate_passphrase_produces_different_values() {
+        let p1 = generate_passphrase();
+        let p2 = generate_passphrase();
+        // Extremely unlikely to collide with 1296^4 possibilities
+        assert_ne!(p1, p2, "two generated passphrases should differ");
+    }
+
+    #[test]
+    fn verify_passphrase_wrong_input_returns_false() {
+        let hash = hash_passphrase("correct horse battery staple").unwrap();
+        assert!(!verify_passphrase("wrong phrase entirely", &hash).unwrap());
+    }
+
+    #[test]
+    fn create_passphrase_hash_exactly_8_chars() {
+        let dir = tempfile::tempdir().unwrap();
+        // 8 characters should be accepted
+        create_passphrase_hash(dir.path(), "12345678").unwrap();
+        assert!(is_claimed(dir.path()));
+    }
+
+    #[test]
+    fn ensure_passphrase_on_empty_hash_file_regenerates() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("passphrase_hash"), "").unwrap();
+        let result = ensure_passphrase(dir.path()).unwrap();
+        assert!(
+            result.is_some(),
+            "empty hash file should trigger regeneration"
+        );
+    }
+
+    #[test]
+    fn reset_passphrase_verifies_against_new_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        ensure_passphrase(dir.path()).unwrap();
+        let new_passphrase = reset_passphrase(dir.path()).unwrap();
+        let hash = load_passphrase_hash(dir.path()).unwrap().unwrap();
+        assert!(verify_passphrase(&new_passphrase, &hash).unwrap());
     }
 }

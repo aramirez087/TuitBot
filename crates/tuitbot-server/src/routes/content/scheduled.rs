@@ -97,3 +97,32 @@ pub async fn cancel_scheduled(
         "id": id,
     })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn edit_scheduled_request_all_none() {
+        let json = "{}";
+        let req: EditScheduledRequest = serde_json::from_str(json).expect("deser");
+        assert!(req.content.is_none());
+        assert!(req.scheduled_for.is_none());
+    }
+
+    #[test]
+    fn edit_scheduled_request_with_content() {
+        let json = r#"{"content": "updated text"}"#;
+        let req: EditScheduledRequest = serde_json::from_str(json).expect("deser");
+        assert_eq!(req.content.as_deref(), Some("updated text"));
+        assert!(req.scheduled_for.is_none());
+    }
+
+    #[test]
+    fn edit_scheduled_request_with_both() {
+        let json = r#"{"content": "new", "scheduled_for": "2026-03-16T12:00:00Z"}"#;
+        let req: EditScheduledRequest = serde_json::from_str(json).expect("deser");
+        assert_eq!(req.content.as_deref(), Some("new"));
+        assert_eq!(req.scheduled_for.as_deref(), Some("2026-03-16T12:00:00Z"));
+    }
+}

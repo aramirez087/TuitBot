@@ -274,3 +274,94 @@ pub(super) fn replace_binary_at(new_binary: &[u8], target_path: &Path) -> Result
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- parse_server_version_output ---
+
+    #[test]
+    fn parse_server_version_standard() {
+        let v = parse_server_version_output("tuitbot-server 0.5.2").unwrap();
+        assert_eq!(v.major, 0);
+        assert_eq!(v.minor, 5);
+        assert_eq!(v.patch, 2);
+    }
+
+    #[test]
+    fn parse_server_version_no_prefix() {
+        let v = parse_server_version_output("1.2.3").unwrap();
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 2);
+        assert_eq!(v.patch, 3);
+    }
+
+    #[test]
+    fn parse_server_version_with_trailing_text() {
+        let v = parse_server_version_output("tuitbot-server 0.5.2\nsome extra output").unwrap();
+        assert_eq!(v.minor, 5);
+    }
+
+    #[test]
+    fn parse_server_version_empty() {
+        assert!(parse_server_version_output("").is_none());
+    }
+
+    #[test]
+    fn parse_server_version_invalid() {
+        assert!(parse_server_version_output("tuitbot-server not-a-version").is_none());
+    }
+
+    #[test]
+    fn parse_server_version_whitespace() {
+        let v = parse_server_version_output("  tuitbot-server 2.0.0  ").unwrap();
+        assert_eq!(v.major, 2);
+    }
+
+    // --- detect_server_path ---
+
+    #[test]
+    fn detect_server_path_returns_option() {
+        // Just verify it doesn't panic; result depends on system
+        let _ = detect_server_path();
+    }
+
+    // --- replace_binary_at ---
+
+    #[test]
+    fn replace_binary_at_creates_new_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("test-binary");
+
+        // Create the original file
+        fs::write(&target, b"old content").unwrap();
+
+        replace_binary_at(b"new content", &target).unwrap();
+
+        let content = fs::read_to_string(&target).unwrap();
+        assert_eq!(content, "new content");
+    }
+
+    #[test]
+    fn replace_binary_at_cleans_up_old() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("test-bin");
+        fs::write(&target, b"original").unwrap();
+
+        replace_binary_at(b"updated", &target).unwrap();
+
+        // Old file should be cleaned up
+        let old = dir.path().join(".test-bin-old");
+        assert!(!old.exists());
+    }
+
+    #[test]
+    fn replace_binary_at_fails_for_nonexistent_target() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("nonexistent");
+
+        let result = replace_binary_at(b"data", &target);
+        assert!(result.is_err());
+    }
+}

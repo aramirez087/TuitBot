@@ -642,6 +642,104 @@ mod tests {
         assert!(output.contains("40/100"));
     }
 
+    // --- ScoringEngine accessors ---
+
+    #[test]
+    fn engine_keywords_accessor() {
+        let keywords = vec!["rust".to_string(), "cli".to_string()];
+        let engine = ScoringEngine::new(default_scoring_config(), keywords.clone());
+        assert_eq!(engine.keywords(), &keywords);
+    }
+
+    #[test]
+    fn engine_config_accessor() {
+        let config = default_scoring_config();
+        let engine = ScoringEngine::new(config.clone(), vec![]);
+        assert_eq!(engine.config().threshold, 60);
+        assert!((engine.config().keyword_relevance_max - 25.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn score_text_only_higher_than_media() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+
+        let text_tweet = test_tweet(now);
+        let mut media_tweet = test_tweet(now);
+        media_tweet.has_media = true;
+
+        let text_score = engine.score_tweet_at(&text_tweet, now);
+        let media_score = engine.score_tweet_at(&media_tweet, now);
+        assert!(text_score.total > media_score.total);
+    }
+
+    #[test]
+    fn score_recent_tweet_higher_than_old() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+
+        let recent_tweet = test_tweet(now); // 10 min old
+        let mut old_tweet = test_tweet(now);
+        old_tweet.created_at = (now - Duration::hours(8)).to_rfc3339();
+
+        let recent_score = engine.score_tweet_at(&recent_tweet, now);
+        let old_score = engine.score_tweet_at(&old_tweet, now);
+        assert!(recent_score.recency > old_score.recency);
+    }
+
+    // --- find_matched_keywords edge cases ---
+
+    #[test]
+    fn find_matched_case_insensitive() {
+        let keywords = vec!["RUST".to_string()];
+        let matched = find_matched_keywords("rust is great", &keywords);
+        assert_eq!(matched, vec!["RUST".to_string()]);
+    }
+
+    #[test]
+    fn find_matched_empty_keywords() {
+        let matched = find_matched_keywords("some text", &[]);
+        assert!(matched.is_empty());
+    }
+
+    // --- format_follower_count edge cases ---
+
+    #[test]
+    fn format_followers_zero() {
+        assert_eq!(format_follower_count(0), "0");
+    }
+
+    #[test]
+    fn format_followers_exact_1k() {
+        assert_eq!(format_follower_count(1000), "1.0K");
+    }
+
+    #[test]
+    fn format_followers_exact_1m() {
+        assert_eq!(format_follower_count(1_000_000), "1.0M");
+    }
+
+    // --- truncate_text edge cases ---
+
+    #[test]
+    fn truncate_exact_length() {
+        assert_eq!(truncate_text("hello", 5), "hello");
+    }
+
+    #[test]
+    fn truncate_empty() {
+        assert_eq!(truncate_text("", 10), "");
+    }
+
+    #[test]
+    fn truncate_one_char() {
+        assert_eq!(truncate_text("x", 1), "x");
+    }
+
     // --- Display impl tests ---
 
     #[test]
@@ -661,5 +759,593 @@ mod tests {
         assert!(display.contains("REPLY"));
         assert!(display.contains("rep:"));
         assert!(display.contains("ct:"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional scoring coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn display_impl_skip() {
+        let score = TweetScore {
+            total: 30.0,
+            keyword_relevance: 5.0,
+            follower: 5.0,
+            recency: 5.0,
+            engagement: 5.0,
+            reply_count: 5.0,
+            content_type: 5.0,
+            meets_threshold: false,
+        };
+        let display = format!("{score}");
+        assert!(display.contains("30/100"));
+        assert!(display.contains("SKIP"));
+    }
+
+    #[test]
+    fn score_tweet_uses_current_time() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+
+        // score_tweet (no time arg) should work
+        let score = engine.score_tweet(&tweet);
+        assert!(score.total > 0.0);
+    }
+
+    #[test]
+    fn score_zero_followers_no_panic() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.author_followers = 0;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert_eq!(score.follower, 0.0);
+        assert!(score.total >= 0.0);
+    }
+
+    #[test]
+    fn score_empty_text_no_keyword_match() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.text = String::new();
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert_eq!(score.keyword_relevance, 0.0);
+    }
+
+    #[test]
+    fn format_breakdown_media_tweet() {
+        let config = default_scoring_config();
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.has_media = true;
+
+        let score = TweetScore {
+            total: 50.0,
+            keyword_relevance: 15.0,
+            follower: 10.0,
+            recency: 8.0,
+            engagement: 7.0,
+            reply_count: 10.0,
+            content_type: 0.0,
+            meets_threshold: false,
+        };
+
+        let output = score.format_breakdown(&config, &tweet, &[]);
+        assert!(output.contains("media/quote"));
+        assert!(output.contains("SKIP"));
+    }
+
+    #[test]
+    fn format_breakdown_no_keywords_matched() {
+        let config = default_scoring_config();
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+
+        let score = TweetScore {
+            total: 60.0,
+            keyword_relevance: 0.0,
+            follower: 15.0,
+            recency: 10.0,
+            engagement: 15.0,
+            reply_count: 10.0,
+            content_type: 10.0,
+            meets_threshold: true,
+        };
+
+        let output = score.format_breakdown(&config, &tweet, &[]);
+        assert!(output.contains("none"));
+    }
+
+    #[test]
+    fn find_matched_partial_text() {
+        let keywords = vec!["rust programming".to_string()];
+        let matched = find_matched_keywords("I love rust programming", &keywords);
+        assert_eq!(matched.len(), 1);
+    }
+
+    #[test]
+    fn format_followers_999() {
+        assert_eq!(format_follower_count(999), "999");
+    }
+
+    #[test]
+    fn format_followers_large_m() {
+        assert_eq!(format_follower_count(5_500_000), "5.5M");
+    }
+
+    #[test]
+    fn format_age_zero_seconds() {
+        let now = Utc::now();
+        let created = now.to_rfc3339();
+        let result = format_tweet_age_at(&created, now);
+        assert_eq!(result, "0 seconds");
+    }
+
+    #[test]
+    fn format_age_boundary_59_minutes() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(59)).to_rfc3339();
+        assert_eq!(format_tweet_age_at(&created, now), "59 minutes");
+    }
+
+    #[test]
+    fn format_age_boundary_60_minutes() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(60)).to_rfc3339();
+        assert_eq!(format_tweet_age_at(&created, now), "1 hours");
+    }
+
+    #[test]
+    fn format_age_boundary_23_hours() {
+        let now = Utc::now();
+        let created = (now - Duration::hours(23)).to_rfc3339();
+        assert_eq!(format_tweet_age_at(&created, now), "23 hours");
+    }
+
+    #[test]
+    fn format_age_boundary_24_hours() {
+        let now = Utc::now();
+        let created = (now - Duration::hours(24)).to_rfc3339();
+        assert_eq!(format_tweet_age_at(&created, now), "1 days");
+    }
+
+    #[test]
+    fn format_tweet_age_uses_current_time() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(5)).to_rfc3339();
+        let result = format_tweet_age(&created);
+        assert!(result.contains("minutes") || result.contains("seconds"));
+    }
+
+    #[test]
+    fn tweet_score_clone() {
+        let score = TweetScore {
+            total: 50.0,
+            keyword_relevance: 10.0,
+            follower: 10.0,
+            recency: 10.0,
+            engagement: 10.0,
+            reply_count: 5.0,
+            content_type: 5.0,
+            meets_threshold: false,
+        };
+        let cloned = score.clone();
+        assert!((cloned.total - score.total).abs() < 0.01);
+        assert_eq!(cloned.meets_threshold, score.meets_threshold);
+    }
+
+    #[test]
+    fn tweet_data_clone() {
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+        let cloned = tweet.clone();
+        assert_eq!(cloned.text, tweet.text);
+        assert_eq!(cloned.author_followers, tweet.author_followers);
+    }
+
+    #[test]
+    fn score_high_engagement_tweet() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string(), "cli".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.likes = 500;
+        tweet.retweets = 100;
+        tweet.replies = 50;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!(score.engagement > 0.0);
+    }
+
+    #[test]
+    fn format_breakdown_multiple_keywords() {
+        let config = default_scoring_config();
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+
+        let score = TweetScore {
+            total: 70.0,
+            keyword_relevance: 20.0,
+            follower: 10.0,
+            recency: 10.0,
+            engagement: 10.0,
+            reply_count: 10.0,
+            content_type: 10.0,
+            meets_threshold: true,
+        };
+
+        let keywords = vec!["rust".to_string(), "cli".to_string()];
+        let output = score.format_breakdown(&config, &tweet, &keywords);
+        assert!(output.contains("rust, cli"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Extended scoring edge cases for coverage push
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn score_very_old_tweet_low_recency() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.created_at = (now - Duration::days(30)).to_rfc3339();
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!(
+            score.recency < 2.0,
+            "30-day old tweet should have near-zero recency"
+        );
+    }
+
+    #[test]
+    fn score_zero_engagement_tweet() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.likes = 0;
+        tweet.retweets = 0;
+        tweet.replies = 0;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!(score.engagement >= 0.0);
+        assert!(score.total >= 0.0);
+    }
+
+    #[test]
+    fn score_massive_followers_low_follower_score() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.author_followers = 10_000_000;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        // Very large accounts should get low follower score (bell curve)
+        assert!(score.follower < 5.0);
+    }
+
+    #[test]
+    fn score_optimal_followers_high_score() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.author_followers = 3000; // sweet spot
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!(
+            score.follower > 5.0,
+            "3K followers should score well on bell curve"
+        );
+    }
+
+    #[test]
+    fn score_multiple_keyword_matches() {
+        let config = default_scoring_config();
+        let keywords = vec![
+            "rust".to_string(),
+            "cli".to_string(),
+            "tools".to_string(),
+            "developers".to_string(),
+        ];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let tweet = test_tweet(now); // "Building amazing Rust CLI tools for developers"
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!(score.keyword_relevance > 0.0);
+    }
+
+    #[test]
+    fn score_no_keyword_matches() {
+        let config = default_scoring_config();
+        let keywords = vec!["python".to_string(), "java".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert_eq!(score.keyword_relevance, 0.0);
+    }
+
+    #[test]
+    fn score_has_media_zero_content_type() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.has_media = true;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!((score.content_type - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn score_text_only_max_content_type() {
+        let config = default_scoring_config();
+        let expected_max = config.content_type_max;
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let tweet = test_tweet(now); // text only, no media, not quote
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!((score.content_type - expected_max).abs() < 0.01);
+    }
+
+    #[test]
+    fn score_high_reply_count_low_reply_score() {
+        let config = default_scoring_config();
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.replies = 100;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!(
+            score.reply_count < 5.0,
+            "100 replies should yield low reply score"
+        );
+    }
+
+    #[test]
+    fn score_zero_replies_max_reply_score() {
+        let config = default_scoring_config();
+        let expected_max = config.reply_count_max;
+        let keywords = vec!["rust".to_string()];
+        let engine = ScoringEngine::new(config, keywords);
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.replies = 0;
+
+        let score = engine.score_tweet_at(&tweet, now);
+        assert!((score.reply_count - expected_max).abs() < 0.01);
+    }
+
+    #[test]
+    fn score_threshold_exactly_at_boundary() {
+        let config = ScoringConfig {
+            threshold: 0,
+            ..default_scoring_config()
+        };
+        let engine = ScoringEngine::new(config, vec![]);
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+
+        let score = engine.score_tweet_at(&tweet, now);
+        // Threshold 0 means everything passes
+        assert!(score.meets_threshold);
+    }
+
+    #[test]
+    fn score_threshold_100_nearly_impossible() {
+        let config = ScoringConfig {
+            threshold: 100,
+            ..default_scoring_config()
+        };
+        let engine = ScoringEngine::new(config, vec!["nonexistent".to_string()]);
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+
+        let score = engine.score_tweet_at(&tweet, now);
+        // Very unlikely to reach 100
+        assert!(!score.meets_threshold || score.total >= 100.0);
+    }
+
+    #[test]
+    fn find_matched_keywords_substring() {
+        let keywords = vec!["rust".to_string()];
+        let matched = find_matched_keywords("trustworthy tool", &keywords);
+        // "rust" is substring of "trustworthy"
+        assert_eq!(matched.len(), 1);
+    }
+
+    #[test]
+    fn find_matched_keywords_multiple_occurrences() {
+        let keywords = vec!["rust".to_string()];
+        let matched = find_matched_keywords("Rust is great. I love Rust!", &keywords);
+        assert_eq!(matched.len(), 1); // deduped by keyword, not occurrence count
+    }
+
+    #[test]
+    fn format_follower_count_boundary_values() {
+        assert_eq!(format_follower_count(1), "1");
+        assert_eq!(format_follower_count(999), "999");
+        assert_eq!(format_follower_count(1000), "1.0K");
+        assert_eq!(format_follower_count(999_999), "1000.0K");
+        assert_eq!(format_follower_count(1_000_000), "1.0M");
+        assert_eq!(format_follower_count(10_000_000), "10.0M");
+    }
+
+    #[test]
+    fn format_age_negative_duration_handled() {
+        let now = Utc::now();
+        let future = (now + Duration::hours(1)).to_rfc3339();
+        let result = format_tweet_age_at(&future, now);
+        // Future timestamp => negative duration => "0 seconds" because of max(0)
+        assert_eq!(result, "0 seconds");
+    }
+
+    #[test]
+    fn truncate_text_boundary_at_max() {
+        let text = "abcde";
+        assert_eq!(truncate_text(text, 5), "abcde");
+        assert_eq!(truncate_text(text, 4), "abcd...");
+        assert_eq!(truncate_text(text, 6), "abcde");
+    }
+
+    #[test]
+    fn truncate_text_max_zero() {
+        assert_eq!(truncate_text("hello", 0), "...");
+    }
+
+    #[test]
+    fn display_impl_all_zero_scores() {
+        let score = TweetScore {
+            total: 0.0,
+            keyword_relevance: 0.0,
+            follower: 0.0,
+            recency: 0.0,
+            engagement: 0.0,
+            reply_count: 0.0,
+            content_type: 0.0,
+            meets_threshold: false,
+        };
+        let display = format!("{score}");
+        assert!(display.contains("0/100"));
+        assert!(display.contains("SKIP"));
+    }
+
+    #[test]
+    fn display_impl_max_scores() {
+        let score = TweetScore {
+            total: 100.0,
+            keyword_relevance: 25.0,
+            follower: 15.0,
+            recency: 10.0,
+            engagement: 15.0,
+            reply_count: 15.0,
+            content_type: 10.0,
+            meets_threshold: true,
+        };
+        let display = format!("{score}");
+        assert!(display.contains("100/100"));
+        assert!(display.contains("REPLY"));
+    }
+
+    #[test]
+    fn tweet_data_debug_format() {
+        let now = Utc::now();
+        let tweet = test_tweet(now);
+        let debug = format!("{:?}", tweet);
+        assert!(debug.contains("TweetData"));
+        assert!(debug.contains("devuser"));
+    }
+
+    #[test]
+    fn tweet_score_debug_format() {
+        let score = TweetScore {
+            total: 42.0,
+            keyword_relevance: 10.0,
+            follower: 8.0,
+            recency: 5.0,
+            engagement: 7.0,
+            reply_count: 7.0,
+            content_type: 5.0,
+            meets_threshold: false,
+        };
+        let debug = format!("{:?}", score);
+        assert!(debug.contains("TweetScore"));
+        assert!(debug.contains("42"));
+    }
+
+    #[test]
+    fn format_breakdown_text_only_tweet() {
+        let config = default_scoring_config();
+        let now = Utc::now();
+        let tweet = test_tweet(now); // text-only
+
+        let score = TweetScore {
+            total: 65.0,
+            keyword_relevance: 20.0,
+            follower: 12.0,
+            recency: 8.0,
+            engagement: 10.0,
+            reply_count: 10.0,
+            content_type: 5.0,
+            meets_threshold: true,
+        };
+
+        let output = score.format_breakdown(&config, &tweet, &["rust".to_string()]);
+        assert!(output.contains("text-only"));
+        assert!(output.contains("REPLY"));
+        assert!(output.contains("65/100"));
+        assert!(output.contains("5.0K")); // follower display
+    }
+
+    #[test]
+    fn format_breakdown_zero_follower_tweet() {
+        let config = default_scoring_config();
+        let now = Utc::now();
+        let mut tweet = test_tweet(now);
+        tweet.author_followers = 0;
+
+        let score = TweetScore {
+            total: 30.0,
+            keyword_relevance: 10.0,
+            follower: 0.0,
+            recency: 5.0,
+            engagement: 5.0,
+            reply_count: 5.0,
+            content_type: 5.0,
+            meets_threshold: false,
+        };
+
+        let output = score.format_breakdown(&config, &tweet, &[]);
+        assert!(output.contains("0 followers"));
+        assert!(output.contains("SKIP"));
+    }
+
+    #[test]
+    fn engine_config_threshold_accessible() {
+        let config = ScoringConfig {
+            threshold: 42,
+            ..default_scoring_config()
+        };
+        let engine = ScoringEngine::new(config, vec![]);
+        assert_eq!(engine.config().threshold, 42);
+    }
+
+    #[test]
+    fn engine_keywords_empty() {
+        let engine = ScoringEngine::new(default_scoring_config(), vec![]);
+        assert!(engine.keywords().is_empty());
+    }
+
+    #[test]
+    fn engine_keywords_many() {
+        let keywords: Vec<String> = (0..50).map(|i| format!("keyword_{i}")).collect();
+        let engine = ScoringEngine::new(default_scoring_config(), keywords.clone());
+        assert_eq!(engine.keywords().len(), 50);
+        assert_eq!(engine.keywords()[25], "keyword_25");
     }
 }

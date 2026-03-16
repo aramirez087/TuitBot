@@ -408,3 +408,283 @@ impl ServerHandler for ApiReadonlyMcpServer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use tuitbot_core::config::Config;
+    use tuitbot_core::error::XApiError;
+    use tuitbot_core::x_api::types::*;
+    use tuitbot_core::x_api::XApiClient;
+
+    use crate::kernel;
+    use crate::provider::retry::{RetryPolicy, RetryingProvider};
+    use crate::provider::x_api::XApiProvider;
+    use crate::state::ReadonlyState;
+
+    // ── Minimal no-op X client ────────────────────────────────────────────
+    struct NullX;
+
+    #[async_trait::async_trait]
+    impl XApiClient for NullX {
+        async fn search_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_mentions(
+            &self,
+            _: &str,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<MentionResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn post_tweet(&self, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn reply_to_tweet(&self, _: &str, _: &str) -> Result<PostedTweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_tweet(&self, _: &str) -> Result<Tweet, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_me(&self) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_tweets(
+            &self,
+            _: &str,
+            _: u32,
+            _: Option<&str>,
+        ) -> Result<SearchResponse, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+        async fn get_user_by_username(&self, _: &str) -> Result<User, XApiError> {
+            Err(XApiError::AuthExpired)
+        }
+    }
+
+    fn make_state() -> Arc<ReadonlyState> {
+        Arc::new(ReadonlyState {
+            config: Config::default(),
+            x_client: Box::new(NullX),
+            authenticated_user_id: String::new(),
+            x_available: false,
+        })
+    }
+
+    fn provider(state: &ReadonlyState) -> RetryingProvider<XApiProvider<'_>> {
+        RetryingProvider::new(
+            XApiProvider::new(state.x_client.as_ref()),
+            RetryPolicy::default(),
+        )
+    }
+
+    // ── kernel::read — full api-readonly tool surface ─────────────────────
+
+    #[tokio::test]
+    async fn api_readonly_get_tweet() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_tweet(&p, "123").await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_by_username() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_by_username(&p, "alice").await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_search_tweets() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::search_tweets(&p, "rust lang", 5, None, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_mentions() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_mentions(&p, "u1", None, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_tweets() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_tweets(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_home_timeline() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_home_timeline(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_user_by_id() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_user_by_id(&p, "u1").await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_followers() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_followers(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_following() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_following(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_liked_tweets() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_liked_tweets(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_bookmarks() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_bookmarks(&p, "u1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_users_by_ids() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_users_by_ids(&p, &["u1", "u2"]).await;
+        assert!(!r.is_empty());
+    }
+
+    #[tokio::test]
+    async fn api_readonly_get_tweet_liking_users() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::read::get_tweet_liking_users(&p, "t1", 5, None).await;
+        assert!(!r.is_empty());
+    }
+
+    // ── Server construction & ServerHandler ──────────────────────────────
+
+    #[test]
+    fn api_readonly_server_construction() {
+        let state = make_state();
+        let _server = super::ApiReadonlyMcpServer::new(state);
+    }
+
+    #[test]
+    fn api_readonly_server_info_has_instructions() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::ApiReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.instructions.is_some());
+        let instructions = info.instructions.unwrap();
+        assert!(
+            instructions.contains("Read-Only"),
+            "instructions should mention Read-Only"
+        );
+    }
+
+    #[test]
+    fn api_readonly_server_info_has_tool_capabilities() {
+        use rmcp::ServerHandler;
+        let state = make_state();
+        let server = super::ApiReadonlyMcpServer::new(state);
+        let info = server.get_info();
+        assert!(info.capabilities.tools.is_some());
+    }
+
+    #[test]
+    fn api_readonly_server_clones() {
+        let state = make_state();
+        let server = super::ApiReadonlyMcpServer::new(state);
+        let _clone = server.clone();
+    }
+
+    // ── Utils via kernel (pure, exercising tool surface) ─────────────────
+
+    #[tokio::test]
+    async fn api_readonly_get_me() {
+        let state = make_state();
+        let p = provider(&state);
+        let r = kernel::utils::get_me(&p).await;
+        assert!(!r.is_empty());
+    }
+
+    // ── Config & scoring tools ───────────────────────────────────────────
+
+    #[test]
+    fn api_readonly_get_config() {
+        let state = make_state();
+        let result = crate::tools::config::get_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn api_readonly_validate_config() {
+        let state = make_state();
+        let result = crate::tools::config::validate_config(&state.config);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn api_readonly_score_tweet() {
+        let state = make_state();
+        let input = crate::tools::scoring::ScoreTweetInput {
+            text: "Rust is amazing",
+            author_username: "rustacean",
+            author_followers: 5000,
+            likes: 20,
+            retweets: 5,
+            replies: 3,
+            created_at: "2026-01-01T00:00:00Z",
+        };
+        let result = crate::tools::scoring::score_tweet(&state.config, &input);
+        assert!(!result.is_empty());
+    }
+
+    // ── Meta tools (capabilities, mode) ──────────────────────────────────
+
+    #[test]
+    fn api_readonly_mode_string() {
+        let state = make_state();
+        let mode = state.config.mode.to_string();
+        assert!(!mode.is_empty());
+    }
+
+    #[test]
+    fn api_readonly_effective_approval_mode() {
+        let state = make_state();
+        // effective_approval_mode returns a bool
+        let _approval = state.config.effective_approval_mode();
+    }
+}

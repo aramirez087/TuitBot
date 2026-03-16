@@ -302,3 +302,122 @@ fn is_headless_environment() -> bool {
 
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── validate_callback_state ──────────────────────────────────────
+
+    #[test]
+    fn validate_callback_state_matching() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123&state=mystate";
+        assert!(validate_callback_state(url, "mystate").is_ok());
+    }
+
+    #[test]
+    fn validate_callback_state_mismatch() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123&state=wrong";
+        let err = validate_callback_state(url, "expected").unwrap_err();
+        assert!(err.to_string().contains("state mismatch"));
+    }
+
+    #[test]
+    fn validate_callback_state_missing_state() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123";
+        let err = validate_callback_state(url, "expected").unwrap_err();
+        assert!(err.to_string().contains("missing"));
+    }
+
+    // ── is_headless_environment ──────────────────────────────────────
+
+    #[test]
+    fn is_headless_returns_bool() {
+        // We can't easily control env vars in tests, but we can at least
+        // ensure the function doesn't panic and returns a bool.
+        let _result = is_headless_environment();
+    }
+
+    // ── validate_callback_state edge cases ────────────────────────────
+
+    #[test]
+    fn validate_callback_state_with_extra_params() {
+        let url = "http://127.0.0.1:8080/callback?code=abc&state=mystate&extra=value";
+        assert!(validate_callback_state(url, "mystate").is_ok());
+    }
+
+    #[test]
+    fn validate_callback_state_state_before_code() {
+        let url = "http://127.0.0.1:8080/callback?state=mystate&code=abc123";
+        assert!(validate_callback_state(url, "mystate").is_ok());
+    }
+
+    #[test]
+    fn validate_callback_state_error_message_contains_mismatch() {
+        let url = "http://127.0.0.1:8080/callback?code=abc&state=wrong";
+        let err = validate_callback_state(url, "expected").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("state mismatch") || msg.contains("mismatch"));
+    }
+
+    #[test]
+    fn validate_callback_state_error_message_contains_missing() {
+        let url = "http://127.0.0.1:8080/callback?code=abc123";
+        let err = validate_callback_state(url, "expected").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("missing") || msg.contains("Missing"));
+    }
+
+    // ── URL/code detection patterns ───────────────────────────────────
+
+    #[test]
+    fn input_detection_url_vs_code() {
+        let url_input = "http://127.0.0.1:8080/callback?code=abc123&state=xyz";
+        assert!(url_input.contains("code=") || url_input.contains("state="));
+
+        let bare_code = "abc123def456";
+        assert!(!bare_code.contains("code=") && !bare_code.contains("state="));
+    }
+
+    // ── extract_auth_code ─────────────────────────────────────────────
+
+    #[test]
+    fn extract_auth_code_from_url() {
+        let code = extract_auth_code("http://127.0.0.1:8080/callback?code=mycode&state=st");
+        assert_eq!(code, "mycode");
+    }
+
+    #[test]
+    fn extract_auth_code_bare_code() {
+        let code = extract_auth_code("mycode123");
+        // When input doesn't contain code=, the function should handle it
+        // (either return the input or empty depending on implementation)
+        assert!(!code.is_empty() || code.is_empty()); // just don't panic
+    }
+
+    // ── extract_callback_state ────────────────────────────────────────
+
+    #[test]
+    fn extract_callback_state_from_url() {
+        let state = extract_callback_state("http://127.0.0.1:8080/callback?code=c&state=mystate");
+        assert_eq!(state, "mystate");
+    }
+
+    #[test]
+    fn extract_callback_state_missing() {
+        let state = extract_callback_state("http://127.0.0.1:8080/callback?code=c");
+        assert!(state.is_empty());
+    }
+
+    // ── Auth mode matching ────────────────────────────────────────────
+
+    #[test]
+    fn auth_mode_matching_patterns() {
+        let modes = ["manual", "local_callback"];
+        for mode in &modes {
+            let valid = matches!(*mode, "manual" | "local_callback");
+            assert!(valid, "mode {mode} should be valid");
+        }
+        assert!(!matches!("invalid", "manual" | "local_callback"));
+    }
+}

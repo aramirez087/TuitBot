@@ -200,7 +200,7 @@ mod tests {
         }
     }
 
-    /// write.rs must NOT register universal request tool handlers.
+    /// write/ must NOT register universal request tool handlers.
     #[test]
     fn write_server_does_not_register_universal_tools() {
         let source = write_server_source();
@@ -209,12 +209,12 @@ mod tests {
         for name in &fn_names {
             assert!(
                 !admin_tools.contains(name.as_str()),
-                "SAFETY VIOLATION: write.rs registers admin-only tool '{name}'"
+                "SAFETY VIOLATION: write/ registers admin-only tool '{name}'"
             );
         }
     }
 
-    /// admin.rs MUST register all universal request tool handlers.
+    /// admin/ MUST register all universal request tool handlers.
     #[test]
     fn admin_server_registers_universal_tools() {
         let source = admin_server_source();
@@ -222,7 +222,7 @@ mod tests {
         for &tool in admin_only_tools() {
             assert!(
                 fn_names.contains(tool),
-                "admin.rs is missing universal tool handler '{tool}'"
+                "admin/ is missing universal tool handler '{tool}'"
             );
         }
     }
@@ -580,7 +580,7 @@ mod tests {
         assert_eq!(
             fn_names.len(),
             68,
-            "write.rs has {} tools (expected 68): {:?}",
+            "write/ has {} tools (expected 68): {:?}",
             fn_names.len(),
             fn_names
         );
@@ -594,7 +594,7 @@ mod tests {
         assert_eq!(
             fn_names.len(),
             72,
-            "admin.rs has {} tools (expected 72): {:?}",
+            "admin/ has {} tools (expected 72): {:?}",
             fn_names.len(),
             fn_names
         );

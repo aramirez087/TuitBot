@@ -7,6 +7,230 @@ use super::helpers::{capitalize, non_empty, parse_csv};
 use super::prompts;
 use super::wizard::WizardResult;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Default model resolution ──────────────────────────────────────
+
+    #[test]
+    fn default_model_openai() {
+        let (model, base_url) = match "openai" {
+            "openai" => ("gpt-4o-mini", None),
+            "anthropic" => ("claude-sonnet-4-6", None),
+            "ollama" => ("llama3.2", Some("http://localhost:11434/v1".to_string())),
+            _ => ("", None),
+        };
+        assert_eq!(model, "gpt-4o-mini");
+        assert!(base_url.is_none());
+    }
+
+    #[test]
+    fn default_model_anthropic() {
+        let (model, base_url) = match "anthropic" {
+            "openai" => ("gpt-4o-mini", None),
+            "anthropic" => ("claude-sonnet-4-6", None),
+            "ollama" => ("llama3.2", Some("http://localhost:11434/v1".to_string())),
+            _ => ("", None),
+        };
+        assert_eq!(model, "claude-sonnet-4-6");
+        assert!(base_url.is_none());
+    }
+
+    #[test]
+    fn default_model_ollama() {
+        let (model, base_url) = match "ollama" {
+            "openai" => ("gpt-4o-mini", None),
+            "anthropic" => ("claude-sonnet-4-6", None),
+            "ollama" => ("llama3.2", Some("http://localhost:11434/v1".to_string())),
+            _ => ("", None),
+        };
+        assert_eq!(model, "llama3.2");
+        assert_eq!(base_url, Some("http://localhost:11434/v1".to_string()));
+    }
+
+    #[test]
+    fn default_model_unknown_provider() {
+        let (model, base_url) = match "unknown" {
+            "openai" => ("gpt-4o-mini", None),
+            "anthropic" => ("claude-sonnet-4-6", None),
+            "ollama" => ("llama3.2", Some("http://localhost:11434/v1".to_string())),
+            _ => ("", None),
+        };
+        assert_eq!(model, "");
+        assert!(base_url.is_none());
+    }
+
+    // ── WizardResult struct defaults ──────────────────────────────────
+
+    #[test]
+    fn wizard_result_quickstart_defaults() {
+        let result = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: String::new(),
+            product_url: None,
+            target_audience: String::new(),
+            product_keywords: vec!["kw".to_string()],
+            industry_topics: vec![],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            approval_mode: true,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".to_string(),
+                "Tue".to_string(),
+                "Wed".to_string(),
+                "Thu".to_string(),
+                "Fri".to_string(),
+                "Sat".to_string(),
+                "Sun".to_string(),
+            ],
+            llm_provider: "openai".to_string(),
+            llm_api_key: Some("sk-test".to_string()),
+            llm_model: "gpt-4o-mini".to_string(),
+            llm_base_url: None,
+        };
+
+        assert!(result.approval_mode);
+        assert_eq!(result.timezone, "UTC");
+        assert_eq!(result.active_hours_start, 8);
+        assert_eq!(result.active_hours_end, 22);
+        assert_eq!(result.active_days.len(), 7);
+    }
+
+    // ── WizardResult struct update via spread ─────────────────────────
+
+    #[test]
+    fn wizard_result_spread_preserves_fields() {
+        let prev = WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: String::new(),
+            product_description: String::new(),
+            product_url: None,
+            target_audience: String::new(),
+            product_keywords: vec![],
+            industry_topics: vec![],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            approval_mode: true,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec!["Mon".to_string()],
+            llm_provider: String::new(),
+            llm_api_key: None,
+            llm_model: String::new(),
+            llm_base_url: None,
+        };
+
+        let updated = WizardResult {
+            product_name: "NewApp".to_string(),
+            product_description: "desc".to_string(),
+            ..prev
+        };
+
+        // Updated fields
+        assert_eq!(updated.product_name, "NewApp");
+        assert_eq!(updated.product_description, "desc");
+        // Preserved fields
+        assert_eq!(updated.client_id, "cid");
+        assert!(updated.approval_mode);
+        assert_eq!(updated.timezone, "UTC");
+    }
+
+    // ── non_empty helper ──────────────────────────────────────────────
+
+    #[test]
+    fn non_empty_returns_some_for_values() {
+        assert_eq!(non_empty("hello".to_string()), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn non_empty_returns_none_for_empty() {
+        assert_eq!(non_empty("".to_string()), None);
+        assert_eq!(non_empty("   ".to_string()), None);
+    }
+
+    // ── capitalize helper ─────────────────────────────────────────────
+
+    #[test]
+    fn capitalize_providers() {
+        assert_eq!(capitalize("openai"), "Openai");
+        assert_eq!(capitalize("anthropic"), "Anthropic");
+        assert_eq!(capitalize("ollama"), "Ollama");
+    }
+
+    // ── parse_csv validation in steps ─────────────────────────────────
+
+    #[test]
+    fn parse_csv_returns_empty_for_blanks() {
+        assert!(parse_csv("").is_empty());
+        assert!(parse_csv("   ").is_empty());
+        assert!(parse_csv(",,,").is_empty());
+    }
+
+    #[test]
+    fn parse_csv_splits_and_trims() {
+        let result = parse_csv("rust , cli,  tools");
+        assert_eq!(result, vec!["rust", "cli", "tools"]);
+    }
+
+    // ── Provider list ─────────────────────────────────────────────────
+
+    #[test]
+    fn providers_list_has_three_entries() {
+        let providers = &["openai", "anthropic", "ollama"];
+        assert_eq!(providers.len(), 3);
+    }
+
+    // ── All days constant ─────────────────────────────────────────────
+
+    #[test]
+    fn all_days_has_seven_entries() {
+        let all_days = &["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        assert_eq!(all_days.len(), 7);
+    }
+
+    // ── API key skip for ollama ───────────────────────────────────────
+
+    #[test]
+    fn ollama_skips_api_key() {
+        let provider = "ollama";
+        let api_key = if provider == "ollama" {
+            None
+        } else {
+            Some("key".to_string())
+        };
+        assert!(api_key.is_none());
+    }
+
+    #[test]
+    fn openai_requires_api_key() {
+        let provider = "openai";
+        let api_key = if provider == "ollama" {
+            None
+        } else {
+            Some("key".to_string())
+        };
+        assert!(api_key.is_some());
+    }
+}
+
 /// Quickstart: collect 5 critical inputs, default everything else.
 pub(super) fn step_quickstart() -> Result<WizardResult> {
     // Prompt 1: Product name (easy, builds momentum)

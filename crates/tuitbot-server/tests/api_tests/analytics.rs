@@ -459,11 +459,6 @@ product_keywords = ["base"]
     assert_eq!(config.x_api.client_id, "test-client-id");
 }
 
-// ============================================================
-// OAuth unlink (Session 8)
-// ============================================================
-
-/// Test: unlinking OAuth tokens deletes the token file and updates status.
 
 // ============================================================
 // Analytics summary + recent-performance (Task 3.4)

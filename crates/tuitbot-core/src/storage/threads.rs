@@ -599,6 +599,116 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_recent_original_tweets_returns_newest_first() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut tweet1 = sample_original_tweet();
+        tweet1.created_at = "2026-02-20T10:00:00Z".to_string();
+        tweet1.tweet_id = Some("ot_1".to_string());
+        insert_original_tweet(&pool, &tweet1).await.expect("insert");
+
+        let mut tweet2 = sample_original_tweet();
+        tweet2.created_at = "2026-02-21T10:00:00Z".to_string();
+        tweet2.tweet_id = Some("ot_2".to_string());
+        insert_original_tweet(&pool, &tweet2).await.expect("insert");
+
+        let mut tweet3 = sample_original_tweet();
+        tweet3.created_at = "2026-02-22T10:00:00Z".to_string();
+        tweet3.tweet_id = Some("ot_3".to_string());
+        insert_original_tweet(&pool, &tweet3).await.expect("insert");
+
+        let recent = get_recent_original_tweets(&pool, 2).await.expect("recent");
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].tweet_id, Some("ot_3".to_string()));
+        assert_eq!(recent[1].tweet_id, Some("ot_2".to_string()));
+    }
+
+    #[tokio::test]
+    async fn get_recent_original_tweets_empty() {
+        let pool = init_test_db().await.expect("init db");
+        let recent = get_recent_original_tweets(&pool, 10).await.expect("recent");
+        assert!(recent.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_recent_threads_returns_newest_first() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut thread1 = sample_thread();
+        thread1.created_at = "2026-02-20T10:00:00Z".to_string();
+        insert_thread(&pool, &thread1).await.expect("insert");
+
+        let mut thread2 = sample_thread();
+        thread2.created_at = "2026-02-21T10:00:00Z".to_string();
+        insert_thread(&pool, &thread2).await.expect("insert");
+
+        let recent = get_recent_threads(&pool, 1).await.expect("recent");
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].created_at, "2026-02-21T10:00:00Z");
+    }
+
+    #[tokio::test]
+    async fn get_recent_threads_empty() {
+        let pool = init_test_db().await.expect("init db");
+        let recent = get_recent_threads(&pool, 10).await.expect("recent");
+        assert!(recent.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_todays_tweet_times_returns_today_only() {
+        let pool = init_test_db().await.expect("init db");
+
+        // Insert a tweet with today's date
+        let tweet = sample_original_tweet();
+        insert_original_tweet(&pool, &tweet).await.expect("insert");
+
+        // Insert a tweet from a different day
+        let mut old_tweet = sample_original_tweet();
+        old_tweet.created_at = "2020-01-01T10:00:00Z".to_string();
+        old_tweet.tweet_id = Some("ot_old".to_string());
+        insert_original_tweet(&pool, &old_tweet)
+            .await
+            .expect("insert old");
+
+        let times = get_todays_tweet_times(&pool).await.expect("times");
+        // Should only include today's tweet
+        assert_eq!(times.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn get_last_thread_time_returns_latest() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut thread1 = sample_thread();
+        thread1.created_at = "2026-02-20T10:00:00Z".to_string();
+        insert_thread(&pool, &thread1).await.expect("insert");
+
+        let mut thread2 = sample_thread();
+        thread2.created_at = "2026-02-22T10:00:00Z".to_string();
+        insert_thread(&pool, &thread2).await.expect("insert");
+
+        let time = get_last_thread_time(&pool).await.expect("get time");
+        assert_eq!(time, Some("2026-02-22T10:00:00Z".to_string()));
+    }
+
+    #[tokio::test]
+    async fn insert_original_tweet_failed_status() {
+        let pool = init_test_db().await.expect("init db");
+
+        let mut tweet = sample_original_tweet();
+        tweet.status = "failed".to_string();
+        tweet.error_message = Some("API error".to_string());
+        tweet.tweet_id = None;
+
+        let id = insert_original_tweet(&pool, &tweet).await.expect("insert");
+        assert!(id > 0);
+
+        // Failed tweets should NOT appear in last original tweet time (status != 'sent')
+        let time = get_last_original_tweet_time(&pool).await.expect("get time");
+        assert!(time.is_none());
+    }
+
+    #[tokio::test]
     async fn get_threads_in_range_filters() {
         let pool = init_test_db().await.expect("init db");
 

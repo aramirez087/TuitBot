@@ -452,6 +452,91 @@ mod tests {
         assert_eq!(body["fragments"].as_array().unwrap().len(), 0);
     }
 
+    // --- clamp_limit tests ---
+
+    #[test]
+    fn clamp_limit_default() {
+        assert_eq!(clamp_limit(None), DEFAULT_LIMIT);
+    }
+
+    #[test]
+    fn clamp_limit_under_max() {
+        assert_eq!(clamp_limit(Some(50)), 50);
+    }
+
+    #[test]
+    fn clamp_limit_at_max() {
+        assert_eq!(clamp_limit(Some(MAX_LIMIT)), MAX_LIMIT);
+    }
+
+    #[test]
+    fn clamp_limit_over_max() {
+        assert_eq!(clamp_limit(Some(500)), MAX_LIMIT);
+    }
+
+    // --- truncate_snippet tests ---
+
+    #[test]
+    fn truncate_snippet_short_text() {
+        assert_eq!(truncate_snippet("hello", 120), "hello");
+    }
+
+    #[test]
+    fn truncate_snippet_at_limit() {
+        let text = "a".repeat(120);
+        assert_eq!(truncate_snippet(&text, 120), text);
+    }
+
+    #[test]
+    fn truncate_snippet_over_limit() {
+        let text = "a".repeat(200);
+        let result = truncate_snippet(&text, 120);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 120);
+    }
+
+    #[test]
+    fn truncate_snippet_unicode_safe() {
+        // Test with multi-byte chars
+        let text = "a".repeat(115) + "\u{1F600}\u{1F600}\u{1F600}";
+        let result = truncate_snippet(&text, 120);
+        assert!(result.ends_with("..."));
+        // Should not panic on char boundary
+    }
+
+    // --- deserialization tests ---
+
+    #[test]
+    fn search_notes_query_defaults() {
+        let json = "{}";
+        let q: SearchNotesQuery = serde_json::from_str(json).expect("deser");
+        assert!(q.q.is_none());
+        assert!(q.source_id.is_none());
+        assert!(q.limit.is_none());
+    }
+
+    #[test]
+    fn search_fragments_query_deserializes() {
+        let json = r#"{"q":"rust","limit":10}"#;
+        let q: SearchFragmentsQuery = serde_json::from_str(json).expect("deser");
+        assert_eq!(q.q, "rust");
+        assert_eq!(q.limit, Some(10));
+    }
+
+    #[test]
+    fn resolve_refs_request_deserializes() {
+        let json = r#"{"node_ids":[1,2,3]}"#;
+        let req: ResolveRefsRequest = serde_json::from_str(json).expect("deser");
+        assert_eq!(req.node_ids.len(), 3);
+    }
+
+    #[test]
+    fn resolve_refs_request_empty_ids() {
+        let json = r#"{"node_ids":[]}"#;
+        let req: ResolveRefsRequest = serde_json::from_str(json).expect("deser");
+        assert!(req.node_ids.is_empty());
+    }
+
     #[tokio::test]
     async fn resolve_refs_returns_empty_for_empty_ids() {
         let state = test_state().await;

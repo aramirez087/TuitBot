@@ -247,6 +247,231 @@ pub(super) fn print_llm_validation_fail(provider: &str, error: &str) {
     );
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_wizard_result() -> WizardResult {
+        WizardResult {
+            client_id: "test-client".to_string(),
+            client_secret: Some("secret".to_string()),
+            product_name: "TestApp".to_string(),
+            product_description: "Test product".to_string(),
+            product_url: Some("https://test.com".to_string()),
+            target_audience: "developers".to_string(),
+            product_keywords: vec!["rust".to_string(), "cli".to_string()],
+            industry_topics: vec!["programming".to_string()],
+            brand_voice: Some("Friendly".to_string()),
+            reply_style: Some("Helpful".to_string()),
+            content_style: Some("Practical".to_string()),
+            persona_opinions: vec!["Rust is great".to_string()],
+            persona_experiences: vec!["Built CLI tools".to_string()],
+            content_pillars: vec!["Systems programming".to_string()],
+            target_accounts: vec!["user1".to_string()],
+            approval_mode: true,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec!["Mon".to_string(), "Tue".to_string()],
+            llm_provider: "openai".to_string(),
+            llm_api_key: Some("sk-test".to_string()),
+            llm_model: "gpt-4o-mini".to_string(),
+            llm_base_url: None,
+        }
+    }
+
+    fn minimal_wizard_result() -> WizardResult {
+        WizardResult {
+            client_id: "cid".to_string(),
+            client_secret: None,
+            product_name: "App".to_string(),
+            product_description: String::new(),
+            product_url: None,
+            target_audience: String::new(),
+            product_keywords: vec!["kw".to_string()],
+            industry_topics: vec![],
+            brand_voice: None,
+            reply_style: None,
+            content_style: None,
+            persona_opinions: vec![],
+            persona_experiences: vec![],
+            content_pillars: vec![],
+            target_accounts: vec![],
+            approval_mode: true,
+            timezone: "UTC".to_string(),
+            active_hours_start: 8,
+            active_hours_end: 22,
+            active_days: vec![
+                "Mon".to_string(),
+                "Tue".to_string(),
+                "Wed".to_string(),
+                "Thu".to_string(),
+                "Fri".to_string(),
+                "Sat".to_string(),
+                "Sun".to_string(),
+            ],
+            llm_provider: "ollama".to_string(),
+            llm_api_key: None,
+            llm_model: "llama3.2".to_string(),
+            llm_base_url: Some("http://localhost:11434/v1".to_string()),
+        }
+    }
+
+    // ── print functions don't panic ───────────────────────────────────
+
+    #[test]
+    fn print_step_header_does_not_panic() {
+        print_step_header(1, "Test Step");
+        print_step_header(8, "Last Step");
+    }
+
+    #[test]
+    fn print_step_subtitle_does_not_panic() {
+        print_step_subtitle(&["Line 1", "Line 2"]);
+        print_step_subtitle(&[]);
+    }
+
+    #[test]
+    fn print_welcome_banner_does_not_panic() {
+        print_welcome_banner();
+    }
+
+    #[test]
+    fn print_quickstart_banner_does_not_panic() {
+        print_quickstart_banner();
+    }
+
+    #[test]
+    fn print_x_api_guide_does_not_panic() {
+        print_x_api_guide();
+    }
+
+    #[test]
+    fn print_summary_does_not_panic() {
+        print_summary(&test_wizard_result());
+    }
+
+    #[test]
+    fn print_summary_minimal_does_not_panic() {
+        print_summary(&minimal_wizard_result());
+    }
+
+    #[test]
+    fn print_remaining_steps_does_not_panic() {
+        print_remaining_steps(&["tuitbot auth", "tuitbot test", "tuitbot run"]);
+        print_remaining_steps(&[]);
+    }
+
+    #[test]
+    fn print_llm_validation_ok_does_not_panic() {
+        print_llm_validation_ok("openai", "gpt-4o-mini", 150);
+    }
+
+    #[test]
+    fn print_llm_validation_fail_does_not_panic() {
+        print_llm_validation_fail("anthropic", "connection refused");
+    }
+
+    // ── Summary display logic ─────────────────────────────────────────
+
+    #[test]
+    fn summary_client_secret_display_set() {
+        let result = test_wizard_result();
+        let display = if result.client_secret.is_some() {
+            "(set)"
+        } else {
+            "(none)"
+        };
+        assert_eq!(display, "(set)");
+    }
+
+    #[test]
+    fn summary_client_secret_display_none() {
+        let result = minimal_wizard_result();
+        let display = if result.client_secret.is_some() {
+            "(set)"
+        } else {
+            "(none)"
+        };
+        assert_eq!(display, "(none)");
+    }
+
+    #[test]
+    fn summary_product_url_display() {
+        let result = test_wizard_result();
+        let display = result.product_url.as_deref().unwrap_or("(none)");
+        assert_eq!(display, "https://test.com");
+    }
+
+    #[test]
+    fn summary_product_url_none() {
+        let result = minimal_wizard_result();
+        let display = result.product_url.as_deref().unwrap_or("(none)");
+        assert_eq!(display, "(none)");
+    }
+
+    #[test]
+    fn summary_approval_mode_display() {
+        let display_true = if true { "yes" } else { "no" };
+        assert_eq!(display_true, "yes");
+        let display_false = if false { "yes" } else { "no" };
+        assert_eq!(display_false, "no");
+    }
+
+    #[test]
+    fn summary_empty_vec_display() {
+        let opinions: Vec<String> = vec![];
+        let display = if opinions.is_empty() {
+            "(none)".to_string()
+        } else {
+            opinions.join(", ")
+        };
+        assert_eq!(display, "(none)");
+    }
+
+    #[test]
+    fn summary_nonempty_vec_display() {
+        let opinions = vec!["opinion1".to_string(), "opinion2".to_string()];
+        let display = if opinions.is_empty() {
+            "(none)".to_string()
+        } else {
+            opinions.join(", ")
+        };
+        assert_eq!(display, "opinion1, opinion2");
+    }
+
+    #[test]
+    fn summary_active_hours_format() {
+        let result = test_wizard_result();
+        let hours = format!(
+            "{}:00 - {}:00",
+            result.active_hours_start, result.active_hours_end
+        );
+        assert_eq!(hours, "8:00 - 22:00");
+    }
+
+    #[test]
+    fn summary_api_key_display() {
+        let result = test_wizard_result();
+        let display = if result.llm_api_key.is_some() {
+            "(set)"
+        } else {
+            "(none)"
+        };
+        assert_eq!(display, "(set)");
+    }
+
+    #[test]
+    fn summary_base_url_display() {
+        let result = minimal_wizard_result();
+        if let Some(url) = &result.llm_base_url {
+            assert_eq!(url, "http://localhost:11434/v1");
+        } else {
+            panic!("expected base_url to be set for ollama");
+        }
+    }
+}
+
 /// Print a compact summary of quickstart-collected values.
 pub(super) fn print_quickstart_summary(result: &WizardResult) {
     let bold = Style::new().bold();

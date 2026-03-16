@@ -12,6 +12,9 @@ pub mod loopback;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod inline_tests;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;

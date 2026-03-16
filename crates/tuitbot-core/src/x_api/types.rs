@@ -690,4 +690,515 @@ mod tests {
         assert!(resp.data.location.is_none());
         assert!(resp.data.url.is_none());
     }
+
+    // --- Serde roundtrip coverage for remaining types ---
+
+    #[test]
+    fn tweet_serde_roundtrip() {
+        let json = r#"{"id":"99","text":"roundtrip","author_id":"7","created_at":"2026-01-01T00:00:00Z","public_metrics":{"retweet_count":1,"reply_count":2,"like_count":3,"quote_count":4,"impression_count":5,"bookmark_count":6},"conversation_id":"99"}"#;
+        let tweet: Tweet = serde_json::from_str(json).unwrap();
+        assert_eq!(tweet.id, "99");
+        assert_eq!(tweet.public_metrics.bookmark_count, 6);
+        let back = serde_json::to_string(&tweet).unwrap();
+        let re: Tweet = serde_json::from_str(&back).unwrap();
+        assert_eq!(re.text, "roundtrip");
+    }
+
+    #[test]
+    fn public_metrics_default() {
+        let pm = PublicMetrics::default();
+        assert_eq!(pm.retweet_count, 0);
+        assert_eq!(pm.reply_count, 0);
+        assert_eq!(pm.like_count, 0);
+        assert_eq!(pm.quote_count, 0);
+        assert_eq!(pm.impression_count, 0);
+        assert_eq!(pm.bookmark_count, 0);
+    }
+
+    #[test]
+    fn user_metrics_default() {
+        let um = UserMetrics::default();
+        assert_eq!(um.followers_count, 0);
+        assert_eq!(um.following_count, 0);
+        assert_eq!(um.tweet_count, 0);
+    }
+
+    #[test]
+    fn user_metrics_serde_roundtrip() {
+        let um = UserMetrics {
+            followers_count: 100,
+            following_count: 50,
+            tweet_count: 200,
+        };
+        let json = serde_json::to_string(&um).unwrap();
+        let back: UserMetrics = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.followers_count, 100);
+        assert_eq!(back.following_count, 50);
+        assert_eq!(back.tweet_count, 200);
+    }
+
+    #[test]
+    fn includes_default() {
+        let inc = Includes::default();
+        assert!(inc.users.is_empty());
+    }
+
+    #[test]
+    fn includes_serde_roundtrip() {
+        let inc = Includes {
+            users: vec![User {
+                id: "1".into(),
+                username: "u".into(),
+                name: "N".into(),
+                profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
+                public_metrics: UserMetrics::default(),
+            }],
+        };
+        let json = serde_json::to_string(&inc).unwrap();
+        let back: Includes = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.users.len(), 1);
+    }
+
+    #[test]
+    fn user_serde_roundtrip() {
+        let user = User {
+            id: "42".into(),
+            username: "alice".into(),
+            name: "Alice".into(),
+            profile_image_url: Some("https://img.example.com/a.jpg".into()),
+            description: Some("dev".into()),
+            location: Some("NYC".into()),
+            url: Some("https://example.com".into()),
+            public_metrics: UserMetrics {
+                followers_count: 10,
+                following_count: 5,
+                tweet_count: 30,
+            },
+        };
+        let json = serde_json::to_string(&user).unwrap();
+        let back: User = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "42");
+        assert_eq!(back.description.as_deref(), Some("dev"));
+    }
+
+    #[test]
+    fn search_meta_serde_roundtrip() {
+        let meta = SearchMeta {
+            newest_id: Some("n1".into()),
+            oldest_id: Some("o1".into()),
+            result_count: 5,
+            next_token: Some("tok".into()),
+        };
+        let json = serde_json::to_string(&meta).unwrap();
+        let back: SearchMeta = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.result_count, 5);
+        assert_eq!(back.next_token.as_deref(), Some("tok"));
+    }
+
+    #[test]
+    fn media_payload_serde_roundtrip() {
+        let mp = MediaPayload {
+            media_ids: vec!["a".into(), "b".into()],
+        };
+        let json = serde_json::to_string(&mp).unwrap();
+        let back: MediaPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.media_ids.len(), 2);
+    }
+
+    #[test]
+    fn reply_to_serde_roundtrip() {
+        let rt = ReplyTo {
+            in_reply_to_tweet_id: "999".into(),
+        };
+        let json = serde_json::to_string(&rt).unwrap();
+        let back: ReplyTo = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.in_reply_to_tweet_id, "999");
+    }
+
+    #[test]
+    fn posted_tweet_serde_roundtrip() {
+        let pt = PostedTweet {
+            id: "100".into(),
+            text: "posted".into(),
+        };
+        let json = serde_json::to_string(&pt).unwrap();
+        let back: PostedTweet = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "100");
+    }
+
+    #[test]
+    fn post_tweet_response_serde_roundtrip() {
+        let resp = PostTweetResponse {
+            data: PostedTweet {
+                id: "200".into(),
+                text: "hello".into(),
+            },
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: PostTweetResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.data.id, "200");
+    }
+
+    #[test]
+    fn raw_api_response_serde_roundtrip() {
+        let raw = RawApiResponse {
+            status: 200,
+            headers: std::collections::HashMap::from([("x-rate".into(), "100".into())]),
+            body: r#"{"ok":true}"#.into(),
+            rate_limit: None,
+        };
+        let json = serde_json::to_string(&raw).unwrap();
+        let back: RawApiResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.status, 200);
+        assert!(back.body.contains("ok"));
+        // rate_limit is skipped by serde
+        assert!(back.rate_limit.is_none());
+    }
+
+    #[test]
+    fn x_api_error_response_serde_roundtrip() {
+        let err = XApiErrorResponse {
+            detail: Some("bad".into()),
+            title: Some("Error".into()),
+            error_type: Some("about:blank".into()),
+            status: Some(400),
+        };
+        let json = serde_json::to_string(&err).unwrap();
+        let back: XApiErrorResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.status, Some(400));
+        assert_eq!(back.detail.as_deref(), Some("bad"));
+    }
+
+    #[test]
+    fn x_api_error_response_empty() {
+        let json = r#"{}"#;
+        let err: XApiErrorResponse = serde_json::from_str(json).unwrap();
+        assert!(err.detail.is_none());
+        assert!(err.title.is_none());
+        assert!(err.status.is_none());
+    }
+
+    #[test]
+    fn single_tweet_response_serde_roundtrip() {
+        let json = r#"{"data":{"id":"1","text":"hi","author_id":"2"}}"#;
+        let resp: SingleTweetResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.data.id, "1");
+        assert!(resp.includes.is_none());
+        let back = serde_json::to_string(&resp).unwrap();
+        assert!(back.contains("\"id\":\"1\""));
+    }
+
+    #[test]
+    fn users_meta_serde_roundtrip() {
+        let meta = UsersMeta {
+            result_count: 3,
+            next_token: Some("nt".into()),
+        };
+        let json = serde_json::to_string(&meta).unwrap();
+        let back: UsersMeta = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.result_count, 3);
+    }
+
+    #[test]
+    fn like_tweet_request_serde_roundtrip() {
+        let req = LikeTweetRequest {
+            tweet_id: "t1".into(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: LikeTweetRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tweet_id, "t1");
+    }
+
+    #[test]
+    fn follow_user_request_serde_roundtrip() {
+        let req = FollowUserRequest {
+            target_user_id: "u1".into(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: FollowUserRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.target_user_id, "u1");
+    }
+
+    #[test]
+    fn action_result_response_serde_roundtrip() {
+        let resp = ActionResultResponse {
+            data: ActionResultData { result: true },
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: ActionResultResponse = serde_json::from_str(&json).unwrap();
+        assert!(back.data.result);
+    }
+
+    #[test]
+    fn action_result_data_liked_alias() {
+        let json = r#"{"liked": true}"#;
+        let data: ActionResultData = serde_json::from_str(json).unwrap();
+        assert!(data.result);
+    }
+
+    #[test]
+    fn action_result_data_following_alias() {
+        let json = r#"{"following": false}"#;
+        let data: ActionResultData = serde_json::from_str(json).unwrap();
+        assert!(!data.result);
+    }
+
+    #[test]
+    fn action_result_data_retweeted_alias() {
+        let json = r#"{"retweeted": true}"#;
+        let data: ActionResultData = serde_json::from_str(json).unwrap();
+        assert!(data.result);
+    }
+
+    #[test]
+    fn bookmark_tweet_request_serde_roundtrip() {
+        let req = BookmarkTweetRequest {
+            tweet_id: "b1".into(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: BookmarkTweetRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tweet_id, "b1");
+    }
+
+    #[test]
+    fn retweet_request_serde_roundtrip() {
+        let req = RetweetRequest {
+            tweet_id: "rt1".into(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: RetweetRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tweet_id, "rt1");
+    }
+
+    #[test]
+    fn delete_tweet_response_serde_roundtrip() {
+        let resp = DeleteTweetResponse {
+            data: DeleteTweetData { deleted: true },
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: DeleteTweetResponse = serde_json::from_str(&json).unwrap();
+        assert!(back.data.deleted);
+    }
+
+    #[test]
+    fn delete_tweet_data_false() {
+        let json = r#"{"deleted": false}"#;
+        let data: DeleteTweetData = serde_json::from_str(json).unwrap();
+        assert!(!data.deleted);
+    }
+
+    #[test]
+    fn media_type_png_properties() {
+        let png = MediaType::Image(ImageFormat::Png);
+        assert_eq!(png.mime_type(), "image/png");
+        assert_eq!(png.max_size(), 5 * 1024 * 1024);
+        assert_eq!(png.media_category(), "tweet_image");
+        assert!(!png.requires_chunked(1024));
+        assert!(png.requires_chunked(6 * 1024 * 1024));
+    }
+
+    #[test]
+    fn media_type_webp_properties() {
+        let webp = MediaType::Image(ImageFormat::Webp);
+        assert_eq!(webp.mime_type(), "image/webp");
+        assert_eq!(webp.media_category(), "tweet_image");
+    }
+
+    #[test]
+    fn media_type_gif_category() {
+        assert_eq!(MediaType::Gif.media_category(), "tweet_gif");
+    }
+
+    #[test]
+    fn media_type_video_category() {
+        assert_eq!(MediaType::Video.media_category(), "tweet_video");
+    }
+
+    #[test]
+    fn media_id_clone_eq() {
+        let id = MediaId("mid1".into());
+        let id2 = id.clone();
+        assert_eq!(id, id2);
+        assert_eq!(id.0, "mid1");
+    }
+
+    #[test]
+    fn mention_response_is_search_response() {
+        // MentionResponse is a type alias for SearchResponse
+        let json = r#"{"data":[],"meta":{"result_count":0}}"#;
+        let resp: MentionResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.data.is_empty());
+        assert_eq!(resp.meta.result_count, 0);
+    }
+
+    #[test]
+    fn image_format_eq() {
+        assert_eq!(ImageFormat::Jpeg, ImageFormat::Jpeg);
+        assert_ne!(ImageFormat::Jpeg, ImageFormat::Png);
+        assert_ne!(ImageFormat::Png, ImageFormat::Webp);
+    }
+
+    #[test]
+    fn image_format_copy() {
+        let a = ImageFormat::Jpeg;
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn media_type_eq_and_copy() {
+        let a = MediaType::Image(ImageFormat::Jpeg);
+        let b = a;
+        assert_eq!(a, b);
+        assert_ne!(a, MediaType::Gif);
+    }
+
+    #[test]
+    fn media_type_image_requires_chunked_boundary() {
+        let jpeg = MediaType::Image(ImageFormat::Jpeg);
+        // Exact boundary: 5MB should not require chunked
+        assert!(!jpeg.requires_chunked(5 * 1024 * 1024));
+        // Just over: requires chunked
+        assert!(jpeg.requires_chunked(5 * 1024 * 1024 + 1));
+    }
+
+    #[test]
+    fn deserialize_tweet_with_only_some_metrics() {
+        let json = r#"{
+            "id": "1",
+            "text": "t",
+            "author_id": "a",
+            "public_metrics": {
+                "like_count": 42
+            }
+        }"#;
+        let tweet: Tweet = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(tweet.public_metrics.like_count, 42);
+        assert_eq!(tweet.public_metrics.retweet_count, 0);
+        assert_eq!(tweet.public_metrics.bookmark_count, 0);
+    }
+
+    #[test]
+    fn deserialize_search_response_no_includes() {
+        let json = r#"{
+            "data": [{"id":"1","text":"t","author_id":"a"}],
+            "meta": {"result_count": 1}
+        }"#;
+        let resp: SearchResponse = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(resp.data.len(), 1);
+        assert!(resp.includes.is_none());
+    }
+
+    #[test]
+    fn x_api_error_response_partial_fields() {
+        let json = r#"{"detail": "Not Found"}"#;
+        let err: XApiErrorResponse = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(err.detail.as_deref(), Some("Not Found"));
+        assert!(err.title.is_none());
+        assert!(err.status.is_none());
+        assert!(err.error_type.is_none());
+    }
+
+    #[test]
+    fn single_tweet_response_with_includes() {
+        let json = r#"{
+            "data": {"id":"1","text":"hi","author_id":"2"},
+            "includes": {"users": [{"id":"2","username":"u","name":"N"}]}
+        }"#;
+        let resp: SingleTweetResponse = serde_json::from_str(json).expect("deserialize");
+        let includes = resp.includes.expect("includes");
+        assert_eq!(includes.users.len(), 1);
+        assert_eq!(includes.users[0].username, "u");
+    }
+
+    #[test]
+    fn delete_tweet_response_not_deleted() {
+        let json = r#"{"data": {"deleted": false}}"#;
+        let resp: DeleteTweetResponse = serde_json::from_str(json).expect("deserialize");
+        assert!(!resp.data.deleted);
+    }
+
+    #[test]
+    fn rate_limit_info_none_values() {
+        let info = RateLimitInfo {
+            remaining: None,
+            reset_at: None,
+        };
+        assert!(info.remaining.is_none());
+        assert!(info.reset_at.is_none());
+    }
+
+    #[test]
+    fn media_id_debug() {
+        let id = MediaId("test_id".into());
+        let debug = format!("{id:?}");
+        assert!(debug.contains("test_id"));
+    }
+
+    #[test]
+    fn rate_limit_info_construction() {
+        let info = RateLimitInfo {
+            remaining: Some(100),
+            reset_at: Some(1700000000),
+        };
+        assert_eq!(info.remaining, Some(100));
+        assert_eq!(info.reset_at, Some(1700000000));
+    }
+
+    #[test]
+    fn post_tweet_request_full_roundtrip() {
+        let req = PostTweetRequest {
+            text: "full test".into(),
+            reply: Some(ReplyTo {
+                in_reply_to_tweet_id: "123".into(),
+            }),
+            media: Some(MediaPayload {
+                media_ids: vec!["m1".into()],
+            }),
+            quote_tweet_id: Some("qt1".into()),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: PostTweetRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.text, "full test");
+        assert_eq!(back.reply.unwrap().in_reply_to_tweet_id, "123");
+        assert_eq!(back.media.unwrap().media_ids.len(), 1);
+        assert_eq!(back.quote_tweet_id.as_deref(), Some("qt1"));
+    }
+
+    #[test]
+    fn user_response_serde_roundtrip() {
+        let resp = UserResponse {
+            data: User {
+                id: "u1".into(),
+                username: "test".into(),
+                name: "Test".into(),
+                profile_image_url: None,
+                description: None,
+                location: None,
+                url: None,
+                public_metrics: UserMetrics::default(),
+            },
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: UserResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.data.username, "test");
+    }
+
+    #[test]
+    fn users_response_serde_roundtrip() {
+        let resp = UsersResponse {
+            data: vec![],
+            meta: UsersMeta {
+                result_count: 0,
+                next_token: None,
+            },
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: UsersResponse = serde_json::from_str(&json).unwrap();
+        assert!(back.data.is_empty());
+        assert_eq!(back.meta.result_count, 0);
+    }
 }

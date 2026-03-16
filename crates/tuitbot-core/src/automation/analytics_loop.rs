@@ -618,4 +618,225 @@ mod tests {
         let err = AnalyticsError::StorageError("disk full".to_string());
         assert_eq!(err.to_string(), "storage error: disk full");
     }
+
+    #[test]
+    fn analytics_error_display_other() {
+        let err = AnalyticsError::Other("unexpected".to_string());
+        assert_eq!(err.to_string(), "unexpected");
+    }
+
+    #[test]
+    fn analytics_error_is_std_error() {
+        let err = AnalyticsError::ApiError("test".to_string());
+        // Verify it implements std::error::Error
+        let _: &dyn std::error::Error = &err;
+    }
+
+    #[test]
+    fn analytics_summary_default() {
+        let summary = AnalyticsSummary::default();
+        assert_eq!(summary.follower_count, 0);
+        assert_eq!(summary.replies_measured, 0);
+        assert_eq!(summary.tweets_measured, 0);
+    }
+
+    #[test]
+    fn profile_metrics_debug_and_clone() {
+        let m = ProfileMetrics {
+            follower_count: 500,
+            following_count: 100,
+            tweet_count: 200,
+        };
+        let m2 = m.clone();
+        assert_eq!(m2.follower_count, 500);
+        let debug = format!("{m:?}");
+        assert!(debug.contains("500"));
+    }
+
+    #[test]
+    fn tweet_metrics_debug_and_clone() {
+        let m = TweetMetrics {
+            likes: 5,
+            retweets: 2,
+            replies: 3,
+            impressions: 100,
+        };
+        let m2 = m.clone();
+        assert_eq!(m2.likes, 5);
+        let debug = format!("{m:?}");
+        assert!(debug.contains("100"));
+    }
+
+    #[test]
+    fn performance_score_all_zeros() {
+        let score = compute_performance_score(0, 0, 0, 0);
+        assert!((score - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn performance_score_high_engagement() {
+        let score = compute_performance_score(100, 50, 30, 500);
+        // (100*3 + 50*5 + 30*4) / 500 * 1000 = (300+250+120)/500*1000 = 1340
+        assert!((score - 1340.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn performance_score_only_likes() {
+        let score = compute_performance_score(10, 0, 0, 100);
+        // (10*3 + 0 + 0) / 100 * 1000 = 300
+        assert!((score - 300.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn performance_score_only_replies() {
+        let score = compute_performance_score(0, 10, 0, 100);
+        // (0 + 10*5 + 0) / 100 * 1000 = 500
+        assert!((score - 500.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn performance_score_only_retweets() {
+        let score = compute_performance_score(0, 0, 10, 100);
+        // (0 + 0 + 10*4) / 100 * 1000 = 400
+        assert!((score - 400.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn performance_score_negative_impressions_clamped() {
+        // Negative impressions should be clamped to 1
+        let score = compute_performance_score(1, 1, 1, -5);
+        // (3 + 5 + 4) / 1 * 1000 = 12000
+        assert!((score - 12000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn analytics_error_debug() {
+        let err = AnalyticsError::ApiError("timeout".to_string());
+        let debug = format!("{err:?}");
+        assert!(debug.contains("ApiError"));
+        assert!(debug.contains("timeout"));
+
+        let err = AnalyticsError::StorageError("disk full".to_string());
+        let debug = format!("{err:?}");
+        assert!(debug.contains("StorageError"));
+
+        let err = AnalyticsError::Other("unexpected".to_string());
+        let debug = format!("{err:?}");
+        assert!(debug.contains("Other"));
+    }
+
+    #[test]
+    fn analytics_summary_debug() {
+        let summary = AnalyticsSummary {
+            follower_count: 500,
+            replies_measured: 3,
+            tweets_measured: 2,
+        };
+        let debug = format!("{summary:?}");
+        assert!(debug.contains("500"));
+        assert!(debug.contains("3"));
+        assert!(debug.contains("2"));
+    }
+
+    #[test]
+    fn analytics_error_source_is_none() {
+        let err = AnalyticsError::ApiError("test".to_string());
+        // std::error::Error default source() returns None
+        assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[tokio::test]
+    async fn iteration_with_both_replies_and_tweets() {
+        let storage = Arc::new(
+            MockAnalyticsStorage::new()
+                .with_replies(vec!["r1".to_string()])
+                .with_tweets(vec!["t1".to_string(), "t2".to_string()]),
+        );
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: default_profile(),
+            }),
+            Arc::new(MockEngagementFetcher {
+                metrics: default_tweet_metrics(),
+            }),
+            storage.clone(),
+        );
+
+        let summary = analytics.run_iteration().await.expect("iteration");
+        assert_eq!(summary.replies_measured, 1);
+        assert_eq!(summary.tweets_measured, 2);
+        assert_eq!(summary.follower_count, 1000);
+    }
+
+    #[tokio::test]
+    async fn iteration_follower_growth_no_alert() {
+        // Yesterday: 1000, Today: 1050 (growth, not a drop)
+        let storage = Arc::new(MockAnalyticsStorage::new().with_yesterday(1000));
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: ProfileMetrics {
+                    follower_count: 1050,
+                    following_count: 200,
+                    tweet_count: 500,
+                },
+            }),
+            Arc::new(MockEngagementFetcher {
+                metrics: default_tweet_metrics(),
+            }),
+            storage,
+        );
+
+        let summary = analytics.run_iteration().await.expect("iteration");
+        assert_eq!(summary.follower_count, 1050);
+    }
+
+    #[tokio::test]
+    async fn iteration_no_yesterday_data() {
+        let storage = Arc::new(MockAnalyticsStorage::new());
+        // No yesterday data — should not crash
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: default_profile(),
+            }),
+            Arc::new(MockEngagementFetcher {
+                metrics: default_tweet_metrics(),
+            }),
+            storage,
+        );
+
+        let summary = analytics.run_iteration().await.expect("iteration");
+        assert_eq!(summary.follower_count, 1000);
+    }
+
+    // --- Failing engagement fetcher ---
+
+    struct FailingEngagementFetcher;
+
+    #[async_trait::async_trait]
+    impl EngagementFetcher for FailingEngagementFetcher {
+        async fn get_tweet_metrics(&self, _tweet_id: &str) -> Result<TweetMetrics, AnalyticsError> {
+            Err(AnalyticsError::ApiError("rate limited".to_string()))
+        }
+    }
+
+    #[tokio::test]
+    async fn iteration_engagement_fetch_failure_continues() {
+        let storage = Arc::new(
+            MockAnalyticsStorage::new()
+                .with_replies(vec!["r1".to_string()])
+                .with_tweets(vec!["t1".to_string()]),
+        );
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: default_profile(),
+            }),
+            Arc::new(FailingEngagementFetcher),
+            storage.clone(),
+        );
+
+        let summary = analytics.run_iteration().await.expect("iteration");
+        // Failures are silently skipped, not counted
+        assert_eq!(summary.replies_measured, 0);
+        assert_eq!(summary.tweets_measured, 0);
+    }
 }

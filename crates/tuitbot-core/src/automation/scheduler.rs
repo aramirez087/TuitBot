@@ -52,7 +52,7 @@ impl LoopScheduler {
         } else {
             let min_ms = self.min_delay.as_millis() as u64;
             let max_ms = self.max_delay.as_millis() as u64;
-            Duration::from_millis(rand::thread_rng().gen_range(min_ms..=max_ms))
+            Duration::from_millis(rand::rng().random_range(min_ms..=max_ms))
         };
 
         self.interval + jitter
@@ -175,5 +175,86 @@ mod tests {
         let elapsed = start.elapsed();
 
         assert!(elapsed >= Duration::from_millis(10));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional scheduler coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn next_delay_with_large_jitter() {
+        let scheduler = LoopScheduler::new(
+            Duration::from_secs(60),
+            Duration::from_secs(30),
+            Duration::from_secs(120),
+        );
+
+        for _ in 0..50 {
+            let delay = scheduler.next_delay();
+            assert!(delay >= Duration::from_secs(90)); // 60 + 30
+            assert!(delay <= Duration::from_secs(180)); // 60 + 120
+        }
+    }
+
+    #[test]
+    fn scheduler_clone() {
+        let scheduler = LoopScheduler::new(
+            Duration::from_secs(10),
+            Duration::from_secs(1),
+            Duration::from_secs(5),
+        );
+        let cloned = scheduler.clone();
+        assert_eq!(cloned.interval(), scheduler.interval());
+        assert_eq!(cloned.jitter_range(), scheduler.jitter_range());
+    }
+
+    #[test]
+    fn scheduler_debug() {
+        let scheduler = LoopScheduler::new(Duration::from_secs(1), Duration::ZERO, Duration::ZERO);
+        let debug = format!("{:?}", scheduler);
+        assert!(debug.contains("LoopScheduler"));
+    }
+
+    #[test]
+    fn scheduler_from_config_zero_interval() {
+        let scheduler = scheduler_from_config(0, 0, 0);
+        assert_eq!(scheduler.interval(), Duration::ZERO);
+        assert_eq!(scheduler.next_delay(), Duration::ZERO);
+    }
+
+    #[test]
+    fn scheduler_from_config_swapped_delays() {
+        let scheduler = scheduler_from_config(10, 60, 30);
+        let (min, max) = scheduler.jitter_range();
+        assert_eq!(min, Duration::from_secs(30));
+        assert_eq!(max, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn scheduler_equal_min_max_deterministic() {
+        let scheduler = LoopScheduler::new(
+            Duration::from_secs(100),
+            Duration::from_secs(50),
+            Duration::from_secs(50),
+        );
+        // All delays should be exactly 150
+        for _ in 0..10 {
+            assert_eq!(scheduler.next_delay(), Duration::from_secs(150));
+        }
+    }
+
+    #[tokio::test]
+    async fn tick_with_jitter() {
+        let scheduler = LoopScheduler::new(
+            Duration::from_millis(5),
+            Duration::from_millis(1),
+            Duration::from_millis(5),
+        );
+
+        let start = tokio::time::Instant::now();
+        scheduler.tick().await;
+        let elapsed = start.elapsed();
+
+        assert!(elapsed >= Duration::from_millis(6)); // 5 + 1
     }
 }

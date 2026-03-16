@@ -103,6 +103,79 @@ mod cubic_curve {
             let value = cubic.get_value(0.5);
             assert!(value > 0.0);
         }
+
+        #[test]
+        fn get_value_at_zero() {
+            let cubic = Cubic::new(vec![0.2, 0.3, 0.8, 0.7]);
+            let value = cubic.get_value(0.0);
+            assert_eq!(value, 0.0);
+        }
+
+        #[test]
+        fn get_value_below_zero() {
+            let cubic = Cubic::new(vec![0.2, 0.4, 0.8, 0.6]);
+            let value = cubic.get_value(-0.5);
+            // Should use start gradient: curves[1]/curves[0] = 0.4/0.2 = 2.0
+            // result = 2.0 * (-0.5) = -1.0
+            assert!((value - (-1.0)).abs() < 0.001);
+        }
+
+        #[test]
+        fn get_value_above_one() {
+            let cubic = Cubic::new(vec![0.2, 0.3, 0.8, 0.7]);
+            let value = cubic.get_value(1.5);
+            // Should use end gradient logic
+            assert!(value > 0.0);
+        }
+
+        #[test]
+        fn get_value_at_one() {
+            let cubic = Cubic::new(vec![0.2, 0.3, 0.8, 0.7]);
+            // time >= 1.0, curves[2] < 1.0
+            let value = cubic.get_value(1.0);
+            // end_gradient = (curves[3] - 1.0) / (curves[2] - 1.0) = (0.7 - 1.0) / (0.8 - 1.0) = (-0.3)/(-0.2) = 1.5
+            // result = 1.0 + 1.5 * (1.0 - 1.0) = 1.0
+            assert!((value - 1.0).abs() < 0.001);
+        }
+
+        #[test]
+        fn get_value_at_midpoint() {
+            let cubic = Cubic::new(vec![0.25, 0.25, 0.75, 0.75]);
+            let value = cubic.get_value(0.5);
+            // Linear-ish curve should give ~0.5
+            assert!((value - 0.5).abs() < 0.1);
+        }
+
+        #[test]
+        fn calculate_at_zero() {
+            let result = Cubic::calculate(0.5, 0.5, 0.0);
+            assert_eq!(result, 0.0);
+        }
+
+        #[test]
+        fn calculate_at_one() {
+            let result = Cubic::calculate(0.5, 0.5, 1.0);
+            assert_eq!(result, 1.0);
+        }
+
+        #[test]
+        fn get_value_start_gradient_zero_first_curve() {
+            // curves[0] == 0.0, curves[1] == 0.0, curves[2] > 0.0
+            let cubic = Cubic::new(vec![0.0, 0.0, 0.5, 0.8]);
+            let value = cubic.get_value(-1.0);
+            // start_gradient = curves[3] / curves[2] = 0.8/0.5 = 1.6
+            assert!((value - (-1.6)).abs() < 0.001);
+        }
+
+        #[test]
+        fn get_value_end_gradient_curves2_one() {
+            // curves[2] == 1.0, curves[0] < 1.0
+            let cubic = Cubic::new(vec![0.5, 0.3, 1.0, 0.8]);
+            let value = cubic.get_value(2.0);
+            // end_gradient = (curves[1] - 1.0) / (curves[0] - 1.0) = (0.3 - 1.0) / (0.5 - 1.0) = -0.7/-0.5 = 1.4
+            // result = 1.0 + 1.4 * (2.0 - 1.0) = 2.4
+            assert!((value - 2.4).abs() < 0.001);
+        }
     }
 }
 
@@ -150,6 +223,41 @@ mod interpolate {
             let result = interpolate(&from, &to, 0.5);
             assert!(result.is_err());
         }
+
+        #[test]
+        fn interpolate_at_zero() {
+            let from = vec![10.0, 20.0];
+            let to = vec![30.0, 40.0];
+            let result = interpolate(&from, &to, 0.0).unwrap();
+            assert_eq!(result, vec![10.0, 20.0]);
+        }
+
+        #[test]
+        fn interpolate_at_one() {
+            let from = vec![10.0, 20.0];
+            let to = vec![30.0, 40.0];
+            let result = interpolate(&from, &to, 1.0).unwrap();
+            assert_eq!(result, vec![30.0, 40.0]);
+        }
+
+        #[test]
+        fn interpolate_single_element() {
+            let result = interpolate(&[0.0], &[100.0], 0.25).unwrap();
+            assert_eq!(result, vec![25.0]);
+        }
+
+        #[test]
+        fn interpolate_empty_lists() {
+            let result = interpolate(&[], &[], 0.5).unwrap();
+            assert!(result.is_empty());
+        }
+
+        #[test]
+        fn interpolate_negative_factor() {
+            let result = interpolate(&[10.0], &[20.0], -1.0).unwrap();
+            // 10 * (1 - (-1)) + 20 * (-1) = 10*2 + (-20) = 0.0
+            assert_eq!(result, vec![0.0]);
+        }
     }
 }
 
@@ -195,6 +303,49 @@ mod rotation {
             assert!((matrix[3] - 0.0).abs() < 0.00001);
             assert_eq!(matrix[4], 0.0);
             assert_eq!(matrix[5], 0.0);
+        }
+
+        #[test]
+        fn rotation_zero_degrees() {
+            let matrix = convert_rotation_to_matrix(0.0);
+            assert!((matrix[0] - 1.0).abs() < 0.00001);
+            assert!((matrix[1] - 0.0).abs() < 0.00001);
+            assert!((matrix[2] - 0.0).abs() < 0.00001);
+            assert!((matrix[3] - 1.0).abs() < 0.00001);
+        }
+
+        #[test]
+        fn rotation_180_degrees() {
+            let matrix = convert_rotation_to_matrix(180.0);
+            assert!((matrix[0] - (-1.0)).abs() < 0.00001);
+            assert!(matrix[1].abs() < 0.00001);
+            assert!(matrix[2].abs() < 0.00001);
+            assert!((matrix[3] - (-1.0)).abs() < 0.00001);
+        }
+
+        #[test]
+        fn rotation_360_degrees() {
+            let matrix = convert_rotation_to_matrix(360.0);
+            assert!((matrix[0] - 1.0).abs() < 0.00001);
+            assert!(matrix[1].abs() < 0.00001);
+            assert!(matrix[2].abs() < 0.00001);
+            assert!((matrix[3] - 1.0).abs() < 0.00001);
+        }
+
+        #[test]
+        fn rotation_45_degrees() {
+            let matrix = convert_rotation_to_matrix(45.0);
+            let sqrt2_over_2 = std::f64::consts::FRAC_1_SQRT_2;
+            assert!((matrix[0] - sqrt2_over_2).abs() < 0.00001);
+            assert!((matrix[1] - (-sqrt2_over_2)).abs() < 0.00001);
+        }
+
+        #[test]
+        fn transform_matrix_zero_degrees() {
+            let matrix = convert_rotation_to_transform_matrix(0.0);
+            assert!((matrix[0] - 1.0).abs() < 0.00001);
+            assert!(matrix[1].abs() < 0.00001);
+            assert_eq!(matrix.len(), 6);
         }
     }
 }
@@ -384,6 +535,80 @@ mod utils {
             let encoded = base64_encode(original);
             let decoded = base64_decode(&encoded).unwrap();
             assert_eq!(decoded, original.as_bytes());
+        }
+
+        #[test]
+        fn base64_empty() {
+            let encoded = base64_encode(b"");
+            let decoded = base64_decode(&encoded).unwrap();
+            assert!(decoded.is_empty());
+        }
+
+        #[test]
+        fn base64_decode_invalid() {
+            let result = base64_decode("!!!invalid!!!");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn float_to_hex_zero() {
+            assert_eq!(float_to_hex(0.0), "0");
+        }
+
+        #[test]
+        fn float_to_hex_one() {
+            assert_eq!(float_to_hex(1.0), "1");
+        }
+
+        #[test]
+        fn float_to_hex_255() {
+            assert_eq!(float_to_hex(255.0), "FF");
+        }
+
+        #[test]
+        fn float_to_hex_large_value() {
+            let result = float_to_hex(256.0);
+            assert_eq!(result, "100");
+        }
+
+        #[test]
+        fn float_to_hex_fractional_only() {
+            // 0.25 in hex: 0.25 * 16 = 4.0
+            assert_eq!(float_to_hex(0.25), "0.4");
+        }
+
+        #[test]
+        fn is_odd_zero() {
+            assert_eq!(is_odd(0), 0.0);
+        }
+
+        #[test]
+        fn is_odd_negative() {
+            // -1 % 2 in Rust is -1
+            assert_eq!(is_odd(-1), 0.0);
+        }
+
+        #[test]
+        fn is_odd_large() {
+            assert_eq!(is_odd(101), -1.0);
+            assert_eq!(is_odd(100), 0.0);
+        }
+
+        #[test]
+        fn js_round_positive_half() {
+            assert_eq!(js_round(2.5), 3.0);
+        }
+
+        #[test]
+        fn js_round_negative_half() {
+            // -0.5 → ceil → 0.0 (not -1.0)
+            assert_eq!(js_round(-0.5), 0.0);
+        }
+
+        #[test]
+        fn js_round_large_number() {
+            assert_eq!(js_round(1000.6), 1001.0);
+            assert_eq!(js_round(1000.4), 1000.0);
         }
     }
 }
@@ -720,6 +945,171 @@ mod transaction {
             assert!(!transaction_id.is_empty());
 
             Ok(())
+        }
+
+        // ── solve() ───────────────────────────────────────────────────
+
+        #[test]
+        fn solve_with_rounding() {
+            let result = ClientTransaction::solve(128.0, 0.0, 100.0, true);
+            // 128/255 * 100 = 50.196... → floor → 50
+            assert_eq!(result, 50.0);
+        }
+
+        #[test]
+        fn solve_without_rounding() {
+            let result = ClientTransaction::solve(128.0, 0.0, 100.0, false);
+            // 128/255 * 100 = 50.196... → round to 2 dp → 50.2
+            assert!((result - 50.2).abs() < 0.01);
+        }
+
+        #[test]
+        fn solve_zero_value() {
+            assert_eq!(ClientTransaction::solve(0.0, 10.0, 20.0, true), 10.0);
+        }
+
+        #[test]
+        fn solve_max_value() {
+            let result = ClientTransaction::solve(255.0, 10.0, 20.0, true);
+            assert_eq!(result, 20.0);
+        }
+
+        #[test]
+        fn solve_with_negative_min() {
+            let result = ClientTransaction::solve(127.0, -10.0, 10.0, false);
+            // 127/255 * 20 + (-10) = 9.96... - 10 ≈ -0.04
+            assert!(result.abs() < 1.0);
+        }
+
+        // ── animate() ─────────────────────────────────────────────────
+
+        #[test]
+        fn animate_returns_nonempty_string() {
+            // Provide a minimal 11-element frame array:
+            // 3 from-color + 3 to-color + 1 rotation + 4 curve params
+            let frames = vec![100, 50, 200, 150, 100, 50, 128, 64, 128, 64, 128];
+            let result = ClientTransaction::animate(&frames, 0.5);
+            assert!(!result.is_empty());
+        }
+
+        #[test]
+        fn animate_at_time_zero() {
+            let frames = vec![255, 0, 128, 0, 255, 128, 0, 128, 128, 128, 128];
+            let result = ClientTransaction::animate(&frames, 0.0);
+            assert!(!result.is_empty());
+        }
+
+        #[test]
+        fn animate_at_time_one() {
+            let frames = vec![255, 0, 128, 0, 255, 128, 200, 128, 128, 128, 128];
+            let result = ClientTransaction::animate(&frames, 1.0);
+            assert!(!result.is_empty());
+        }
+
+        // ── generate_transaction_id (synthetic) ───────────────────────
+
+        #[test]
+        fn generate_transaction_id_deterministic_structure() {
+            let txn = ClientTransaction {
+                additional_random_number: 3,
+                default_keyword: "obfiowerehiring".to_string(),
+                key_bytes: vec![1, 2, 3, 4, 5, 6, 7, 8],
+                animation_key: "testanimationkey".to_string(),
+            };
+
+            let id = txn.generate_transaction_id("GET", "/test/path").unwrap();
+            assert!(!id.is_empty());
+            // Base64 output should be alphanumeric + / + (trimmed =)
+            assert!(id
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '/' || c == '+'));
+        }
+
+        #[test]
+        fn generate_transaction_id_different_methods() {
+            let txn = ClientTransaction {
+                additional_random_number: 3,
+                default_keyword: "obfiowerehiring".to_string(),
+                key_bytes: vec![10, 20, 30, 40],
+                animation_key: "animkey".to_string(),
+            };
+
+            let id_get = txn.generate_transaction_id("GET", "/path").unwrap();
+            let id_post = txn.generate_transaction_id("POST", "/path").unwrap();
+            // Different methods should produce different IDs (different hash input)
+            assert_ne!(id_get, id_post);
+        }
+
+        #[test]
+        fn generate_transaction_id_different_paths() {
+            let txn = ClientTransaction {
+                additional_random_number: 3,
+                default_keyword: "obfiowerehiring".to_string(),
+                key_bytes: vec![10, 20, 30, 40],
+                animation_key: "animkey".to_string(),
+            };
+
+            let id1 = txn.generate_transaction_id("GET", "/path1").unwrap();
+            let id2 = txn.generate_transaction_id("GET", "/path2").unwrap();
+            assert_ne!(id1, id2);
+        }
+
+        #[test]
+        fn generate_transaction_id_empty_key_bytes() {
+            let txn = ClientTransaction {
+                additional_random_number: 5,
+                default_keyword: "keyword".to_string(),
+                key_bytes: vec![],
+                animation_key: String::new(),
+            };
+
+            let id = txn.generate_transaction_id("GET", "/api/test").unwrap();
+            assert!(!id.is_empty());
+        }
+
+        // ── on_demand_file_regex / indices_regex ──────────────────────
+
+        #[test]
+        fn on_demand_file_regex_is_valid() {
+            let re = on_demand_file_regex();
+            assert!(re.captures(r#""ondemand.s": "abc123def""#).is_some());
+        }
+
+        #[test]
+        fn on_demand_file_regex_no_match() {
+            let re = on_demand_file_regex();
+            assert!(re.captures("no match here").is_none());
+        }
+
+        #[test]
+        fn indices_regex_is_valid() {
+            let re = indices_regex();
+            let text = "(a[5], 16)";
+            assert!(re.captures(text).is_some());
+        }
+
+        #[test]
+        fn indices_regex_two_digit_index() {
+            let re = indices_regex();
+            let text = "(x[12], 16)";
+            assert!(re.captures(text).is_some());
+            let cap = re.captures(text).unwrap();
+            assert_eq!(cap.get(2).unwrap().as_str(), "12");
+        }
+
+        // ── get_key_bytes ────────────────────────────────────────────
+
+        #[test]
+        fn get_key_bytes_valid_base64() {
+            let key = base64_encode(b"test key data");
+            let bytes = ClientTransaction::get_key_bytes(&key).unwrap();
+            assert_eq!(bytes, b"test key data");
+        }
+
+        #[test]
+        fn get_key_bytes_invalid_base64() {
+            let result = ClientTransaction::get_key_bytes("!!!not-base64!!!");
+            assert!(result.is_err());
         }
     }
 }

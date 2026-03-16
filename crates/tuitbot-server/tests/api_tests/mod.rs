@@ -13,12 +13,27 @@ use tuitbot_server::state::AppState;
 use tuitbot_server::ws::AccountWsEvent;
 
 mod analytics;
+mod analytics_summary; // Task 3.4: analytics summary + recent-performance endpoints
 mod approval;
+mod approval_coverage; // Additional approval queue edge-case coverage
+mod approval_workflow; // Task 3.4: approval happy-path mutations (approve/reject/bulk/history)
 mod compose;
+mod connectors_coverage; // Connector routes (link, status, disconnect) coverage
 mod content;
 mod content_drafts; // Task 3.4: legacy /api/content/drafts CRUD + publish + schedule
+mod coverage_final; // Deep integration tests for all routes — final 75% push
+mod coverage_gaps;
+mod coverage_sprint1; // Sprint-1 coverage push: compose, connectors, settings, factory reset
+mod deep_handler_coverage; // Deep happy-path integration tests for large handlers
 mod discovery;
 mod discovery_feed; // Task 3.4: discovery feed + queue-reply routes
+mod draft_studio_coverage; // Additional draft studio error-path coverage
+mod final_coverage; // Final coverage push: drafts CRUD, scheduled, strategy, vault, sources, x-auth, LAN, state
+mod mcp_policy; // Task 3.8: /api/mcp/* policy + telemetry coverage
+mod route_coverage_extra; // Extra compose, onboarding, media, ingest, assist, draft-studio coverage
+mod settings_accounts; // Settings, accounts, activity, connectors, vault, content, and misc route coverage
+mod settings_init_workflow; // Settings init → get → patch → validate workflow coverage
+mod x_auth; // X OAuth unlink tests // Task 3.8: integration tests for 0%-coverage server routes
 
 /// The test API token used across all tests.
 pub const TEST_TOKEN: &str = "test-token-abc123";

@@ -107,7 +107,7 @@ pub(super) fn pick_topic(
     recent: &mut Vec<String>,
     rng: &mut impl rand::Rng,
 ) -> String {
-    use rand::seq::SliceRandom;
+    use rand::seq::IndexedRandom;
     let available: Vec<&String> = topics.iter().filter(|t| !recent.contains(t)).collect();
 
     if available.is_empty() {
@@ -383,5 +383,58 @@ pub(super) mod test_mocks {
             "Third, the compiler is your best friend.".to_string(),
             "Finally, the community is incredibly welcoming.".to_string(),
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests_pick_topic {
+    use super::pick_topic;
+
+    #[test]
+    fn pick_avoids_recent() {
+        let topics = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        let mut recent = vec!["A".to_string(), "B".to_string()];
+        let mut rng = rand::rng();
+
+        for _ in 0..20 {
+            let topic = pick_topic(&topics, &mut recent, &mut rng);
+            assert_eq!(topic, "C");
+        }
+    }
+
+    #[test]
+    fn pick_clears_when_all_recent() {
+        let topics = vec!["A".to_string(), "B".to_string()];
+        let mut recent = vec!["A".to_string(), "B".to_string()];
+        let mut rng = rand::rng();
+
+        let topic = pick_topic(&topics, &mut recent, &mut rng);
+        assert!(topics.contains(&topic));
+        assert!(recent.is_empty()); // cleared
+    }
+
+    #[test]
+    fn pick_single_topic() {
+        let topics = vec!["Only".to_string()];
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+
+        let topic = pick_topic(&topics, &mut recent, &mut rng);
+        assert_eq!(topic, "Only");
+    }
+
+    #[test]
+    fn pick_rotates_through_all() {
+        let topics = vec!["X".to_string(), "Y".to_string(), "Z".to_string()];
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..100 {
+            let topic = pick_topic(&topics, &mut recent, &mut rng);
+            seen.insert(topic);
+            recent.clear(); // reset for next iteration
+        }
+        assert_eq!(seen.len(), 3);
     }
 }

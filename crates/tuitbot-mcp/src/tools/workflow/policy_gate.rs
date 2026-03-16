@@ -378,3 +378,279 @@ fn format_duplicate(info: &DuplicateInfo, tool_name: &str, start: Instant) -> St
     .with_meta(ToolMeta::new(elapsed))
     .to_json()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── format_duplicate tests ──────────────────────────────────────
+
+    #[test]
+    fn format_duplicate_with_cached_result() {
+        let info = DuplicateInfo {
+            original_correlation_id: "corr-123".to_string(),
+            cached_result: Some(r#"{"id":"tw1"}"#.to_string()),
+            audit_id: 42,
+        };
+        let json = format_duplicate(&info, "post_tweet", Instant::now());
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["duplicate"], true);
+        assert_eq!(parsed["data"]["original_correlation_id"], "corr-123");
+        assert_eq!(parsed["data"]["cached_result"]["id"], "tw1");
+        assert!(parsed["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("post_tweet"));
+    }
+
+    #[test]
+    fn format_duplicate_without_cached_result() {
+        let info = DuplicateInfo {
+            original_correlation_id: "corr-456".to_string(),
+            cached_result: None,
+            audit_id: 99,
+        };
+        let json = format_duplicate(&info, "like_tweet", Instant::now());
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["duplicate"], true);
+        // Default cached_result is "{}" which parses to an empty object.
+        assert!(parsed["data"]["cached_result"].is_object());
+        assert!(parsed["data"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("like_tweet"));
+    }
+
+    #[test]
+    fn format_duplicate_with_invalid_json_cached_result() {
+        let info = DuplicateInfo {
+            original_correlation_id: "corr-789".to_string(),
+            cached_result: Some("not-json".to_string()),
+            audit_id: 7,
+        };
+        let json = format_duplicate(&info, "retweet", Instant::now());
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["duplicate"], true);
+        // Invalid JSON falls back to a string value.
+        assert_eq!(parsed["data"]["cached_result"], "not-json");
+    }
+
+    #[test]
+    fn format_duplicate_has_meta_elapsed() {
+        let info = DuplicateInfo {
+            original_correlation_id: "c".to_string(),
+            cached_result: None,
+            audit_id: 1,
+        };
+        let json = format_duplicate(&info, "post_tweet", Instant::now());
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert!(parsed["meta"]["elapsed_ms"].is_number());
+    }
+
+    // ── GateResult / GatewayResult variant tests ────────────────────
+
+    #[test]
+    fn gate_result_proceed_variant() {
+        let result = GateResult::Proceed;
+        assert!(matches!(result, GateResult::Proceed));
+    }
+
+    #[test]
+    fn gate_result_early_return_variant() {
+        let result = GateResult::EarlyReturn("{}".to_string());
+        match result {
+            GateResult::EarlyReturn(json) => assert_eq!(json, "{}"),
+            _ => panic!("expected EarlyReturn"),
+        }
+    }
+
+    #[test]
+    fn gateway_result_early_return_variant() {
+        let result = GatewayResult::EarlyReturn(r#"{"error":"blocked"}"#.to_string());
+        match result {
+            GatewayResult::EarlyReturn(json) => assert!(json.contains("blocked")),
+            _ => panic!("expected EarlyReturn"),
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    use std::sync::Arc;
+    use tuitbot_core::config::{Config, McpPolicyConfig};
+    use tuitbot_core::storage;
+
+    async fn make_test_state(config: Config) -> SharedState {
+        let pool = storage::init_test_db().await.expect("init db");
+        tuitbot_core::storage::rate_limits::init_mcp_rate_limit(
+            &pool,
+            config.mcp_policy.max_mutations_per_hour,
+        )
+        .await
+        .ok(); // ignore if already initialized
+        Arc::new(crate::state::AppState {
+            pool,
+            config,
+            llm_provider: None,
+            x_client: None,
+            authenticated_user_id: None,
+            granted_scopes: vec![],
+            idempotency: Arc::new(crate::tools::idempotency::IdempotencyStore::new()),
+        })
+    }
+
+    // ── get_policy_status tests (requires DB) ───────────────────────
+
+    #[tokio::test]
+    async fn get_policy_status_returns_config_fields() {
+        let state = make_test_state(Config::default()).await;
+        let json = get_policy_status(&state).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert!(parsed["data"]["enforce_for_mutations"].is_boolean());
+        assert!(parsed["data"]["require_approval_for"].is_array());
+        assert!(parsed["data"]["blocked_tools"].is_array());
+        assert!(parsed["data"]["dry_run_mutations"].is_boolean());
+        assert!(parsed["data"]["max_mutations_per_hour"].is_number());
+        assert!(parsed["data"]["rate_limit"].is_object());
+        assert!(parsed["meta"]["elapsed_ms"].is_number());
+    }
+
+    #[tokio::test]
+    async fn get_policy_status_reflects_blocked_tools() {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            blocked_tools: vec!["post_tweet".to_string(), "delete_tweet".to_string()],
+            require_approval_for: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 5,
+            ..McpPolicyConfig::default()
+        };
+        let state = make_test_state(config).await;
+
+        let json = get_policy_status(&state).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        let blocked = parsed["data"]["blocked_tools"].as_array().unwrap();
+        assert_eq!(blocked.len(), 2);
+        assert_eq!(parsed["data"]["max_mutations_per_hour"], 5);
+    }
+
+    // ── check_policy tests (require DB) ─────────────────────────────
+
+    #[tokio::test]
+    async fn check_policy_blocked_tool_is_rejected() {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            blocked_tools: vec!["post_tweet".to_string()],
+            require_approval_for: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
+        };
+        let state = make_test_state(config).await;
+
+        let result = check_policy(&state, "post_tweet", "{}", Instant::now()).await;
+        match result {
+            GateResult::EarlyReturn(json) => {
+                let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+                assert_eq!(parsed["success"], false);
+                assert_eq!(parsed["error"]["code"], "policy_denied_blocked");
+            }
+            GateResult::Proceed => panic!("expected blocked tool to be rejected"),
+        }
+    }
+
+    #[tokio::test]
+    async fn check_policy_unblocked_tool_passes() {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            blocked_tools: vec!["post_tweet".to_string()],
+            require_approval_for: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
+        };
+        let state = make_test_state(config).await;
+
+        let result = check_policy(&state, "like_tweet", "{}", Instant::now()).await;
+        assert!(
+            matches!(result, GateResult::Proceed),
+            "unblocked tool should pass"
+        );
+    }
+
+    #[tokio::test]
+    async fn check_policy_approval_tool_returns_approval() {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            require_approval_for: vec!["post_tweet".to_string()],
+            blocked_tools: Vec::new(),
+            dry_run_mutations: false,
+            max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
+        };
+        let state = make_test_state(config).await;
+
+        let result = check_policy(&state, "post_tweet", "{}", Instant::now()).await;
+        match result {
+            GateResult::EarlyReturn(json) => {
+                let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+                assert_eq!(parsed["success"], true);
+                assert_eq!(parsed["data"]["routed_to_approval"], true);
+            }
+            GateResult::Proceed => panic!("expected approval routing"),
+        }
+    }
+
+    #[tokio::test]
+    async fn check_policy_dry_run_returns_dry_run() {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: true,
+            require_approval_for: Vec::new(),
+            blocked_tools: Vec::new(),
+            dry_run_mutations: true,
+            max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
+        };
+        let state = make_test_state(config).await;
+
+        let result = check_policy(&state, "post_tweet", "{}", Instant::now()).await;
+        match result {
+            GateResult::EarlyReturn(json) => {
+                let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+                assert_eq!(parsed["success"], true);
+                assert_eq!(parsed["data"]["dry_run"], true);
+                assert_eq!(parsed["data"]["would_execute"], "post_tweet");
+            }
+            GateResult::Proceed => panic!("expected dry run response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn check_policy_enforcement_off_always_proceeds() {
+        let mut config = Config::default();
+        config.mcp_policy = McpPolicyConfig {
+            enforce_for_mutations: false,
+            blocked_tools: vec!["post_tweet".to_string()],
+            require_approval_for: vec!["post_tweet".to_string()],
+            dry_run_mutations: true,
+            max_mutations_per_hour: 20,
+            ..McpPolicyConfig::default()
+        };
+        let state = make_test_state(config).await;
+
+        let result = check_policy(&state, "post_tweet", "{}", Instant::now()).await;
+        assert!(
+            matches!(result, GateResult::Proceed),
+            "with enforcement off, all tools should proceed"
+        );
+    }
+}

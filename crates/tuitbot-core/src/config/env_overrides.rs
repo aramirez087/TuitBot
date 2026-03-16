@@ -348,3 +348,99 @@ pub(super) fn parse_env_bool(var_name: &str, val: &str) -> Result<bool, ConfigEr
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    // Env-var tests mutate process state — must run one at a time.
+    // A process-wide mutex serializes all tests in this module.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn env_override_mode_autopilot() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("TUITBOT_MODE", "autopilot");
+        let mut c = Config::default();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.mode, OperatingMode::Autopilot);
+        std::env::remove_var("TUITBOT_MODE");
+    }
+
+    #[test]
+    fn env_override_mode_composer() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("TUITBOT_MODE", "composer");
+        let mut c = Config::default();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.mode, OperatingMode::Composer);
+        std::env::remove_var("TUITBOT_MODE");
+    }
+
+    #[test]
+    fn env_override_deployment_desktop() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("TUITBOT_DEPLOYMENT_MODE", "desktop");
+        let mut c = Config::default();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.deployment_mode, DeploymentMode::Desktop);
+        std::env::remove_var("TUITBOT_DEPLOYMENT_MODE");
+    }
+
+    #[test]
+    fn env_override_deployment_self_host_variants() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        for val in &["self_host", "selfhost", "self-host"] {
+            std::env::set_var("TUITBOT_DEPLOYMENT_MODE", val);
+            let mut c = Config::default();
+            c.apply_env_overrides().unwrap();
+            assert_eq!(
+                c.deployment_mode,
+                DeploymentMode::SelfHost,
+                "variant: {val}"
+            );
+            std::env::remove_var("TUITBOT_DEPLOYMENT_MODE");
+        }
+    }
+
+    #[test]
+    fn env_override_deployment_cloud() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("TUITBOT_DEPLOYMENT_MODE", "cloud");
+        let mut c = Config::default();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.deployment_mode, DeploymentMode::Cloud);
+        std::env::remove_var("TUITBOT_DEPLOYMENT_MODE");
+    }
+
+    #[test]
+    fn env_override_x_api_client_id() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("TUITBOT_X_API__CLIENT_ID", "test-client-123");
+        let mut c = Config::default();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.x_api.client_id, "test-client-123");
+        std::env::remove_var("TUITBOT_X_API__CLIENT_ID");
+    }
+
+    #[test]
+    fn env_override_business_product_name() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        std::env::set_var("TUITBOT_BUSINESS__PRODUCT_NAME", "EnvBot");
+        let mut c = Config::default();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.business.product_name, "EnvBot");
+        std::env::remove_var("TUITBOT_BUSINESS__PRODUCT_NAME");
+    }
+
+    #[test]
+    fn env_override_no_vars_is_noop() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        // With no env vars set, apply_env_overrides should be a no-op
+        let mut c = Config::default();
+        let before_mode = c.mode.clone();
+        c.apply_env_overrides().unwrap();
+        assert_eq!(c.mode, before_mode);
+    }
+}

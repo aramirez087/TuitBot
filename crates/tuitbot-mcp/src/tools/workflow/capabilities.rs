@@ -96,7 +96,7 @@ fn compute_endpoint_groups(granted: &BTreeSet<String>) -> Vec<EndpointGroupStatu
     let mut groups: std::collections::BTreeMap<String, (BTreeSet<String>, usize)> =
         std::collections::BTreeMap::new();
 
-    for ep in SPEC_ENDPOINTS {
+    for ep in SPEC_ENDPOINTS.iter() {
         let entry = groups
             .entry(ep.group.to_string())
             .or_insert_with(|| (BTreeSet::new(), 0));

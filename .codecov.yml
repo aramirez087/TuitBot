@@ -1,39 +1,27 @@
+# Codecov configuration for TuitBot
+# https://docs.codecov.com/docs/codecov-yaml
+
 coverage:
-  # Overall project coverage targets.
-  # These are aspirational — actual enforcement is handled in CI via
-  # cargo-tarpaulin --fail-under (Rust) and Vitest thresholds (frontend).
   status:
     project:
       default:
-        target: 70%
-        threshold: 5%        # Allow ±5% swing before marking the PR red
-        informational: false  # Enforcement on: thresholds now at spec
+        # Don't fail PRs just for coverage drops < 1 %
+        threshold: 1%
     patch:
       default:
-        target: 60%          # New code on PRs should be ≥60% covered
-        threshold: 5%
-
-  # Track Rust and TypeScript separately
-  flags:
-    rust:
-      paths:
-        - crates/
-      carryforward: true
-    frontend:
-      paths:
-        - dashboard/src/
-      carryforward: true
-
-# Ignore generated/non-application files
-ignore:
-  - "dashboard/src/**/*.d.ts"
-  - "dashboard/src/lib/assets/**"
-  - "crates/*/tests/**"
-  - "crates/*/benches/**"
-  - "scripts/**"
-  - "**/*.config.*"
+        # Require new code in PRs to have ≥ 60 % line coverage
+        target: 60%
 
 comment:
-  layout: "reach, diff, flags, files"
+  layout: "reach,diff,flags,files"
   behavior: default
-  require_changes: true    # Only comment when coverage changes
+
+flags:
+  rust:
+    paths:
+      - crates/
+    carryforward: true
+  frontend:
+    paths:
+      - dashboard/src/
+    carryforward: true

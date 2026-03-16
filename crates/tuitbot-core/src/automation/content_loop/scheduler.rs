@@ -6,7 +6,7 @@
 use super::super::schedule::{apply_slot_jitter, schedule_gate, ActiveSchedule};
 use super::super::scheduler::LoopScheduler;
 use super::{ContentLoop, ContentResult};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::SeedableRng;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -40,7 +40,7 @@ impl ContentLoop {
             .max(min_recent)
             .min(self.topics.len());
         let mut recent_topics: Vec<String> = Vec::with_capacity(max_recent);
-        let mut rng = rand::rngs::StdRng::from_entropy();
+        let mut rng = rand::rngs::StdRng::from_rng(&mut rand::rng());
 
         loop {
             if cancel.is_cancelled() {
@@ -202,7 +202,7 @@ impl ContentLoop {
                 if self.topics.is_empty() {
                     return ContentResult::NoTopics;
                 }
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 self.topics
                     .choose(&mut rng)
                     .expect("topics is non-empty")
@@ -392,7 +392,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::TooSoon { .. }));
     }
@@ -419,10 +419,356 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(storage.posted_count(), 1);
+        assert_eq!(recent.len(), 1);
+    }
+
+    // ---------------------------------------------------------------------------
+    // run() loop — cancellation coverage
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_cancels_immediately_with_topics() {
+        // Pre-cancel the token: loop should see is_cancelled() == true and exit
+        // without doing any work. Covers lines: slot_mode setup, loop entry, break.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        cancel.cancel(); // already cancelled before run() is called
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            3600,
+            false,
+        );
+
+        let scheduler =
+            LoopScheduler::new(Duration::from_secs(3600), Duration::ZERO, Duration::ZERO);
+        // Should return immediately — no panic, no post
+        content.run(cancel, scheduler, None).await;
+    }
+
+    #[tokio::test]
+    async fn run_no_topics_exits_on_cancel() {
+        // Empty topics: run() logs a warning then awaits cancel.
+        // Pre-cancelling means cancel.cancelled().await resolves immediately.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            vec![], // no topics
+            3600,
+            false,
+        );
+
+        let scheduler = LoopScheduler::new(Duration::from_secs(1), Duration::ZERO, Duration::ZERO);
+        content.run(cancel, scheduler, None).await;
+    }
+
+    #[tokio::test]
+    async fn run_interval_mode_one_iteration_then_cancel() {
+        // Interval mode with a very short scheduler interval.
+        // The loop runs one iteration, then gets cancelled via a background task.
+        use crate::automation::scheduler::LoopScheduler;
+        use std::time::Duration;
+        use tokio_util::sync::CancellationToken;
+
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "interval tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            0, // post_window_secs=0 → always elapsed
+            false,
+        );
+
+        // Scheduler with 1ms interval so tick() resolves immediately
+        let scheduler =
+            LoopScheduler::new(Duration::from_millis(1), Duration::ZERO, Duration::ZERO);
+
+        // Cancel after 50ms to let one iteration complete
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            cancel_clone.cancel();
+        });
+
+        tokio::time::timeout(Duration::from_secs(5), content.run(cancel, scheduler, None))
+            .await
+            .expect("run() should complete within timeout");
+    }
+
+    // ---------------------------------------------------------------------------
+    // log_content_result — all arms
+    // ---------------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn log_content_result_all_variants() {
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "t".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            3600,
+            false,
+        );
+
+        // Exercise every arm — no panics, no assertions needed (these are tracing calls)
+        content.log_content_result(&ContentResult::Posted {
+            topic: "Rust".to_string(),
+            content: "hello".to_string(),
+        });
+        content.log_content_result(&ContentResult::TooSoon {
+            elapsed_secs: 10,
+            window_secs: 3600,
+        });
+        content.log_content_result(&ContentResult::RateLimited);
+        content.log_content_result(&ContentResult::NoTopics);
+        content.log_content_result(&ContentResult::Failed {
+            error: "oops".to_string(),
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional scheduler coverage tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn run_once_with_specific_topic() {
+        let storage = Arc::new(MockStorage::new(None));
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "Topic-specific tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let result = content.run_once(Some("CLI tools")).await;
+        assert!(matches!(result, ContentResult::Posted { .. }));
+        if let ContentResult::Posted { topic, .. } = result {
+            assert_eq!(topic, "CLI tools");
+        }
+    }
+
+    #[tokio::test]
+    async fn run_once_random_topic_when_none() {
+        let storage = Arc::new(MockStorage::new(None));
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "Random topic tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let result = content.run_once(None).await;
+        assert!(matches!(result, ContentResult::Posted { .. }));
+    }
+
+    #[tokio::test]
+    async fn run_iteration_posts_when_no_previous_tweet() {
+        let storage = Arc::new(MockStorage::new(None)); // No last tweet
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "First ever tweet!".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+        let result = content.run_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::Posted { .. }));
+        assert_eq!(storage.posted_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn run_iteration_rate_limited() {
+        let now = chrono::Utc::now();
+        let last_tweet = now - chrono::Duration::hours(5);
+        let storage = Arc::new(MockStorage::new(Some(last_tweet)));
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: false, // rate limited
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+        let result = content.run_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::RateLimited));
+    }
+
+    #[tokio::test]
+    async fn run_slot_iteration_rate_limited() {
+        let storage = Arc::new(MockStorage::new(None));
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: false, // rate limited
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+        let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::RateLimited));
+    }
+
+    #[tokio::test]
+    async fn run_slot_iteration_success_updates_recent() {
+        let storage = Arc::new(MockStorage::new(None));
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "Slot tweet!".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage.clone(),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+        let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::Posted { .. }));
+        assert_eq!(recent.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn run_slot_iteration_caps_recent_topics() {
+        let storage = Arc::new(MockStorage::new(None));
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        let max_recent = 3;
+        let mut rng = rand::rng();
+        let result = content
+            .run_slot_iteration(&mut recent, max_recent, &mut rng)
+            .await;
+        if matches!(result, ContentResult::Posted { .. }) {
+            // Recent should have removed oldest and added new
+            assert_eq!(recent.len(), max_recent);
+        }
+    }
+
+    #[tokio::test]
+    async fn run_iteration_updates_recent_on_success() {
+        let now = chrono::Utc::now();
+        let last_tweet = now - chrono::Duration::hours(5);
+        let storage = Arc::new(MockStorage::new(Some(last_tweet)));
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+        let result = content.run_iteration(&mut recent, 3, &mut rng).await;
+        assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(recent.len(), 1);
     }
 }

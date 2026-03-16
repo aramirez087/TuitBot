@@ -261,4 +261,168 @@ mod tests {
             CapabilityTier::ExplorationReady
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Additional capability coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_tier_labels_non_empty() {
+        let tiers = [
+            CapabilityTier::Unconfigured,
+            CapabilityTier::ProfileReady,
+            CapabilityTier::ExplorationReady,
+            CapabilityTier::GenerationReady,
+            CapabilityTier::PostingReady,
+        ];
+        for tier in tiers {
+            assert!(!tier.label().is_empty());
+            assert!(!tier.description().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_tier_debug_and_clone() {
+        let tier = CapabilityTier::GenerationReady;
+        let cloned = tier;
+        assert_eq!(tier, cloned);
+        let debug = format!("{:?}", tier);
+        assert!(debug.contains("GenerationReady"));
+    }
+
+    #[test]
+    fn test_tier_serde_roundtrip() {
+        let tier = CapabilityTier::PostingReady;
+        let json = serde_json::to_string(&tier).expect("serialize");
+        assert_eq!(json, "\"posting_ready\"");
+        let deserialized: CapabilityTier = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized, tier);
+    }
+
+    #[test]
+    fn test_tier_serde_all_variants() {
+        let expected = [
+            (CapabilityTier::Unconfigured, "\"unconfigured\""),
+            (CapabilityTier::ProfileReady, "\"profile_ready\""),
+            (CapabilityTier::ExplorationReady, "\"exploration_ready\""),
+            (CapabilityTier::GenerationReady, "\"generation_ready\""),
+            (CapabilityTier::PostingReady, "\"posting_ready\""),
+        ];
+        for (tier, expected_json) in expected {
+            let json = serde_json::to_string(&tier).expect("serialize");
+            assert_eq!(json, expected_json, "mismatch for {:?}", tier);
+        }
+    }
+
+    #[test]
+    fn test_missing_for_next_profile_ready() {
+        let config = minimal_profile_config();
+        let missing = CapabilityTier::ProfileReady.missing_for_next(&config, false);
+        assert!(!missing.is_empty());
+        assert!(missing.iter().any(|m| m.contains("X API")));
+    }
+
+    #[test]
+    fn test_missing_for_next_exploration_ready() {
+        let mut config = minimal_profile_config();
+        config.x_api.client_id = "abc".to_string();
+        let missing = CapabilityTier::ExplorationReady.missing_for_next(&config, false);
+        assert!(!missing.is_empty());
+        assert!(missing.iter().any(|m| m.contains("LLM")));
+    }
+
+    #[test]
+    fn test_missing_for_next_exploration_ready_with_provider_no_key() {
+        let mut config = minimal_profile_config();
+        config.x_api.client_id = "abc".to_string();
+        config.llm.provider = "anthropic".to_string();
+        // No API key
+        let missing = CapabilityTier::ExplorationReady.missing_for_next(&config, false);
+        assert!(!missing.is_empty());
+        assert!(missing.iter().any(|m| m.contains("API key")));
+    }
+
+    #[test]
+    fn test_missing_for_next_generation_ready_no_post() {
+        let config = minimal_profile_config();
+        let missing = CapabilityTier::GenerationReady.missing_for_next(&config, false);
+        assert!(!missing.is_empty());
+        assert!(missing.iter().any(|m| m.contains("posting")));
+    }
+
+    #[test]
+    fn test_missing_for_next_generation_ready_can_post() {
+        let config = minimal_profile_config();
+        let missing = CapabilityTier::GenerationReady.missing_for_next(&config, true);
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_unconfigured_empty_description() {
+        let mut config = Config::default();
+        config.business.product_name = "Test".to_string();
+        config.business.product_description = "   ".to_string(); // whitespace only
+        config.business.product_keywords = vec!["kw".to_string()];
+        assert_eq!(compute_tier(&config, false), CapabilityTier::Unconfigured);
+    }
+
+    #[test]
+    fn test_competitor_keywords_count_for_profile() {
+        let mut config = Config::default();
+        config.business.product_name = "Test".to_string();
+        config.business.product_description = "A product".to_string();
+        // No product_keywords, but has competitor_keywords
+        config.business.competitor_keywords = vec!["rival".to_string()];
+        assert_eq!(compute_tier(&config, false), CapabilityTier::ProfileReady);
+    }
+
+    #[test]
+    fn test_unconfigured_missing_with_some_fields() {
+        let mut config = Config::default();
+        config.business.product_name = "Test".to_string();
+        // Missing description and keywords
+        let missing = CapabilityTier::Unconfigured.missing_for_next(&config, false);
+        assert!(missing.iter().any(|m| m.contains("description")));
+        assert!(missing.iter().any(|m| m.contains("keywords")));
+    }
+
+    #[test]
+    fn test_profile_ready_scraper_backend_no_client_id() {
+        let mut config = minimal_profile_config();
+        config.x_api.provider_backend = "scraper".to_string();
+        // No client_id needed for scraper
+        let missing = CapabilityTier::ProfileReady.missing_for_next(&config, false);
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_cloud_provider_with_empty_key_stays_exploration() {
+        let mut config = minimal_profile_config();
+        config.x_api.client_id = "abc123".to_string();
+        config.llm.provider = "anthropic".to_string();
+        config.llm.api_key = Some("".to_string());
+        assert_eq!(
+            compute_tier(&config, false),
+            CapabilityTier::ExplorationReady
+        );
+    }
+
+    #[test]
+    fn test_ollama_no_key_reaches_generation() {
+        let mut config = minimal_profile_config();
+        config.x_api.client_id = "abc123".to_string();
+        config.llm.provider = "ollama".to_string();
+        // No API key needed for ollama
+        assert_eq!(
+            compute_tier(&config, false),
+            CapabilityTier::GenerationReady
+        );
+    }
+
+    #[test]
+    fn test_whitespace_client_id_stays_profile() {
+        let mut config = minimal_profile_config();
+        config.x_api.client_id = "   ".to_string();
+        assert_eq!(compute_tier(&config, false), CapabilityTier::ProfileReady);
+    }
 }

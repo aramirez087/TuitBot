@@ -4,7 +4,7 @@
 //! on [`ContentLoop`], plus the free functions used by the scheduler.
 
 use super::{ContentLoop, ContentResult, EXPLOIT_RATIO};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 impl ContentLoop {
     /// Generate a tweet and post it (or print in dry-run mode).
@@ -115,7 +115,7 @@ impl ContentLoop {
         rng: &mut impl rand::Rng,
     ) -> String {
         if let Some(scorer) = &self.topic_scorer {
-            let roll: f64 = rng.gen();
+            let roll: f64 = rng.random();
             if roll < EXPLOIT_RATIO {
                 // Exploit: try to pick from top-performing topics
                 if let Ok(top_topics) = scorer.get_top_topics(10).await {
@@ -259,7 +259,7 @@ mod tests {
     fn pick_topic_avoids_recent() {
         let topics = make_topics();
         let mut recent = vec!["Rust".to_string(), "CLI tools".to_string()];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..20 {
             let topic = super::pick_topic(&topics, &mut recent, &mut rng);
@@ -272,7 +272,7 @@ mod tests {
     fn pick_topic_clears_when_all_recent() {
         let topics = make_topics();
         let mut recent = topics.clone();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = super::pick_topic(&topics, &mut recent, &mut rng);
         assert!(topics.contains(&topic));
@@ -389,7 +389,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = content
             .pick_topic_epsilon_greedy(&mut recent, &mut rng)
@@ -413,5 +413,149 @@ mod tests {
 
         let result = content.run_once(Some("Rust")).await;
         assert!(matches!(result, ContentResult::Failed { .. }));
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional generator coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn truncate_at_word_boundary_no_space() {
+        let result = super::truncate_at_word_boundary("abcdefghijklmnop", 10);
+        // No space found before cutoff (10-3=7), truncates at pos 7
+        assert_eq!(result, "abcdefg...");
+    }
+
+    #[test]
+    fn truncate_at_word_boundary_exact_cutoff() {
+        let result = super::truncate_at_word_boundary("Hello World", 11);
+        assert_eq!(result, "Hello World"); // fits exactly
+    }
+
+    #[test]
+    fn truncate_display_exact_length() {
+        assert_eq!(super::truncate_display("12345", 5), "12345");
+    }
+
+    #[test]
+    fn truncate_display_one_over() {
+        let result = super::truncate_display("123456", 5);
+        assert_eq!(result, "12345...");
+    }
+
+    #[tokio::test]
+    async fn overlong_with_retry_fitting() {
+        let content = ContentLoop::new(
+            Arc::new(OverlongGenerator {
+                first_response: "a ".repeat(200), // 400 chars (too long)
+                retry_response: "Short retry tweet".to_string(), // fits
+                call_count: Mutex::new(0),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            Arc::new(MockStorage::new(None)),
+            make_topics(),
+            14400,
+            false,
+        );
+
+        let result = content.run_once(Some("Rust")).await;
+        if let ContentResult::Posted { content, .. } = result {
+            assert_eq!(content, "Short retry tweet");
+        } else {
+            panic!("Expected Posted");
+        }
+    }
+
+    #[tokio::test]
+    async fn epsilon_greedy_skips_recent_topics() {
+        let storage = Arc::new(MockStorage::new(None));
+        let scorer = Arc::new(MockTopicScorer {
+            top_topics: vec!["Rust".to_string(), "CLI tools".to_string()],
+        });
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        )
+        .with_topic_scorer(scorer);
+
+        // "Rust" is in recent, so exploit should pick "CLI tools"
+        let mut recent = vec!["Rust".to_string()];
+        let mut rng = FirstCallRng::low_roll();
+
+        let topic = content
+            .pick_topic_epsilon_greedy(&mut recent, &mut rng)
+            .await;
+        assert_eq!(topic, "CLI tools");
+    }
+
+    #[tokio::test]
+    async fn epsilon_greedy_falls_through_when_all_top_are_recent() {
+        let storage = Arc::new(MockStorage::new(None));
+        let scorer = Arc::new(MockTopicScorer {
+            top_topics: vec!["Rust".to_string()],
+        });
+
+        let content = ContentLoop::new(
+            Arc::new(MockGenerator {
+                response: "tweet".to_string(),
+            }),
+            Arc::new(MockSafety {
+                can_tweet: true,
+                can_thread: true,
+            }),
+            storage,
+            make_topics(),
+            14400,
+            false,
+        )
+        .with_topic_scorer(scorer);
+
+        // All top topics are recent -> falls through to random
+        let mut recent = vec!["Rust".to_string()];
+        let mut rng = FirstCallRng::low_roll();
+
+        let topic = content
+            .pick_topic_epsilon_greedy(&mut recent, &mut rng)
+            .await;
+        // Should pick a non-Rust topic from the full list
+        assert!(make_topics().contains(&topic));
+    }
+
+    #[test]
+    fn pick_topic_single_topic() {
+        let topics = vec!["Only".to_string()];
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+
+        let topic = super::pick_topic(&topics, &mut recent, &mut rng);
+        assert_eq!(topic, "Only");
+    }
+
+    #[test]
+    fn pick_topic_rotates_through_all() {
+        let topics = vec!["A".to_string(), "B".to_string()];
+        let mut recent = Vec::new();
+        let mut rng = rand::rng();
+
+        // First pick: one of A or B
+        let first = super::pick_topic(&topics, &mut recent, &mut rng);
+        recent.push(first.clone());
+
+        // Second pick: must be the other
+        let second = super::pick_topic(&topics, &mut recent, &mut rng);
+        assert_ne!(first, second);
     }
 }

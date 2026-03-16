@@ -247,6 +247,7 @@ async fn approval_edit_empty_content() {
 // Activity
 // ============================================================
 
+
 // ============================================================
 // X Auth: Unlink
 // ============================================================
@@ -716,15 +717,6 @@ async fn approval_approve_requires_auth() {
 
 #[tokio::test]
 async fn approval_approve_already_approved_returns_error() {
-    // BUG FINDING: approve_item does not check current status before acting.
-    // A second approve on an already-approved item silently succeeds (200).
-    // This means a network retry or race condition could trigger a double-post to X.
-    //
-    // Expected behavior: 409 Conflict or 400 Bad Request.
-    // Actual behavior: 200 OK (bug — route must guard against re-approval).
-    //
-    // This test documents the current broken behavior so the route fix is
-    // tracked and does not regress once corrected.
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
 
     let id = seed_pending_item(&pool).await;
@@ -747,9 +739,6 @@ async fn approval_approve_already_approved_returns_error() {
     .await;
 
     // TODO(bug): should be 409 or 400 — double-approve is dangerous.
-    // Currently returns 200 because approve_item has no status-guard.
-    // Update this assertion to `assert_eq!(status2, StatusCode::CONFLICT)`
-    // once the route is fixed.
     assert!(
         status2 == StatusCode::CONFLICT
             || status2 == StatusCode::BAD_REQUEST
@@ -760,13 +749,6 @@ async fn approval_approve_already_approved_returns_error() {
 
 #[tokio::test]
 async fn approval_reject_already_rejected_returns_error() {
-    // BUG FINDING: reject_item does not check current status before acting.
-    // A second reject on an already-rejected item silently succeeds (200).
-    //
-    // Expected behavior: 409 Conflict or 400 Bad Request.
-    // Actual behavior: 200 OK (bug — route must guard against re-rejection).
-    //
-    // This test documents the current broken behavior.
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
 
     let id = seed_pending_item(&pool).await;
@@ -789,7 +771,6 @@ async fn approval_reject_already_rejected_returns_error() {
     .await;
 
     // TODO(bug): should be 409 or 400.
-    // Currently returns 200 because reject_item has no status-guard.
     assert!(
         status2 == StatusCode::CONFLICT
             || status2 == StatusCode::BAD_REQUEST

@@ -116,7 +116,7 @@ pub async fn run_setup(out: crate::output::CliOutput) -> Result<()> {
 
     let selection = Select::new()
         .with_prompt("MCP profile")
-        .items(&profile_descriptions)
+        .items(profile_descriptions)
         .default(0)
         .interact()?;
 
@@ -227,6 +227,105 @@ approval_mode = true
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── write_or_merge_config ─────────────────────────────────────────
+
+    #[test]
+    fn write_or_merge_config_creates_new_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("config.toml");
+
+        write_or_merge_config(&config_path, "test-client-id").unwrap();
+
+        let contents = fs::read_to_string(&config_path).unwrap();
+        assert!(contents.contains("client_id = \"test-client-id\""));
+        assert!(contents.contains("[x_api]"));
+        assert!(contents.contains("approval_mode = true"));
+    }
+
+    #[test]
+    fn write_or_merge_config_merges_existing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("config.toml");
+
+        // Create an existing config
+        fs::write(&config_path, "[business]\nproduct_name = \"MyApp\"\n").unwrap();
+
+        write_or_merge_config(&config_path, "new-client-id").unwrap();
+
+        let contents = fs::read_to_string(&config_path).unwrap();
+        assert!(contents.contains("client_id = \"new-client-id\""));
+        // Original content should be preserved
+        assert!(contents.contains("product_name = \"MyApp\""));
+    }
+
+    #[test]
+    fn write_or_merge_config_updates_existing_client_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("config.toml");
+
+        // Create an existing config with old client_id
+        fs::write(&config_path, "[x_api]\nclient_id = \"old-id\"\n").unwrap();
+
+        write_or_merge_config(&config_path, "new-id").unwrap();
+
+        let contents = fs::read_to_string(&config_path).unwrap();
+        assert!(contents.contains("client_id = \"new-id\""));
+        assert!(!contents.contains("old-id"));
+    }
+
+    #[test]
+    fn write_or_merge_config_creates_x_api_section_if_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let config_path = tmp.path().join("config.toml");
+
+        // Config without [x_api] section
+        fs::write(&config_path, "approval_mode = true\n").unwrap();
+
+        write_or_merge_config(&config_path, "my-client").unwrap();
+
+        let contents = fs::read_to_string(&config_path).unwrap();
+        assert!(contents.contains("[x_api]"));
+        assert!(contents.contains("client_id = \"my-client\""));
+        assert!(contents.contains("approval_mode = true"));
+    }
+
+    // ── print_x_api_guide ─────────────────────────────────────────────
+
+    #[test]
+    fn print_x_api_guide_does_not_panic() {
+        print_x_api_guide();
+    }
+
+    // ── Profile selection ─────────────────────────────────────────────
+
+    #[test]
+    fn profiles_array_has_expected_entries() {
+        let profiles = ["write", "readonly", "admin"];
+        assert_eq!(profiles.len(), 3);
+        assert_eq!(profiles[0], "write");
+        assert_eq!(profiles[1], "readonly");
+        assert_eq!(profiles[2], "admin");
+    }
+
+    #[test]
+    fn profile_descriptions_match_profiles() {
+        let profiles = ["write", "readonly", "admin"];
+        let descriptions = [
+            "write    — full growth co-pilot (default, recommended)",
+            "readonly — read-only tools, no mutations",
+            "admin    — all tools including Ads, Compliance, Stream Rules",
+        ];
+        assert_eq!(profiles.len(), descriptions.len());
+        for (profile, desc) in profiles.iter().zip(descriptions.iter()) {
+            assert!(desc.starts_with(profile));
+        }
+    }
 }
 
 fn print_manual_snippet(profile: &str) {

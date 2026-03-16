@@ -5,7 +5,7 @@
 //! LLM produces distinctly different content depending on the chosen
 //! framework.
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 // ============================================================================
 // Reply archetypes
@@ -41,7 +41,7 @@ impl ReplyArchetype {
         ];
 
         let total: u32 = choices.iter().map(|(_, w)| w).sum();
-        let mut roll = rng.gen_range(0..total);
+        let mut roll = rng.random_range(0..total);
         for (archetype, weight) in choices {
             if roll < *weight {
                 return *archetype;
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn reply_archetype_select_returns_valid() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..100 {
             let _ = ReplyArchetype::select(&mut rng);
         }
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn reply_archetype_select_distribution() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut counts = [0u32; 5];
         for _ in 0..1000 {
             let archetype = ReplyArchetype::select(&mut rng);
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn tweet_format_select_avoids_recent() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let recent = vec![TweetFormat::List, TweetFormat::Tip, TweetFormat::Question];
 
         for _ in 0..50 {
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn tweet_format_select_clears_when_all_recent() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let recent: Vec<TweetFormat> = TweetFormat::ALL.to_vec();
         // When all are recent, should still pick one
         let format = TweetFormat::select(&recent, &mut rng);
@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn thread_structure_select_returns_valid() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..50 {
             let structure = ThreadStructure::select(&mut rng);
             assert!(ThreadStructure::ALL.contains(&structure));
@@ -379,5 +379,207 @@ mod tests {
         assert_eq!(ThreadStructure::Framework.to_string(), "framework");
         assert_eq!(ThreadStructure::Mistakes.to_string(), "mistakes");
         assert_eq!(ThreadStructure::Analysis.to_string(), "analysis");
+    }
+
+    #[test]
+    fn reply_archetype_all_variants_reachable() {
+        use std::collections::HashSet;
+        let mut rng = rand::rng();
+        let mut seen = HashSet::new();
+        for _ in 0..10_000 {
+            seen.insert(ReplyArchetype::select(&mut rng).to_string());
+        }
+        assert_eq!(
+            seen.len(),
+            5,
+            "expected all 5 reply archetypes, got {seen:?}"
+        );
+    }
+
+    #[test]
+    fn tweet_format_all_variants_reachable() {
+        use std::collections::HashSet;
+        let mut rng = rand::rng();
+        let mut seen = HashSet::new();
+        let recent: Vec<TweetFormat> = vec![];
+        for _ in 0..10_000 {
+            seen.insert(TweetFormat::select(&recent, &mut rng).to_string());
+        }
+        assert_eq!(seen.len(), 7, "expected all 7 tweet formats, got {seen:?}");
+    }
+
+    #[test]
+    fn thread_structure_all_variants_reachable() {
+        use std::collections::HashSet;
+        let mut rng = rand::rng();
+        let mut seen = HashSet::new();
+        for _ in 0..10_000 {
+            seen.insert(ThreadStructure::select(&mut rng).to_string());
+        }
+        assert_eq!(
+            seen.len(),
+            4,
+            "expected all 4 thread structures, got {seen:?}"
+        );
+    }
+
+    #[test]
+    fn tweet_format_display_all_variants() {
+        assert_eq!(TweetFormat::List.to_string(), "list");
+        assert_eq!(TweetFormat::ContrarianTake.to_string(), "contrarian_take");
+        assert_eq!(
+            TweetFormat::MostPeopleThinkX.to_string(),
+            "most_people_think_x"
+        );
+        assert_eq!(TweetFormat::Storytelling.to_string(), "storytelling");
+        assert_eq!(TweetFormat::BeforeAfter.to_string(), "before_after");
+        assert_eq!(TweetFormat::Question.to_string(), "question");
+        assert_eq!(TweetFormat::Tip.to_string(), "tip");
+    }
+
+    #[test]
+    fn reply_archetype_display_all_variants() {
+        assert_eq!(
+            ReplyArchetype::AgreeAndExpand.to_string(),
+            "agree_and_expand"
+        );
+        assert_eq!(
+            ReplyArchetype::RespectfulDisagree.to_string(),
+            "respectful_disagree"
+        );
+        assert_eq!(ReplyArchetype::AddData.to_string(), "add_data");
+        assert_eq!(ReplyArchetype::AskQuestion.to_string(), "ask_question");
+        assert_eq!(
+            ReplyArchetype::ShareExperience.to_string(),
+            "share_experience"
+        );
+    }
+
+    #[test]
+    fn tweet_format_select_single_available() {
+        let mut rng = rand::rng();
+        // Put 6 of 7 in recent — only Storytelling remains.
+        let recent = vec![
+            TweetFormat::List,
+            TweetFormat::ContrarianTake,
+            TweetFormat::MostPeopleThinkX,
+            TweetFormat::BeforeAfter,
+            TweetFormat::Question,
+            TweetFormat::Tip,
+        ];
+        for _ in 0..50 {
+            let picked = TweetFormat::select(&recent, &mut rng);
+            assert_eq!(
+                picked,
+                TweetFormat::Storytelling,
+                "only Storytelling should be available"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional frameworks coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn reply_archetype_prompt_fragment_content() {
+        // Verify each prompt fragment contains relevant guidance words
+        let frag = ReplyArchetype::AgreeAndExpand.prompt_fragment();
+        assert!(frag.contains("Agree"));
+        let frag = ReplyArchetype::RespectfulDisagree.prompt_fragment();
+        assert!(frag.contains("alternative"));
+        let frag = ReplyArchetype::AddData.prompt_fragment();
+        assert!(frag.contains("data"));
+        let frag = ReplyArchetype::AskQuestion.prompt_fragment();
+        assert!(frag.contains("question"));
+        let frag = ReplyArchetype::ShareExperience.prompt_fragment();
+        assert!(frag.contains("experience"));
+    }
+
+    #[test]
+    fn tweet_format_prompt_fragment_content() {
+        let frag = TweetFormat::List.prompt_fragment();
+        assert!(frag.contains("list"));
+        let frag = TweetFormat::ContrarianTake.prompt_fragment();
+        assert!(frag.contains("challenge"));
+        let frag = TweetFormat::Storytelling.prompt_fragment();
+        assert!(frag.contains("story"));
+        let frag = TweetFormat::BeforeAfter.prompt_fragment();
+        assert!(frag.contains("Before"));
+        let frag = TweetFormat::Question.prompt_fragment();
+        assert!(frag.contains("question"));
+        let frag = TweetFormat::Tip.prompt_fragment();
+        assert!(frag.contains("tip"));
+    }
+
+    #[test]
+    fn thread_structure_prompt_fragment_content() {
+        let frag = ThreadStructure::Transformation.prompt_fragment();
+        assert!(frag.contains("transformation"));
+        let frag = ThreadStructure::Framework.prompt_fragment();
+        assert!(frag.contains("framework"));
+        let frag = ThreadStructure::Mistakes.prompt_fragment();
+        assert!(frag.contains("mistakes"));
+        let frag = ThreadStructure::Analysis.prompt_fragment();
+        assert!(frag.contains("analysis"));
+    }
+
+    #[test]
+    fn tweet_format_all_count() {
+        assert_eq!(TweetFormat::ALL.len(), 7);
+    }
+
+    #[test]
+    fn thread_structure_all_count() {
+        assert_eq!(ThreadStructure::ALL.len(), 4);
+    }
+
+    #[test]
+    fn reply_archetype_equality() {
+        assert_eq!(ReplyArchetype::AddData, ReplyArchetype::AddData);
+        assert_ne!(ReplyArchetype::AddData, ReplyArchetype::AskQuestion);
+    }
+
+    #[test]
+    fn tweet_format_equality() {
+        assert_eq!(TweetFormat::Tip, TweetFormat::Tip);
+        assert_ne!(TweetFormat::Tip, TweetFormat::List);
+    }
+
+    #[test]
+    fn thread_structure_equality() {
+        assert_eq!(ThreadStructure::Analysis, ThreadStructure::Analysis);
+        assert_ne!(ThreadStructure::Analysis, ThreadStructure::Framework);
+    }
+
+    #[test]
+    fn tweet_format_empty_recent() {
+        let mut rng = rand::rng();
+        let format = TweetFormat::select(&[], &mut rng);
+        assert!(TweetFormat::ALL.contains(&format));
+    }
+
+    #[test]
+    fn thread_structure_debug() {
+        let debug = format!("{:?}", ThreadStructure::Transformation);
+        assert!(debug.contains("Transformation"));
+    }
+
+    #[test]
+    fn tweet_format_debug() {
+        let debug = format!("{:?}", TweetFormat::List);
+        assert!(debug.contains("List"));
+    }
+
+    #[test]
+    fn reply_archetype_debug() {
+        let debug = format!("{:?}", ReplyArchetype::AddData);
+        assert!(debug.contains("AddData"));
+    }
+
+    #[test]
+    fn tweet_format_most_people_think_x_prompt() {
+        let frag = TweetFormat::MostPeopleThinkX.prompt_fragment();
+        assert!(frag.contains("Most people"));
     }
 }

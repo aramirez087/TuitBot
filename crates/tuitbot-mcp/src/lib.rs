@@ -462,4 +462,215 @@ mod tests {
             state.err()
         );
     }
+
+    /// Utility-readonly profile should degrade gracefully without tokens.
+    #[tokio::test]
+    async fn init_readonly_utility_readonly_no_tokens() {
+        let config = Config::default();
+        let state = init_readonly_state(config, Profile::UtilityReadonly).await;
+        assert!(state.is_ok());
+        let state = state.unwrap();
+        assert!(!state.x_available);
+    }
+
+    /// Utility-write profile should degrade gracefully without tokens.
+    #[tokio::test]
+    async fn init_readonly_utility_write_no_tokens() {
+        let config = Config::default();
+        let state = init_readonly_state(config, Profile::UtilityWrite).await;
+        assert!(state.is_ok());
+        let state = state.unwrap();
+        assert!(!state.x_available);
+        assert!(state.authenticated_user_id.is_empty());
+    }
+
+    /// Scraper backend with utility-readonly profile.
+    #[tokio::test]
+    async fn init_readonly_scraper_utility_readonly() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::UtilityReadonly).await;
+        assert!(state.is_ok());
+    }
+
+    /// Scraper backend with utility-write profile.
+    #[tokio::test]
+    async fn init_readonly_scraper_utility_write() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::UtilityWrite).await;
+        assert!(state.is_ok());
+    }
+
+    /// Readonly state has config accessible.
+    #[tokio::test]
+    async fn readonly_state_config_accessible() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+
+        let state = init_readonly_state(config, Profile::Readonly)
+            .await
+            .unwrap();
+        // Config should be accessible
+        assert_eq!(state.config.x_api.provider_backend, "scraper");
+    }
+
+    /// Profile display covers all variants.
+    #[test]
+    fn profile_display_all_variants() {
+        assert_eq!(format!("{}", Profile::Readonly), "readonly");
+        assert_eq!(format!("{}", Profile::ApiReadonly), "api-readonly");
+        assert_eq!(format!("{}", Profile::Write), "write");
+        assert_eq!(format!("{}", Profile::Admin), "admin");
+        assert_eq!(format!("{}", Profile::UtilityReadonly), "utility-readonly");
+        assert_eq!(format!("{}", Profile::UtilityWrite), "utility-write");
+    }
+
+    /// Profile parse from string.
+    #[test]
+    fn profile_parse_roundtrip() {
+        for profile in [
+            Profile::Readonly,
+            Profile::ApiReadonly,
+            Profile::Write,
+            Profile::Admin,
+            Profile::UtilityReadonly,
+            Profile::UtilityWrite,
+        ] {
+            let s = profile.to_string();
+            let parsed: Profile = s.parse().unwrap();
+            assert_eq!(parsed, profile);
+        }
+    }
+
+    /// Profile parse unknown string.
+    #[test]
+    fn profile_parse_unknown_error() {
+        let result: Result<Profile, _> = "nonexistent".parse();
+        assert!(result.is_err());
+    }
+
+    // ── Provider backend parsing ───────────────────────────────────
+
+    #[test]
+    fn parse_backend_scraper() {
+        assert_eq!(
+            provider::parse_backend("scraper"),
+            provider::ProviderBackend::Scraper
+        );
+    }
+
+    #[test]
+    fn parse_backend_scraper_uppercase() {
+        assert_eq!(
+            provider::parse_backend("SCRAPER"),
+            provider::ProviderBackend::Scraper
+        );
+    }
+
+    #[test]
+    fn parse_backend_x_api() {
+        assert_eq!(
+            provider::parse_backend("x_api"),
+            provider::ProviderBackend::XApi
+        );
+    }
+
+    #[test]
+    fn parse_backend_empty_defaults_to_x_api() {
+        assert_eq!(provider::parse_backend(""), provider::ProviderBackend::XApi);
+    }
+
+    #[test]
+    fn parse_backend_unknown_defaults_to_x_api() {
+        assert_eq!(
+            provider::parse_backend("something_else"),
+            provider::ProviderBackend::XApi
+        );
+    }
+
+    // ── Provider backend display ───────────────────────────────────
+
+    #[test]
+    fn provider_backend_display_x_api() {
+        assert_eq!(provider::ProviderBackend::XApi.to_string(), "x_api");
+    }
+
+    #[test]
+    fn provider_backend_display_scraper() {
+        assert_eq!(provider::ProviderBackend::Scraper.to_string(), "scraper");
+    }
+
+    // ── inject_provider_backend ────────────────────────────────────
+
+    #[test]
+    fn inject_backend_into_json_with_meta() {
+        let input = r#"{"data":{},"meta":{"elapsed":5}}"#;
+        let result = provider::inject_provider_backend(input, "scraper");
+        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(v["meta"]["provider_backend"], "scraper");
+        assert_eq!(v["meta"]["elapsed"], 5);
+    }
+
+    #[test]
+    fn inject_backend_into_json_without_meta() {
+        let input = r#"{"data":{}}"#;
+        let result = provider::inject_provider_backend(input, "x_api");
+        let v: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(v["meta"]["provider_backend"], "x_api");
+    }
+
+    #[test]
+    fn inject_backend_invalid_json_returns_input() {
+        let input = "not valid json";
+        let result = provider::inject_provider_backend(input, "x_api");
+        assert_eq!(result, "not valid json");
+    }
+
+    // ── Profile equality and copy ──────────────────────────────────
+
+    #[test]
+    fn profile_equality() {
+        assert_eq!(Profile::Write, Profile::Write);
+        assert_ne!(Profile::Write, Profile::Admin);
+        assert_ne!(Profile::Readonly, Profile::ApiReadonly);
+    }
+
+    #[test]
+    fn profile_clone() {
+        let p = Profile::UtilityWrite;
+        let p2 = p;
+        assert_eq!(p, p2);
+    }
+
+    #[test]
+    fn profile_debug_format() {
+        let debug = format!("{:?}", Profile::Admin);
+        assert_eq!(debug, "Admin");
+    }
+
+    // ── Readonly state x_available checks ──────────────────────────
+
+    #[tokio::test]
+    async fn readonly_state_x_not_available_without_tokens() {
+        let config = Config::default();
+        let state = init_readonly_state(config, Profile::Readonly)
+            .await
+            .unwrap();
+        assert!(!state.x_available);
+        assert!(state.authenticated_user_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn readonly_state_config_preserved() {
+        let mut config = Config::default();
+        config.x_api.provider_backend = "scraper".to_string();
+        config.business.product_name = "TestBrand".to_string();
+        let state = init_readonly_state(config, Profile::Readonly)
+            .await
+            .unwrap();
+        assert_eq!(state.config.business.product_name, "TestBrand");
+    }
 }

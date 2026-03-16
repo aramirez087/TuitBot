@@ -1,17 +1,19 @@
 <script lang="ts">
 	import ComposerShell from '$lib/components/composer/ComposerShell.svelte';
 
+	interface Props {
+		open?: boolean;
+		focusMode?: boolean;
+		inspectorOpen?: boolean;
+		onclose?: () => void;
+	}
+
 	let {
 		open = true,
 		focusMode = false,
 		inspectorOpen = false,
 		onclose = () => {}
-	}: {
-		open?: boolean;
-		focusMode?: boolean;
-		inspectorOpen?: boolean;
-		onclose?: () => void;
-	} = $props();
+	}: Props = $props();
 </script>
 
 <ComposerShell {open} {focusMode} {inspectorOpen} {onclose}>

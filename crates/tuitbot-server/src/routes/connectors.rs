@@ -479,3 +479,345 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn html_escape_basic() {
+        assert_eq!(html_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn html_escape_ampersand() {
+        assert_eq!(html_escape("a&b"), "a&amp;b");
+    }
+
+    #[test]
+    fn html_escape_angle_brackets() {
+        assert_eq!(html_escape("<script>"), "&lt;script&gt;");
+    }
+
+    #[test]
+    fn html_escape_quotes() {
+        assert_eq!(html_escape(r#"say "hi""#), "say &quot;hi&quot;");
+    }
+
+    #[test]
+    fn html_escape_all_chars() {
+        assert_eq!(
+            html_escape(r#"<a href="x">a&b</a>"#),
+            "&lt;a href=&quot;x&quot;&gt;a&amp;b&lt;/a&gt;"
+        );
+    }
+
+    #[test]
+    fn html_escape_empty() {
+        assert_eq!(html_escape(""), "");
+    }
+
+    #[test]
+    fn base64url_encode_basic() {
+        // Just verify it produces a non-empty string without padding
+        let data = b"test data for encoding";
+        let encoded = base64url_encode(data);
+        assert!(!encoded.is_empty());
+        assert!(!encoded.contains('='), "no padding in URL-safe base64");
+        assert!(!encoded.contains('+'), "no + in URL-safe base64");
+        assert!(!encoded.contains('/'), "no / in URL-safe base64");
+    }
+
+    #[test]
+    fn base64url_encode_empty() {
+        let encoded = base64url_encode(b"");
+        assert!(encoded.is_empty());
+    }
+
+    #[test]
+    fn random_bytes_correct_length() {
+        let bytes = random_bytes(32);
+        assert_eq!(bytes.len(), 32);
+    }
+
+    #[test]
+    fn random_bytes_zero_length() {
+        let bytes = random_bytes(0);
+        assert!(bytes.is_empty());
+    }
+
+    #[test]
+    fn random_bytes_unique() {
+        let a = random_bytes(32);
+        let b = random_bytes(32);
+        // Very unlikely to be equal
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn oauth_state_ttl_is_10_minutes() {
+        assert_eq!(OAUTH_STATE_TTL, Duration::from_secs(600));
+    }
+
+    // ── html_escape extended coverage ─────────────────────────────
+
+    #[test]
+    fn html_escape_only_special_chars() {
+        assert_eq!(html_escape("&<>\""), "&amp;&lt;&gt;&quot;");
+    }
+
+    #[test]
+    fn html_escape_mixed_with_normal() {
+        assert_eq!(
+            html_escape("user@example.com & \"friends\""),
+            "user@example.com &amp; &quot;friends&quot;"
+        );
+    }
+
+    #[test]
+    fn html_escape_unicode_preserved() {
+        assert_eq!(html_escape("hello world"), "hello world");
+    }
+
+    #[test]
+    fn html_escape_no_single_quote_escaping() {
+        // We only escape &, <, >, "
+        assert_eq!(html_escape("it's"), "it's");
+    }
+
+    #[test]
+    fn html_escape_nested_tags() {
+        assert_eq!(
+            html_escape("<div><span>text</span></div>"),
+            "&lt;div&gt;&lt;span&gt;text&lt;/span&gt;&lt;/div&gt;"
+        );
+    }
+
+    // ── base64url_encode extended coverage ────────────────────────
+
+    #[test]
+    fn base64url_encode_known_value() {
+        // SHA-256 hash bytes have well-known base64url encoding
+        let data = [0u8; 32];
+        let encoded = base64url_encode(&data);
+        assert_eq!(encoded.len(), 43); // 32 bytes -> 43 chars in base64 no pad
+        assert!(!encoded.contains('='));
+    }
+
+    #[test]
+    fn base64url_encode_single_byte() {
+        let encoded = base64url_encode(&[0xFF]);
+        assert!(!encoded.is_empty());
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+    }
+
+    #[test]
+    fn base64url_encode_deterministic() {
+        let data = b"PKCE code challenge test";
+        let a = base64url_encode(data);
+        let b = base64url_encode(data);
+        assert_eq!(a, b);
+    }
+
+    // ── random_bytes extended coverage ────────────────────────────
+
+    #[test]
+    fn random_bytes_large() {
+        let bytes = random_bytes(256);
+        assert_eq!(bytes.len(), 256);
+    }
+
+    #[test]
+    fn random_bytes_one() {
+        let bytes = random_bytes(1);
+        assert_eq!(bytes.len(), 1);
+    }
+
+    // ── PKCE code challenge simulation ────────────────────────────
+
+    #[test]
+    fn pkce_code_challenge_flow() {
+        // Simulate the PKCE flow used in link_google_drive
+        let code_verifier = hex::encode(random_bytes(64));
+        assert_eq!(code_verifier.len(), 128);
+
+        let hash = sha2::Sha256::digest(code_verifier.as_bytes());
+        let code_challenge = base64url_encode(&hash);
+
+        // Base64url of 32 bytes = 43 chars
+        assert_eq!(code_challenge.len(), 43);
+        assert!(!code_challenge.contains('='));
+        assert!(!code_challenge.contains('+'));
+    }
+
+    #[test]
+    fn oauth_state_generation() {
+        let state = hex::encode(random_bytes(32));
+        assert_eq!(state.len(), 64); // 32 bytes -> 64 hex chars
+    }
+
+    // ── CallbackParams deserialization ─────────────────────────────
+
+    #[test]
+    fn callback_params_deserialize_full() {
+        let json = r#"{"code": "auth_code_123", "state": "state_abc"}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.code.as_deref(), Some("auth_code_123"));
+        assert_eq!(params.state.as_deref(), Some("state_abc"));
+    }
+
+    #[test]
+    fn callback_params_deserialize_empty() {
+        let json = r#"{}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert!(params.code.is_none());
+        assert!(params.state.is_none());
+    }
+
+    // ── LinkParams deserialization ─────────────────────────────────
+
+    #[test]
+    fn link_params_deserialize_no_force() {
+        let json = r#"{}"#;
+        let params: LinkParams = serde_json::from_str(json).unwrap();
+        assert!(params.force.is_none());
+    }
+
+    #[test]
+    fn link_params_deserialize_force_true() {
+        let json = r#"{"force": true}"#;
+        let params: LinkParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.force, Some(true));
+    }
+
+    #[test]
+    fn link_params_deserialize_force_false() {
+        let json = r#"{"force": false}"#;
+        let params: LinkParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.force, Some(false));
+    }
+
+    // ── PKCE flow internals ────────────────────────────────────────
+
+    #[test]
+    fn pkce_verifier_length_128_hex() {
+        // The link handler generates 64 random bytes, hex-encoded = 128 chars
+        let verifier = hex::encode(random_bytes(64));
+        assert_eq!(verifier.len(), 128);
+        // All hex chars
+        assert!(verifier.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn pkce_challenge_from_verifier() {
+        let verifier = hex::encode(random_bytes(64));
+        let hash = sha2::Sha256::digest(verifier.as_bytes());
+        let challenge = base64url_encode(&hash);
+
+        // SHA-256 output is 32 bytes = 43 chars in base64url no-pad
+        assert_eq!(challenge.len(), 43);
+        // No padding characters
+        assert!(!challenge.contains('='));
+    }
+
+    #[test]
+    fn pkce_different_verifiers_different_challenges() {
+        let v1 = hex::encode(random_bytes(64));
+        let v2 = hex::encode(random_bytes(64));
+        let h1 = sha2::Sha256::digest(v1.as_bytes());
+        let h2 = sha2::Sha256::digest(v2.as_bytes());
+        let c1 = base64url_encode(&h1);
+        let c2 = base64url_encode(&h2);
+        assert_ne!(
+            c1, c2,
+            "different verifiers should produce different challenges"
+        );
+    }
+
+    // ── OAuth state generation ─────────────────────────────────────
+
+    #[test]
+    fn oauth_state_is_64_hex_chars() {
+        let state = hex::encode(random_bytes(32));
+        assert_eq!(state.len(), 64);
+        assert!(state.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    // ── html_escape stress ─────────────────────────────────────────
+
+    #[test]
+    fn html_escape_long_string() {
+        let input = "<script>alert('xss')</script>".repeat(100);
+        let escaped = html_escape(&input);
+        assert!(!escaped.contains('<'));
+        assert!(!escaped.contains('>'));
+    }
+
+    #[test]
+    fn html_escape_newlines_preserved() {
+        assert_eq!(html_escape("line1\nline2"), "line1\nline2");
+    }
+
+    // ── base64url edge cases ───────────────────────────────────────
+
+    #[test]
+    fn base64url_encode_all_zeros() {
+        let data = vec![0u8; 64];
+        let encoded = base64url_encode(&data);
+        assert!(!encoded.is_empty());
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('='));
+    }
+
+    #[test]
+    fn base64url_encode_all_ones() {
+        let data = vec![0xFFu8; 32];
+        let encoded = base64url_encode(&data);
+        assert_eq!(encoded.len(), 43); // 32 bytes -> 43 chars
+    }
+
+    // ── CallbackParams edge cases ──────────────────────────────────
+
+    #[test]
+    fn callback_params_with_only_code() {
+        let json = r#"{"code": "abc123"}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.code.as_deref(), Some("abc123"));
+        assert!(params.state.is_none());
+    }
+
+    #[test]
+    fn callback_params_with_only_state() {
+        let json = r#"{"state": "xyz789"}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert!(params.code.is_none());
+        assert_eq!(params.state.as_deref(), Some("xyz789"));
+    }
+
+    #[test]
+    fn callback_params_empty_strings() {
+        let json = r#"{"code": "", "state": ""}"#;
+        let params: CallbackParams = serde_json::from_str(json).unwrap();
+        assert_eq!(params.code.as_deref(), Some(""));
+        assert_eq!(params.state.as_deref(), Some(""));
+    }
+
+    // ── random_bytes distribution sanity ───────────────────────────
+
+    #[test]
+    fn random_bytes_not_all_zeros() {
+        let bytes = random_bytes(64);
+        // Statistically impossible for 64 random bytes to all be zero
+        assert!(bytes.iter().any(|&b| b != 0));
+    }
+
+    #[test]
+    fn random_bytes_64_for_verifier() {
+        let bytes = random_bytes(64);
+        assert_eq!(bytes.len(), 64);
+        let hex = hex::encode(&bytes);
+        assert_eq!(hex.len(), 128);
+    }
+}

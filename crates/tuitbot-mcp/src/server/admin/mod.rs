@@ -280,3 +280,6 @@ impl AdminMcpServer {
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 }
+
+#[cfg(test)]
+mod tests;

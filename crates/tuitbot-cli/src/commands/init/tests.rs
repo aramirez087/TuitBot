@@ -1,6 +1,74 @@
-use super::helpers::{escape_toml, format_toml_array, parse_csv};
+use super::helpers::{capitalize, escape_toml, format_toml_array, non_empty, parse_csv};
 use super::render::render_config_toml;
 use super::wizard::WizardResult;
+use super::EXAMPLE_CONFIG;
+
+// ============================================================================
+// EXAMPLE_CONFIG validation
+// ============================================================================
+
+#[test]
+fn example_config_is_valid_toml() {
+    let _config: tuitbot_core::config::Config =
+        toml::from_str(EXAMPLE_CONFIG).expect("config.example.toml should be valid TOML");
+}
+
+#[test]
+fn example_config_has_required_sections() {
+    assert!(EXAMPLE_CONFIG.contains("[x_api]"));
+    assert!(EXAMPLE_CONFIG.contains("[business]"));
+    assert!(EXAMPLE_CONFIG.contains("[llm]"));
+    assert!(EXAMPLE_CONFIG.contains("[scoring]"));
+    assert!(EXAMPLE_CONFIG.contains("[limits]"));
+    assert!(EXAMPLE_CONFIG.contains("[intervals]"));
+    assert!(EXAMPLE_CONFIG.contains("[storage]"));
+    assert!(EXAMPLE_CONFIG.contains("[schedule]"));
+}
+
+#[test]
+fn example_config_has_sensible_defaults() {
+    let config: tuitbot_core::config::Config =
+        toml::from_str(EXAMPLE_CONFIG).expect("config.example.toml should parse");
+    assert!(config.scoring.threshold <= 100);
+    assert!(config.limits.max_replies_per_day > 0);
+    assert!(config.limits.min_action_delay_seconds <= config.limits.max_action_delay_seconds);
+    assert!(config.schedule.active_hours_start <= 23);
+    assert!(config.schedule.active_hours_end <= 23);
+    assert!(config.storage.retention_days > 0);
+}
+
+#[test]
+fn example_config_is_not_empty() {
+    assert!(!EXAMPLE_CONFIG.is_empty());
+    assert!(
+        EXAMPLE_CONFIG.len() > 100,
+        "config.example.toml seems too small"
+    );
+}
+
+// ============================================================================
+// Helper function edge cases
+// ============================================================================
+
+#[test]
+fn capitalize_unicode() {
+    // Unicode characters should not panic
+    let result = capitalize("uber");
+    assert_eq!(result, "Uber");
+}
+
+#[test]
+fn non_empty_only_spaces_returns_none() {
+    assert_eq!(non_empty("   \t  ".to_string()), None);
+}
+
+#[test]
+fn non_empty_newline_returns_trimmed() {
+    assert_eq!(
+        non_empty("\n hello \n".to_string()),
+        Some("hello".to_string())
+    );
+}
 
 #[test]
 fn parse_csv_basic() {

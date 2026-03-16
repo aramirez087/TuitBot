@@ -272,4 +272,207 @@ mod tests {
 
         assert!(links.is_empty());
     }
+
+    // -----------------------------------------------------------------------
+    // Additional provenance coverage tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn get_links_for_nonexistent_entity() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let links = get_links_for(&pool, account_id, "approval_queue", 9999)
+            .await
+            .expect("get");
+        assert!(links.is_empty());
+    }
+
+    #[tokio::test]
+    async fn delete_links_for_nonexistent() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let deleted = delete_links_for(&pool, account_id, "approval_queue", 9999)
+            .await
+            .expect("delete");
+        assert_eq!(deleted, 0);
+    }
+
+    #[tokio::test]
+    async fn copy_links_for_nonexistent_source() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let copied = copy_links_for(
+            &pool,
+            account_id,
+            "approval_queue",
+            9999,
+            "original_tweet",
+            1,
+        )
+        .await
+        .expect("copy");
+        assert_eq!(copied, 0);
+    }
+
+    #[tokio::test]
+    async fn insert_links_with_source_and_snippet() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let refs = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: Some("notes/full.md".to_string()),
+            heading_path: Some("# Full > ## Path".to_string()),
+            snippet: Some("Full snippet text".to_string()),
+        }];
+
+        insert_links_for(&pool, account_id, "scheduled_content", 100, &refs)
+            .await
+            .expect("insert");
+
+        let links = get_links_for(&pool, account_id, "scheduled_content", 100)
+            .await
+            .expect("get");
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].source_path.as_deref(), Some("notes/full.md"));
+        assert_eq!(links[0].heading_path.as_deref(), Some("# Full > ## Path"));
+        assert_eq!(links[0].snippet.as_deref(), Some("Full snippet text"));
+        assert_eq!(links[0].entity_type, "scheduled_content");
+        assert_eq!(links[0].entity_id, 100);
+    }
+
+    #[tokio::test]
+    async fn insert_links_with_no_optional_fields() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let refs = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: None,
+            heading_path: None,
+            snippet: None,
+        }];
+
+        insert_links_for(&pool, account_id, "thread", 50, &refs)
+            .await
+            .expect("insert");
+
+        let links = get_links_for(&pool, account_id, "thread", 50)
+            .await
+            .expect("get");
+
+        assert_eq!(links.len(), 1);
+        assert!(links[0].node_id.is_none());
+        assert!(links[0].source_path.is_none());
+        assert!(links[0].snippet.is_none());
+    }
+
+    #[tokio::test]
+    async fn multiple_entities_independent() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let refs_a = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: Some("a.md".to_string()),
+            heading_path: None,
+            snippet: None,
+        }];
+
+        let refs_b = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: Some("b.md".to_string()),
+            heading_path: None,
+            snippet: None,
+        }];
+
+        insert_links_for(&pool, account_id, "approval_queue", 1, &refs_a)
+            .await
+            .expect("insert a");
+        insert_links_for(&pool, account_id, "approval_queue", 2, &refs_b)
+            .await
+            .expect("insert b");
+
+        let links_a = get_links_for(&pool, account_id, "approval_queue", 1)
+            .await
+            .expect("get a");
+        let links_b = get_links_for(&pool, account_id, "approval_queue", 2)
+            .await
+            .expect("get b");
+
+        assert_eq!(links_a.len(), 1);
+        assert_eq!(links_b.len(), 1);
+        assert_eq!(links_a[0].source_path.as_deref(), Some("a.md"));
+        assert_eq!(links_b[0].source_path.as_deref(), Some("b.md"));
+    }
+
+    #[tokio::test]
+    async fn delete_only_target_entity() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        insert_links_for(&pool, account_id, "approval_queue", 1, &sample_refs())
+            .await
+            .expect("insert 1");
+        insert_links_for(&pool, account_id, "approval_queue", 2, &sample_refs())
+            .await
+            .expect("insert 2");
+
+        delete_links_for(&pool, account_id, "approval_queue", 1)
+            .await
+            .expect("delete");
+
+        // Entity 1 should be gone, entity 2 should remain
+        let links_1 = get_links_for(&pool, account_id, "approval_queue", 1)
+            .await
+            .expect("get 1");
+        let links_2 = get_links_for(&pool, account_id, "approval_queue", 2)
+            .await
+            .expect("get 2");
+
+        assert!(links_1.is_empty());
+        assert_eq!(links_2.len(), 2);
+    }
+
+    #[test]
+    fn provenance_ref_serde_roundtrip() {
+        let pref = ProvenanceRef {
+            node_id: Some(1),
+            chunk_id: None,
+            seed_id: Some(5),
+            source_path: Some("test.md".to_string()),
+            heading_path: None,
+            snippet: Some("hello".to_string()),
+        };
+
+        let json = serde_json::to_string(&pref).expect("serialize");
+        let deserialized: ProvenanceRef = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.node_id, Some(1));
+        assert_eq!(deserialized.chunk_id, None);
+        assert_eq!(deserialized.seed_id, Some(5));
+    }
+
+    #[test]
+    fn provenance_ref_deserialize_defaults() {
+        // Empty JSON object should deserialize with all None
+        let pref: ProvenanceRef = serde_json::from_str("{}").expect("deserialize");
+        assert!(pref.node_id.is_none());
+        assert!(pref.chunk_id.is_none());
+        assert!(pref.seed_id.is_none());
+        assert!(pref.source_path.is_none());
+        assert!(pref.heading_path.is_none());
+        assert!(pref.snippet.is_none());
+    }
 }

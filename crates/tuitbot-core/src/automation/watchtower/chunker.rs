@@ -217,3 +217,207 @@ pub async fn chunk_pending_nodes(pool: &DbPool, account_id: &str, limit: u32) ->
 
     chunked
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Simple markdown document ────────────────────────────────────
+
+    #[test]
+    fn chunk_simple_markdown() {
+        let body = "First paragraph.\n\nSecond paragraph.\n";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 1);
+        assert_eq!(frags[0].heading_path, "");
+        assert!(frags[0].text.contains("First paragraph"));
+        assert!(frags[0].text.contains("Second paragraph"));
+    }
+
+    // ── Splits on headings ──────────────────────────────────────────
+
+    #[test]
+    fn chunk_splits_on_headings() {
+        let body = "\
+## Introduction
+
+Welcome to the guide.
+
+## Getting Started
+
+Install the CLI tool.
+
+## Advanced Usage
+
+Use the `--verbose` flag.
+";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 3);
+        assert_eq!(frags[0].heading_path, "## Introduction");
+        assert!(frags[0].text.contains("Welcome"));
+        assert_eq!(frags[1].heading_path, "## Getting Started");
+        assert!(frags[1].text.contains("Install"));
+        assert_eq!(frags[2].heading_path, "## Advanced Usage");
+        assert!(frags[2].text.contains("--verbose"));
+    }
+
+    // ── Empty input ─────────────────────────────────────────────────
+
+    #[test]
+    fn chunk_empty_input_returns_empty() {
+        assert!(extract_fragments("").is_empty());
+    }
+
+    #[test]
+    fn chunk_whitespace_only_returns_empty() {
+        assert!(extract_fragments("   \n\n\t\n  ").is_empty());
+    }
+
+    // ── Long text without headings stays as single fragment ─────────
+
+    #[test]
+    fn chunk_long_text_single_fragment() {
+        let long = "word ".repeat(500);
+        let frags = extract_fragments(&long);
+        assert_eq!(frags.len(), 1);
+        assert_eq!(frags[0].heading_path, "");
+        assert_eq!(frags[0].index, 0);
+    }
+
+    // ── Heading hierarchy preserved ─────────────────────────────────
+
+    #[test]
+    fn chunk_heading_hierarchy_preserved() {
+        let body = "\
+# Top Level
+
+Intro text.
+
+## Section One
+
+Content one.
+
+### Subsection A
+
+Deep content A.
+
+### Subsection B
+
+Deep content B.
+
+## Section Two
+
+Content two.
+";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 5);
+        assert_eq!(frags[0].heading_path, "# Top Level");
+        assert_eq!(frags[1].heading_path, "# Top Level/## Section One");
+        assert_eq!(
+            frags[2].heading_path,
+            "# Top Level/## Section One/### Subsection A"
+        );
+        assert_eq!(
+            frags[3].heading_path,
+            "# Top Level/## Section One/### Subsection B"
+        );
+        assert_eq!(frags[4].heading_path, "# Top Level/## Section Two");
+    }
+
+    // ── Root text before any heading ────────────────────────────────
+
+    #[test]
+    fn chunk_root_text_before_heading() {
+        let body = "Preamble text.\n\n## Heading\n\nBody.\n";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 2);
+        assert_eq!(frags[0].heading_path, "");
+        assert!(frags[0].text.contains("Preamble"));
+        assert_eq!(frags[1].heading_path, "## Heading");
+    }
+
+    // ── Code blocks do not create headings ──────────────────────────
+
+    #[test]
+    fn chunk_code_block_headings_ignored() {
+        let body = "\
+## Real Heading
+
+Some text.
+
+```markdown
+# This is inside a code block
+## Also inside
+```
+
+More text after code.
+";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 1);
+        assert_eq!(frags[0].heading_path, "## Real Heading");
+        assert!(frags[0].text.contains("# This is inside a code block"));
+        assert!(frags[0].text.contains("More text after code"));
+    }
+
+    // ── Consecutive headings with no body skip empty fragments ──────
+
+    #[test]
+    fn chunk_consecutive_headings_skip_empty() {
+        let body = "## A\n## B\n## C\nFinal content.\n";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 1);
+        assert_eq!(frags[0].heading_path, "## C");
+        assert!(frags[0].text.contains("Final content"));
+    }
+
+    // ── Index values are sequential ─────────────────────────────────
+
+    #[test]
+    fn chunk_indices_sequential() {
+        let body = "Intro.\n\n## A\n\nA text.\n\n## B\n\nB text.\n\n## C\n\nC text.\n";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 4);
+        for (i, frag) in frags.iter().enumerate() {
+            assert_eq!(frag.index, i, "fragment {i} should have index {i}");
+        }
+    }
+
+    // ── H6 heading level works ──────────────────────────────────────
+
+    #[test]
+    fn chunk_h6_heading() {
+        let body = "###### Deep Heading\n\nDeep content.\n";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 1);
+        assert_eq!(frags[0].heading_path, "###### Deep Heading");
+    }
+
+    // ── Heading level reset pops stack correctly ────────────────────
+
+    #[test]
+    fn chunk_heading_level_reset() {
+        let body = "\
+### Level 3
+
+Content at 3.
+
+## Level 2
+
+Content at 2.
+";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 2);
+        assert_eq!(frags[0].heading_path, "### Level 3");
+        assert_eq!(frags[1].heading_path, "## Level 2");
+    }
+
+    // ── Fragment text is trimmed ────────────────────────────────────
+
+    #[test]
+    fn chunk_fragment_text_trimmed() {
+        let body = "## Heading\n\n\n   Some text.   \n\n\n";
+        let frags = extract_fragments(body);
+        assert_eq!(frags.len(), 1);
+        assert_eq!(frags[0].text, "Some text.");
+    }
+}
