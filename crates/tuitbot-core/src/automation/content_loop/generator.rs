@@ -4,7 +4,7 @@
 //! on [`ContentLoop`], plus the free functions used by the scheduler.
 
 use super::{ContentLoop, ContentResult, EXPLOIT_RATIO};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 impl ContentLoop {
     /// Generate a tweet and post it (or print in dry-run mode).
@@ -115,7 +115,7 @@ impl ContentLoop {
         rng: &mut impl rand::Rng,
     ) -> String {
         if let Some(scorer) = &self.topic_scorer {
-            let roll: f64 = rng.gen();
+            let roll: f64 = rng.random();
             if roll < EXPLOIT_RATIO {
                 // Exploit: try to pick from top-performing topics
                 if let Ok(top_topics) = scorer.get_top_topics(10).await {
@@ -259,7 +259,7 @@ mod tests {
     fn pick_topic_avoids_recent() {
         let topics = make_topics();
         let mut recent = vec!["Rust".to_string(), "CLI tools".to_string()];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..20 {
             let topic = super::pick_topic(&topics, &mut recent, &mut rng);
@@ -272,7 +272,7 @@ mod tests {
     fn pick_topic_clears_when_all_recent() {
         let topics = make_topics();
         let mut recent = topics.clone();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = super::pick_topic(&topics, &mut recent, &mut rng);
         assert!(topics.contains(&topic));
@@ -389,7 +389,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = content
             .pick_topic_epsilon_greedy(&mut recent, &mut rng)
@@ -538,7 +538,7 @@ mod tests {
     fn pick_topic_single_topic() {
         let topics = vec!["Only".to_string()];
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = super::pick_topic(&topics, &mut recent, &mut rng);
         assert_eq!(topic, "Only");
@@ -548,7 +548,7 @@ mod tests {
     fn pick_topic_rotates_through_all() {
         let topics = vec!["A".to_string(), "B".to_string()];
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // First pick: one of A or B
         let first = super::pick_topic(&topics, &mut recent, &mut rng);

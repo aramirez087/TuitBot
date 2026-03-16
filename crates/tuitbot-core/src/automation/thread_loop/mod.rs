@@ -107,7 +107,7 @@ pub(super) fn pick_topic(
     recent: &mut Vec<String>,
     rng: &mut impl rand::Rng,
 ) -> String {
-    use rand::seq::SliceRandom;
+    use rand::seq::IndexedRandom;
     let available: Vec<&String> = topics.iter().filter(|t| !recent.contains(t)).collect();
 
     if available.is_empty() {
@@ -394,7 +394,7 @@ mod tests_pick_topic {
     fn pick_avoids_recent() {
         let topics = vec!["A".to_string(), "B".to_string(), "C".to_string()];
         let mut recent = vec!["A".to_string(), "B".to_string()];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..20 {
             let topic = pick_topic(&topics, &mut recent, &mut rng);
@@ -406,7 +406,7 @@ mod tests_pick_topic {
     fn pick_clears_when_all_recent() {
         let topics = vec!["A".to_string(), "B".to_string()];
         let mut recent = vec!["A".to_string(), "B".to_string()];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = pick_topic(&topics, &mut recent, &mut rng);
         assert!(topics.contains(&topic));
@@ -417,7 +417,7 @@ mod tests_pick_topic {
     fn pick_single_topic() {
         let topics = vec!["Only".to_string()];
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = pick_topic(&topics, &mut recent, &mut rng);
         assert_eq!(topic, "Only");
@@ -427,7 +427,7 @@ mod tests_pick_topic {
     fn pick_rotates_through_all() {
         let topics = vec!["X".to_string(), "Y".to_string(), "Z".to_string()];
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let mut seen = std::collections::HashSet::new();
         for _ in 0..100 {

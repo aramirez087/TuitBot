@@ -6,7 +6,7 @@
 use super::super::schedule::{apply_slot_jitter, schedule_gate, ActiveSchedule};
 use super::super::scheduler::LoopScheduler;
 use super::{ContentLoop, ContentResult};
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::SeedableRng;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -40,7 +40,7 @@ impl ContentLoop {
             .max(min_recent)
             .min(self.topics.len());
         let mut recent_topics: Vec<String> = Vec::with_capacity(max_recent);
-        let mut rng = rand::rngs::StdRng::from_entropy();
+        let mut rng = rand::rngs::StdRng::from_rng(&mut rand::rng());
 
         loop {
             if cancel.is_cancelled() {
@@ -202,7 +202,7 @@ impl ContentLoop {
                 if self.topics.is_empty() {
                     return ContentResult::NoTopics;
                 }
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 self.topics
                     .choose(&mut rng)
                     .expect("topics is non-empty")
@@ -392,7 +392,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::TooSoon { .. }));
     }
@@ -419,7 +419,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(storage.posted_count(), 1);
@@ -634,7 +634,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(storage.posted_count(), 1);
@@ -661,7 +661,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::RateLimited));
     }
@@ -685,7 +685,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::RateLimited));
     }
@@ -709,7 +709,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(recent.len(), 1);
@@ -735,7 +735,7 @@ mod tests {
 
         let mut recent = vec!["A".to_string(), "B".to_string(), "C".to_string()];
         let max_recent = 3;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content
             .run_slot_iteration(&mut recent, max_recent, &mut rng)
             .await;
@@ -766,7 +766,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(recent.len(), 1);

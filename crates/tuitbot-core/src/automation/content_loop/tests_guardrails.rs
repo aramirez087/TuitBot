@@ -712,7 +712,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(storage.posted_count(), 1);
@@ -737,7 +737,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::RateLimited));
     }
@@ -760,7 +760,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_slot_iteration(&mut recent, 3, &mut rng).await;
         match result {
             ContentResult::Posted { topic, content } => {
@@ -793,7 +793,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         match result {
             ContentResult::Posted { topic, .. } => {

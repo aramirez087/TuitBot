@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn reply_archetype_all_variants_reachable() {
         use std::collections::HashSet;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut seen = HashSet::new();
         for _ in 0..10_000 {
             seen.insert(ReplyArchetype::select(&mut rng).to_string());
@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn tweet_format_all_variants_reachable() {
         use std::collections::HashSet;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut seen = HashSet::new();
         let recent: Vec<TweetFormat> = vec![];
         for _ in 0..10_000 {
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn thread_structure_all_variants_reachable() {
         use std::collections::HashSet;
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut seen = HashSet::new();
         for _ in 0..10_000 {
             seen.insert(ThreadStructure::select(&mut rng).to_string());
@@ -457,7 +457,7 @@ mod tests {
 
     #[test]
     fn tweet_format_select_single_available() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // Put 6 of 7 in recent — only Storytelling remains.
         let recent = vec![
             TweetFormat::List,
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn tweet_format_empty_recent() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let format = TweetFormat::select(&[], &mut rng);
         assert!(TweetFormat::ALL.contains(&format));
     }

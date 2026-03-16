@@ -299,7 +299,7 @@ pub(super) mod test_mocks {
         pub fn low_roll() -> Self {
             Self {
                 first_u64: Some(0),
-                inner: rand::thread_rng(),
+                inner: rand::rng(),
             }
         }
 
@@ -307,7 +307,7 @@ pub(super) mod test_mocks {
         pub fn high_roll() -> Self {
             Self {
                 first_u64: Some(u64::MAX),
-                inner: rand::thread_rng(),
+                inner: rand::rng(),
             }
         }
     }
@@ -325,9 +325,6 @@ pub(super) mod test_mocks {
         }
         fn fill_bytes(&mut self, dest: &mut [u8]) {
             self.inner.fill_bytes(dest);
-        }
-        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-            self.inner.try_fill_bytes(dest)
         }
     }
 
