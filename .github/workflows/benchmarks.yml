@@ -58,7 +58,7 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Rust Benchmarks
-          tool: cargo
+          tool: criterionrs
           output-file-path: bench-output/rust.txt
           # Alert when a benchmark regresses by more than 10% vs stored baseline.
           alert-threshold: '110%'
