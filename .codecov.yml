@@ -1,0 +1,27 @@
+# Codecov configuration for TuitBot
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        # Don't fail PRs just for coverage drops < 1 %
+        threshold: 1%
+    patch:
+      default:
+        # Require new code in PRs to have ≥ 60 % line coverage
+        target: 60%
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+
+flags:
+  rust:
+    paths:
+      - crates/
+    carryforward: true
+  frontend:
+    paths:
+      - dashboard/src/
+    carryforward: true
