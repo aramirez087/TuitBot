@@ -1,17 +1,11 @@
 version: 2
 updates:
-  # ── Rust / Cargo ──────────────────────────────────────────────────────────
+  # Rust workspace (root Cargo.toml)
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    allow:
-      - dependency-type: "direct"
-    reviewers:
-      - "aramirez087"
     labels:
       - "dependencies"
       - "rust"
@@ -19,18 +13,25 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 10
 
-  # ── Node.js / dashboard ───────────────────────────────────────────────────
+  # GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 10
+
+  # SvelteKit dashboard (dashboard/)
   - package-ecosystem: "npm"
     directory: "/dashboard"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    allow:
-      - dependency-type: "direct"
-    reviewers:
-      - "aramirez087"
     labels:
       - "dependencies"
       - "frontend"
@@ -38,38 +39,15 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 10
 
-  # ── Node.js / openclaw plugin ─────────────────────────────────────────────
+  # OpenClaw plugin (plugins/openclaw-tuitbot/)
   - package-ecosystem: "npm"
     directory: "/plugins/openclaw-tuitbot"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    allow:
-      - dependency-type: "direct"
-    reviewers:
-      - "aramirez087"
     labels:
       - "dependencies"
       - "plugin"
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 5
-
-  # ── GitHub Actions ────────────────────────────────────────────────────────
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    reviewers:
-      - "aramirez087"
-    labels:
-      - "dependencies"
-      - "ci"
-    commit-message:
-      prefix: "chore(deps)"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10

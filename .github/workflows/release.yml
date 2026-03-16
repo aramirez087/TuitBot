@@ -3,12 +3,19 @@ name: Release
 on:
   push:
     branches: [main]
+    tags:
+      - 'app-v*'  # Desktop app releases
   workflow_dispatch:
     inputs:
       release_tag:
         description: Existing CLI or server release tag to backfill assets for
         required: false
         type: string
+      build_desktop:
+        description: Manually trigger desktop build (for app-v* tags)
+        required: false
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -61,7 +68,7 @@ jobs:
       release_version: ${{ steps.release-meta.outputs.version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -70,7 +77,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -195,7 +202,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -204,7 +211,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -252,7 +259,7 @@ jobs:
             archive_ext: zip
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.release.outputs.release_tag }}
 
@@ -292,7 +299,7 @@ jobs:
         run: cargo build --locked --release --package tuitbot-cli --target ${{ matrix.target }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -370,14 +377,14 @@ jobs:
           Compress-Archive -Path dist/server-package/* -DestinationPath "dist/tuitbot-server-$env:TARGET.zip" -Force
 
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuitbot-${{ matrix.target }}
           path: dist/tuitbot-${{ matrix.target }}.${{ matrix.archive_ext }}
           if-no-files-found: error
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuitbot-server-${{ matrix.target }}
           path: dist/tuitbot-server-${{ matrix.target }}.${{ matrix.archive_ext }}
@@ -394,7 +401,7 @@ jobs:
       contents: write
     steps:
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: tuitbot-*
           merge-multiple: true
@@ -487,6 +494,36 @@ jobs:
               --repo "$GH_REPO"
           fi
 
+      - name: Import GPG key
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          echo "$GPG_PRIVATE_KEY" | gpg --import --batch --no-tty
+          # Configure git to use GPG for signing (optional; for future signed commits)
+          git config --global user.signingkey $(gpg --list-keys --with-colons | grep fpr | head -1 | cut -d: -f10)
+
+      - name: Sign release artifacts with GPG
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cd dist
+          # Sign each artifact with detached signature (.asc)
+          for artifact in *; do
+            if [ -f "$artifact" ] && [[ "$artifact" != *.asc ]]; then
+              echo "Signing $artifact..."
+              gpg --batch --no-tty --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+                --detach-sign --armor "$artifact" || \
+                echo "Warning: Failed to sign $artifact (GPG may not be configured)"
+            fi
+          done
+          ls -la *.asc 2>/dev/null | wc -l | xargs echo "Generated signatures:"
+
       - name: Upload assets to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -494,4 +531,63 @@ jobs:
           TAG: ${{ needs.release.outputs.release_tag }}
         run: |
           set -euo pipefail
+          # Upload all artifacts (binaries + signatures)
           gh release upload "$TAG" dist/* --clobber --repo "$GH_REPO"
+
+  # ── Desktop app build (Tauri) — triggered on app-v* tags ──
+  build-desktop:
+    name: Build desktop app (${{ matrix.target }})
+    if: startsWith(github.ref, 'refs/tags/app-v') || github.event.inputs.build_desktop == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry and Tauri build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            dashboard/src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.target }}-tauri-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-tauri-
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: cd dashboard && npm ci
+
+      - name: Build Tauri app
+        run: cd dashboard && npm run tauri build -- --target ${{ matrix.target }}
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tuitbot-desktop-${{ matrix.target }}
+          path: dashboard/src-tauri/target/${{ matrix.target }}/release/bundle/
+          retention-days: 30

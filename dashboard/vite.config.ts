@@ -23,5 +23,21 @@ export default defineConfig(({ mode }) => ({
 	},
 	define: {
 		__DEV_API_TOKEN__: JSON.stringify(mode === 'development' ? readDevToken() : '')
+	},
+	test: {
+		// Vitest config — runs unit tests outside SvelteKit's SSR context.
+		// Uses jsdom so Svelte components can mount without a real browser.
+		environment: 'jsdom',
+		globals: true,
+		include: ['src/**/*.{test,spec}.{js,ts}'],
+		coverage: {
+			// v8 provider is fast and requires no extra instrumentation.
+			provider: 'v8',
+			reporter: ['text', 'lcov', 'json-summary'],
+			// lcov.info is what codecov parses; written to coverage/ by default.
+			reportsDirectory: './coverage',
+			include: ['src/**/*.{js,ts,svelte}'],
+			exclude: ['src/**/*.{test,spec}.{js,ts}', 'src/app.d.ts']
+		}
 	}
 }));

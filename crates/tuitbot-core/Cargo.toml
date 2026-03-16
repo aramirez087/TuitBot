@@ -1,6 +1,6 @@
 [package]
 name = "tuitbot-core"
-version = "0.1.31"
+version = "0.1.32"
 edition = "2021"
 rust-version = "1.75"
 description = "Core library for Tuitbot autonomous X growth assistant"
@@ -49,12 +49,8 @@ tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 wiremock = "0.6"
 tokio-test = "0.4"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { workspace = true }
 
 [[bench]]
-name = "scoring_bench"
-harness = false
-
-[[bench]]
-name = "content_bench"
+name = "core_operations"
 harness = false

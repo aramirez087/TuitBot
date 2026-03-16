@@ -1,4 +1,7 @@
-name: Build Desktop App
+# ⚠️ DEPRECATED: This workflow has been consolidated into release.yml
+# For desktop app builds triggered on app-v* tags, see release.yml build-desktop job.
+# This file is kept for backward compatibility; delete after migration complete.
+name: Build Desktop App (DEPRECATED)
 on:
   push:
     tags: ['app-v*']
@@ -20,9 +23,9 @@ jobs:
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -31,7 +34,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry and build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -54,7 +57,7 @@ jobs:
         run: cd dashboard && npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuitbot-desktop-${{ matrix.target }}
           path: dashboard/src-tauri/target/${{ matrix.target }}/release/bundle/
