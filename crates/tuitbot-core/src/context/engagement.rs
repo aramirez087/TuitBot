@@ -371,3 +371,323 @@ fn build_policy_considerations(
 
     policies
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::init_test_db;
+
+    // ============================================================
+    // decide_action tests
+    // ============================================================
+
+    #[test]
+    fn decide_action_blocked() {
+        let (action, confidence) = decide_action(100.0, true);
+        assert_eq!(action, "skip");
+        assert!((confidence - 0.95).abs() < 0.01);
+    }
+
+    #[test]
+    fn decide_action_high_score_reply() {
+        let (action, confidence) = decide_action(80.0, false);
+        assert_eq!(action, "reply");
+        assert!(confidence >= 0.6);
+        assert!(confidence <= 0.95);
+    }
+
+    #[test]
+    fn decide_action_medium_score_observe() {
+        let (action, confidence) = decide_action(50.0, false);
+        assert_eq!(action, "observe");
+        assert!(confidence >= 0.4);
+        assert!(confidence <= 0.8);
+    }
+
+    #[test]
+    fn decide_action_low_score_skip() {
+        let (action, confidence) = decide_action(20.0, false);
+        assert_eq!(action, "skip");
+        assert!(confidence >= 0.5);
+    }
+
+    #[test]
+    fn decide_action_boundary_65() {
+        let (action, _) = decide_action(65.0, false);
+        assert_eq!(action, "reply");
+    }
+
+    #[test]
+    fn decide_action_boundary_40() {
+        let (action, _) = decide_action(40.0, false);
+        assert_eq!(action, "observe");
+    }
+
+    #[test]
+    fn decide_action_boundary_39() {
+        let (action, _) = decide_action(39.0, false);
+        assert_eq!(action, "skip");
+    }
+
+    // ============================================================
+    // evaluate_campaign tests
+    // ============================================================
+
+    #[test]
+    fn campaign_no_objective() {
+        let mut factors = Vec::new();
+        let score = evaluate_campaign("Some tweet about rust programming", None, &mut factors);
+        assert_eq!(score, 50.0);
+        assert_eq!(factors.len(), 1);
+        assert_eq!(factors[0].signal, "neutral");
+    }
+
+    #[test]
+    fn campaign_empty_objective() {
+        let mut factors = Vec::new();
+        let score = evaluate_campaign("Some tweet", Some(""), &mut factors);
+        assert_eq!(score, 50.0);
+    }
+
+    #[test]
+    fn campaign_strong_alignment() {
+        let mut factors = Vec::new();
+        let score = evaluate_campaign(
+            "Rust async programming with tokio runtime is great",
+            Some("Rust async programming tokio runtime"),
+            &mut factors,
+        );
+        assert_eq!(score, 90.0);
+        assert_eq!(factors.last().unwrap().signal, "positive");
+    }
+
+    #[test]
+    fn campaign_partial_alignment() {
+        let mut factors = Vec::new();
+        let score = evaluate_campaign(
+            "I love rust programming today",
+            Some("Rust programming excellence"),
+            &mut factors,
+        );
+        assert!(score >= 60.0);
+        assert_eq!(factors.last().unwrap().signal, "neutral");
+    }
+
+    #[test]
+    fn campaign_no_alignment() {
+        let mut factors = Vec::new();
+        let score = evaluate_campaign(
+            "The weather is nice today",
+            Some("Rust programming async tokio"),
+            &mut factors,
+        );
+        assert_eq!(score, 20.0);
+        assert_eq!(factors.last().unwrap().signal, "negative");
+    }
+
+    // ============================================================
+    // evaluate_capacity tests
+    // ============================================================
+
+    #[test]
+    fn capacity_at_limit() {
+        let mut factors = Vec::new();
+        let mut blocked = false;
+        let score = evaluate_capacity(50, 50, &mut factors, &mut blocked);
+        assert_eq!(score, 0.0);
+        assert!(blocked);
+    }
+
+    #[test]
+    fn capacity_over_80_percent() {
+        let mut factors = Vec::new();
+        let mut blocked = false;
+        let score = evaluate_capacity(42, 50, &mut factors, &mut blocked);
+        assert_eq!(score, 30.0);
+        assert!(!blocked);
+    }
+
+    #[test]
+    fn capacity_under_80_percent() {
+        let mut factors = Vec::new();
+        let mut blocked = false;
+        let score = evaluate_capacity(10, 50, &mut factors, &mut blocked);
+        assert_eq!(score, 100.0);
+        assert!(!blocked);
+    }
+
+    #[test]
+    fn capacity_empty() {
+        let mut factors = Vec::new();
+        let mut blocked = false;
+        let score = evaluate_capacity(0, 50, &mut factors, &mut blocked);
+        assert_eq!(score, 100.0);
+        assert!(!blocked);
+    }
+
+    // ============================================================
+    // evaluate_relationship tests
+    // ============================================================
+
+    #[test]
+    fn relationship_no_prior_interaction() {
+        let mut factors = Vec::new();
+        let ctx = author::AuthorContext {
+            author_username: "test".to_string(),
+            author_id: None,
+            interaction_summary: author::InteractionSummary {
+                total_replies_sent: 0,
+                replies_today: 0,
+                first_interaction: None,
+                last_interaction: None,
+                distinct_days_active: 0,
+            },
+            conversation_history: vec![],
+            topic_affinity: vec![],
+            risk_signals: vec![],
+            response_metrics: author::ResponseMetrics {
+                replies_with_engagement: 0,
+                replies_measured: 0,
+                response_rate: 0.0,
+                avg_performance_score: 0.0,
+            },
+        };
+        let score = evaluate_relationship(&ctx, &mut factors);
+        assert_eq!(score, 50.0);
+    }
+
+    #[test]
+    fn relationship_good_engagement() {
+        let mut factors = Vec::new();
+        let ctx = author::AuthorContext {
+            author_username: "test".to_string(),
+            author_id: None,
+            interaction_summary: author::InteractionSummary {
+                total_replies_sent: 5,
+                replies_today: 1,
+                first_interaction: Some("2026-01-01".to_string()),
+                last_interaction: Some("2026-03-01".to_string()),
+                distinct_days_active: 3,
+            },
+            conversation_history: vec![],
+            topic_affinity: vec![],
+            risk_signals: vec![],
+            response_metrics: author::ResponseMetrics {
+                replies_with_engagement: 3,
+                replies_measured: 5,
+                response_rate: 0.6,
+                avg_performance_score: 70.0,
+            },
+        };
+        let score = evaluate_relationship(&ctx, &mut factors);
+        assert_eq!(score, 90.0);
+    }
+
+    #[test]
+    fn relationship_no_engagement() {
+        let mut factors = Vec::new();
+        let ctx = author::AuthorContext {
+            author_username: "test".to_string(),
+            author_id: None,
+            interaction_summary: author::InteractionSummary {
+                total_replies_sent: 3,
+                replies_today: 0,
+                first_interaction: Some("2026-01-01".to_string()),
+                last_interaction: Some("2026-02-01".to_string()),
+                distinct_days_active: 2,
+            },
+            conversation_history: vec![],
+            topic_affinity: vec![],
+            risk_signals: vec![],
+            response_metrics: author::ResponseMetrics {
+                replies_with_engagement: 0,
+                replies_measured: 3,
+                response_rate: 0.0,
+                avg_performance_score: 10.0,
+            },
+        };
+        let score = evaluate_relationship(&ctx, &mut factors);
+        assert_eq!(score, 30.0);
+    }
+
+    // ============================================================
+    // build_policy_considerations tests
+    // ============================================================
+
+    #[test]
+    fn policy_empty_when_ok() {
+        let config = Config::default();
+        let policies = build_policy_considerations(&config, 0, 50, 0, 5);
+        // May or may not have approval_mode depending on default config
+        assert!(policies
+            .iter()
+            .all(|p| p.policy != "daily_rate_limit" && p.policy != "per_author_limit"));
+    }
+
+    #[test]
+    fn policy_daily_limit_blocked() {
+        let config = Config::default();
+        let policies = build_policy_considerations(&config, 50, 50, 0, 5);
+        assert!(policies
+            .iter()
+            .any(|p| p.policy == "daily_rate_limit" && p.status == "blocked"));
+    }
+
+    #[test]
+    fn policy_daily_limit_warning() {
+        let config = Config::default();
+        let policies = build_policy_considerations(&config, 42, 50, 0, 5);
+        assert!(policies
+            .iter()
+            .any(|p| p.policy == "daily_rate_limit" && p.status == "warning"));
+    }
+
+    #[test]
+    fn policy_per_author_blocked() {
+        let config = Config::default();
+        let policies = build_policy_considerations(&config, 0, 50, 5, 5);
+        assert!(policies
+            .iter()
+            .any(|p| p.policy == "per_author_limit" && p.status == "blocked"));
+    }
+
+    // ============================================================
+    // Full integration test
+    // ============================================================
+
+    #[tokio::test]
+    async fn recommend_engagement_fresh_author() {
+        let pool = init_test_db().await.expect("init db");
+        let config = Config::default();
+
+        let rec =
+            recommend_engagement(&pool, "nobody", "Check out this rust crate!", None, &config)
+                .await
+                .expect("recommend");
+        assert!(!rec.recommended_action.is_empty());
+        assert!(rec.confidence > 0.0);
+        assert!(!rec.contributing_factors.is_empty());
+    }
+
+    #[tokio::test]
+    async fn recommend_engagement_with_campaign() {
+        let pool = init_test_db().await.expect("init db");
+        let config = Config::default();
+
+        let rec = recommend_engagement(
+            &pool,
+            "nobody",
+            "Rust async tokio runtime performance",
+            Some("Build awareness for Rust async programming tools"),
+            &config,
+        )
+        .await
+        .expect("recommend");
+        assert!(!rec.recommended_action.is_empty());
+        // Should have campaign alignment factor
+        assert!(rec
+            .contributing_factors
+            .iter()
+            .any(|f| f.factor == "campaign_alignment"));
+    }
+}

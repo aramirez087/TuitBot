@@ -728,4 +728,225 @@ mod tests {
     fn truncate_long_string() {
         assert_eq!(truncate("hello world this is long", 10), "hello worl...");
     }
+
+    #[test]
+    fn truncate_exact_length() {
+        assert_eq!(truncate("hello", 5), "hello");
+    }
+
+    #[test]
+    fn update_max_id_from_none() {
+        let mut max = None;
+        update_max_id(&mut max, "42");
+        assert_eq!(max, Some("42".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_longer_id_wins() {
+        // A longer numeric string is always larger
+        let mut max = Some("99".to_string());
+        update_max_id(&mut max, "100");
+        assert_eq!(max, Some("100".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_shorter_id_loses() {
+        let mut max = Some("100".to_string());
+        update_max_id(&mut max, "99");
+        assert_eq!(max, Some("100".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_equal_length_comparison() {
+        let mut max = Some("200".to_string());
+        update_max_id(&mut max, "199");
+        assert_eq!(max, Some("200".to_string()));
+
+        update_max_id(&mut max, "201");
+        assert_eq!(max, Some("201".to_string()));
+    }
+
+    #[test]
+    fn update_max_id_same_id_no_change() {
+        let mut max = Some("100".to_string());
+        update_max_id(&mut max, "100");
+        assert_eq!(max, Some("100".to_string()));
+    }
+
+    #[test]
+    fn truncate_unicode_boundary() {
+        // Truncation at byte boundary may cut a multi-byte char; verify no panic
+        let s = "hello world";
+        let result = truncate(s, 7);
+        assert_eq!(result, "hello w...");
+    }
+
+    #[test]
+    fn truncate_one_char() {
+        assert_eq!(truncate("hello", 1), "h...");
+    }
+
+    #[test]
+    fn truncate_zero_len() {
+        assert_eq!(truncate("hello", 0), "...");
+    }
+
+    #[test]
+    fn mentions_loop_new_sets_dry_run() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: Vec::new(),
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            true,
+        );
+        assert!(mentions_loop.dry_run);
+    }
+
+    #[test]
+    fn mentions_loop_new_sets_not_dry_run() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: Vec::new(),
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        assert!(!mentions_loop.dry_run);
+    }
+
+    #[tokio::test]
+    async fn run_once_with_since_id_passthrough() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![test_tweet("200", "carol")],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hey".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, since_id) = mentions_loop
+            .run_once(Some("150"), None, &storage)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(since_id, Some("200".to_string()));
+    }
+
+    #[tokio::test]
+    async fn run_once_limit_zero_processes_none() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![test_tweet("100", "alice")],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, since_id) = mentions_loop
+            .run_once(None, Some(0), &storage)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+        assert!(since_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn run_once_posting_failure_returns_failed() {
+        struct FailingPoster;
+
+        #[async_trait::async_trait]
+        impl PostSender for FailingPoster {
+            async fn send_reply(&self, _tweet_id: &str, _content: &str) -> Result<(), LoopError> {
+                Err(LoopError::Other("network error".to_string()))
+            }
+        }
+
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![test_tweet("100", "alice")],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hi".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(FailingPoster),
+            false, // not dry_run — will actually try to post
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, _) = mentions_loop.run_once(None, None, &storage).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(&results[0], MentionResult::Failed { error, .. } if error.contains("network error"))
+        );
+    }
+
+    #[tokio::test]
+    async fn run_once_multiple_mentions_tracks_max_id() {
+        let mentions_loop = MentionsLoop::new(
+            Arc::new(MockFetcher {
+                mentions: vec![
+                    test_tweet("50", "alice"),
+                    test_tweet("200", "bob"),
+                    test_tweet("100", "carol"),
+                ],
+            }),
+            Arc::new(MockGenerator {
+                reply_prefix: "Hey".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            Arc::new(MockPoster::new()),
+            false,
+        );
+        let storage: Arc<dyn LoopStorage> = Arc::new(MockStorage::new());
+
+        let (results, since_id) = mentions_loop.run_once(None, None, &storage).await.unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(since_id, Some("200".to_string()));
+    }
+
+    #[test]
+    fn mention_result_debug() {
+        let result = MentionResult::Replied {
+            tweet_id: "123".to_string(),
+            author: "alice".to_string(),
+            reply_text: "hello".to_string(),
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("Replied"));
+        assert!(debug.contains("123"));
+
+        let result = MentionResult::Skipped {
+            tweet_id: "456".to_string(),
+            reason: "already replied".to_string(),
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("Skipped"));
+
+        let result = MentionResult::Failed {
+            tweet_id: "789".to_string(),
+            error: "timeout".to_string(),
+        };
+        let debug = format!("{result:?}");
+        assert!(debug.contains("Failed"));
+    }
 }

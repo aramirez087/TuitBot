@@ -16,6 +16,10 @@ mod x_api;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_safety;
+#[cfg(test)]
+mod tests_storage;
 
 pub use llm::*;
 pub use queue::*;

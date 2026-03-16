@@ -5,16 +5,10 @@
 	import { deploymentMode } from '$lib/stores/runtime';
 	import { api } from '$lib/api';
 	import { trackFunnel } from '$lib/analytics/funnel';
-	import {
-		ExternalLink,
-		Copy,
-		Check,
-		CheckCircle2,
-		XCircle,
-		Loader2,
-		RefreshCw,
-		Sparkles
-	} from 'lucide-svelte';
+	import XApiGuide from './XApiGuide.svelte';
+	import XApiKeyForm from './XApiKeyForm.svelte';
+	import XApiConnectPanel from './XApiConnectPanel.svelte';
+	import XApiFeatureMatrix from './XApiFeatureMatrix.svelte';
 
 	const CALLBACK_URL = 'http://127.0.0.1:8080/callback';
 
@@ -33,16 +27,11 @@
 		$onboardingData.provider_backend === 'scraper' ? 'scraper' : 'x_api'
 	);
 	let isCloud = $derived($deploymentMode === 'cloud');
-
-	// Mode A: server has client_id — show hero login immediately
-	// Mode B: no server client_id — show developer setup form
 	let isHeroMode = $derived(hasServerClientId && !isCloud);
-
 	let showConnect = $derived(
 		!isHeroMode && selectedMode === 'x_api' && clientId.trim().length > 0 && !isCloud
 	);
 
-	// Poll timer reference for cleanup.
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 	$effect(() => {
@@ -53,7 +42,6 @@
 		onboardingData.updateField('client_secret', clientSecret);
 	});
 
-	// Clean up poll timer on destroy.
 	$effect(() => {
 		return () => {
 			if (pollTimer) {
@@ -82,16 +70,11 @@
 			mode: selectedMode === 'scraper' ? 'scraper' : 'api',
 			hero: isHeroMode,
 		});
-
 		try {
-			// In hero mode, no client_id is passed (server uses its in-memory value).
-			// In developer mode, pass the user-entered client_id.
 			const result = isHeroMode
 				? await api.onboarding.startAuth()
 				: await api.onboarding.startAuth(clientId.trim());
 			onboardingSession.setAuthUrl(result.authorization_url, result.state);
-
-			// Open the auth URL and handle the callback.
 			await openAuthWindow(result.authorization_url, result.state);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : 'Failed to start auth';
@@ -100,14 +83,10 @@
 		}
 	}
 
-	/** Open auth URL in Tauri's isolated OAuth webview (intercepts the
-	 *  callback and emits an event). Falls back to window.open + polling
-	 *  outside Tauri. */
 	async function openAuthWindow(url: string, oauthState: string) {
 		try {
 			const { invoke } = await import('@tauri-apps/api/core');
 			const { listen } = await import('@tauri-apps/api/event');
-
 			const unlisten = await listen<{ code: string; state: string }>(
 				'oauth-callback',
 				async (event) => {
@@ -118,16 +97,13 @@
 					}
 				}
 			);
-
 			await invoke('open_oauth_window', { url });
 		} catch {
-			// Not running in Tauri — fall back to default browser + polling.
 			window.open(url, '_blank', 'noopener');
 			startPolling();
 		}
 	}
 
-	/** Complete the OAuth token exchange and handle the connected state. */
 	async function handleOAuthCallback(code: string, state: string) {
 		try {
 			const result = await api.onboarding.completeAuth(code, state);
@@ -156,8 +132,6 @@
 					const user = status.user as OnboardingXUser;
 					onboardingSession.setConnected(user);
 					trackFunnel('onboarding:x-auth-success', { username: user.username });
-					// Persist X identity in the onboarding data store so it's
-					// included in the init payload for account provisioning.
 					onboardingData.updateField('x_user_id', user.id);
 					onboardingData.updateField('x_username', user.username);
 					onboardingData.updateField('x_display_name', user.name);
@@ -166,7 +140,6 @@
 						clearInterval(pollTimer);
 						pollTimer = null;
 					}
-					// Run inline heuristic analysis after successful OAuth.
 					runInlineAnalysis();
 				}
 			} catch {
@@ -174,7 +147,6 @@
 			}
 		}, 2000);
 
-		// Stop polling after 5 minutes to avoid infinite loops.
 		setTimeout(() => {
 			if (pollTimer) {
 				clearInterval(pollTimer);
@@ -193,135 +165,36 @@
 		analysisPhase = 'running';
 		onboardingSession.setAnalyzing(true);
 		try {
-			// Heuristic-only analysis (no LLM config yet during onboarding).
 			const result = await api.onboarding.analyzeProfile();
 			if (result.profile) {
 				onboardingData.prefillFromInference(result.profile);
-				onboardingSession.setInferredProfile(
-					result.profile,
-					result.warnings ?? []
-				);
+				onboardingSession.setInferredProfile(result.profile, result.warnings ?? []);
 				analysisPhase = 'done';
-				trackFunnel('onboarding:inline-analysis-done', {
-					status: result.status,
-				});
+				trackFunnel('onboarding:inline-analysis-done', { status: result.status });
 			} else {
 				analysisPhase = 'failed';
 			}
 		} catch {
-			// Non-fatal — user will fill profile manually.
 			analysisPhase = 'failed';
 		}
 		onboardingSession.setAnalyzing(false);
-	}
-
-	function retryAuth() {
-		onboardingSession.setError('');
-		startXAuth();
 	}
 </script>
 
 <div class="step">
 	{#if isHeroMode}
-		<!-- Mode A: Server has client_id — hero login -->
 		<h2 class="step-title">Connect Your X Account</h2>
 		<p class="step-description">
 			Sign in with X to get started. We'll analyze your profile to set up
 			Tuitbot automatically.
 		</p>
-
-		<div class="connect-section">
-			{#if $onboardingSession.x_connected && $onboardingSession.x_user}
-				<div class="connected-card">
-					{#if $onboardingSession.x_user.profile_image_url}
-						<img
-							src={$onboardingSession.x_user.profile_image_url}
-							alt=""
-							class="avatar"
-						/>
-					{:else}
-						<div class="avatar avatar-placeholder"></div>
-					{/if}
-					<div class="connected-info">
-						<span class="display-name"
-							>{$onboardingSession.x_user.name}</span
-						>
-						<span class="username"
-							>@{$onboardingSession.x_user.username}</span
-						>
-					</div>
-					<div class="connected-badge">
-						<CheckCircle2 size={18} />
-						Connected
-					</div>
-				</div>
-
-				{#if analysisPhase === 'running'}
-					<div class="analysis-status">
-						<span class="spinner"><Loader2 size={14} /></span>
-						<span>Analyzing your profile...</span>
-					</div>
-				{:else if analysisPhase === 'done'}
-					<div class="analysis-status analysis-done">
-						<Sparkles size={14} />
-						<span>Profile analyzed — fields pre-filled below.</span>
-					</div>
-				{/if}
-			{:else}
-				<div class="hero-connect">
-					{#if $onboardingSession.auth_error}
-						<div class="auth-error" role="alert">
-							{$onboardingSession.auth_error}
-						</div>
-					{/if}
-
-					<button
-						type="button"
-						class="btn-connect btn-connect-hero"
-						onclick={$onboardingSession.auth_loading ? undefined : startXAuth}
-						disabled={$onboardingSession.auth_loading}
-					>
-						{#if $onboardingSession.auth_loading}
-							<span class="spinner"><Loader2 size={18} /></span>
-							Waiting for X...
-						{:else if $onboardingSession.auth_error}
-							<RefreshCw size={18} />
-							Retry
-						{:else}
-							<svg
-								viewBox="0 0 24 24"
-								width="18"
-								height="18"
-								fill="currentColor"
-								aria-hidden="true"
-							>
-								<path
-									d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-								/>
-							</svg>
-							Login with X
-						{/if}
-					</button>
-
-					{#if $onboardingSession.auth_loading}
-						<p class="connect-hint">
-							Complete the sign-in in the window that opened, then return
-							here.
-						</p>
-					{/if}
-				</div>
-
-				<button
-					type="button"
-					class="scraper-fallback"
-					onclick={() => setMode('scraper')}
-				>
-					Or continue without an X account
-				</button>
-			{/if}
-		</div>
+		<XApiConnectPanel
+			heroMode={true}
+			{analysisPhase}
+			onStartAuth={startXAuth}
+			onSetScraperMode={() => setMode('scraper')}
+		/>
 	{:else}
-		<!-- Mode B: No server client_id — developer setup -->
 		<h2 class="step-title">X Access</h2>
 		<p class="step-description">Choose how Tuitbot connects to X.</p>
 
@@ -363,193 +236,22 @@
 		{/if}
 
 		{#if selectedMode === 'x_api' || isCloud}
-			<div class="setup-guide">
-				<p class="guide-heading">Quick setup (~2 minutes)</p>
-				<ol class="guide-steps">
-					<li>
-						Go to the <a
-							href="https://developer.x.com/en/portal/dashboard"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="link"
-							>X Developer Portal <ExternalLink size={10} /></a
-						> and create a Project &amp; App (or select an existing one)
-					</li>
-					<li>
-						Under <strong>User authentication settings</strong>, enable OAuth 2.0
-					</li>
-					<li>
-						Set App type to <strong>Native App</strong> and paste this as your Callback
-						URL:
-						<span class="callback-url">
-							<code>{CALLBACK_URL}</code>
-							<button
-								class="copy-btn"
-								onclick={copyCallbackUrl}
-								title="Copy to clipboard"
-							>
-								{#if copied}
-									<Check size={13} />
-								{:else}
-									<Copy size={13} />
-								{/if}
-							</button>
-						</span>
-					</li>
-					<li>Copy the <strong>Client ID</strong> from the "Keys and tokens" tab</li>
-				</ol>
-			</div>
-
-			<div class="fields">
-				<div class="field">
-					<label class="field-label" for="client-id"
-						>Client ID <span class="required">*</span></label
-					>
-					<input
-						id="client-id"
-						type="text"
-						class="field-input"
-						placeholder="Your OAuth 2.0 Client ID"
-						bind:value={clientId}
-					/>
-				</div>
-
-				<div class="field">
-					<label class="field-label" for="client-secret"
-						>Client Secret <span class="optional">(optional)</span></label
-					>
-					<input
-						id="client-secret"
-						type="password"
-						class="field-input"
-						placeholder="For confidential clients only"
-						bind:value={clientSecret}
-					/>
-					<span class="field-hint"
-						>Only needed for confidential OAuth clients. Most users can skip this.</span
-					>
-				</div>
-			</div>
-
+			<XApiGuide
+				callbackUrl={CALLBACK_URL}
+				{copied}
+				onCopy={copyCallbackUrl}
+			/>
+			<XApiKeyForm bind:clientId bind:clientSecret />
 			{#if showConnect}
-				<div class="connect-section">
-					{#if $onboardingSession.x_connected && $onboardingSession.x_user}
-						<div class="connected-card">
-							{#if $onboardingSession.x_user.profile_image_url}
-								<img
-									src={$onboardingSession.x_user.profile_image_url}
-									alt=""
-									class="avatar"
-								/>
-							{:else}
-								<div class="avatar avatar-placeholder"></div>
-							{/if}
-							<div class="connected-info">
-								<span class="display-name"
-									>{$onboardingSession.x_user.name}</span
-								>
-								<span class="username"
-									>@{$onboardingSession.x_user.username}</span
-								>
-							</div>
-							<div class="connected-badge">
-								<CheckCircle2 size={18} />
-								Connected
-							</div>
-						</div>
-
-						{#if analysisPhase === 'running'}
-							<div class="analysis-status">
-								<span class="spinner"><Loader2 size={14} /></span>
-								<span>Analyzing your profile...</span>
-							</div>
-						{:else if analysisPhase === 'done'}
-							<div class="analysis-status analysis-done">
-								<Sparkles size={14} />
-								<span>Profile analyzed — fields pre-filled below.</span>
-							</div>
-						{/if}
-					{:else}
-						<div class="connect-prompt">
-							<p class="connect-heading">Connect your X account</p>
-							<p class="connect-desc">
-								Sign in with X to speed up setup. We'll pre-fill your profile
-								info from your account.
-							</p>
-
-							{#if $onboardingSession.auth_error}
-								<div class="auth-error" role="alert">
-									{$onboardingSession.auth_error}
-								</div>
-							{/if}
-
-							<button
-								type="button"
-								class="btn-connect"
-								onclick={$onboardingSession.auth_loading ? undefined : startXAuth}
-								disabled={$onboardingSession.auth_loading}
-							>
-								{#if $onboardingSession.auth_loading}
-									<span class="spinner"><Loader2 size={16} /></span>
-									Waiting for X...
-								{:else if $onboardingSession.auth_error}
-									<RefreshCw size={16} />
-									Retry
-								{:else}
-									<svg
-										viewBox="0 0 24 24"
-										width="16"
-										height="16"
-										fill="currentColor"
-										aria-hidden="true"
-									>
-										<path
-											d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-										/>
-									</svg>
-									Continue with X
-								{/if}
-							</button>
-
-							{#if $onboardingSession.auth_loading}
-								<p class="connect-hint">
-									Complete the sign-in in the window that opened, then return
-									here.
-								</p>
-							{/if}
-
-							<p class="connect-skip">
-								You can skip this and connect later in Settings.
-							</p>
-						</div>
-					{/if}
-				</div>
+				<XApiConnectPanel
+					heroMode={false}
+					{analysisPhase}
+					onStartAuth={startXAuth}
+					onSetScraperMode={() => setMode('scraper')}
+				/>
 			{/if}
 		{:else}
-			<div class="feature-matrix">
-				<p class="matrix-heading">What you can do</p>
-				<ul class="matrix-list">
-					<li class="available"><CheckCircle2 size={14} /> Search and discover tweets</li>
-					<li class="available">
-						<CheckCircle2 size={14} /> Score conversations for relevance
-					</li>
-					<li class="available">
-						<CheckCircle2 size={14} /> Draft replies and original content
-					</li>
-					<li class="available">
-						<CheckCircle2 size={14} /> Plan and preview threads
-					</li>
-					<li class="unavailable">
-						<XCircle size={14} /> Post tweets and replies
-					</li>
-					<li class="unavailable">
-						<XCircle size={14} /> Mentions and home timeline
-					</li>
-				</ul>
-				<p class="matrix-footer">
-					You can switch to the Official X API anytime in Settings.
-				</p>
-			</div>
+			<XApiFeatureMatrix />
 		{/if}
 	{/if}
 </div>
@@ -647,397 +349,6 @@
 	.mode-desc {
 		font-size: 13px;
 		color: var(--color-text-muted);
-		line-height: 1.4;
-	}
-
-	.link {
-		color: var(--color-accent);
-		text-decoration: none;
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.link:hover {
-		text-decoration: underline;
-	}
-
-	.fields {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.field-label {
-		font-size: 13px;
-		font-weight: 500;
-		color: var(--color-text);
-	}
-
-	.required {
-		color: var(--color-danger);
-	}
-
-	.optional {
-		font-weight: 400;
-		color: var(--color-text-subtle);
-	}
-
-	.field-input {
-		padding: 8px 12px;
-		background: var(--color-base);
-		border: 1px solid var(--color-border);
-		border-radius: 6px;
-		color: var(--color-text);
-		font-size: 13px;
-		transition: border-color 0.15s;
-	}
-
-	.field-input:focus {
-		outline: none;
-		border-color: var(--color-accent);
-	}
-
-	.field-input::placeholder {
-		color: var(--color-text-subtle);
-	}
-
-	.field-hint {
-		font-size: 12px;
-		color: var(--color-text-subtle);
-	}
-
-	.setup-guide {
-		background: var(--color-base);
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		padding: 14px 16px;
-	}
-
-	.guide-heading {
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		margin: 0 0 10px;
-	}
-
-	.guide-steps {
-		margin: 0;
-		padding-left: 20px;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		font-size: 13px;
-		color: var(--color-text-muted);
-		line-height: 1.5;
-	}
-
-	.guide-steps strong {
-		color: var(--color-text);
-	}
-
-	.callback-url {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		margin-top: 4px;
-	}
-
-	.callback-url code {
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-		border-radius: 4px;
-		padding: 3px 8px;
-		font-size: 12px;
-		color: var(--color-accent);
-		font-family: monospace;
-		user-select: all;
-	}
-
-	.copy-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding: 3px;
-		background: transparent;
-		border: 1px solid var(--color-border);
-		border-radius: 4px;
-		color: var(--color-text-subtle);
-		cursor: pointer;
-		transition:
-			color 0.15s,
-			border-color 0.15s;
-	}
-
-	.copy-btn:hover {
-		color: var(--color-accent);
-		border-color: var(--color-accent);
-	}
-
-	/* --- Hero connect (Mode A) --- */
-
-	.hero-connect {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 14px;
-		padding: 32px 24px;
-		background: var(--color-base);
-		border: 1px solid var(--color-border);
-		border-radius: 10px;
-	}
-
-	.btn-connect-hero {
-		padding: 14px 32px;
-		font-size: 16px;
-		border-radius: 10px;
-		align-self: center;
-	}
-
-	.scraper-fallback {
-		background: none;
-		border: none;
-		color: var(--color-text-subtle);
-		font-size: 13px;
-		cursor: pointer;
-		padding: 4px 0;
-		transition: color 0.15s;
-	}
-
-	.scraper-fallback:hover {
-		color: var(--color-text-muted);
-		text-decoration: underline;
-	}
-
-	/* --- Connect with X section --- */
-
-	.connect-section {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-top: 4px;
-	}
-
-	.connect-prompt {
-		background: var(--color-base);
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		padding: 16px;
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-
-	.connect-heading {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--color-text);
-		margin: 0;
-	}
-
-	.connect-desc {
-		font-size: 13px;
-		color: var(--color-text-muted);
-		line-height: 1.4;
-		margin: 0;
-	}
-
-	.btn-connect {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		padding: 10px 20px;
-		background: var(--color-text);
-		color: var(--color-base);
-		border: none;
-		border-radius: 8px;
-		font-size: 14px;
-		font-weight: 500;
-		cursor: pointer;
-		transition:
-			opacity 0.15s,
-			transform 0.1s;
-		align-self: flex-start;
-	}
-
-	.btn-connect:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-
-	.btn-connect:active:not(:disabled) {
-		transform: scale(0.98);
-	}
-
-	.btn-connect:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.connect-hint {
-		font-size: 12px;
-		color: var(--color-text-muted);
-		margin: 0;
-		font-style: italic;
-		text-align: center;
-	}
-
-	.connect-skip {
-		font-size: 12px;
-		color: var(--color-text-subtle);
-		margin: 0;
-	}
-
-	.auth-error {
-		padding: 8px 12px;
-		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-		border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
-		border-radius: 6px;
-		color: var(--color-danger);
-		font-size: 13px;
-	}
-
-	/* --- Analysis status --- */
-
-	.analysis-status {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 10px 14px;
-		background: color-mix(in srgb, var(--color-accent) 6%, var(--color-base));
-		border: 1px solid color-mix(in srgb, var(--color-accent) 20%, var(--color-border));
-		border-radius: 8px;
-		font-size: 13px;
-		color: var(--color-text-muted);
-	}
-
-	.analysis-done {
-		background: color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--color-base));
-		border-color: color-mix(in srgb, var(--color-success, #22c55e) 25%, var(--color-border));
-		color: var(--color-success, #22c55e);
-	}
-
-	/* --- Connected state --- */
-
-	.connected-card {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 14px 16px;
-		background: color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--color-base));
-		border: 1px solid color-mix(in srgb, var(--color-success, #22c55e) 25%, var(--color-border));
-		border-radius: 8px;
-	}
-
-	.avatar {
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		object-fit: cover;
-		flex-shrink: 0;
-	}
-
-	.avatar-placeholder {
-		background: var(--color-surface);
-		border: 1px solid var(--color-border);
-	}
-
-	.connected-info {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		flex: 1;
-		min-width: 0;
-	}
-
-	.display-name {
-		font-size: 14px;
-		font-weight: 500;
-		color: var(--color-text);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.username {
-		font-size: 13px;
-		color: var(--color-text-muted);
-	}
-
-	.connected-badge {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--color-success, #22c55e);
-		flex-shrink: 0;
-	}
-
-	.spinner {
-		display: inline-flex;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.feature-matrix {
-		background: var(--color-base);
-		border: 1px solid var(--color-border);
-		border-radius: 8px;
-		padding: 14px 16px;
-	}
-
-	.matrix-heading {
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		margin: 0 0 10px;
-	}
-
-	.matrix-list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.matrix-list li {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: 13px;
-		line-height: 1.4;
-	}
-
-	.matrix-list li.available {
-		color: var(--color-success, #22c55e);
-	}
-
-	.matrix-list li.unavailable {
-		color: var(--color-text-subtle);
-	}
-
-	.matrix-footer {
-		margin: 12px 0 0;
-		font-size: 12px;
-		color: var(--color-text-subtle);
 		line-height: 1.4;
 	}
 </style>

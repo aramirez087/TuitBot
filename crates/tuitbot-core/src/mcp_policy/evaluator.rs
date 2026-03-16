@@ -213,3 +213,83 @@ impl McpPolicyEvaluator {
         rate_limits::record_policy_rate_limits(pool, tool_name, &category, rate_limit_configs).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── PolicyDenialReason::Display ───────────────────────────────────────
+
+    #[test]
+    fn denial_reason_display_tool_blocked() {
+        assert_eq!(PolicyDenialReason::ToolBlocked.to_string(), "tool_blocked");
+    }
+
+    #[test]
+    fn denial_reason_display_rate_limited() {
+        assert_eq!(PolicyDenialReason::RateLimited.to_string(), "rate_limited");
+    }
+
+    #[test]
+    fn denial_reason_display_hard_rule() {
+        assert_eq!(PolicyDenialReason::HardRule.to_string(), "hard_rule");
+    }
+
+    #[test]
+    fn denial_reason_display_user_rule() {
+        assert_eq!(PolicyDenialReason::UserRule.to_string(), "user_rule");
+    }
+
+    // ── PolicyDecision equality / patterns ───────────────────────────────
+
+    #[test]
+    fn policy_decision_allow_eq() {
+        assert_eq!(PolicyDecision::Allow, PolicyDecision::Allow);
+    }
+
+    #[test]
+    fn policy_decision_dry_run_pattern() {
+        let d = PolicyDecision::DryRun {
+            rule_id: Some("r1".to_string()),
+        };
+        assert!(matches!(d, PolicyDecision::DryRun { .. }));
+    }
+
+    #[test]
+    fn policy_decision_route_to_approval_pattern() {
+        let d = PolicyDecision::RouteToApproval {
+            reason: "needs review".to_string(),
+            rule_id: None,
+        };
+        assert!(matches!(d, PolicyDecision::RouteToApproval { .. }));
+    }
+
+    #[test]
+    fn policy_decision_deny_pattern() {
+        let d = PolicyDecision::Deny {
+            reason: PolicyDenialReason::ToolBlocked,
+            rule_id: None,
+        };
+        assert!(matches!(
+            d,
+            PolicyDecision::Deny {
+                reason: PolicyDenialReason::ToolBlocked,
+                ..
+            }
+        ));
+    }
+
+    // ── PolicyDenialReason equality ───────────────────────────────────────
+
+    #[test]
+    fn denial_reason_eq() {
+        assert_eq!(
+            PolicyDenialReason::RateLimited,
+            PolicyDenialReason::RateLimited
+        );
+        assert_ne!(
+            PolicyDenialReason::ToolBlocked,
+            PolicyDenialReason::HardRule
+        );
+    }
+}

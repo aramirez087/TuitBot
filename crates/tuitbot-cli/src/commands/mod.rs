@@ -287,3 +287,164 @@ pub enum McpSubcommand {
     /// Guided setup for MCP-only users (Client ID → auth → register)
     Setup,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── OutputFormat ─────────────────────────────────────────────────
+
+    #[test]
+    fn output_format_from_str_json() {
+        assert_eq!(OutputFormat::from_str("json"), OutputFormat::Json);
+    }
+
+    #[test]
+    fn output_format_from_str_text() {
+        assert_eq!(OutputFormat::from_str("text"), OutputFormat::Text);
+    }
+
+    #[test]
+    fn output_format_from_str_unknown_defaults_to_text() {
+        assert_eq!(OutputFormat::from_str("xml"), OutputFormat::Text);
+        assert_eq!(OutputFormat::from_str(""), OutputFormat::Text);
+        assert_eq!(OutputFormat::from_str("JSON"), OutputFormat::Text); // case-sensitive
+    }
+
+    #[test]
+    fn output_format_is_json() {
+        assert!(OutputFormat::Json.is_json());
+        assert!(!OutputFormat::Text.is_json());
+    }
+
+    #[test]
+    fn output_format_debug_impl() {
+        // Exercises the Debug derive
+        assert_eq!(format!("{:?}", OutputFormat::Json), "Json");
+        assert_eq!(format!("{:?}", OutputFormat::Text), "Text");
+    }
+
+    #[test]
+    fn output_format_clone_and_copy() {
+        let a = OutputFormat::Json;
+        let b = a; // Copy
+        let c = a.clone(); // Clone
+        assert_eq!(a, b);
+        assert_eq!(a, c);
+    }
+
+    #[test]
+    fn output_format_eq() {
+        assert_eq!(OutputFormat::Json, OutputFormat::Json);
+        assert_eq!(OutputFormat::Text, OutputFormat::Text);
+        assert_ne!(OutputFormat::Json, OutputFormat::Text);
+    }
+
+    // ── Arg struct Debug impls ───────────────────────────────────────
+    // These exercise the derived Debug impls for coverage.
+
+    #[test]
+    fn init_args_debug() {
+        let args = InitArgs {
+            force: true,
+            non_interactive: false,
+            advanced: true,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("force: true"));
+        assert!(debug.contains("advanced: true"));
+    }
+
+    #[test]
+    fn approve_args_debug() {
+        let args = ApproveArgs {
+            list: true,
+            approve: Some(42),
+            reject: None,
+            approve_all: false,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("list: true"));
+        assert!(debug.contains("42"));
+    }
+
+    #[test]
+    fn settings_args_debug() {
+        let args = SettingsArgs {
+            show: true,
+            set: Some("key=value".to_string()),
+            category: None,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("show: true"));
+        assert!(debug.contains("key=value"));
+    }
+
+    #[test]
+    fn backup_args_debug() {
+        let args = BackupArgs {
+            output_dir: Some("/tmp".to_string()),
+            list: false,
+            prune: Some(5),
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("/tmp"));
+        assert!(debug.contains("5"));
+    }
+
+    #[test]
+    fn tick_args_debug() {
+        let args = TickArgs {
+            dry_run: true,
+            ignore_schedule: false,
+            loops: Some(vec!["discovery".to_string(), "content".to_string()]),
+            require_approval: false,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("dry_run: true"));
+        assert!(debug.contains("discovery"));
+    }
+
+    #[test]
+    fn update_args_debug() {
+        let args = UpdateArgs {
+            non_interactive: true,
+            check: false,
+            config_only: true,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("non_interactive: true"));
+        assert!(debug.contains("config_only: true"));
+    }
+
+    #[test]
+    fn upgrade_args_debug() {
+        let args = UpgradeArgs {
+            non_interactive: true,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("non_interactive: true"));
+    }
+
+    #[test]
+    fn restore_args_debug() {
+        let args = RestoreArgs {
+            backup_path: "/tmp/backup.db".to_string(),
+            force: true,
+            validate_only: false,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("/tmp/backup.db"));
+        assert!(debug.contains("force: true"));
+    }
+
+    #[test]
+    fn uninstall_args_debug() {
+        let args = UninstallArgs {
+            force: false,
+            data_only: true,
+        };
+        let debug = format!("{:?}", args);
+        assert!(debug.contains("data_only: true"));
+    }
+}

@@ -1,5 +1,8 @@
 node_modules
 
+# Coverage output (Vitest / v8)
+coverage/
+
 # Output
 .output
 .vercel
@@ -21,3 +24,4 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+dashboard/test-results/

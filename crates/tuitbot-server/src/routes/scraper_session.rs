@@ -159,3 +159,31 @@ pub async fn delete_scraper_session(
         "deleted": deleted,
     })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn import_session_request_deserializes() {
+        let json = r#"{"auth_token":"tok123","ct0":"csrf456"}"#;
+        let req: ImportSessionRequest = serde_json::from_str(json).expect("deser");
+        assert_eq!(req.auth_token, "tok123");
+        assert_eq!(req.ct0, "csrf456");
+        assert!(req.username.is_none());
+    }
+
+    #[test]
+    fn import_session_request_with_username() {
+        let json = r#"{"auth_token":"tok","ct0":"ct","username":"alice"}"#;
+        let req: ImportSessionRequest = serde_json::from_str(json).expect("deser");
+        assert_eq!(req.username.as_deref(), Some("alice"));
+    }
+
+    #[test]
+    fn import_session_request_empty_username() {
+        let json = r#"{"auth_token":"tok","ct0":"ct","username":null}"#;
+        let req: ImportSessionRequest = serde_json::from_str(json).expect("deser");
+        assert!(req.username.is_none());
+    }
+}

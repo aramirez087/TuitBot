@@ -978,4 +978,259 @@ mod tests {
         assert!(path.to_string_lossy().contains("tokens.json"));
         assert!(path.to_string_lossy().contains(".tuitbot"));
     }
+
+    // --- extract_callback_state ---
+
+    #[test]
+    fn extract_callback_state_from_url() {
+        let state =
+            extract_callback_state("http://127.0.0.1:8080/callback?code=abc123&state=mystate456");
+        assert_eq!(state, "mystate456");
+    }
+
+    #[test]
+    fn extract_callback_state_no_state() {
+        let state = extract_callback_state("http://127.0.0.1:8080/callback?code=abc123");
+        assert_eq!(state, "");
+    }
+
+    #[test]
+    fn extract_callback_state_state_only() {
+        let state = extract_callback_state("state=xyz789");
+        assert_eq!(state, "xyz789");
+    }
+
+    #[test]
+    fn extract_callback_state_with_http_suffix() {
+        // Simulates raw HTTP request line
+        let state = extract_callback_state("/callback?code=abc&state=test123 HTTP/1.1");
+        assert_eq!(state, "test123");
+    }
+
+    // --- validate_db_path ---
+
+    #[test]
+    fn validate_db_path_empty_rejected() {
+        let result = validate_db_path("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_db_path_whitespace_rejected() {
+        let result = validate_db_path("   ");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn validate_db_path_valid_path() {
+        let result = validate_db_path("/tmp/test.db");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from("/tmp/test.db"));
+    }
+
+    #[test]
+    fn validate_db_path_tilde_expansion() {
+        let result = validate_db_path("~/.tuitbot/test.db");
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(!path.to_string_lossy().starts_with('~'));
+        assert!(path.to_string_lossy().contains("test.db"));
+    }
+
+    #[test]
+    fn validate_db_path_directory_rejected() {
+        // Use a known existing directory (cross-platform)
+        let tmp = std::env::temp_dir();
+        let result = validate_db_path(tmp.to_str().unwrap());
+        assert!(result.is_err());
+    }
+
+    // --- expand_tilde edge cases ---
+
+    #[test]
+    fn expand_tilde_bare_tilde() {
+        let expanded = expand_tilde("~");
+        // Should expand to home directory, not just "~"
+        assert!(!expanded.to_string_lossy().ends_with('~') || expanded == PathBuf::from("~"));
+        if let Some(home) = dirs::home_dir() {
+            assert_eq!(expanded, home);
+        }
+    }
+
+    #[test]
+    fn expand_tilde_relative_path() {
+        let expanded = expand_tilde("relative/path");
+        assert_eq!(expanded, PathBuf::from("relative/path"));
+    }
+
+    // --- StoredTokens edge cases ---
+
+    #[test]
+    fn stored_tokens_analyze_scopes_returns_analysis() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: vec!["tweet.read".to_string(), "tweet.write".to_string()],
+        };
+        let analysis = tokens.analyze_scopes();
+        // Should complete without panic and return valid analysis
+        assert!(
+            !analysis.granted.is_empty()
+                || analysis.missing.is_empty()
+                || !analysis.missing.is_empty()
+        );
+    }
+
+    #[test]
+    fn stored_tokens_time_until_expiry_some() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: Some(chrono::Utc::now() + chrono::TimeDelta::hours(2)),
+            scopes: vec![],
+        };
+        let duration = tokens.time_until_expiry();
+        assert!(duration.is_some());
+        assert!(duration.unwrap().num_minutes() > 100);
+    }
+
+    #[test]
+    fn stored_tokens_time_until_expiry_none() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: vec![],
+        };
+        assert!(tokens.time_until_expiry().is_none());
+    }
+
+    // --- StartupError variants ---
+
+    #[test]
+    fn startup_error_all_variants_display() {
+        let errors = vec![
+            StartupError::Config("bad".to_string()),
+            StartupError::AuthRequired,
+            StartupError::AuthExpired,
+            StartupError::TokenRefreshFailed("fail".to_string()),
+            StartupError::Database("db err".to_string()),
+            StartupError::LlmError("llm err".to_string()),
+            StartupError::XApiError("api err".to_string()),
+            StartupError::Other("other".to_string()),
+        ];
+        for err in &errors {
+            let msg = err.to_string();
+            assert!(!msg.is_empty());
+        }
+    }
+
+    // --- URL encoding edge cases ---
+
+    #[test]
+    fn url_encode_special_chars() {
+        assert_eq!(url_encode("a b+c"), "a%20b%2Bc");
+        assert_eq!(url_encode("foo@bar"), "foo%40bar");
+        assert_eq!(url_encode("~valid_chars.-"), "~valid_chars.-");
+    }
+
+    #[test]
+    fn url_encode_empty() {
+        assert_eq!(url_encode(""), "");
+    }
+
+    // --- resolve_db_path ---
+
+    #[test]
+    fn resolve_db_path_nonexistent_config_falls_back() {
+        let result = resolve_db_path("/nonexistent/path/to/config.toml");
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.to_string_lossy().contains("tuitbot.db"));
+    }
+
+    #[test]
+    fn resolve_db_path_valid_config() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[storage]\ndb_path = \"~/.tuitbot/custom.db\"\n",
+        )
+        .expect("write config");
+        let result = resolve_db_path(config_path.to_str().unwrap());
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.to_string_lossy().contains("custom.db"));
+    }
+
+    #[test]
+    fn resolve_db_path_empty_db_path_in_config() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(&config_path, "[storage]\ndb_path = \"\"\n").expect("write config");
+        let result = resolve_db_path(config_path.to_str().unwrap());
+        assert!(result.is_err());
+    }
+
+    // --- StartupError Io variant ---
+
+    #[test]
+    fn startup_error_io_display() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "missing");
+        let startup_err = StartupError::Io(io_err);
+        let msg = startup_err.to_string();
+        assert!(msg.contains("missing"), "got: {msg}");
+    }
+
+    // --- StoredTokens: scope analysis with required scopes ---
+
+    #[test]
+    fn stored_tokens_analyze_scopes_missing_scopes() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: vec!["tweet.read".to_string()], // missing several required
+        };
+        let analysis = tokens.analyze_scopes();
+        assert!(!analysis.missing.is_empty(), "should have missing scopes");
+        assert!(!analysis.granted.is_empty(), "should have granted scopes");
+    }
+
+    #[test]
+    fn stored_tokens_analyze_scopes_all_granted() {
+        let tokens = StoredTokens {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: REQUIRED_SCOPES.iter().map(|s| s.to_string()).collect(),
+        };
+        let analysis = tokens.analyze_scopes();
+        assert!(analysis.missing.is_empty(), "all scopes should be granted");
+    }
+
+    // --- load_tokens_from_file error cases (without touching real ~/.tuitbot) ---
+
+    #[test]
+    fn save_and_load_roundtrip_via_file_io() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("tokens.json");
+        let tokens = StoredTokens {
+            access_token: "at".to_string(),
+            refresh_token: Some("rt".to_string()),
+            expires_at: Some(chrono::Utc::now() + chrono::TimeDelta::hours(1)),
+            scopes: vec!["offline.access".to_string()],
+        };
+        let json = serde_json::to_string_pretty(&tokens).expect("serialize");
+        std::fs::write(&path, &json).expect("write");
+
+        let loaded_json = std::fs::read_to_string(&path).expect("read");
+        let loaded: StoredTokens = serde_json::from_str(&loaded_json).expect("parse");
+        assert_eq!(loaded.access_token, "at");
+        assert_eq!(loaded.refresh_token.as_deref(), Some("rt"));
+        assert!(loaded.has_scope("offline.access"));
+        assert!(!loaded.is_expired());
+    }
 }

@@ -838,6 +838,172 @@ mod tests {
         assert!(stats.is_none());
     }
 
+    #[test]
+    fn compute_frequency_less_than_two_replies() {
+        let result = compute_frequency(
+            &Some("2026-01-01T00:00:00".to_string()),
+            &Some("2026-01-10T00:00:00".to_string()),
+            1,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn compute_frequency_none_dates() {
+        assert!(compute_frequency(&None, &Some("2026-01-10T00:00:00".to_string()), 5).is_none());
+        assert!(compute_frequency(&Some("2026-01-01T00:00:00".to_string()), &None, 5).is_none());
+    }
+
+    #[test]
+    fn compute_frequency_valid_dates() {
+        let first = Some("2026-01-01T00:00:00".to_string());
+        let last = Some("2026-01-11T00:00:00".to_string());
+        let result = compute_frequency(&first, &last, 6);
+        assert!(result.is_some());
+        // 10 days / (6-1) = 2.0 days per interaction
+        assert!((result.unwrap() - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn compute_frequency_same_date_returns_none() {
+        let date = Some("2026-01-01T00:00:00".to_string());
+        let result = compute_frequency(&date, &date, 3);
+        assert!(result.is_none()); // span = 0
+    }
+
+    #[test]
+    fn compute_frequency_invalid_dates() {
+        let result = compute_frequency(
+            &Some("not-a-date".to_string()),
+            &Some("2026-01-10T00:00:00".to_string()),
+            5,
+        );
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn deactivate_target_account_works() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+
+        let deactivated = deactivate_target_account(&pool, "alice")
+            .await
+            .expect("deactivate");
+        assert!(deactivated);
+
+        // Should not appear in active accounts
+        let active = get_active_target_accounts(&pool).await.expect("get");
+        assert!(active.is_empty());
+    }
+
+    #[tokio::test]
+    async fn deactivate_nonexistent_account_returns_false() {
+        let pool = init_test_db().await.expect("init db");
+
+        let deactivated = deactivate_target_account(&pool, "nobody")
+            .await
+            .expect("deactivate");
+        assert!(!deactivated);
+    }
+
+    #[tokio::test]
+    async fn deactivate_already_inactive_returns_false() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+        deactivate_target_account(&pool, "alice")
+            .await
+            .expect("deactivate");
+
+        // Second deactivate should return false
+        let second = deactivate_target_account(&pool, "alice")
+            .await
+            .expect("deactivate");
+        assert!(!second);
+    }
+
+    #[tokio::test]
+    async fn get_target_account_by_username_works() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+
+        let account = get_target_account_by_username(&pool, "alice")
+            .await
+            .expect("get")
+            .expect("found");
+        assert_eq!(account.account_id, "acc_1");
+        assert_eq!(account.username, "alice");
+    }
+
+    #[tokio::test]
+    async fn get_target_account_by_username_not_found() {
+        let pool = init_test_db().await.expect("init db");
+
+        let account = get_target_account_by_username(&pool, "nobody")
+            .await
+            .expect("get");
+        assert!(account.is_none());
+    }
+
+    #[tokio::test]
+    async fn upsert_updates_username_on_conflict() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+        upsert_target_account(&pool, "acc_1", "alice_new")
+            .await
+            .expect("upsert again");
+
+        let account = get_target_account(&pool, "acc_1")
+            .await
+            .expect("get")
+            .expect("found");
+        assert_eq!(account.username, "alice_new");
+    }
+
+    #[tokio::test]
+    async fn get_target_account_not_found() {
+        let pool = init_test_db().await.expect("init db");
+
+        let account = get_target_account(&pool, "nonexistent").await.expect("get");
+        assert!(account.is_none());
+    }
+
+    #[tokio::test]
+    async fn store_target_tweet_ignore_duplicate() {
+        let pool = init_test_db().await.expect("init db");
+
+        upsert_target_account(&pool, "acc_1", "alice")
+            .await
+            .expect("upsert");
+
+        store_target_tweet(&pool, "tw_1", "acc_1", "hello", "2026-01-01", 0, 5, 80.0)
+            .await
+            .expect("store first");
+
+        // Should not error (INSERT OR IGNORE)
+        store_target_tweet(&pool, "tw_1", "acc_1", "updated", "2026-01-01", 0, 5, 90.0)
+            .await
+            .expect("store duplicate");
+    }
+
+    #[tokio::test]
+    async fn count_target_replies_today_zero() {
+        let pool = init_test_db().await.expect("init db");
+        let count = count_target_replies_today(&pool).await.expect("count");
+        assert_eq!(count, 0);
+    }
+
     #[tokio::test]
     async fn get_target_stats_returns_zero_avg_for_target_without_replies() {
         let pool = init_test_db().await.expect("init db");

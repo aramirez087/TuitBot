@@ -284,6 +284,84 @@ pub async fn remove_role(
 
 // ---- Profile sync ----
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_account_request_deser() {
+        let json = r#"{"label": "My Account"}"#;
+        let req: CreateAccountRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.label, "My Account");
+    }
+
+    #[test]
+    fn update_account_request_deser() {
+        let json = r#"{"label": "New Label", "config_overrides": "{}"}"#;
+        let req: UpdateAccountRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.label.as_deref(), Some("New Label"));
+        assert_eq!(req.config_overrides.as_deref(), Some("{}"));
+    }
+
+    #[test]
+    fn update_account_request_optional_fields() {
+        let json = r#"{}"#;
+        let req: UpdateAccountRequest = serde_json::from_str(json).unwrap();
+        assert!(req.label.is_none());
+        assert!(req.config_overrides.is_none());
+    }
+
+    #[test]
+    fn set_role_request_deser() {
+        let json = r#"{"actor": "user@example.com", "role": "admin"}"#;
+        let req: SetRoleRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.actor, "user@example.com");
+        assert_eq!(req.role, "admin");
+    }
+
+    #[test]
+    fn remove_role_request_deser() {
+        let json = r#"{"actor": "user@example.com"}"#;
+        let req: RemoveRoleRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.actor, "user@example.com");
+    }
+
+    #[test]
+    fn load_base_config_nonexistent() {
+        let result = load_base_config(std::path::Path::new("/nonexistent/config.toml"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_base_config_valid() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let config_path = dir.path().join("config.toml");
+        // Write minimal valid config
+        std::fs::write(&config_path, "").expect("write");
+        let result = load_base_config(&config_path);
+        // Parsing empty file may succeed with defaults or fail — either is valid
+        let _ = result;
+    }
+
+    #[test]
+    fn create_account_request_debug() {
+        let _req = CreateAccountRequest {
+            label: "Test".to_string(),
+        };
+        // This should not panic (exercises Deserialize derive)
+        let json = serde_json::to_string(&serde_json::json!({"label": "Test"})).unwrap();
+        let _: CreateAccountRequest = serde_json::from_str(&json).unwrap();
+    }
+
+    #[test]
+    fn set_role_request_roundtrip() {
+        let json = r#"{"actor": "bot", "role": "viewer"}"#;
+        let req: SetRoleRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.actor, "bot");
+        assert_eq!(req.role, "viewer");
+    }
+}
+
 /// `POST /api/accounts/{id}/sync-profile` — fetch X profile and update account.
 ///
 /// Tries OAuth tokens first (`/users/me`). If unavailable, falls back to

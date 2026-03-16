@@ -228,4 +228,90 @@ mod tests {
         assert!(db_path.exists());
         pool.close().await;
     }
+
+    #[test]
+    fn expand_tilde_with_home_prefix() {
+        let expanded = expand_tilde("~/some/path");
+        // Should not start with ~ anymore (unless no home dir)
+        if dirs::home_dir().is_some() {
+            assert!(!expanded.starts_with('~'));
+            assert!(expanded.ends_with("some/path"));
+        }
+    }
+
+    #[test]
+    fn expand_tilde_bare_tilde() {
+        let expanded = expand_tilde("~");
+        if let Some(home) = dirs::home_dir() {
+            assert_eq!(expanded, home.to_string_lossy().to_string());
+        }
+    }
+
+    #[test]
+    fn expand_tilde_no_tilde() {
+        let expanded = expand_tilde("/absolute/path");
+        assert_eq!(expanded, "/absolute/path");
+    }
+
+    #[test]
+    fn expand_tilde_relative_path() {
+        let expanded = expand_tilde("relative/path");
+        assert_eq!(expanded, "relative/path");
+    }
+
+    #[test]
+    fn expand_tilde_tilde_not_at_start() {
+        // ~ in the middle should not be expanded
+        let expanded = expand_tilde("/home/~user/dir");
+        assert_eq!(expanded, "/home/~user/dir");
+    }
+
+    #[tokio::test]
+    async fn init_db_empty_path_errors() {
+        let result = init_db("").await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("must not be empty"));
+    }
+
+    #[tokio::test]
+    async fn init_db_whitespace_path_errors() {
+        let result = init_db("   ").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn init_db_directory_path_errors() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let result = init_db(&dir.path().to_string_lossy()).await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("directory"));
+    }
+
+    #[tokio::test]
+    async fn init_db_creates_parent_directories() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let nested_path = dir.path().join("a").join("b").join("c").join("test.db");
+        let db_path_str = nested_path.to_string_lossy().to_string();
+
+        let pool = init_db(&db_path_str).await.expect("init db");
+        assert!(nested_path.exists());
+        pool.close().await;
+    }
+
+    #[tokio::test]
+    async fn init_db_idempotent_file_db() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        let db_path = dir.path().join("idempotent.db");
+        let db_path_str = db_path.to_string_lossy().to_string();
+
+        let pool1 = init_db(&db_path_str).await.expect("first init");
+        pool1.close().await;
+
+        // Second init on same path should succeed
+        let pool2 = init_db(&db_path_str).await.expect("second init");
+        pool2.close().await;
+    }
 }

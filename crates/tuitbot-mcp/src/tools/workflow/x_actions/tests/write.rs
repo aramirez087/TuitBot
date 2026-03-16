@@ -275,3 +275,113 @@ async fn post_tweet_dry_run_policy_blocked() {
     // Policy blocked means policy_would_allow is false
     assert_eq!(parsed["data"]["policy_would_allow"], false);
 }
+
+// ── Reply tests ─────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn reply_to_tweet_success() {
+    let state = make_state(Some(Box::new(MockXApiClient)), Some("u1".into())).await;
+    let result = reply_to_tweet(&state, "Nice!", "t1", None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["id"], "reply_1");
+}
+
+#[tokio::test]
+async fn reply_to_tweet_with_media() {
+    let state = make_state(Some(Box::new(MockXApiClient)), Some("u1".into())).await;
+    let media = vec!["m1".to_string()];
+    let result = reply_to_tweet(&state, "With image!", "t1", Some(&media)).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["id"], "reply_1");
+}
+
+// ── Not configured tests ────────────────────────────────────────────
+
+#[tokio::test]
+async fn post_tweet_not_configured() {
+    let state = make_state(None, Some("u1".into())).await;
+    let result = post_tweet(&state, "Hello!", None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn reply_to_tweet_not_configured() {
+    let state = make_state(None, Some("u1".into())).await;
+    let result = reply_to_tweet(&state, "Hello!", "t1", None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn quote_tweet_not_configured() {
+    let state = make_state(None, Some("u1".into())).await;
+    let result = quote_tweet(&state, "Hello!", "qt1", None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn delete_tweet_not_configured() {
+    let state = make_state(None, Some("u1".into())).await;
+    let result = delete_tweet(&state, "t1").await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+#[tokio::test]
+async fn post_thread_not_configured() {
+    let state = make_state(None, Some("u1".into())).await;
+    let tweets = vec!["T1".to_string(), "T2".to_string()];
+    let result = post_thread(&state, &tweets, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "x_not_configured");
+}
+
+// ── Quote tweet length validation ───────────────────────────────────
+
+#[tokio::test]
+async fn quote_tweet_too_long() {
+    let state = make_state(Some(Box::new(MockXApiClient)), Some("u1".into())).await;
+    let long_text = "a".repeat(281);
+    let result = quote_tweet(&state, &long_text, "qt1", None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "tweet_too_long");
+}
+
+// ── Policy gate on write tools ──────────────────────────────────────
+
+#[tokio::test]
+async fn reply_blocked_by_policy() {
+    let mut config = blocked_config();
+    config.mcp_policy.blocked_tools = vec!["reply_to_tweet".to_string()];
+    let state =
+        make_state_with_config(Some(Box::new(MockXApiClient)), Some("u1".into()), config).await;
+    let result = reply_to_tweet(&state, "Hello!", "t1", None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], false);
+    assert_eq!(parsed["error"]["code"], "policy_denied_blocked");
+}
+
+#[tokio::test]
+async fn thread_dry_run_policy_would_allow() {
+    let state = make_state_with_config(
+        Some(Box::new(MockXApiClient)),
+        Some("u1".into()),
+        allowed_config(),
+    )
+    .await;
+    let tweets = vec!["T1".to_string()];
+    let result = post_thread_dry_run(&state, &tweets, None).await;
+    let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+    assert_eq!(parsed["success"], true);
+    assert_eq!(parsed["data"]["policy_would_allow"], true);
+}

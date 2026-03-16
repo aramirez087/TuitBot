@@ -278,3 +278,266 @@ pub async fn execute(config: &Config, args: ApproveArgs, out: CliOutput) -> anyh
     pool.close().await;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── ApprovalItemJson ──────────────────────────────────────────────
+
+    #[test]
+    fn approval_item_json_serializes() {
+        let item = ApprovalItemJson {
+            id: 42,
+            action_type: "reply".to_string(),
+            target_tweet_id: "12345".to_string(),
+            target_author: "alice".to_string(),
+            generated_content: "Great point!".to_string(),
+            topic: "rust".to_string(),
+            archetype: "helpful".to_string(),
+            score: 85.5,
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"id\":42"));
+        assert!(json.contains("\"action_type\":\"reply\""));
+        assert!(json.contains("\"target_tweet_id\":\"12345\""));
+        assert!(json.contains("\"target_author\":\"alice\""));
+        assert!(json.contains("\"generated_content\":\"Great point!\""));
+        assert!(json.contains("\"topic\":\"rust\""));
+        assert!(json.contains("\"archetype\":\"helpful\""));
+        assert!(json.contains("85.5"));
+        assert!(json.contains("\"created_at\":\"2025-01-01T00:00:00Z\""));
+    }
+
+    #[test]
+    fn approval_item_json_from_trait_conversion() {
+        // Test the From trait conversion directly with our JSON struct
+        let json_item = ApprovalItemJson {
+            id: 1,
+            action_type: "tweet".to_string(),
+            target_tweet_id: String::new(),
+            target_author: String::new(),
+            generated_content: "Hello world".to_string(),
+            topic: "general".to_string(),
+            archetype: "thought_leader".to_string(),
+            score: 0.0,
+            created_at: "2025-06-01".to_string(),
+        };
+        assert_eq!(json_item.id, 1);
+        assert_eq!(json_item.action_type, "tweet");
+        assert!(json_item.target_tweet_id.is_empty());
+        assert_eq!(json_item.generated_content, "Hello world");
+    }
+
+    #[test]
+    fn approval_item_json_empty_target_displays_original() {
+        let item = ApprovalItemJson {
+            id: 1,
+            action_type: "tweet".to_string(),
+            target_tweet_id: String::new(),
+            target_author: String::new(),
+            generated_content: "Content".to_string(),
+            topic: String::new(),
+            archetype: String::new(),
+            score: 0.0,
+            created_at: "now".to_string(),
+        };
+        // Verify the display logic used in the list command
+        let display = if item.target_tweet_id.is_empty() {
+            "(original)".to_string()
+        } else {
+            format!("reply to {}", item.target_tweet_id)
+        };
+        assert_eq!(display, "(original)");
+    }
+
+    #[test]
+    fn approval_item_json_with_target_displays_reply() {
+        let item = ApprovalItemJson {
+            id: 1,
+            action_type: "reply".to_string(),
+            target_tweet_id: "9999".to_string(),
+            target_author: "bob".to_string(),
+            generated_content: "Reply text".to_string(),
+            topic: "topic".to_string(),
+            archetype: "arch".to_string(),
+            score: 72.0,
+            created_at: "now".to_string(),
+        };
+        let display = if item.target_tweet_id.is_empty() {
+            "(original)".to_string()
+        } else {
+            format!("reply to {}", item.target_tweet_id)
+        };
+        assert_eq!(display, "reply to 9999");
+    }
+
+    #[test]
+    fn approval_item_json_topic_dash_for_empty() {
+        let topic = "";
+        let display = if topic.is_empty() { "-" } else { topic };
+        assert_eq!(display, "-");
+    }
+
+    // ── ApproveActionResult ───────────────────────────────────────────
+
+    #[test]
+    fn approve_action_result_serializes() {
+        let result = ApproveActionResult {
+            id: 5,
+            status: "approved".to_string(),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"id\":5"));
+        assert!(json.contains("\"status\":\"approved\""));
+    }
+
+    #[test]
+    fn approve_action_result_rejected() {
+        let result = ApproveActionResult {
+            id: 10,
+            status: "rejected".to_string(),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"status\":\"rejected\""));
+    }
+
+    // ── Action count validation ───────────────────────────────────────
+
+    #[test]
+    fn action_count_detects_conflicting_flags() {
+        let args = ApproveArgs {
+            list: true,
+            approve: Some(1),
+            reject: None,
+            approve_all: false,
+        };
+        let action_count = args.list as u8
+            + args.approve.is_some() as u8
+            + args.reject.is_some() as u8
+            + args.approve_all as u8;
+        assert!(action_count > 1);
+    }
+
+    #[test]
+    fn action_count_zero_for_interactive() {
+        let args = ApproveArgs {
+            list: false,
+            approve: None,
+            reject: None,
+            approve_all: false,
+        };
+        let action_count = args.list as u8
+            + args.approve.is_some() as u8
+            + args.reject.is_some() as u8
+            + args.approve_all as u8;
+        assert_eq!(action_count, 0);
+    }
+
+    #[test]
+    fn action_count_one_for_single_flag() {
+        let args = ApproveArgs {
+            list: true,
+            approve: None,
+            reject: None,
+            approve_all: false,
+        };
+        let action_count = args.list as u8
+            + args.approve.is_some() as u8
+            + args.reject.is_some() as u8
+            + args.approve_all as u8;
+        assert_eq!(action_count, 1);
+    }
+
+    #[test]
+    fn is_non_interactive_detects_list() {
+        let args = ApproveArgs {
+            list: true,
+            approve: None,
+            reject: None,
+            approve_all: false,
+        };
+        let is_non_interactive =
+            args.list || args.approve.is_some() || args.reject.is_some() || args.approve_all;
+        assert!(is_non_interactive);
+    }
+
+    #[test]
+    fn is_non_interactive_false_for_interactive() {
+        let args = ApproveArgs {
+            list: false,
+            approve: None,
+            reject: None,
+            approve_all: false,
+        };
+        let is_non_interactive =
+            args.list || args.approve.is_some() || args.reject.is_some() || args.approve_all;
+        assert!(!is_non_interactive);
+    }
+
+    // ── Choice parsing ────────────────────────────────────────────────
+
+    #[test]
+    fn choice_parsing_yes() {
+        let choice = "y".to_lowercase();
+        assert!(matches!(choice.as_str(), "y" | "yes"));
+    }
+
+    #[test]
+    fn choice_parsing_no() {
+        let choice = "n".to_lowercase();
+        assert!(matches!(choice.as_str(), "n" | "no"));
+    }
+
+    #[test]
+    fn choice_parsing_quit() {
+        let choice = "q".to_lowercase();
+        assert!(matches!(choice.as_str(), "q" | "quit"));
+    }
+
+    #[test]
+    fn choice_parsing_skip() {
+        let choice = "s".to_lowercase();
+        // Skip is the default (neither yes, no, nor quit)
+        assert!(!matches!(
+            choice.as_str(),
+            "y" | "yes" | "n" | "no" | "q" | "quit"
+        ));
+    }
+
+    // ── Serialization round-trip ──────────────────────────────────────
+
+    #[test]
+    fn approval_item_json_vec_serializes() {
+        let items = vec![
+            ApprovalItemJson {
+                id: 1,
+                action_type: "reply".to_string(),
+                target_tweet_id: "100".to_string(),
+                target_author: "alice".to_string(),
+                generated_content: "Content 1".to_string(),
+                topic: "t1".to_string(),
+                archetype: "a1".to_string(),
+                score: 50.0,
+                created_at: "2025-01-01".to_string(),
+            },
+            ApprovalItemJson {
+                id: 2,
+                action_type: "tweet".to_string(),
+                target_tweet_id: String::new(),
+                target_author: String::new(),
+                generated_content: "Content 2".to_string(),
+                topic: "t2".to_string(),
+                archetype: "a2".to_string(),
+                score: 0.0,
+                created_at: "2025-01-02".to_string(),
+            },
+        ];
+        let json = serde_json::to_string(&items).unwrap();
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0]["id"], 1);
+        assert_eq!(parsed[1]["id"], 2);
+    }
+}

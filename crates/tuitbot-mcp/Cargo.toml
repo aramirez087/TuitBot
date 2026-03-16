@@ -2,7 +2,7 @@
 name = "tuitbot-mcp"
 version = "0.1.35"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.80"
 description = "MCP server for Tuitbot autonomous X growth assistant"
 license = "MIT"
 repository = "https://github.com/aramirez087/TuitBot"

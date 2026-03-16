@@ -263,13 +263,15 @@ mod tests {
 
     #[tokio::test]
     async fn cooldown_to_half_open() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        // Use 500 ms cooldown (was 50 ms) so the Open→HalfOpen assertion at line
+        // +2 stays stable even under tarpaulin's instrumentation overhead.
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
 
         cb.record_error().await;
         assert_eq!(cb.state().await, BreakerState::Open);
 
         // Wait for cooldown.
-        tokio::time::sleep(Duration::from_millis(60)).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
 
         assert_eq!(cb.state().await, BreakerState::HalfOpen);
         assert!(cb.should_allow_mutation().await);
@@ -277,12 +279,12 @@ mod tests {
 
     #[tokio::test]
     async fn success_resets_to_closed() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
 
         cb.record_error().await;
         assert_eq!(cb.state().await, BreakerState::Open);
 
-        tokio::time::sleep(Duration::from_millis(60)).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
         assert_eq!(cb.state().await, BreakerState::HalfOpen);
 
         cb.record_success().await;
@@ -292,10 +294,10 @@ mod tests {
 
     #[tokio::test]
     async fn half_open_failure_reopens() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
 
         cb.record_error().await;
-        tokio::time::sleep(Duration::from_millis(60)).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
         assert_eq!(cb.state().await, BreakerState::HalfOpen);
 
         let state = cb.record_error().await;
@@ -305,14 +307,15 @@ mod tests {
 
     #[tokio::test]
     async fn sliding_window_eviction() {
-        let cb = CircuitBreaker::new(3, Duration::from_millis(100), Duration::from_secs(10));
+        // Use 1 s window / 1.2 s sleep (was 100 ms / 150 ms) for tarpaulin stability.
+        let cb = CircuitBreaker::new(3, Duration::from_millis(1000), Duration::from_secs(10));
 
         cb.record_error().await;
         cb.record_error().await;
         assert_eq!(cb.error_count().await, 2);
 
         // Wait for window to expire.
-        tokio::time::sleep(Duration::from_millis(150)).await;
+        tokio::time::sleep(Duration::from_millis(1200)).await;
 
         // Old errors evicted; this single error shouldn't trip.
         let state = cb.record_error().await;
@@ -339,7 +342,7 @@ mod tests {
 
     #[tokio::test]
     async fn wait_until_closed_returns_on_transition() {
-        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(50));
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
         cb.record_error().await;
 
         let cancel = CancellationToken::new();
@@ -362,5 +365,105 @@ mod tests {
         assert_eq!(BreakerState::Closed.to_string(), "closed");
         assert_eq!(BreakerState::Open.to_string(), "open");
         assert_eq!(BreakerState::HalfOpen.to_string(), "half_open");
+    }
+
+    #[tokio::test]
+    async fn success_in_closed_state_is_noop() {
+        let cb = CircuitBreaker::new(3, Duration::from_secs(60), Duration::from_secs(10));
+        assert_eq!(cb.state().await, BreakerState::Closed);
+
+        // Recording success in closed state should not change anything
+        cb.record_success().await;
+        assert_eq!(cb.state().await, BreakerState::Closed);
+        assert_eq!(cb.error_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn errors_while_open_accumulate() {
+        let cb = CircuitBreaker::new(2, Duration::from_secs(60), Duration::from_secs(600));
+
+        cb.record_error().await;
+        cb.record_error().await;
+        assert_eq!(cb.state().await, BreakerState::Open);
+
+        // More errors while open should not panic or change state
+        let state = cb.record_error().await;
+        assert_eq!(state, BreakerState::Open);
+        assert_eq!(cb.error_count().await, 3);
+    }
+
+    #[tokio::test]
+    async fn cooldown_remaining_zero_when_closed() {
+        let cb = CircuitBreaker::new(3, Duration::from_secs(60), Duration::from_secs(10));
+        assert_eq!(cb.cooldown_remaining_seconds().await, 0);
+    }
+
+    #[tokio::test]
+    async fn cooldown_remaining_zero_when_half_open() {
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
+        cb.record_error().await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert_eq!(cb.state().await, BreakerState::HalfOpen);
+        assert_eq!(cb.cooldown_remaining_seconds().await, 0);
+    }
+
+    #[tokio::test]
+    async fn multiple_trip_reset_cycles() {
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
+
+        // Cycle 1: trip → half-open → success → closed
+        cb.record_error().await;
+        assert_eq!(cb.state().await, BreakerState::Open);
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert_eq!(cb.state().await, BreakerState::HalfOpen);
+        cb.record_success().await;
+        assert_eq!(cb.state().await, BreakerState::Closed);
+
+        // Cycle 2: trip again
+        cb.record_error().await;
+        assert_eq!(cb.state().await, BreakerState::Open);
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert_eq!(cb.state().await, BreakerState::HalfOpen);
+
+        // Probe fails → re-opens
+        cb.record_error().await;
+        assert_eq!(cb.state().await, BreakerState::Open);
+
+        // Wait again → half-open → success → closed
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert_eq!(cb.state().await, BreakerState::HalfOpen);
+        cb.record_success().await;
+        assert_eq!(cb.state().await, BreakerState::Closed);
+        assert_eq!(cb.error_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn should_allow_mutation_half_open() {
+        let cb = CircuitBreaker::new(1, Duration::from_secs(60), Duration::from_millis(500));
+        cb.record_error().await;
+        assert!(!cb.should_allow_mutation().await);
+
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert!(cb.should_allow_mutation().await);
+    }
+
+    #[test]
+    fn breaker_state_equality() {
+        assert_eq!(BreakerState::Closed, BreakerState::Closed);
+        assert_ne!(BreakerState::Open, BreakerState::Closed);
+        assert_ne!(BreakerState::HalfOpen, BreakerState::Open);
+    }
+
+    #[test]
+    fn breaker_state_debug() {
+        let debug = format!("{:?}", BreakerState::HalfOpen);
+        assert!(debug.contains("HalfOpen"));
+    }
+
+    #[test]
+    fn breaker_state_clone_copy() {
+        let state = BreakerState::Open;
+        let cloned = state;
+        assert_eq!(state, cloned);
     }
 }

@@ -1198,3 +1198,374 @@ async fn ensure_manual_source_for_scoped() {
         .expect("ensure A again");
     assert_eq!(id_a, id_a2);
 }
+
+// ============================================================================
+// Extended watchtower tests for coverage push
+// ============================================================================
+
+#[test]
+fn source_context_from_row_fields() {
+    let row: SourceContextRow = (
+        1,
+        "acct-1".to_string(),
+        "local_fs".to_string(),
+        r#"{"path":"~/notes"}"#.to_string(),
+        Some("cursor-123".to_string()),
+        "active".to_string(),
+        None,
+        "2026-01-01T00:00:00Z".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+    );
+    let ctx = SourceContext::from_row(row);
+    assert_eq!(ctx.id, 1);
+    assert_eq!(ctx.account_id, "acct-1");
+    assert_eq!(ctx.source_type, "local_fs");
+    assert_eq!(ctx.sync_cursor.as_deref(), Some("cursor-123"));
+    assert_eq!(ctx.status, "active");
+    assert!(ctx.error_message.is_none());
+}
+
+#[test]
+fn source_context_from_row_with_error() {
+    let row: SourceContextRow = (
+        2,
+        "acct-2".to_string(),
+        "manual".to_string(),
+        "{}".to_string(),
+        None,
+        "error".to_string(),
+        Some("path not found".to_string()),
+        "2026-01-01T00:00:00Z".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+    );
+    let ctx = SourceContext::from_row(row);
+    assert_eq!(ctx.status, "error");
+    assert_eq!(ctx.error_message.as_deref(), Some("path not found"));
+}
+
+#[test]
+fn content_node_from_row_all_fields() {
+    let row: ContentNodeRow = (
+        1,
+        "acct-1".to_string(),
+        10,
+        "notes/test.md".to_string(),
+        "hash123".to_string(),
+        Some("Title".to_string()),
+        "Body text".to_string(),
+        Some(r#"{"key":"val"}"#.to_string()),
+        Some("rust,testing".to_string()),
+        "pending".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+    );
+    let node = ContentNode::from_row(row);
+    assert_eq!(node.id, 1);
+    assert_eq!(node.source_id, 10);
+    assert_eq!(node.relative_path, "notes/test.md");
+    assert_eq!(node.content_hash, "hash123");
+    assert_eq!(node.title.as_deref(), Some("Title"));
+    assert_eq!(node.body_text, "Body text");
+    assert_eq!(node.tags.as_deref(), Some("rust,testing"));
+    assert_eq!(node.status, "pending");
+}
+
+#[test]
+fn content_node_from_row_minimal() {
+    let row: ContentNodeRow = (
+        5,
+        "acct-x".to_string(),
+        1,
+        "a.md".to_string(),
+        "h".to_string(),
+        None,
+        "body".to_string(),
+        None,
+        None,
+        "processed".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+    );
+    let node = ContentNode::from_row(row);
+    assert_eq!(node.id, 5);
+    assert!(node.title.is_none());
+    assert!(node.front_matter_json.is_none());
+    assert!(node.tags.is_none());
+    assert_eq!(node.status, "processed");
+}
+
+#[test]
+fn draft_seed_from_row_all_fields() {
+    let row: DraftSeedRow = (
+        1,
+        "acct-1".to_string(),
+        10,
+        "Hook text".to_string(),
+        Some("tip".to_string()),
+        0.75,
+        "pending".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+        None,
+        Some(42),
+    );
+    let seed = DraftSeed::from_row(row);
+    assert_eq!(seed.id, 1);
+    assert_eq!(seed.node_id, 10);
+    assert_eq!(seed.seed_text, "Hook text");
+    assert_eq!(seed.archetype_suggestion.as_deref(), Some("tip"));
+    assert!((seed.engagement_weight - 0.75).abs() < 0.001);
+    assert_eq!(seed.chunk_id, Some(42));
+    assert!(seed.used_at.is_none());
+}
+
+#[test]
+fn draft_seed_from_row_minimal() {
+    let row: DraftSeedRow = (
+        2,
+        "acct-2".to_string(),
+        5,
+        "Text".to_string(),
+        None,
+        1.0,
+        "used".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+        Some("2026-01-02T00:00:00Z".to_string()),
+        None,
+    );
+    let seed = DraftSeed::from_row(row);
+    assert!(seed.archetype_suggestion.is_none());
+    assert!(seed.chunk_id.is_none());
+    assert!(seed.used_at.is_some());
+    assert_eq!(seed.status, "used");
+}
+
+#[test]
+fn content_chunk_from_row_all_fields() {
+    let row: ContentChunkRow = (
+        1,
+        "acct-1".to_string(),
+        10,
+        "## Heading".to_string(),
+        "Chunk text here".to_string(),
+        "chunk_hash_123".to_string(),
+        0,
+        1.5,
+        "active".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+    );
+    let chunk = ContentChunk::from_row(row);
+    assert_eq!(chunk.id, 1);
+    assert_eq!(chunk.node_id, 10);
+    assert_eq!(chunk.heading_path, "## Heading");
+    assert_eq!(chunk.chunk_text, "Chunk text here");
+    assert_eq!(chunk.chunk_hash, "chunk_hash_123");
+    assert_eq!(chunk.chunk_index, 0);
+    assert!((chunk.retrieval_boost - 1.5).abs() < 0.001);
+    assert_eq!(chunk.status, "active");
+}
+
+#[test]
+fn upsert_result_equality() {
+    assert_eq!(UpsertResult::Inserted, UpsertResult::Inserted);
+    assert_eq!(UpsertResult::Updated, UpsertResult::Updated);
+    assert_eq!(UpsertResult::Skipped, UpsertResult::Skipped);
+    assert_ne!(UpsertResult::Inserted, UpsertResult::Updated);
+    assert_ne!(UpsertResult::Updated, UpsertResult::Skipped);
+    assert_ne!(UpsertResult::Inserted, UpsertResult::Skipped);
+}
+
+#[test]
+fn upsert_result_debug() {
+    let debug = format!("{:?}", UpsertResult::Inserted);
+    assert!(debug.contains("Inserted"));
+    let debug = format!("{:?}", UpsertResult::Updated);
+    assert!(debug.contains("Updated"));
+    let debug = format!("{:?}", UpsertResult::Skipped);
+    assert!(debug.contains("Skipped"));
+}
+
+#[test]
+fn upsert_result_clone() {
+    let a = UpsertResult::Inserted;
+    let b = a.clone();
+    assert_eq!(a, b);
+}
+
+#[test]
+fn seed_with_context_debug() {
+    let seed = SeedWithContext {
+        seed_text: "Hook text".to_string(),
+        source_title: Some("Title".to_string()),
+        archetype_suggestion: Some("tip".to_string()),
+        engagement_weight: 0.8,
+    };
+    let debug = format!("{:?}", seed);
+    assert!(debug.contains("SeedWithContext"));
+    assert!(debug.contains("Hook text"));
+}
+
+#[test]
+fn seed_with_context_clone() {
+    let seed = SeedWithContext {
+        seed_text: "Text".to_string(),
+        source_title: None,
+        archetype_suggestion: None,
+        engagement_weight: 1.0,
+    };
+    let cloned = seed.clone();
+    assert_eq!(cloned.seed_text, seed.seed_text);
+    assert!((cloned.engagement_weight - seed.engagement_weight).abs() < 0.001);
+}
+
+#[test]
+fn chunk_with_node_context_debug() {
+    let chunk = ContentChunk::from_row((
+        1,
+        "acct".to_string(),
+        1,
+        "## H".to_string(),
+        "text".to_string(),
+        "hash".to_string(),
+        0,
+        1.0,
+        "active".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+        "2026-01-01T00:00:00Z".to_string(),
+    ));
+    let ctx = ChunkWithNodeContext {
+        chunk,
+        relative_path: "notes/test.md".to_string(),
+        source_title: Some("Test".to_string()),
+    };
+    let debug = format!("{:?}", ctx);
+    assert!(debug.contains("ChunkWithNodeContext"));
+    assert!(debug.contains("notes/test.md"));
+}
+
+#[test]
+fn chunk_with_node_context_clone() {
+    let chunk = ContentChunk::from_row((
+        1,
+        "acct".to_string(),
+        1,
+        "".to_string(),
+        "txt".to_string(),
+        "h".to_string(),
+        0,
+        1.0,
+        "active".to_string(),
+        "ts".to_string(),
+        "ts".to_string(),
+    ));
+    let ctx = ChunkWithNodeContext {
+        chunk,
+        relative_path: "a.md".to_string(),
+        source_title: None,
+    };
+    let cloned = ctx.clone();
+    assert_eq!(cloned.relative_path, "a.md");
+    assert!(cloned.source_title.is_none());
+}
+
+#[test]
+fn source_context_debug_clone_serialize() {
+    let row: SourceContextRow = (
+        1,
+        "acct".to_string(),
+        "local_fs".to_string(),
+        "{}".to_string(),
+        None,
+        "active".to_string(),
+        None,
+        "ts".to_string(),
+        "ts".to_string(),
+    );
+    let ctx = SourceContext::from_row(row);
+    let cloned = ctx.clone();
+    assert_eq!(cloned.id, ctx.id);
+
+    let debug = format!("{:?}", ctx);
+    assert!(debug.contains("SourceContext"));
+
+    let json = serde_json::to_string(&ctx).unwrap();
+    assert!(json.contains("local_fs"));
+}
+
+#[test]
+fn content_node_debug_clone_serialize() {
+    let row: ContentNodeRow = (
+        1,
+        "acct".to_string(),
+        1,
+        "a.md".to_string(),
+        "h".to_string(),
+        None,
+        "body".to_string(),
+        None,
+        None,
+        "pending".to_string(),
+        "ts".to_string(),
+        "ts".to_string(),
+    );
+    let node = ContentNode::from_row(row);
+    let cloned = node.clone();
+    assert_eq!(cloned.relative_path, "a.md");
+
+    let debug = format!("{:?}", node);
+    assert!(debug.contains("ContentNode"));
+
+    let json = serde_json::to_string(&node).unwrap();
+    assert!(json.contains("a.md"));
+}
+
+#[test]
+fn draft_seed_debug_clone_serialize() {
+    let row: DraftSeedRow = (
+        1,
+        "acct".to_string(),
+        1,
+        "text".to_string(),
+        None,
+        1.0,
+        "pending".to_string(),
+        "ts".to_string(),
+        None,
+        None,
+    );
+    let seed = DraftSeed::from_row(row);
+    let cloned = seed.clone();
+    assert_eq!(cloned.seed_text, "text");
+
+    let debug = format!("{:?}", seed);
+    assert!(debug.contains("DraftSeed"));
+
+    let json = serde_json::to_string(&seed).unwrap();
+    assert!(json.contains("text"));
+}
+
+#[test]
+fn content_chunk_debug_clone_serialize() {
+    let row: ContentChunkRow = (
+        1,
+        "acct".to_string(),
+        1,
+        "## H".to_string(),
+        "chunk".to_string(),
+        "hash".to_string(),
+        0,
+        1.0,
+        "active".to_string(),
+        "ts".to_string(),
+        "ts".to_string(),
+    );
+    let chunk = ContentChunk::from_row(row);
+    let cloned = chunk.clone();
+    assert_eq!(cloned.chunk_text, "chunk");
+
+    let debug = format!("{:?}", chunk);
+    assert!(debug.contains("ContentChunk"));
+
+    let json = serde_json::to_string(&chunk).unwrap();
+    assert!(json.contains("chunk"));
+}

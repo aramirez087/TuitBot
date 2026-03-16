@@ -213,3 +213,182 @@ pub async fn approve_all(pool: &DbPool, config: &Config, x_available: bool) -> S
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn test_pool() -> DbPool {
+        storage::init_test_db().await.expect("init db")
+    }
+
+    fn default_config() -> Config {
+        Config::default()
+    }
+
+    // ── list_pending tests ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn list_pending_empty_queue() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = list_pending(&pool, &config).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert!(parsed["data"].is_array());
+        assert_eq!(parsed["data"].as_array().unwrap().len(), 0);
+        assert!(parsed["meta"]["elapsed_ms"].is_number());
+    }
+
+    #[tokio::test]
+    async fn list_pending_has_workflow_meta() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = list_pending(&pool, &config).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        // WorkflowContext is flattened into meta, so mode is a top-level meta key.
+        assert!(parsed["meta"]["mode"].is_string());
+    }
+
+    // ── get_pending_count tests ─────────────────────────────────────
+
+    #[tokio::test]
+    async fn get_pending_count_zero() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = get_pending_count(&pool, &config).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["pending_count"], 0);
+    }
+
+    // ── approve_item tests ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn approve_item_x_unavailable_rejected() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = approve_item(&pool, 1, &config, false).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], false);
+        assert_eq!(parsed["error"]["code"], "x_not_configured");
+        assert!(parsed["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("X API client not available"));
+    }
+
+    #[tokio::test]
+    async fn approve_item_nonexistent_id() {
+        let pool = test_pool().await;
+        let config = default_config();
+        // ID 99999 does not exist, but the update_status query may not error
+        // (it just affects 0 rows). Verify it returns success or a graceful error.
+        let json = approve_item(&pool, 99999, &config, true).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        // Should succeed (0-row update is not an error in most implementations).
+        assert!(parsed["success"].is_boolean());
+    }
+
+    // ── reject_item tests ───────────────────────────────────────────
+
+    #[tokio::test]
+    async fn reject_item_nonexistent_id() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = reject_item(&pool, 99999, &config).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert!(parsed["success"].is_boolean());
+    }
+
+    // ── approve_all tests ───────────────────────────────────────────
+
+    #[tokio::test]
+    async fn approve_all_x_unavailable_rejected() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = approve_all(&pool, &config, false).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], false);
+        assert_eq!(parsed["error"]["code"], "x_not_configured");
+    }
+
+    #[tokio::test]
+    async fn approve_all_empty_queue() {
+        let pool = test_pool().await;
+        let config = default_config();
+        let json = approve_all(&pool, &config, true).await;
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["data"]["approved"], 0);
+        assert!(parsed["data"]["ids"].is_array());
+        assert_eq!(parsed["data"]["ids"].as_array().unwrap().len(), 0);
+    }
+
+    // ── item_to_out mapping test ────────────────────────────────────
+
+    fn make_approval_item(id: i64) -> storage::approval_queue::ApprovalItem {
+        storage::approval_queue::ApprovalItem {
+            id,
+            action_type: "reply".to_string(),
+            target_tweet_id: "tw123".to_string(),
+            target_author: "author1".to_string(),
+            generated_content: "Great post!".to_string(),
+            topic: "rust".to_string(),
+            archetype: "helpful".to_string(),
+            score: 0.85,
+            status: "pending".to_string(),
+            created_at: "2026-03-14T12:00:00Z".to_string(),
+            media_paths: "[]".to_string(),
+            reviewed_by: Some("admin".to_string()),
+            review_notes: Some("looks good".to_string()),
+            reason: Some("high quality".to_string()),
+            detected_risks: "[]".to_string(),
+            qa_report: "{}".to_string(),
+            qa_hard_flags: "[]".to_string(),
+            qa_soft_flags: "[]".to_string(),
+            qa_recommendations: "[]".to_string(),
+            qa_score: 95.0,
+            qa_requires_override: false,
+            qa_override_by: None,
+            qa_override_note: None,
+            qa_override_at: None,
+            source_node_id: None,
+            source_seed_id: None,
+            source_chunks_json: "[]".to_string(),
+            scheduled_for: None,
+        }
+    }
+
+    #[test]
+    fn item_to_out_maps_all_fields() {
+        let item = make_approval_item(42);
+        let out = item_to_out(&item);
+        assert_eq!(out.id, 42);
+        assert_eq!(out.action_type, "reply");
+        assert_eq!(out.target_tweet_id, "tw123");
+        assert_eq!(out.target_author, "author1");
+        assert_eq!(out.generated_content, "Great post!");
+        assert_eq!(out.topic, "rust");
+        assert_eq!(out.archetype, "helpful");
+        assert!((out.score - 0.85).abs() < f64::EPSILON);
+        assert_eq!(out.status, "pending");
+        assert_eq!(out.reviewed_by, Some("admin".to_string()));
+        assert_eq!(out.review_notes, Some("looks good".to_string()));
+        assert_eq!(out.reason, Some("high quality".to_string()));
+    }
+
+    #[test]
+    fn item_to_out_serializes_to_json() {
+        let mut item = make_approval_item(1);
+        item.action_type = "post".to_string();
+        item.reviewed_by = None;
+        item.review_notes = None;
+        item.reason = None;
+        let out = item_to_out(&item);
+        let json = serde_json::to_value(&out).expect("serializes");
+        assert_eq!(json["id"], 1);
+        assert_eq!(json["action_type"], "post");
+        assert!(json["reviewed_by"].is_null());
+    }
+}

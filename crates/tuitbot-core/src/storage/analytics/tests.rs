@@ -417,3 +417,385 @@ async fn malformed_snapshot_date_excluded() {
     assert_eq!(snapshots.len(), 1);
     assert_eq!(snapshots[0].follower_count, 1000);
 }
+
+// ============================================================================
+// Ancestors: reply engagement score + keyword-filtered queries
+// ============================================================================
+
+#[tokio::test]
+async fn update_reply_engagement_score_works() {
+    let pool = init_test_db().await.expect("init db");
+
+    upsert_reply_performance(&pool, "r1", 10, 5, 1000, 67.0)
+        .await
+        .expect("upsert");
+
+    update_reply_engagement_score(&pool, "r1", 0.72)
+        .await
+        .expect("update");
+
+    let row: (Option<f64>,) =
+        sqlx::query_as("SELECT engagement_score FROM reply_performance WHERE reply_id = ?")
+            .bind("r1")
+            .fetch_one(&pool)
+            .await
+            .expect("query");
+    assert!((row.0.unwrap() - 0.72).abs() < 0.001);
+}
+
+#[tokio::test]
+async fn get_scored_ancestors_with_topic_keywords() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    // Insert two tweets with different topics
+    sqlx::query(
+        "INSERT INTO original_tweets (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-rust', 'Rust is great for systems', 'rust', 'sent', '2026-02-27T10:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert rust tweet");
+
+    sqlx::query(
+        "INSERT INTO original_tweets (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-python', 'Python is great for AI', 'python', 'sent', '2026-02-27T11:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert python tweet");
+
+    upsert_tweet_performance(&pool, "tw-rust", 20, 10, 5, 1000, 90.0)
+        .await
+        .expect("perf rust");
+    update_tweet_engagement_score(&pool, "tw-rust", 0.9)
+        .await
+        .expect("score rust");
+
+    upsert_tweet_performance(&pool, "tw-python", 15, 8, 3, 800, 70.0)
+        .await
+        .expect("perf python");
+    update_tweet_engagement_score(&pool, "tw-python", 0.7)
+        .await
+        .expect("score python");
+
+    // Filter to rust only
+    let ancestors = get_scored_ancestors(&pool, acct, &["rust".to_string()], 0.1, 10)
+        .await
+        .expect("query");
+    assert_eq!(ancestors.len(), 1);
+    assert_eq!(ancestors[0].id, "tw-rust");
+}
+
+#[tokio::test]
+async fn get_scored_ancestors_with_reply_keyword_match() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    // Insert a reply that contains keyword in content
+    sqlx::query(
+        "INSERT INTO replies_sent \
+         (account_id, target_tweet_id, reply_tweet_id, reply_content, status, created_at) \
+         VALUES (?, 't1', 'reply-ml', 'Machine learning is transforming the field', 'sent', '2026-02-28T10:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert reply");
+
+    upsert_reply_performance(&pool, "reply-ml", 30, 15, 2000, 85.0)
+        .await
+        .expect("perf");
+    update_reply_engagement_score(&pool, "reply-ml", 0.88)
+        .await
+        .expect("score");
+
+    // Search with "learning" keyword — should match the reply content via LIKE
+    let ancestors = get_scored_ancestors(&pool, acct, &["learning".to_string()], 0.1, 10)
+        .await
+        .expect("query");
+    assert_eq!(ancestors.len(), 1);
+    assert_eq!(ancestors[0].content_type, "reply");
+    assert_eq!(ancestors[0].id, "reply-ml");
+}
+
+#[tokio::test]
+async fn get_max_performance_score_picks_highest_across_tables() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Tweet with lower score
+    upsert_tweet_performance(&pool, "tw1", 5, 2, 1, 500, 40.0)
+        .await
+        .expect("upsert tweet");
+    // Reply with higher score
+    upsert_reply_performance(&pool, "r1", 30, 15, 2000, 120.0)
+        .await
+        .expect("upsert reply");
+
+    let max = get_max_performance_score(&pool).await.expect("max");
+    assert!((max - 120.0).abs() < 0.01);
+
+    // Now add an even higher tweet
+    upsert_tweet_performance(&pool, "tw2", 100, 50, 20, 5000, 200.0)
+        .await
+        .expect("upsert tweet 2");
+
+    let max = get_max_performance_score(&pool).await.expect("max");
+    assert!((max - 200.0).abs() < 0.01);
+}
+
+// ============================================================================
+// Additional analytics coverage tests
+// ============================================================================
+
+#[tokio::test]
+async fn avg_tweet_engagement_with_data() {
+    let pool = init_test_db().await.expect("init db");
+    upsert_tweet_performance(&pool, "tw1", 10, 5, 3, 500, 82.0)
+        .await
+        .expect("upsert");
+    upsert_tweet_performance(&pool, "tw2", 20, 10, 5, 1000, 90.0)
+        .await
+        .expect("upsert");
+
+    let avg = get_avg_tweet_engagement(&pool).await.expect("avg");
+    // (82 + 90) / 2 = 86
+    assert!((avg - 86.0).abs() < 0.01);
+}
+
+#[tokio::test]
+async fn optimal_posting_times_empty() {
+    let pool = init_test_db().await.expect("init db");
+    let times = get_optimal_posting_times(&pool).await.expect("get");
+    assert!(times.is_empty());
+}
+
+#[tokio::test]
+async fn optimal_posting_times_with_data() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "00000000-0000-0000-0000-000000000000";
+
+    // Insert tweets at different hours
+    sqlx::query(
+        "INSERT INTO original_tweets \
+         (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-morning', 'Morning tweet', 'rust', 'sent', '2026-02-27T09:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert morning tweet");
+
+    sqlx::query(
+        "INSERT INTO original_tweets \
+         (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-afternoon', 'Afternoon tweet', 'rust', 'sent', '2026-02-27T15:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert afternoon tweet");
+
+    upsert_tweet_performance(&pool, "tw-morning", 20, 10, 5, 1000, 90.0)
+        .await
+        .expect("perf morning");
+    upsert_tweet_performance(&pool, "tw-afternoon", 5, 2, 1, 500, 30.0)
+        .await
+        .expect("perf afternoon");
+
+    let times = get_optimal_posting_times(&pool).await.expect("get");
+    assert_eq!(times.len(), 2);
+    // Best hour should be first (ordered by avg_engagement DESC)
+    assert!(times[0].avg_engagement >= times[1].avg_engagement);
+    assert_eq!(times[0].hour, 9);
+}
+
+#[tokio::test]
+async fn content_score_incremental_mean() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert 3 scores for the same topic/format
+    update_content_score(&pool, "testing", "tip", 60.0)
+        .await
+        .expect("score 1");
+    update_content_score(&pool, "testing", "tip", 80.0)
+        .await
+        .expect("score 2");
+    update_content_score(&pool, "testing", "tip", 100.0)
+        .await
+        .expect("score 3");
+
+    let top = get_top_topics(&pool, 10).await.expect("get");
+    assert_eq!(top.len(), 1);
+    assert_eq!(top[0].total_posts, 3);
+    // Incremental mean: (60 + 80 + 100) / 3 = 80 (approximately)
+    assert!(
+        (top[0].avg_performance - 80.0).abs() < 1.0,
+        "expected avg ~80, got {}",
+        top[0].avg_performance
+    );
+}
+
+#[tokio::test]
+async fn top_topics_respects_limit() {
+    let pool = init_test_db().await.expect("init db");
+
+    update_content_score(&pool, "topic1", "tip", 90.0)
+        .await
+        .expect("score");
+    update_content_score(&pool, "topic2", "list", 80.0)
+        .await
+        .expect("score");
+    update_content_score(&pool, "topic3", "thread", 70.0)
+        .await
+        .expect("score");
+
+    let top = get_top_topics(&pool, 2).await.expect("get");
+    assert_eq!(top.len(), 2);
+    assert_eq!(top[0].topic, "topic1");
+    assert_eq!(top[1].topic, "topic2");
+}
+
+#[tokio::test]
+async fn upsert_follower_snapshot_for_updates_correctly() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Upsert twice on the same day — should update, not duplicate
+    upsert_follower_snapshot(&pool, 500, 100, 200)
+        .await
+        .expect("upsert 1");
+    upsert_follower_snapshot(&pool, 750, 150, 300)
+        .await
+        .expect("upsert 2");
+
+    let snaps = get_follower_snapshots(&pool, 10).await.expect("get");
+    assert_eq!(snaps.len(), 1);
+    assert_eq!(snaps[0].follower_count, 750);
+    assert_eq!(snaps[0].following_count, 150);
+}
+
+#[tokio::test]
+async fn upsert_reply_performance_for_account_scoped() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-reply-perf";
+
+    crate::storage::accounts::create_account(&pool, acct, "RP")
+        .await
+        .expect("create");
+
+    upsert_reply_performance_for(&pool, acct, "r-scoped", 15, 7, 500, 72.0)
+        .await
+        .expect("upsert");
+
+    // Verify via avg engagement for that account
+    let avg = get_avg_reply_engagement_for(&pool, acct)
+        .await
+        .expect("avg");
+    assert!((avg - 72.0).abs() < 0.01);
+}
+
+#[tokio::test]
+async fn upsert_tweet_performance_for_account_scoped() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-tweet-perf";
+
+    crate::storage::accounts::create_account(&pool, acct, "TP")
+        .await
+        .expect("create");
+
+    upsert_tweet_performance_for(&pool, acct, "tw-scoped", 25, 12, 6, 2000, 88.0)
+        .await
+        .expect("upsert");
+
+    let avg = get_avg_tweet_engagement_for(&pool, acct)
+        .await
+        .expect("avg");
+    assert!((avg - 88.0).abs() < 0.01);
+
+    let (replies, tweets) = get_performance_counts_for(&pool, acct)
+        .await
+        .expect("counts");
+    assert_eq!(replies, 0);
+    assert_eq!(tweets, 1);
+}
+
+#[tokio::test]
+async fn content_score_for_account_scoped() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-cscore";
+
+    crate::storage::accounts::create_account(&pool, acct, "CS")
+        .await
+        .expect("create");
+
+    update_content_score_for(&pool, acct, "go", "tip", 75.0)
+        .await
+        .expect("score");
+
+    let top = get_top_topics_for(&pool, acct, 10).await.expect("get");
+    assert_eq!(top.len(), 1);
+    assert_eq!(top[0].topic, "go");
+
+    // Default account should have no scores
+    let top_default = get_top_topics(&pool, 10).await.expect("get default");
+    assert!(top_default.is_empty());
+}
+
+#[tokio::test]
+async fn compute_performance_score_large_engagement() {
+    // High engagement relative to impressions
+    let score = compute_performance_score(100, 50, 30, 100);
+    // (100*3 + 50*5 + 30*4) / 100 * 1000 = (300+250+120)/100*1000 = 6700
+    assert!((score - 6700.0).abs() < 0.01);
+}
+
+#[tokio::test]
+async fn recent_performance_items_with_tweets_and_replies() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = DEFAULT_ACCOUNT_ID;
+
+    // Insert a tweet with performance
+    sqlx::query(
+        "INSERT INTO original_tweets \
+         (account_id, tweet_id, content, topic, status, created_at) \
+         VALUES (?, 'tw-perf', 'Great tips for testing', 'testing', 'sent', '2026-03-01T10:00:00Z')",
+    )
+    .bind(acct)
+    .execute(&pool)
+    .await
+    .expect("insert tweet");
+
+    upsert_tweet_performance(&pool, "tw-perf", 30, 15, 8, 2000, 91.0)
+        .await
+        .expect("upsert tweet perf");
+
+    // Insert a reply with performance
+    let reply = crate::storage::replies::ReplySent {
+        id: 0,
+        target_tweet_id: "t-target".to_string(),
+        reply_tweet_id: Some("r-perf".to_string()),
+        reply_content: "Excellent analysis here".to_string(),
+        llm_provider: Some("anthropic".to_string()),
+        llm_model: Some("claude-3".to_string()),
+        created_at: "2026-03-01T12:00:00Z".to_string(),
+        status: "sent".to_string(),
+        error_message: None,
+    };
+    crate::storage::replies::insert_reply(&pool, &reply)
+        .await
+        .expect("insert reply");
+    upsert_reply_performance(&pool, "r-perf", 20, 10, 1500, 78.0)
+        .await
+        .expect("upsert reply perf");
+
+    let items = get_recent_performance_items(&pool, 10).await.expect("get");
+    assert_eq!(items.len(), 2);
+    // Items are ordered by posted_at DESC
+    // The reply is at 12:00, tweet at 10:00
+    assert_eq!(items[0].content_type, "reply");
+    assert_eq!(items[1].content_type, "tweet");
+    assert_eq!(items[0].likes, 20);
+    assert_eq!(items[1].likes, 30);
+}

@@ -1,11 +1,16 @@
 <script lang="ts">
-	import { api, type ThreadBlock } from "$lib/api";
-	import { tweetWeightedLen, MAX_TWEET_CHARS } from "$lib/utils/tweetLength";
-	import * as threadOps from "$lib/utils/threadOps";
-	import { fly, fade } from "svelte/transition";
-	import { flip } from "svelte/animate";
-	import { registerTransferHandler } from "$lib/stores/mediaDrag";
-	import ThreadFlowCard from "./ThreadFlowCard.svelte";
+	import { type ThreadBlock } from '$lib/api';
+	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
+	import * as threadOps from '$lib/utils/threadOps';
+	import { fly, fade } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import { registerTransferHandler } from '$lib/stores/mediaDrag';
+	import ThreadFlowCard from './ThreadFlowCard.svelte';
+	import {
+		handleCardKeydown,
+		handlePaletteAction as laneHandlePaletteAction,
+		handleInlineAssist as laneHandleInlineAssist,
+	} from '$lib/utils/threadLaneActions';
 
 	let {
 		blocks: externalBlocks = [],
@@ -25,26 +30,19 @@
 		onfocusindexchange?: (index: number) => void;
 	} = $props();
 
-	// Stable fallback for when parent has no blocks yet
 	const fallbackBlocks = threadOps.createDefaultBlocks();
-	// Single source of truth: always derived from parent prop
-	const blocks = $derived(
-		externalBlocks.length > 0 ? externalBlocks : fallbackBlocks,
-	);
+	const blocks = $derived(externalBlocks.length > 0 ? externalBlocks : fallbackBlocks);
 
 	let focusedBlockId = $state<string | null>(null);
 	let draggingBlockId = $state<string | null>(null);
 	let dropTargetBlockId = $state<string | null>(null);
-	let reorderAnnouncement = $state("");
+	let reorderAnnouncement = $state('');
 	let mergeError = $state<string | null>(null);
 	let assistingBlockId = $state<string | null>(null);
 
 	const sortedBlocks = $derived(threadOps.sortBlocks(blocks));
 
-	const validationErrors = $derived.by(() => {
-		const result = threadOps.validateThread(blocks);
-		return result.errors;
-	});
+	const validationErrors = $derived.by(() => threadOps.validateThread(blocks).errors);
 
 	const canSubmit = $derived(
 		blocks.filter((b) => b.text.trim().length > 0).length >= 2 &&
@@ -52,11 +50,8 @@
 			blocks.every((b) => b.media_paths.length <= 4),
 	);
 
-	$effect(() => {
-		onvalidchange(canSubmit);
-	});
+	$effect(() => { onvalidchange(canSubmit); });
 
-	// Report focused block index to parent for toolbar display
 	$effect(() => {
 		if (!focusedBlockId || !onfocusindexchange) return;
 		const idx = sortedBlocks.findIndex((b) => b.id === focusedBlockId);
@@ -70,9 +65,7 @@
 			) as HTMLTextAreaElement | null;
 			if (textarea) {
 				textarea.focus();
-				if (cursorPos !== undefined) {
-					textarea.setSelectionRange(cursorPos, cursorPos);
-				}
+				if (cursorPos !== undefined) textarea.setSelectionRange(cursorPos, cursorPos);
 			}
 		});
 	}
@@ -120,9 +113,7 @@
 
 	function announce(msg: string) {
 		reorderAnnouncement = msg;
-		setTimeout(() => {
-			reorderAnnouncement = "";
-		}, 1000);
+		setTimeout(() => { reorderAnnouncement = ''; }, 1000);
 	}
 
 	function splitBlock(id: string) {
@@ -131,8 +122,7 @@
 		) as HTMLTextAreaElement | null;
 		const block = blocks.find((b) => b.id === id);
 		if (!block) return;
-		const cursorPos =
-			textarea?.selectionStart ?? Math.floor(block.text.length / 2);
+		const cursorPos = textarea?.selectionStart ?? Math.floor(block.text.length / 2);
 		const result = threadOps.splitBlockAt(blocks, id, cursorPos);
 		if (!result) return;
 		onchange(result.blocks);
@@ -144,9 +134,7 @@
 		const total = a.length + b.length;
 		if (total > 4) {
 			mergeError = `Cannot merge: combined media would exceed 4 (has ${total}).`;
-			setTimeout(() => {
-				mergeError = null;
-			}, 3000);
+			setTimeout(() => { mergeError = null; }, 3000);
 		}
 	}
 
@@ -156,10 +144,7 @@
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
 			if (idx >= sorted.length - 1 || sorted.length <= 1) return;
-			showMergeMediaError(
-				sorted[idx].media_paths,
-				sorted[idx + 1].media_paths,
-			);
+			showMergeMediaError(sorted[idx].media_paths, sorted[idx + 1].media_paths);
 			return;
 		}
 		onchange(result.blocks);
@@ -173,10 +158,7 @@
 			const sorted = threadOps.sortBlocks(blocks);
 			const idx = sorted.findIndex((b) => b.id === id);
 			if (idx <= 0 || sorted.length <= 1) return;
-			showMergeMediaError(
-				sorted[idx - 1].media_paths,
-				sorted[idx].media_paths,
-			);
+			showMergeMediaError(sorted[idx - 1].media_paths, sorted[idx].media_paths);
 			return;
 		}
 		onchange(result.blocks);
@@ -184,21 +166,11 @@
 		announce(`Posts merged. Now ${result.blocks.length} posts in thread.`);
 	}
 
-	function handleMediaTransfer(
-		targetBlockId: string,
-		mediaPath: string,
-		sourceBlockId: string,
-	) {
-		const result = threadOps.moveMediaBetweenBlocks(
-			blocks,
-			sourceBlockId,
-			targetBlockId,
-			mediaPath,
-		);
+	function handleMediaTransfer(targetBlockId: string, mediaPath: string, sourceBlockId: string) {
+		const result = threadOps.moveMediaBetweenBlocks(blocks, sourceBlockId, targetBlockId, mediaPath);
 		if (result) onchange(result);
 	}
 
-	// Register the media transfer handler so MediaSlot's mouse-based drag can call it
 	$effect(() => {
 		registerTransferHandler(handleMediaTransfer);
 		return () => registerTransferHandler(null);
@@ -207,8 +179,8 @@
 	function handleDragStart(e: DragEvent, blockId: string) {
 		draggingBlockId = blockId;
 		if (e.dataTransfer) {
-			e.dataTransfer.effectAllowed = "move";
-			e.dataTransfer.setData("text/plain", blockId);
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', blockId);
 		}
 	}
 
@@ -219,14 +191,12 @@
 
 	function handleCardDragOver(e: DragEvent, blockId: string) {
 		e.preventDefault();
-		if (draggingBlockId && draggingBlockId !== blockId)
-			dropTargetBlockId = blockId;
+		if (draggingBlockId && draggingBlockId !== blockId) dropTargetBlockId = blockId;
 	}
 
 	function handleCardDragEnter(e: DragEvent, blockId: string) {
 		e.preventDefault();
-		if (draggingBlockId && draggingBlockId !== blockId)
-			dropTargetBlockId = blockId;
+		if (draggingBlockId && draggingBlockId !== blockId) dropTargetBlockId = blockId;
 	}
 
 	function handleCardDragLeave(e: DragEvent, blockId: string) {
@@ -240,110 +210,10 @@
 	function handleCardDrop(e: DragEvent, targetBlockId: string) {
 		e.preventDefault();
 		if (!draggingBlockId || draggingBlockId === targetBlockId) return;
-		const sorted = threadOps.sortBlocks(blocks);
-		const targetIndex = sorted.findIndex((b) => b.id === targetBlockId);
+		const targetIndex = sortedBlocks.findIndex((b) => b.id === targetBlockId);
 		if (targetIndex !== -1) moveBlock(draggingBlockId, targetIndex);
 		draggingBlockId = null;
 		dropTargetBlockId = null;
-	}
-
-	function handleCardKeydown(e: KeyboardEvent, blockId: string) {
-		// Cmd+Enter: split at cursor (fast path for thread mode)
-		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "Enter") {
-			e.preventDefault();
-			e.stopPropagation();
-			const textarea = e.target as HTMLTextAreaElement;
-			const block = blocks.find((b) => b.id === blockId);
-			if (!block) return;
-			if (
-				textarea.selectionStart >= block.text.length ||
-				block.text.trim() === ""
-			) {
-				addBlockAfter(blockId);
-			} else {
-				splitBlock(blockId);
-			}
-			return;
-		}
-
-		// Backspace at position 0: merge with previous
-		if (
-			e.key === "Backspace" &&
-			!e.metaKey &&
-			!e.ctrlKey &&
-			!e.shiftKey &&
-			!e.altKey
-		) {
-			const textarea = e.target as HTMLTextAreaElement;
-			if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
-				const sorted = threadOps.sortBlocks(blocks);
-				const idx = sorted.findIndex((b) => b.id === blockId);
-				if (idx > 0 && sorted.length > 1) {
-					e.preventDefault();
-					mergeWithPrevious(blockId);
-					return;
-				}
-			}
-		}
-
-		// Tab / Shift+Tab: navigate between blocks
-		if (e.key === "Tab" && !e.altKey && !e.metaKey && !e.ctrlKey) {
-			e.preventDefault();
-			const sorted = threadOps.sortBlocks(blocks);
-			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (e.shiftKey) {
-				if (idx > 0) focusBlock(sorted[idx - 1].id);
-			} else {
-				if (idx < sorted.length - 1) focusBlock(sorted[idx + 1].id);
-			}
-			return;
-		}
-
-		// Alt+Arrow: reorder
-		if (e.altKey && e.key === "ArrowUp") {
-			e.preventDefault();
-			const sorted = threadOps.sortBlocks(blocks);
-			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (idx > 0) {
-				moveBlock(blockId, idx - 1);
-				focusBlock(blockId);
-			}
-			return;
-		}
-		if (e.altKey && e.key === "ArrowDown") {
-			e.preventDefault();
-			const sorted = threadOps.sortBlocks(blocks);
-			const idx = sorted.findIndex((b) => b.id === blockId);
-			if (idx < sorted.length - 1) {
-				moveBlock(blockId, idx + 1);
-				focusBlock(blockId);
-			}
-			return;
-		}
-
-		if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "d") {
-			e.preventDefault();
-			duplicateBlock(blockId);
-			return;
-		}
-		if (
-			(e.metaKey || e.ctrlKey) &&
-			e.shiftKey &&
-			(e.key === "s" || e.key === "S")
-		) {
-			e.preventDefault();
-			splitBlock(blockId);
-			return;
-		}
-		if (
-			(e.metaKey || e.ctrlKey) &&
-			e.shiftKey &&
-			(e.key === "m" || e.key === "M")
-		) {
-			e.preventDefault();
-			mergeWithNext(blockId);
-			return;
-		}
 	}
 
 	export function addMediaToFocusedBlock(path: string) {
@@ -354,88 +224,30 @@
 		updateBlockMedia(targetId, [...block.media_paths, path]);
 	}
 
-	export function getBlocks(): ThreadBlock[] {
-		return [...blocks];
-	}
-
-	export function setBlocks(newBlocks: ThreadBlock[]) {
-		onchange([...newBlocks]);
-	}
+	export function getBlocks(): ThreadBlock[] { return [...blocks]; }
+	export function setBlocks(newBlocks: ThreadBlock[]) { onchange([...newBlocks]); }
 
 	export async function handleInlineAssist(voiceCue?: string): Promise<void> {
-		if (!focusedBlockId) return;
-		const block = blocks.find((b) => b.id === focusedBlockId);
-		if (!block) return;
-		const textarea = document.querySelector(
-			`[data-block-id="${focusedBlockId}"] textarea`,
-		) as HTMLTextAreaElement | null;
-		if (!textarea) return;
-		const start = textarea.selectionStart;
-		const end = textarea.selectionEnd;
-		const selectedText =
-			start !== end ? block.text.slice(start, end) : block.text;
-		if (!selectedText.trim()) return;
-		assistingBlockId = focusedBlockId;
-		try {
-			const result = await api.assist.improve(
-				selectedText,
-				voiceCue || undefined,
-			);
-			if (start !== end) {
-				updateBlockText(
-					block.id,
-					block.text.slice(0, start) +
-						result.content +
-						block.text.slice(end),
-				);
-			} else {
-				updateBlockText(block.id, result.content);
-			}
-		} catch {
-			/* Error surfaced via parent */
-		} finally {
-			assistingBlockId = null;
-		}
+		await laneHandleInlineAssist(voiceCue, {
+			getFocusedBlockId: () => focusedBlockId,
+			blocks,
+			updateBlockText,
+			setAssistingBlockId: (id) => { assistingBlockId = id; },
+		});
 	}
 
 	export function handlePaletteAction(actionId: string) {
-		if (!focusedBlockId) {
-			const sorted = threadOps.sortBlocks(blocks);
-			if (sorted.length > 0) focusedBlockId = sorted[0].id;
-		}
-		if (!focusedBlockId) return;
-		switch (actionId) {
-			case "add-card":
-				addBlock();
-				break;
-			case "duplicate":
-				duplicateBlock(focusedBlockId);
-				break;
-			case "split":
-				splitBlock(focusedBlockId);
-				break;
-			case "merge":
-				mergeWithNext(focusedBlockId);
-				break;
-			case "move-up": {
-				const s = threadOps.sortBlocks(blocks);
-				const idx = s.findIndex((b) => b.id === focusedBlockId);
-				if (idx > 0) {
-					moveBlock(focusedBlockId, idx - 1);
-					focusBlock(focusedBlockId);
-				}
-				break;
-			}
-			case "move-down": {
-				const s = threadOps.sortBlocks(blocks);
-				const idx = s.findIndex((b) => b.id === focusedBlockId);
-				if (idx < s.length - 1) {
-					moveBlock(focusedBlockId, idx + 1);
-					focusBlock(focusedBlockId);
-				}
-				break;
-			}
-		}
+		laneHandlePaletteAction(actionId, {
+			getFocusedBlockId: () => focusedBlockId,
+			setFocusedBlockId: (id) => { focusedBlockId = id; },
+			sortedBlocks,
+			addBlock,
+			duplicateBlock,
+			splitBlock,
+			mergeWithNext,
+			moveBlock,
+			focusBlock,
+		});
 	}
 </script>
 
@@ -468,21 +280,18 @@
 				dragging={draggingBlockId === block.id}
 				dropTarget={dropTargetBlockId === block.id}
 				ontext={(text) => updateBlockText(block.id, text)}
-				onfocus={() => {
-					focusedBlockId = block.id;
-				}}
-				onblur={() => {
-					if (focusedBlockId === block.id) focusedBlockId = null;
-				}}
-				onkeydown={(e) => handleCardKeydown(e, block.id)}
+				onfocus={() => { focusedBlockId = block.id; }}
+				onblur={() => { if (focusedBlockId === block.id) focusedBlockId = null; }}
+				onkeydown={(e) => handleCardKeydown(e, block.id, {
+					blocks, sortedBlocks, addBlockAfter, splitBlock,
+					mergeWithPrevious, mergeWithNext, duplicateBlock, moveBlock, focusBlock,
+				})}
 				onmedia={(paths) => updateBlockMedia(block.id, paths)}
 				onmerge={() => mergeWithNext(block.id)}
 				onremove={() => removeBlock(block.id)}
 				onaddafter={() => addBlockAfter(block.id)}
 				onmoveup={i > 0 ? () => moveBlock(block.id, i - 1) : undefined}
-				onmovedown={i < sortedBlocks.length - 1
-					? () => moveBlock(block.id, i + 1)
-					: undefined}
+				onmovedown={i < sortedBlocks.length - 1 ? () => moveBlock(block.id, i + 1) : undefined}
 				ondragstart={(e) => handleDragStart(e, block.id)}
 				ondragend={handleDragEnd}
 				ondragover={(e) => handleCardDragOver(e, block.id)}
@@ -498,9 +307,7 @@
 
 {#if validationErrors.length > 0}
 	<div class="validation-summary" role="status" aria-live="polite">
-		{#each validationErrors as err}<p class="validation-error">
-				{err}
-			</p>{/each}
+		{#each validationErrors as err}<p class="validation-error">{err}</p>{/each}
 	</div>
 {/if}
 
@@ -554,8 +361,6 @@
 	}
 
 	@media (max-width: 640px) {
-		.flow-lane {
-			padding-left: 0;
-		}
+		.flow-lane { padding-left: 0; }
 	}
 </style>

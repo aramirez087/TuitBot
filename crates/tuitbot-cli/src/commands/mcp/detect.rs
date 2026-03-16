@@ -72,3 +72,51 @@ pub fn mcp_json_snippet(profile: &str) -> String {
 }}"#
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mcp_json_snippet_write_profile() {
+        let snippet = mcp_json_snippet("write");
+        assert!(snippet.contains(r#""command": "tuitbot""#));
+        assert!(snippet.contains(r#""args": ["mcp", "serve"]"#));
+        // write profile should NOT include --profile flag
+        assert!(!snippet.contains("--profile"));
+    }
+
+    #[test]
+    fn mcp_json_snippet_readonly_profile() {
+        let snippet = mcp_json_snippet("readonly");
+        assert!(snippet.contains(r#""command": "tuitbot""#));
+        assert!(snippet.contains("--profile"));
+        assert!(snippet.contains("readonly"));
+    }
+
+    #[test]
+    fn mcp_json_snippet_admin_profile() {
+        let snippet = mcp_json_snippet("admin");
+        assert!(snippet.contains("--profile"));
+        assert!(snippet.contains("admin"));
+    }
+
+    #[test]
+    fn mcp_json_snippet_is_valid_json() {
+        let snippet = mcp_json_snippet("write");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&snippet).expect("snippet should be valid JSON");
+        assert!(parsed["mcpServers"]["tuitbot"]["command"].is_string());
+    }
+
+    #[test]
+    fn mcp_json_snippet_readonly_is_valid_json() {
+        let snippet = mcp_json_snippet("readonly");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&snippet).expect("snippet should be valid JSON");
+        let args = parsed["mcpServers"]["tuitbot"]["args"].as_array().unwrap();
+        assert_eq!(args.len(), 4);
+        assert_eq!(args[2].as_str().unwrap(), "--profile");
+        assert_eq!(args[3].as_str().unwrap(), "readonly");
+    }
+}

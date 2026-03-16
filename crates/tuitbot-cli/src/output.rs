@@ -143,4 +143,96 @@ mod tests {
         // (stdout is connected to the test harness, not a broken pipe)
         assert!(write_stdout("hello").is_ok());
     }
+
+    // ── CliOutput ─────────────────────────────────────────────────────
+
+    #[test]
+    fn cli_output_new() {
+        let out = CliOutput::new(false, OutputFormat::Text);
+        assert!(!out.quiet);
+        assert!(!out.is_json());
+    }
+
+    #[test]
+    fn cli_output_json_mode() {
+        let out = CliOutput::new(false, OutputFormat::Json);
+        assert!(out.is_json());
+    }
+
+    #[test]
+    fn cli_output_quiet_mode() {
+        let out = CliOutput::new(true, OutputFormat::Text);
+        assert!(out.quiet);
+        assert!(!out.is_json());
+    }
+
+    #[test]
+    fn cli_output_info_does_not_panic_when_quiet() {
+        let out = CliOutput::new(true, OutputFormat::Text);
+        out.info("this should be suppressed");
+    }
+
+    #[test]
+    fn cli_output_info_does_not_panic_when_json() {
+        let out = CliOutput::new(false, OutputFormat::Json);
+        out.info("this should be suppressed in json mode");
+    }
+
+    #[test]
+    fn cli_output_info_does_not_panic_in_normal_mode() {
+        let out = CliOutput::new(false, OutputFormat::Text);
+        out.info("normal message");
+    }
+
+    #[test]
+    fn cli_output_error_text_mode() {
+        let out = CliOutput::new(false, OutputFormat::Text);
+        // Should not fail
+        assert!(out.error("test error").is_ok());
+    }
+
+    #[test]
+    fn cli_output_error_json_mode() {
+        let out = CliOutput::new(false, OutputFormat::Json);
+        // In JSON mode, error writes to stdout
+        assert!(out.error("test error").is_ok());
+    }
+
+    #[test]
+    fn cli_output_json_serializes_value() {
+        let out = CliOutput::new(false, OutputFormat::Json);
+        let val = serde_json::json!({"key": "value"});
+        assert!(out.json(&val).is_ok());
+    }
+
+    #[test]
+    fn cli_output_debug_impl() {
+        let out = CliOutput::new(false, OutputFormat::Text);
+        let debug = format!("{:?}", out);
+        assert!(debug.contains("CliOutput"));
+        assert!(debug.contains("quiet: false"));
+    }
+
+    #[test]
+    fn cli_output_clone() {
+        let out = CliOutput::new(true, OutputFormat::Json);
+        let cloned = out;
+        assert_eq!(out.quiet, cloned.quiet);
+        assert_eq!(out.is_json(), cloned.is_json());
+    }
+
+    // ── is_broken_pipe additional ─────────────────────────────────────
+
+    #[test]
+    fn is_broken_pipe_with_non_io_error() {
+        let err = anyhow::anyhow!("not an IO error");
+        assert!(!is_broken_pipe(&err));
+    }
+
+    #[test]
+    fn is_broken_pipe_with_permission_denied() {
+        let io_err = io::Error::new(io::ErrorKind::PermissionDenied, "no access");
+        let err = anyhow::Error::new(io_err);
+        assert!(!is_broken_pipe(&err));
+    }
 }

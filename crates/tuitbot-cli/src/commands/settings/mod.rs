@@ -125,3 +125,53 @@ fn expand_tilde(path: &str) -> PathBuf {
     }
     PathBuf::from(path)
 }
+
+#[cfg(test)]
+mod expand_tilde_tests {
+    use super::*;
+
+    #[test]
+    fn expand_tilde_absolute_path_unchanged() {
+        let result = expand_tilde("/usr/local/bin/file");
+        assert_eq!(result, PathBuf::from("/usr/local/bin/file"));
+    }
+
+    #[test]
+    fn expand_tilde_relative_path_unchanged() {
+        let result = expand_tilde("relative/path");
+        assert_eq!(result, PathBuf::from("relative/path"));
+    }
+
+    #[test]
+    fn expand_tilde_with_home() {
+        // HOME is usually set in test environments
+        if let Ok(home) = std::env::var("HOME") {
+            let result = expand_tilde("~/config.toml");
+            assert_eq!(result, PathBuf::from(home).join("config.toml"));
+        }
+    }
+
+    #[test]
+    fn expand_tilde_nested_path() {
+        if let Ok(home) = std::env::var("HOME") {
+            let result = expand_tilde("~/.tuitbot/config.toml");
+            assert_eq!(result, PathBuf::from(home).join(".tuitbot/config.toml"));
+        }
+    }
+
+    #[test]
+    fn expand_tilde_not_at_start() {
+        // ~ in the middle should not be expanded
+        let result = expand_tilde("/home/user/~file");
+        assert_eq!(result, PathBuf::from("/home/user/~file"));
+    }
+
+    #[test]
+    fn expand_tilde_just_tilde_slash() {
+        // ~/  with nothing after it
+        if let Ok(home) = std::env::var("HOME") {
+            let result = expand_tilde("~/");
+            assert_eq!(result, PathBuf::from(home).join(""));
+        }
+    }
+}

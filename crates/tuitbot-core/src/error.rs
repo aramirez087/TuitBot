@@ -398,4 +398,114 @@ mod tests {
             "feature requires X API authentication: get_me requires authenticated API access. Switch to provider_backend = \"x_api\" to use this feature"
         );
     }
+
+    #[test]
+    fn llm_error_generation_failed_message() {
+        let err = LlmError::GenerationFailed("max retries exceeded".to_string());
+        assert_eq!(
+            err.to_string(),
+            "content generation failed: max retries exceeded"
+        );
+    }
+
+    #[test]
+    fn x_api_error_account_restricted_message() {
+        let err = XApiError::AccountRestricted {
+            message: "Account suspended".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "X API account restricted: Account suspended"
+        );
+    }
+
+    #[test]
+    fn x_api_error_forbidden_message() {
+        let err = XApiError::Forbidden {
+            message: "Basic tier cannot access this endpoint".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "X API forbidden: Basic tier cannot access this endpoint"
+        );
+    }
+
+    #[test]
+    fn storage_error_connection_message() {
+        let err = StorageError::Connection {
+            source: sqlx::Error::Configuration("test config error".into()),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("database connection error"));
+    }
+
+    #[test]
+    fn storage_error_query_message() {
+        let err = StorageError::Query {
+            source: sqlx::Error::ColumnNotFound("missing_col".to_string()),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("database query error"));
+    }
+
+    #[test]
+    fn config_error_is_debug() {
+        let err = ConfigError::MissingField {
+            field: "test".to_string(),
+        };
+        let debug = format!("{err:?}");
+        assert!(debug.contains("MissingField"));
+    }
+
+    #[test]
+    fn x_api_error_is_debug() {
+        let err = XApiError::AuthExpired;
+        let debug = format!("{err:?}");
+        assert!(debug.contains("AuthExpired"));
+    }
+
+    #[test]
+    fn llm_error_is_debug() {
+        let err = LlmError::NotConfigured;
+        let debug = format!("{err:?}");
+        assert!(debug.contains("NotConfigured"));
+    }
+
+    #[test]
+    fn storage_error_is_debug() {
+        let err = StorageError::AlreadyReviewed {
+            id: 1,
+            current_status: "approved".to_string(),
+        };
+        let debug = format!("{err:?}");
+        assert!(debug.contains("AlreadyReviewed"));
+    }
+
+    #[test]
+    fn scoring_error_is_debug() {
+        let err = ScoringError::InvalidTweetData {
+            message: "test".to_string(),
+        };
+        let debug = format!("{err:?}");
+        assert!(debug.contains("InvalidTweetData"));
+    }
+
+    #[test]
+    fn x_api_error_rate_limited_with_retry_formats_seconds() {
+        let err = XApiError::RateLimited {
+            retry_after: Some(120),
+        };
+        assert!(err.to_string().contains("120s"));
+    }
+
+    #[test]
+    fn llm_error_api_error_includes_status_code() {
+        let err = LlmError::Api {
+            status: 500,
+            message: "Internal server error".to_string(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("500"));
+        assert!(msg.contains("Internal server error"));
+    }
 }

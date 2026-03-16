@@ -517,3 +517,146 @@ fn is_valid_hhmm(s: &str) -> bool {
     };
     hour <= 23 && minute <= 59
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn minimal_valid_config() -> Config {
+        let mut c = Config::default();
+        c.business.product_name = "TestBot".to_string();
+        c.business.product_description = "A test product for unit testing".to_string();
+        c.business.product_keywords = vec!["test".to_string()];
+        c
+    }
+
+    // ── validate_minimum ──────────────────────────────────────────────────
+
+    #[test]
+    fn validate_minimum_default_config_fails() {
+        let c = Config::default();
+        assert!(c.validate_minimum().is_err());
+    }
+
+    #[test]
+    fn validate_minimum_populated_config_passes() {
+        let c = minimal_valid_config();
+        assert!(c.validate_minimum().is_ok(), "{:?}", c.validate_minimum());
+    }
+
+    #[test]
+    fn validate_minimum_missing_product_name_fails() {
+        let mut c = minimal_valid_config();
+        c.business.product_name = String::new();
+        let errs = c.validate_minimum().unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| format!("{e:?}").contains("product_name")));
+    }
+
+    #[test]
+    fn validate_minimum_missing_description_fails() {
+        let mut c = minimal_valid_config();
+        c.business.product_description = "   ".to_string(); // whitespace only
+        let errs = c.validate_minimum().unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| format!("{e:?}").contains("product_description")));
+    }
+
+    #[test]
+    fn validate_minimum_missing_both_keyword_fields_fails() {
+        let mut c = minimal_valid_config();
+        c.business.product_keywords = vec![];
+        c.business.competitor_keywords = vec![];
+        let errs = c.validate_minimum().unwrap_err();
+        assert!(errs.iter().any(|e| format!("{e:?}").contains("keywords")));
+    }
+
+    #[test]
+    fn validate_minimum_competitor_keywords_satisfies_keyword_requirement() {
+        let mut c = minimal_valid_config();
+        c.business.product_keywords = vec![];
+        c.business.competitor_keywords = vec!["competitor".to_string()];
+        assert!(c.validate_minimum().is_ok(), "{:?}", c.validate_minimum());
+    }
+
+    #[test]
+    fn validate_minimum_invalid_llm_provider_fails() {
+        let mut c = minimal_valid_config();
+        c.llm.provider = "invalid_provider".to_string();
+        let errs = c.validate_minimum().unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| format!("{e:?}").contains("llm.provider")));
+    }
+
+    #[test]
+    fn validate_minimum_valid_llm_providers_pass() {
+        for provider in &["openai", "anthropic", "ollama"] {
+            let mut c = minimal_valid_config();
+            c.llm.provider = provider.to_string();
+            assert!(
+                c.validate_minimum().is_ok(),
+                "provider {provider} should pass"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_minimum_invalid_provider_backend_fails() {
+        let mut c = minimal_valid_config();
+        c.x_api.provider_backend = "invalid_backend".to_string();
+        let errs = c.validate_minimum().unwrap_err();
+        assert!(errs
+            .iter()
+            .any(|e| format!("{e:?}").contains("provider_backend")));
+    }
+
+    #[test]
+    fn validate_minimum_valid_provider_backends_pass() {
+        for backend in &["x_api", "scraper"] {
+            let mut c = minimal_valid_config();
+            c.x_api.provider_backend = backend.to_string();
+            assert!(
+                c.validate_minimum().is_ok(),
+                "backend {backend} should pass"
+            );
+        }
+    }
+
+    // ── validate (full) ───────────────────────────────────────────────────
+
+    #[test]
+    fn validate_default_config_fails() {
+        let c = Config::default();
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn validate_collects_multiple_errors() {
+        let c = Config::default();
+        let errs = c.validate().unwrap_err();
+        assert!(errs.len() >= 2, "expected ≥2 errors, got {}", errs.len());
+    }
+
+    // ── is_valid_hhmm ────────────────────────────────────────────────────
+
+    #[test]
+    fn is_valid_hhmm_valid_times() {
+        assert!(is_valid_hhmm("00:00"));
+        assert!(is_valid_hhmm("09:30"));
+        assert!(is_valid_hhmm("23:59"));
+        assert!(is_valid_hhmm("12:00"));
+    }
+
+    #[test]
+    fn is_valid_hhmm_invalid_times() {
+        assert!(!is_valid_hhmm("24:00")); // hour out of range
+        assert!(!is_valid_hhmm("12:60")); // minute out of range
+        assert!(!is_valid_hhmm("noon")); // non-numeric
+        assert!(!is_valid_hhmm("")); // empty
+        assert!(!is_valid_hhmm("12:30:00")); // too many parts
+        assert!(!is_valid_hhmm("1230")); // no colon
+    }
+}

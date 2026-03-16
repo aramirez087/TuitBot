@@ -23,6 +23,8 @@ pub mod discovery_loop;
 pub mod loop_helpers;
 pub mod mentions_loop;
 pub mod posting_queue;
+#[cfg(test)]
+mod safety_guardrails_tests; // Task 3.5: production-limits safety guardrail tests
 pub mod schedule;
 pub mod scheduler;
 pub mod seed_worker;

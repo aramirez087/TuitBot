@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn enterprise_tools_use_default_host() {
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             if all_enterprise_tools().contains(&ep.tool_name) {
                 assert_eq!(
                     ep.host, None,
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn enterprise_tools_use_v2_api() {
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             if all_enterprise_tools().contains(&ep.tool_name) {
                 assert_eq!(
                     ep.api_version, "v2",

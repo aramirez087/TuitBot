@@ -74,7 +74,7 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
 
       - name: Install dependencies
-        run: cd dashboard && npm ci
+        run: cd dashboard && npm ci && npm i --prefer-offline
 
       - name: Build dashboard
         run: cd dashboard && npm run build

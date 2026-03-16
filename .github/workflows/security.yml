@@ -1,0 +1,137 @@
+name: Security & Compliance
+
+# Runs on every push to main and on every PR.
+# Generates license manifests for both Rust and Node ecosystems and uploads
+# them as CI artifacts for review / inclusion in releases.
+#
+# This workflow is intentionally separate from ci.yml so license failures are
+# surfaced without blocking the primary test matrix.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # License compliance — generate manifests for Rust + Node dependencies
+  # ─────────────────────────────────────────────────────────────────────────
+  license-compliance:
+    name: License compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Rust license manifest ─────────────────────────────────────────────
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-license-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-license-
+
+      - name: Cache cargo-license binary
+        id: cache-cargo-license
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-license
+          key: cargo-license-bin-${{ runner.os }}-v1
+
+      - name: Install cargo-license
+        if: steps.cache-cargo-license.outputs.cache-hit != 'true'
+        run: cargo install cargo-license --locked
+
+      - name: Generate Rust license manifest
+        env:
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+        run: |
+          mkdir -p licenses
+          # Human-readable text manifest (tab-separated: name, version, authors, license)
+          cargo license \
+            --all-features \
+            --avoid-build-deps \
+            --avoid-dev-deps \
+            > licenses/rust-licenses.txt
+          echo "=== Rust license summary (top licenses by crate count) ==="
+          # Second column in the TSV is the license identifier
+          awk -F'\t' 'NR>1 {print $3}' licenses/rust-licenses.txt \
+            | sort | uniq -c | sort -rn || true
+
+      # ── Node license manifest ─────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dashboard dependencies
+        run: cd dashboard && npm ci
+
+      - name: Generate frontend license manifest
+        run: |
+          mkdir -p licenses
+          cd dashboard
+          # license-checker outputs CSV and JSON for the manifest
+          npx license-checker \
+            --production \
+            --csv \
+            --out ../licenses/frontend-licenses.csv
+          npx license-checker \
+            --production \
+            --json \
+            --out ../licenses/frontend-licenses.json
+          echo "=== Frontend license summary ==="
+          npx license-checker --production --summary || true
+
+      # ── Fail on copy-left in production deps ─────────────────────────────
+      - name: Check for disallowed licenses
+        run: |
+          # Disallow GPL/AGPL/SSPL in production dependencies.
+          # LGPL is allowed with review (dynamic linking, not modified/distributed).
+          # MPL-2.0 is allowed (file-level copyleft, compatible with MIT binaries).
+          #
+          # Explicit GPL exceptions (must document rationale + replacement plan):
+          #   rquest-util (GPL-3.0): browser-emulation fingerprinting for local/scraper
+          #   mode only (not the default OAuth path). Accepted short-term; tracked as
+          #   tech debt — replace with MIT-licensed alternative when available.
+          #   See: https://crates.io/crates/rquest-util
+          disallowed_pattern='(^|[[:space:]])(GPL-[0-9]|AGPL-[0-9]|SSPL)'
+          rust_violations=$(grep -E "$disallowed_pattern" licenses/rust-licenses.txt \
+            | grep -v 'rquest-util' \
+            || true)
+          node_violations=$(grep -E "$disallowed_pattern" licenses/frontend-licenses.csv || true)
+
+          if [ -n "$rust_violations" ] || [ -n "$node_violations" ]; then
+            echo "::error::Disallowed license (GPL/AGPL/SSPL) found in production dependencies."
+            echo ""
+            echo "Rust violations:"
+            echo "${rust_violations:-  (none)}"
+            echo ""
+            echo "Node violations:"
+            echo "${node_violations:-  (none)}"
+            echo ""
+            echo "Resolution: add an explicit exception in .cargo/audit.toml and document"
+            echo "the rationale, or replace the dependency."
+            exit 1
+          fi
+
+          echo "✅ No disallowed licenses in production dependencies."
+
+      # ── Upload license manifests ──────────────────────────────────────────
+      - name: Upload license manifests
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: license-manifests
+          path: licenses/
+          retention-days: 90

@@ -315,4 +315,34 @@ mod tests {
         assert_eq!(infer_media_type("file.bmp"), None);
         assert_eq!(infer_media_type("noext"), None);
     }
+
+    #[tokio::test]
+    async fn upload_not_configured() {
+        let state = super::super::tests::make_state(None, None).await;
+        let result = super::upload_media(&state, "photo.jpg", None, false).await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], false);
+        assert_eq!(parsed["error"]["code"], "x_not_configured");
+    }
+
+    #[tokio::test]
+    async fn upload_unsupported_extension() {
+        let state = super::super::tests::make_state(
+            Some(Box::new(super::super::tests::MockXApiClient)),
+            Some("u1".into()),
+        )
+        .await;
+        let result = super::upload_media(&state, "file.bmp", None, false).await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], false);
+        assert_eq!(parsed["error"]["code"], "unsupported_media_type");
+    }
+
+    #[tokio::test]
+    async fn upload_dry_run_unsupported() {
+        let state = super::super::tests::make_state(None, None).await;
+        let result = super::upload_media(&state, "file.bmp", None, true).await;
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid JSON");
+        assert_eq!(parsed["success"], false);
+    }
 }

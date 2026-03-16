@@ -26,6 +26,9 @@ mod x_client_transaction;
 
 pub use error::*;
 
+#[cfg(feature = "test-helpers")]
+pub mod testing;
+
 /// Returns the version of the tuitbot-core library.
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")

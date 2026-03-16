@@ -352,3 +352,369 @@ fn base64_url_encode(data: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(data)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -------------------------------------------------------------------
+    // base64_url_encode
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn base64_url_encode_empty() {
+        assert_eq!(base64_url_encode(b""), "");
+    }
+
+    #[test]
+    fn base64_url_encode_hello() {
+        let encoded = base64_url_encode(b"hello");
+        assert_eq!(encoded, "aGVsbG8");
+        // No padding characters
+        assert!(!encoded.contains('='));
+    }
+
+    #[test]
+    fn base64_url_encode_no_plus_or_slash() {
+        // Bytes that produce + and / in standard base64
+        let data: Vec<u8> = (0..=255).collect();
+        let encoded = base64_url_encode(&data);
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+    }
+
+    // -------------------------------------------------------------------
+    // build_pkcs1_digest_info
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn build_pkcs1_digest_info_correct_length() {
+        let hash = [0u8; 32]; // SHA-256 produces 32 bytes
+        let info = build_pkcs1_digest_info(&hash);
+        // 19 bytes prefix + 32 bytes hash = 51 bytes
+        assert_eq!(info.len(), 51);
+    }
+
+    #[test]
+    fn build_pkcs1_digest_info_starts_with_asn1_prefix() {
+        let hash = Sha256::digest(b"test");
+        let info = build_pkcs1_digest_info(&hash);
+        // DER SEQUENCE tag
+        assert_eq!(info[0], 0x30);
+        assert_eq!(info[1], 0x31);
+    }
+
+    #[test]
+    fn build_pkcs1_digest_info_ends_with_hash() {
+        let hash = Sha256::digest(b"test data");
+        let info = build_pkcs1_digest_info(&hash);
+        // Last 32 bytes should be the hash
+        assert_eq!(&info[19..], hash.as_slice());
+    }
+
+    // -------------------------------------------------------------------
+    // pem_to_der
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn pem_to_der_strips_headers() {
+        // A minimal valid base64 body between PEM headers
+        let pem = "-----BEGIN PRIVATE KEY-----\naGVsbG8=\n-----END PRIVATE KEY-----\n";
+        let der = pem_to_der(pem).unwrap();
+        assert_eq!(der, b"hello");
+    }
+
+    #[test]
+    fn pem_to_der_handles_multiline() {
+        let pem = "-----BEGIN RSA PRIVATE KEY-----\naGVs\nbG8=\n-----END RSA PRIVATE KEY-----";
+        let der = pem_to_der(pem).unwrap();
+        assert_eq!(der, b"hello");
+    }
+
+    #[test]
+    fn pem_to_der_invalid_base64() {
+        let pem = "-----BEGIN PRIVATE KEY-----\n!!!invalid!!!\n-----END PRIVATE KEY-----";
+        let result = pem_to_der(pem);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("PEM decode failed"), "got: {err}");
+    }
+
+    #[test]
+    fn pem_to_der_trims_whitespace() {
+        let pem = "  \n-----BEGIN KEY-----\naGVsbG8=\n-----END KEY-----\n  ";
+        let der = pem_to_der(pem).unwrap();
+        assert_eq!(der, b"hello");
+    }
+
+    // -------------------------------------------------------------------
+    // DER parsing helpers
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn parse_der_length_short_form() {
+        let data = [0x05, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE];
+        let (len, rest) = parse_der_length(&data).unwrap();
+        assert_eq!(len, 5);
+        assert_eq!(rest.len(), 5);
+    }
+
+    #[test]
+    fn parse_der_length_long_form_one_byte() {
+        let data = [0x81, 0x80]; // length = 128
+        let (len, _rest) = parse_der_length(&data).unwrap();
+        assert_eq!(len, 128);
+    }
+
+    #[test]
+    fn parse_der_length_long_form_two_bytes() {
+        let data = [0x82, 0x01, 0x00]; // length = 256
+        let (len, _rest) = parse_der_length(&data).unwrap();
+        assert_eq!(len, 256);
+    }
+
+    #[test]
+    fn parse_der_length_empty_data() {
+        assert!(parse_der_length(&[]).is_err());
+    }
+
+    #[test]
+    fn parse_der_length_indefinite_form_rejected() {
+        // 0x80 = indefinite length (num_bytes = 0)
+        assert!(parse_der_length(&[0x80]).is_err());
+    }
+
+    #[test]
+    fn parse_der_sequence_valid() {
+        // SEQUENCE of 2 bytes: [0xAA, 0xBB]
+        let data = [0x30, 0x02, 0xAA, 0xBB];
+        let (remaining, inner) = parse_der_sequence(&data).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(inner, &[0xAA, 0xBB]);
+    }
+
+    #[test]
+    fn parse_der_sequence_wrong_tag() {
+        let data = [0x31, 0x02, 0xAA, 0xBB]; // SET, not SEQUENCE
+        assert!(parse_der_sequence(&data).is_err());
+    }
+
+    #[test]
+    fn parse_der_octet_string_valid() {
+        let data = [0x04, 0x03, 0x01, 0x02, 0x03];
+        let (remaining, inner) = parse_der_octet_string(&data).unwrap();
+        assert!(remaining.is_empty());
+        assert_eq!(inner, &[0x01, 0x02, 0x03]);
+    }
+
+    #[test]
+    fn parse_der_octet_string_wrong_tag() {
+        let data = [0x03, 0x02, 0xAA, 0xBB]; // BIT STRING, not OCTET STRING
+        assert!(parse_der_octet_string(&data).is_err());
+    }
+
+    #[test]
+    fn parse_der_integer_strips_leading_zero() {
+        // INTEGER with leading zero (positive number encoding)
+        let data = [0x02, 0x03, 0x00, 0x80, 0x01];
+        let (rest, bytes) = parse_der_integer(&data).unwrap();
+        assert!(rest.is_empty());
+        assert_eq!(bytes, vec![0x80, 0x01]); // leading zero stripped
+    }
+
+    #[test]
+    fn parse_der_integer_single_byte() {
+        let data = [0x02, 0x01, 0x42];
+        let (rest, bytes) = parse_der_integer(&data).unwrap();
+        assert!(rest.is_empty());
+        assert_eq!(bytes, vec![0x42]);
+    }
+
+    #[test]
+    fn parse_der_integer_wrong_tag() {
+        let data = [0x03, 0x01, 0x42]; // BIT STRING tag
+        assert!(parse_der_integer(&data).is_err());
+    }
+
+    #[test]
+    fn skip_der_element_works() {
+        let data = [0x02, 0x02, 0xAA, 0xBB, 0xFF];
+        let rest = skip_der_element(&data).unwrap();
+        assert_eq!(rest, &[0xFF]);
+    }
+
+    #[test]
+    fn skip_der_element_empty() {
+        assert!(skip_der_element(&[]).is_err());
+    }
+
+    // -------------------------------------------------------------------
+    // BigUint basic operations
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn biguint_from_bytes_strips_leading_zeros() {
+        let n = BigUint::from_bytes_be(&[0, 0, 0, 1, 2]);
+        assert_eq!(n.to_bytes_be(), vec![1, 2]);
+    }
+
+    #[test]
+    fn biguint_from_bytes_single_zero() {
+        let n = BigUint::from_bytes_be(&[0]);
+        assert!(n.is_zero());
+    }
+
+    #[test]
+    fn biguint_is_zero() {
+        let z = BigUint::from_bytes_be(&[0, 0, 0]);
+        assert!(z.is_zero());
+        let nz = BigUint::from_bytes_be(&[1]);
+        assert!(!nz.is_zero());
+    }
+
+    #[test]
+    fn biguint_bit_len_small() {
+        // 1 = 0b1 -> bit_len = 1
+        let one = BigUint::from_bytes_be(&[1]);
+        assert_eq!(one.bit_len(), 1);
+
+        // 255 = 0b11111111 -> bit_len = 8
+        let ff = BigUint::from_bytes_be(&[0xFF]);
+        assert_eq!(ff.bit_len(), 8);
+
+        // 256 = 0x0100 -> bit_len = 9
+        let n256 = BigUint::from_bytes_be(&[1, 0]);
+        assert_eq!(n256.bit_len(), 9);
+    }
+
+    #[test]
+    fn biguint_bit_len_zero() {
+        let z = BigUint::from_bytes_be(&[0]);
+        assert_eq!(z.bit_len(), 0);
+    }
+
+    #[test]
+    fn biguint_bit_access() {
+        // 5 = 0b101
+        let five = BigUint::from_bytes_be(&[5]);
+        assert!(five.bit(0)); // LSB
+        assert!(!five.bit(1));
+        assert!(five.bit(2));
+        assert!(!five.bit(3));
+    }
+
+    #[test]
+    fn biguint_gte() {
+        let a = BigUint::from_bytes_be(&[2]);
+        let b = BigUint::from_bytes_be(&[1]);
+        assert!(BigUint::gte(&a, &b));
+        assert!(BigUint::gte(&a, &a));
+        assert!(!BigUint::gte(&b, &a));
+    }
+
+    #[test]
+    fn biguint_sub_basic() {
+        // 5 - 3 = 2
+        let a = BigUint::from_bytes_be(&[5]);
+        let b = BigUint::from_bytes_be(&[3]);
+        let result = BigUint::sub(&a, &b);
+        assert_eq!(result.to_bytes_be(), vec![2]);
+    }
+
+    #[test]
+    fn biguint_shift_left_one() {
+        // 1 << 1 = 2
+        let one = BigUint::from_bytes_be(&[1]);
+        let two = BigUint::shift_left_one(&one);
+        assert_eq!(two.to_bytes_be(), vec![2]);
+
+        // 128 << 1 = 256
+        let n128 = BigUint::from_bytes_be(&[128]);
+        let n256 = BigUint::shift_left_one(&n128);
+        assert_eq!(n256.to_bytes_be(), vec![1, 0]);
+    }
+
+    #[test]
+    fn biguint_modulo_small() {
+        // 7 mod 3 = 1
+        let a = BigUint::from_bytes_be(&[7]);
+        let m = BigUint::from_bytes_be(&[3]);
+        let r = BigUint::modulo(&a, &m);
+        assert_eq!(r.to_bytes_be(), vec![1]);
+    }
+
+    #[test]
+    fn biguint_mul_mod_small() {
+        // 3 * 4 mod 5 = 12 mod 5 = 2
+        let a = BigUint::from_bytes_be(&[3]);
+        let b = BigUint::from_bytes_be(&[4]);
+        let m = BigUint::from_bytes_be(&[5]);
+        let r = BigUint::mul_mod(&a, &b, &m);
+        assert_eq!(r.to_bytes_be(), vec![2]);
+    }
+
+    // -------------------------------------------------------------------
+    // mod_pow
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn mod_pow_basic() {
+        // 2^10 mod 1000 = 1024 mod 1000 = 24
+        let base = BigUint::from_bytes_be(&[2]);
+        let exp = BigUint::from_bytes_be(&[10]);
+        let modulus = BigUint::from_bytes_be(&[0x03, 0xE8]); // 1000
+        let result = mod_pow(&base, &exp, &modulus);
+        assert_eq!(result.to_bytes_be(), vec![24]);
+    }
+
+    #[test]
+    fn mod_pow_zero_exponent() {
+        // anything^0 mod m = 1
+        let base = BigUint::from_bytes_be(&[42]);
+        let exp = BigUint::from_bytes_be(&[0]);
+        let modulus = BigUint::from_bytes_be(&[10]);
+        let result = mod_pow(&base, &exp, &modulus);
+        assert_eq!(result.to_bytes_be(), vec![1]);
+    }
+
+    #[test]
+    fn mod_pow_one_exponent() {
+        // 7^1 mod 5 = 2
+        let base = BigUint::from_bytes_be(&[7]);
+        let exp = BigUint::from_bytes_be(&[1]);
+        let modulus = BigUint::from_bytes_be(&[5]);
+        let result = mod_pow(&base, &exp, &modulus);
+        assert_eq!(result.to_bytes_be(), vec![2]);
+    }
+
+    // -------------------------------------------------------------------
+    // build_jwt (structure check, not signature validation)
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn build_jwt_with_invalid_pem_returns_error() {
+        let claims = serde_json::json!({"iss": "test@example.com"});
+        let result = build_jwt(&claims, "not a valid PEM");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn build_jwt_header_is_rs256() {
+        // Even though we can't produce a valid signature without a real key,
+        // we can verify the header structure by checking the first part
+        // The header should decode to {"alg":"RS256","typ":"JWT"}
+        let header_json = serde_json::json!({"alg": "RS256", "typ": "JWT"});
+        let header_bytes = serde_json::to_vec(&header_json).unwrap();
+        let encoded = base64_url_encode(&header_bytes);
+        // This is what build_jwt produces as its first segment
+        assert!(!encoded.is_empty());
+        // Decode it back
+        use base64::Engine;
+        let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&encoded)
+            .unwrap();
+        let parsed: serde_json::Value = serde_json::from_slice(&decoded).unwrap();
+        assert_eq!(parsed["alg"], "RS256");
+        assert_eq!(parsed["typ"], "JWT");
+    }
+}

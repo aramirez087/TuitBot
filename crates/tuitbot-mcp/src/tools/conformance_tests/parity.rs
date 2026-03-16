@@ -37,7 +37,7 @@ mod tests {
     /// Spec-generated tool names, indexed by which profiles they belong to.
     fn spec_tools_by_profile() -> HashMap<Profile, BTreeSet<String>> {
         let mut map: HashMap<Profile, BTreeSet<String>> = HashMap::new();
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             for profile in ep.profiles {
                 map.entry(*profile)
                     .or_default()
@@ -119,14 +119,24 @@ mod tests {
 
     #[test]
     fn write_manifest_runtime_parity() {
-        let source = include_str!("../../server/write.rs");
-        assert_parity_for_profile(Profile::Write, source, "write");
+        let source = [
+            include_str!("../../server/write/mod.rs"),
+            include_str!("../../server/write/tools.rs"),
+            include_str!("../../server/write/handlers.rs"),
+        ]
+        .join("\n");
+        assert_parity_for_profile(Profile::Write, &source, "write");
     }
 
     #[test]
     fn admin_manifest_runtime_parity() {
-        let source = include_str!("../../server/admin.rs");
-        assert_parity_for_profile(Profile::Admin, source, "admin");
+        let source = [
+            include_str!("../../server/admin/mod.rs"),
+            include_str!("../../server/admin/tools.rs"),
+            include_str!("../../server/admin/handlers.rs"),
+        ]
+        .join("\n");
+        assert_parity_for_profile(Profile::Admin, &source, "admin");
     }
 
     // ── Cross-profile consistency ────────────────────────────────────
@@ -138,7 +148,7 @@ mod tests {
         let manifest_by_name: BTreeMap<String, &crate::tools::manifest::ToolEntry> =
             manifest.tools.iter().map(|t| (t.name.clone(), t)).collect();
 
-        for ep in SPEC_ENDPOINTS {
+        for ep in SPEC_ENDPOINTS.iter() {
             let entry = manifest_by_name.get(ep.tool_name).unwrap_or_else(|| {
                 panic!("spec endpoint '{}' not found in manifest", ep.tool_name)
             });
@@ -163,11 +173,23 @@ mod tests {
         let spec_names = all_spec_tool_names();
 
         // Curated handlers across all server files.
+        let write_all = [
+            include_str!("../../server/write/mod.rs"),
+            include_str!("../../server/write/tools.rs"),
+            include_str!("../../server/write/handlers.rs"),
+        ]
+        .join("\n");
+        let admin_all = [
+            include_str!("../../server/admin/mod.rs"),
+            include_str!("../../server/admin/tools.rs"),
+            include_str!("../../server/admin/handlers.rs"),
+        ]
+        .join("\n");
         let all_handlers: BTreeSet<String> = [
             include_str!("../../server/readonly.rs"),
             include_str!("../../server/api_readonly.rs"),
-            include_str!("../../server/write.rs"),
-            include_str!("../../server/admin.rs"),
+            write_all.as_str(),
+            admin_all.as_str(),
         ]
         .iter()
         .flat_map(|src| extract_tool_fn_names(src))
@@ -196,11 +218,23 @@ mod tests {
     fn no_tool_is_both_curated_and_generated() {
         let spec_names = all_spec_tool_names();
 
+        let write_all = [
+            include_str!("../../server/write/mod.rs"),
+            include_str!("../../server/write/tools.rs"),
+            include_str!("../../server/write/handlers.rs"),
+        ]
+        .join("\n");
+        let admin_all = [
+            include_str!("../../server/admin/mod.rs"),
+            include_str!("../../server/admin/tools.rs"),
+            include_str!("../../server/admin/handlers.rs"),
+        ]
+        .join("\n");
         let all_handlers: BTreeSet<String> = [
             include_str!("../../server/readonly.rs"),
             include_str!("../../server/api_readonly.rs"),
-            include_str!("../../server/write.rs"),
-            include_str!("../../server/admin.rs"),
+            write_all.as_str(),
+            admin_all.as_str(),
         ]
         .iter()
         .flat_map(|src| extract_tool_fn_names(src))

@@ -387,4 +387,84 @@ mod tests {
         assert_eq!(json["location"], "NYC");
         assert_eq!(json["url"], "https://example.com");
     }
+
+    #[test]
+    fn user_to_json_with_none_fields() {
+        let user = tuitbot_core::x_api::types::User {
+            id: "456".into(),
+            username: "minimal".into(),
+            name: "Minimal User".into(),
+            profile_image_url: None,
+            description: None,
+            location: None,
+            url: None,
+            public_metrics: Default::default(),
+        };
+        let json = user_to_json(&user);
+        assert_eq!(json["id"], "456");
+        assert_eq!(json["username"], "minimal");
+        assert_eq!(json["name"], "Minimal User");
+        assert!(json["profile_image_url"].is_null());
+        assert!(json["description"].is_null());
+        assert!(json["location"].is_null());
+        assert!(json["url"].is_null());
+    }
+
+    #[test]
+    fn onboarding_token_path_nested() {
+        let path = onboarding_token_path(Path::new("/home/user/.tuitbot"));
+        assert_eq!(
+            path,
+            PathBuf::from("/home/user/.tuitbot/onboarding_tokens.json")
+        );
+    }
+
+    #[test]
+    fn start_auth_request_default() {
+        let req: StartAuthRequest = serde_json::from_str("{}").unwrap();
+        assert!(req.client_id.is_none());
+    }
+
+    #[test]
+    fn start_auth_request_with_client_id() {
+        let req: StartAuthRequest = serde_json::from_str(r#"{"client_id": "my-id"}"#).unwrap();
+        assert_eq!(req.client_id.as_deref(), Some("my-id"));
+    }
+
+    #[test]
+    fn onboarding_callback_request_deserialize() {
+        let req: OnboardingCallbackRequest =
+            serde_json::from_str(r#"{"code": "auth_code_123", "state": "csrf_state_456"}"#)
+                .unwrap();
+        assert_eq!(req.code, "auth_code_123");
+        assert_eq!(req.state, "csrf_state_456");
+    }
+
+    #[test]
+    fn analyze_profile_request_no_llm() {
+        let req: AnalyzeProfileRequest = serde_json::from_str(r#"{}"#).unwrap();
+        assert!(req.llm.is_none());
+    }
+
+    #[test]
+    fn analyze_profile_request_with_llm() {
+        let req: AnalyzeProfileRequest = serde_json::from_str(
+            r#"{"llm": {"provider": "openai", "api_key": "sk-test", "model": "gpt-4", "base_url": null}}"#,
+        )
+        .unwrap();
+        let llm = req.llm.unwrap();
+        assert_eq!(llm.provider, "openai");
+        assert_eq!(llm.model, "gpt-4");
+        assert_eq!(llm.api_key.as_deref(), Some("sk-test"));
+    }
+
+    #[test]
+    fn oauth_state_ttl_is_ten_minutes() {
+        assert_eq!(OAUTH_STATE_TTL, Duration::from_secs(600));
+    }
+
+    #[test]
+    fn onboarding_account_id_sentinel() {
+        assert_eq!(ONBOARDING_ACCOUNT_ID, "__onboarding__");
+    }
 }

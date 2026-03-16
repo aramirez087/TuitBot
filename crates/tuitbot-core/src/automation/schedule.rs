@@ -749,4 +749,730 @@ mod tests {
         let result = schedule_gate(&schedule_opt, &cancel).await;
         assert!(!result);
     }
+
+    #[test]
+    fn posting_slot_to_naive_time() {
+        let slot = PostingSlot::parse("14:30").unwrap();
+        let time = slot.to_naive_time();
+        assert_eq!(time.hour(), 14);
+        assert_eq!(time.minute(), 30);
+    }
+
+    #[test]
+    fn posting_slot_equality() {
+        let a = PostingSlot::parse("09:15").unwrap();
+        let b = PostingSlot::parse("09:15").unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn from_config_with_thread_preferred_time() {
+        let mut config = default_schedule_config();
+        config.thread_preferred_day = Some("Wed".to_string());
+        config.thread_preferred_time = "14:30".to_string();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert!(schedule.has_thread_preferred_schedule());
+        assert!(schedule.next_thread_slot().is_some());
+    }
+
+    #[test]
+    fn from_config_mixed_preferred_times() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["auto".to_string(), "20:00".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 4);
+    }
+
+    #[test]
+    fn from_config_deduplicates_preferred_times() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["09:15".to_string(), "09:15".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 1);
+    }
+
+    #[test]
+    fn from_config_invalid_preferred_time_ignored() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["25:99".to_string(), "09:00".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 1);
+        assert_eq!(schedule.preferred_times[0].format(), "09:00");
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional schedule coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn posting_slot_as_minutes_boundary() {
+        let midnight = PostingSlot::parse("00:00").unwrap();
+        assert_eq!(midnight.as_minutes(), 0);
+
+        let end_of_day = PostingSlot::parse("23:59").unwrap();
+        assert_eq!(end_of_day.as_minutes(), 23 * 60 + 59);
+    }
+
+    #[test]
+    fn posting_slot_format_zero_padded() {
+        let slot = PostingSlot::parse("01:05").unwrap();
+        assert_eq!(slot.format(), "01:05");
+    }
+
+    #[test]
+    fn posting_slot_parse_single_digit_parts() {
+        // Single-digit hours/minutes should parse
+        let slot = PostingSlot::parse("9:5");
+        assert!(slot.is_some());
+        let s = slot.unwrap();
+        assert_eq!(s.hour, 9);
+        assert_eq!(s.minute, 5);
+    }
+
+    #[test]
+    fn posting_slot_parse_negative_rejected() {
+        // Negative values can't parse to u8
+        assert!(PostingSlot::parse("-1:00").is_none());
+        assert!(PostingSlot::parse("12:-5").is_none());
+    }
+
+    #[test]
+    fn posting_slot_ordering_same_hour() {
+        let a = PostingSlot::parse("09:00").unwrap();
+        let b = PostingSlot::parse("09:30").unwrap();
+        assert!(a < b);
+    }
+
+    #[test]
+    fn posting_slot_to_naive_time_boundary() {
+        let slot = PostingSlot::parse("23:59").unwrap();
+        let t = slot.to_naive_time();
+        assert_eq!(t.hour(), 23);
+        assert_eq!(t.minute(), 59);
+    }
+
+    #[test]
+    fn posting_slot_clone_and_debug() {
+        let slot = PostingSlot::parse("12:00").unwrap();
+        let cloned = slot.clone();
+        assert_eq!(slot, cloned);
+        let debug = format!("{:?}", slot);
+        assert!(debug.contains("PostingSlot"));
+    }
+
+    #[test]
+    fn from_config_all_timezones() {
+        for tz in &[
+            "Europe/London",
+            "Asia/Tokyo",
+            "US/Pacific",
+            "Australia/Sydney",
+        ] {
+            let mut config = default_schedule_config();
+            config.timezone = tz.to_string();
+            assert!(
+                ActiveSchedule::from_config(&config).is_some(),
+                "Failed to parse timezone: {tz}"
+            );
+        }
+    }
+
+    #[test]
+    fn from_config_empty_active_days_parsed() {
+        let mut config = default_schedule_config();
+        config.active_days = vec![];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert!(schedule.active_weekdays.is_empty());
+    }
+
+    #[test]
+    fn from_config_invalid_day_ignored() {
+        let mut config = default_schedule_config();
+        config.active_days = vec!["Mon".to_string(), "Funday".to_string(), "Fri".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.active_weekdays.len(), 2);
+    }
+
+    #[test]
+    fn from_config_thread_preferred_invalid_day_none() {
+        let mut config = default_schedule_config();
+        config.thread_preferred_day = Some("NotADay".to_string());
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert!(!schedule.has_thread_preferred_schedule());
+    }
+
+    #[test]
+    fn from_config_thread_preferred_invalid_time_uses_default() {
+        let mut config = default_schedule_config();
+        config.thread_preferred_day = Some("Wed".to_string());
+        config.thread_preferred_time = "bad:time".to_string();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        // Falls back to default 10:00
+        assert!(schedule.has_thread_preferred_schedule());
+    }
+
+    #[test]
+    fn from_config_preferred_times_override_per_day() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["09:00".to_string()];
+        config.preferred_times_override.insert(
+            "Mon".to_string(),
+            vec!["14:00".to_string(), "18:00".to_string()],
+        );
+        config
+            .preferred_times_override
+            .insert("InvalidDay".to_string(), vec!["10:00".to_string()]);
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        // Mon should have 2 slots, invalid day ignored
+        let mon_slots = schedule.preferred_times_override.get(&chrono::Weekday::Mon);
+        assert!(mon_slots.is_some());
+        assert_eq!(mon_slots.unwrap().len(), 2);
+        // Only 1 weekday key in the override map
+        assert_eq!(schedule.preferred_times_override.len(), 1);
+    }
+
+    #[test]
+    fn from_config_preferred_times_override_sorted_deduped() {
+        let mut config = default_schedule_config();
+        config.preferred_times_override.insert(
+            "Tue".to_string(),
+            vec![
+                "18:00".to_string(),
+                "09:00".to_string(),
+                "18:00".to_string(),
+            ],
+        );
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        let tue_slots = schedule
+            .preferred_times_override
+            .get(&chrono::Weekday::Tue)
+            .unwrap();
+        assert_eq!(tue_slots.len(), 2);
+        assert!(tue_slots[0] < tue_slots[1]); // sorted
+    }
+
+    #[test]
+    fn from_config_auto_with_duplicate_deduped() {
+        let mut config = default_schedule_config();
+        // auto expands to 09:15, 12:30, 17:00 — add a duplicate
+        config.preferred_times = vec!["auto".to_string(), "12:30".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times.len(), 3); // deduped
+    }
+
+    #[test]
+    fn wrapping_hours_struct_fields() {
+        let mut config = default_schedule_config();
+        config.active_hours_start = 20;
+        config.active_hours_end = 4;
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.start_hour, 20);
+        assert_eq!(schedule.end_hour, 4);
+    }
+
+    #[test]
+    fn next_thread_slot_within_week() {
+        // Test each day of the week as thread preferred day
+        for day in &["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] {
+            let mut config = default_schedule_config();
+            config.thread_preferred_day = Some(day.to_string());
+            config.thread_preferred_time = "10:00".to_string();
+            let schedule = ActiveSchedule::from_config(&config).unwrap();
+            let dur = schedule.next_thread_slot().unwrap();
+            // Must be <= 7 days from now
+            assert!(
+                dur.as_secs() <= 7 * 86400,
+                "Thread slot for {day} exceeds 7 days: {} secs",
+                dur.as_secs()
+            );
+        }
+    }
+
+    #[test]
+    fn apply_slot_jitter_many_runs_never_panics() {
+        // Stress test that jitter never panics
+        for secs in [0, 1, 60, 900, 3600, 86400] {
+            for _ in 0..50 {
+                let _ = apply_slot_jitter(Duration::from_secs(secs));
+            }
+        }
+    }
+
+    #[test]
+    fn parse_weekday_with_whitespace() {
+        assert_eq!(parse_weekday(" Mon "), Some(chrono::Weekday::Mon));
+        assert_eq!(parse_weekday("  Fri  "), Some(chrono::Weekday::Fri));
+    }
+
+    #[test]
+    fn slots_for_today_no_override_uses_base() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["08:00".to_string(), "13:00".to_string()];
+        // No override for today
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        let slots = schedule.slots_for_today();
+        assert_eq!(slots.len(), 2);
+    }
+
+    #[test]
+    fn time_until_active_non_zero_when_outside() {
+        // Set a narrow window that excludes the current hour
+        let mut config = default_schedule_config();
+        let now_hour = Utc::now().hour() as u8;
+        config.active_hours_start = (now_hour + 3) % 24;
+        config.active_hours_end = (now_hour + 4) % 24;
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+
+        if !schedule.is_active() {
+            let wait = schedule.time_until_active();
+            assert!(wait > Duration::ZERO);
+        }
+    }
+
+    #[test]
+    fn time_until_active_respects_weekday() {
+        let now_weekday = Utc::now().weekday();
+
+        // Pick a day that is NOT today
+        let other_day = match now_weekday {
+            chrono::Weekday::Mon => "Wed",
+            _ => "Mon",
+        };
+
+        let mut config = default_schedule_config();
+        config.active_hours_start = 0;
+        config.active_hours_end = 23;
+        config.active_days = vec![other_day.to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+
+        // We're not on the active day, so should not be active
+        if now_weekday != parse_weekday(other_day).unwrap() {
+            assert!(!schedule.is_active());
+            let wait = schedule.time_until_active();
+            assert!(wait > Duration::ZERO);
+            // Wait should be at most 7 days
+            assert!(wait.as_secs() <= 7 * 86400 + 3600);
+        }
+    }
+
+    #[test]
+    fn is_active_normal_range() {
+        let mut config = default_schedule_config();
+        config.active_hours_start = 8;
+        config.active_hours_end = 22;
+        config.active_days = vec![]; // all days
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+
+        let now_hour = Utc::now().hour() as u8;
+        if now_hour >= 8 && now_hour < 22 {
+            assert!(schedule.is_active());
+        } else {
+            assert!(!schedule.is_active());
+        }
+    }
+
+    #[test]
+    fn auto_preferred_times_constant() {
+        assert_eq!(AUTO_PREFERRED_TIMES.len(), 3);
+        assert_eq!(AUTO_PREFERRED_TIMES[0], "09:15");
+        assert_eq!(AUTO_PREFERRED_TIMES[1], "12:30");
+        assert_eq!(AUTO_PREFERRED_TIMES[2], "17:00");
+    }
+
+    #[tokio::test]
+    async fn schedule_gate_active_returns_true() {
+        // Create a schedule that covers all hours — should be active
+        let mut config = default_schedule_config();
+        config.active_hours_start = 0;
+        config.active_hours_end = 23;
+        config.active_days = vec![]; // all days
+        let schedule = Arc::new(ActiveSchedule::from_config(&config).unwrap());
+        let schedule_opt = Some(schedule);
+
+        let cancel = CancellationToken::new();
+        let now_hour = Utc::now().hour();
+        if now_hour < 23 {
+            // Should be active and return true
+            let result = schedule_gate(&schedule_opt, &cancel).await;
+            assert!(result);
+        }
+    }
+
+    #[test]
+    fn next_unused_slot_empty_schedule_returns_none() {
+        let config = default_schedule_config(); // no preferred times
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        let result = schedule.next_unused_slot(&[]);
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Extended edge-case coverage for coverage push
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn posting_slot_as_minutes_noon() {
+        let slot = PostingSlot::parse("12:00").unwrap();
+        assert_eq!(slot.as_minutes(), 720);
+    }
+
+    #[test]
+    fn posting_slot_as_minutes_one_am() {
+        let slot = PostingSlot::parse("01:00").unwrap();
+        assert_eq!(slot.as_minutes(), 60);
+    }
+
+    #[test]
+    fn posting_slot_format_preserves_leading_zeros() {
+        let slot = PostingSlot::parse("00:05").unwrap();
+        assert_eq!(slot.format(), "00:05");
+        let slot2 = PostingSlot::parse("03:09").unwrap();
+        assert_eq!(slot2.format(), "03:09");
+    }
+
+    #[test]
+    fn posting_slot_to_naive_time_midnight() {
+        let slot = PostingSlot::parse("00:00").unwrap();
+        let t = slot.to_naive_time();
+        assert_eq!(t.hour(), 0);
+        assert_eq!(t.minute(), 0);
+        assert_eq!(t.second(), 0);
+    }
+
+    #[test]
+    fn posting_slot_ordering_reverse() {
+        let a = PostingSlot::parse("23:59").unwrap();
+        let b = PostingSlot::parse("00:00").unwrap();
+        assert!(a > b);
+    }
+
+    #[test]
+    fn posting_slot_ordering_equal() {
+        let a = PostingSlot::parse("15:30").unwrap();
+        let b = PostingSlot::parse("15:30").unwrap();
+        assert!(!(a < b));
+        assert!(!(a > b));
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn posting_slot_parse_boundary_23_59() {
+        let slot = PostingSlot::parse("23:59").unwrap();
+        assert_eq!(slot.hour, 23);
+        assert_eq!(slot.minute, 59);
+        assert_eq!(slot.as_minutes(), 23 * 60 + 59);
+    }
+
+    #[test]
+    fn posting_slot_parse_boundary_00_00() {
+        let slot = PostingSlot::parse("00:00").unwrap();
+        assert_eq!(slot.hour, 0);
+        assert_eq!(slot.minute, 0);
+        assert_eq!(slot.as_minutes(), 0);
+    }
+
+    #[test]
+    fn posting_slot_parse_invalid_separator() {
+        assert!(PostingSlot::parse("12-30").is_none());
+        assert!(PostingSlot::parse("12 30").is_none());
+        assert!(PostingSlot::parse("12.30").is_none());
+    }
+
+    #[test]
+    fn posting_slot_parse_extra_whitespace() {
+        // Leading/trailing whitespace in parts causes parse failure on u8
+        assert!(PostingSlot::parse(" 12:30").is_none());
+        assert!(PostingSlot::parse("12: 30").is_none());
+    }
+
+    #[test]
+    fn posting_slot_parse_hour_24_invalid() {
+        assert!(PostingSlot::parse("24:00").is_none());
+    }
+
+    #[test]
+    fn posting_slot_parse_large_numbers() {
+        assert!(PostingSlot::parse("99:99").is_none());
+        assert!(PostingSlot::parse("255:255").is_none());
+    }
+
+    #[test]
+    fn from_config_all_seven_days() {
+        let config = default_schedule_config();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.active_weekdays.len(), 7);
+    }
+
+    #[test]
+    fn from_config_subset_of_days() {
+        let mut config = default_schedule_config();
+        config.active_days = vec!["Mon".to_string(), "Wed".to_string(), "Fri".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.active_weekdays.len(), 3);
+        assert!(schedule.active_weekdays.contains(&chrono::Weekday::Mon));
+        assert!(schedule.active_weekdays.contains(&chrono::Weekday::Wed));
+        assert!(schedule.active_weekdays.contains(&chrono::Weekday::Fri));
+        assert!(!schedule.active_weekdays.contains(&chrono::Weekday::Tue));
+    }
+
+    #[test]
+    fn from_config_preferred_times_sorted() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec![
+            "17:00".to_string(),
+            "09:00".to_string(),
+            "12:00".to_string(),
+        ];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times[0].format(), "09:00");
+        assert_eq!(schedule.preferred_times[1].format(), "12:00");
+        assert_eq!(schedule.preferred_times[2].format(), "17:00");
+    }
+
+    #[test]
+    fn from_config_multiple_auto_entries_deduped() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec!["auto".to_string(), "auto".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        // auto expands to 3 slots, duplicates deduped => still 3
+        assert_eq!(schedule.preferred_times.len(), 3);
+    }
+
+    #[test]
+    fn from_config_override_with_invalid_times_filtered() {
+        let mut config = default_schedule_config();
+        config.preferred_times_override.insert(
+            "Mon".to_string(),
+            vec![
+                "25:00".to_string(),
+                "09:00".to_string(),
+                "99:99".to_string(),
+            ],
+        );
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        let mon_slots = schedule
+            .preferred_times_override
+            .get(&chrono::Weekday::Mon)
+            .unwrap();
+        assert_eq!(mon_slots.len(), 1);
+        assert_eq!(mon_slots[0].format(), "09:00");
+    }
+
+    #[test]
+    fn from_config_thread_preferred_time_default_fallback() {
+        let mut config = default_schedule_config();
+        config.thread_preferred_time = "invalid".to_string();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        // Fallback to 10:00
+        assert_eq!(schedule.thread_preferred_time.hour, 10);
+        assert_eq!(schedule.thread_preferred_time.minute, 0);
+    }
+
+    #[test]
+    fn from_config_thread_preferred_time_custom() {
+        let mut config = default_schedule_config();
+        config.thread_preferred_time = "15:45".to_string();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.thread_preferred_time.hour, 15);
+        assert_eq!(schedule.thread_preferred_time.minute, 45);
+    }
+
+    #[test]
+    fn apply_slot_jitter_large_wait() {
+        let base = Duration::from_secs(86400); // 1 day
+        for _ in 0..50 {
+            let jittered = apply_slot_jitter(base);
+            // Should be within base +/- 15 min
+            assert!(jittered.as_secs() >= 86400 - SLOT_JITTER_SECS);
+            assert!(jittered.as_secs() <= 86400 + SLOT_JITTER_SECS);
+        }
+    }
+
+    #[test]
+    fn apply_slot_jitter_small_wait() {
+        let base = Duration::from_secs(60);
+        for _ in 0..50 {
+            let jittered = apply_slot_jitter(base);
+            // Should clamp to 0 minimum
+            assert!(jittered.as_secs() <= 60 + SLOT_JITTER_SECS);
+        }
+    }
+
+    #[test]
+    fn wrapping_range_fields_preserved() {
+        let mut config = default_schedule_config();
+        config.active_hours_start = 23;
+        config.active_hours_end = 5;
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.start_hour, 23);
+        assert_eq!(schedule.end_hour, 5);
+    }
+
+    #[test]
+    fn parse_weekday_case_sensitive() {
+        assert_eq!(parse_weekday("mon"), None);
+        assert_eq!(parse_weekday("MON"), None);
+        assert_eq!(parse_weekday("monday"), None);
+    }
+
+    #[test]
+    fn auto_preferred_times_all_parseable() {
+        for time_str in AUTO_PREFERRED_TIMES {
+            let slot = PostingSlot::parse(time_str);
+            assert!(
+                slot.is_some(),
+                "AUTO_PREFERRED_TIMES entry {time_str} should parse"
+            );
+        }
+    }
+
+    #[test]
+    fn from_config_empty_preferred_times() {
+        let config = default_schedule_config();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert!(schedule.preferred_times.is_empty());
+        assert!(!schedule.has_preferred_times());
+    }
+
+    #[test]
+    fn from_config_many_preferred_times() {
+        let mut config = default_schedule_config();
+        config.preferred_times = (0..20).map(|i| format!("{:02}:00", i % 24)).collect();
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        // Deduped and sorted
+        assert!(schedule.preferred_times.len() <= 20);
+        for i in 1..schedule.preferred_times.len() {
+            assert!(schedule.preferred_times[i - 1] < schedule.preferred_times[i]);
+        }
+    }
+
+    #[test]
+    fn next_thread_slot_each_day_of_week_valid_duration() {
+        let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        for day in &days {
+            let mut config = default_schedule_config();
+            config.thread_preferred_day = Some(day.to_string());
+            config.thread_preferred_time = "08:00".to_string();
+            let schedule = ActiveSchedule::from_config(&config).unwrap();
+            let dur = schedule.next_thread_slot().unwrap();
+            assert!(
+                dur.as_secs() > 0 || schedule.thread_preferred_day == Some(Utc::now().weekday())
+            );
+            assert!(dur.as_secs() <= 7 * 86400 + 86400);
+        }
+    }
+
+    #[test]
+    fn from_config_overrides_for_multiple_days() {
+        let mut config = default_schedule_config();
+        config
+            .preferred_times_override
+            .insert("Mon".to_string(), vec!["09:00".to_string()]);
+        config.preferred_times_override.insert(
+            "Fri".to_string(),
+            vec!["14:00".to_string(), "18:00".to_string()],
+        );
+        config
+            .preferred_times_override
+            .insert("Sun".to_string(), vec!["10:30".to_string()]);
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.preferred_times_override.len(), 3);
+        assert_eq!(
+            schedule
+                .preferred_times_override
+                .get(&chrono::Weekday::Fri)
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn has_preferred_times_with_many_slots() {
+        let mut config = default_schedule_config();
+        config.preferred_times = vec![
+            "06:00".to_string(),
+            "10:00".to_string(),
+            "14:00".to_string(),
+            "18:00".to_string(),
+            "22:00".to_string(),
+        ];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert!(schedule.has_preferred_times());
+        assert_eq!(schedule.preferred_times.len(), 5);
+    }
+
+    #[test]
+    fn slot_jitter_secs_is_15_minutes() {
+        assert_eq!(SLOT_JITTER_SECS, 15 * 60);
+        assert_eq!(SLOT_JITTER_SECS, 900);
+    }
+
+    #[test]
+    fn from_config_weekday_only_active_days() {
+        let mut config = default_schedule_config();
+        config.active_days = vec![
+            "Mon".to_string(),
+            "Tue".to_string(),
+            "Wed".to_string(),
+            "Thu".to_string(),
+            "Fri".to_string(),
+        ];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.active_weekdays.len(), 5);
+        assert!(!schedule.active_weekdays.contains(&chrono::Weekday::Sat));
+        assert!(!schedule.active_weekdays.contains(&chrono::Weekday::Sun));
+    }
+
+    #[test]
+    fn from_config_weekend_only_active_days() {
+        let mut config = default_schedule_config();
+        config.active_days = vec!["Sat".to_string(), "Sun".to_string()];
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.active_weekdays.len(), 2);
+        assert!(schedule.active_weekdays.contains(&chrono::Weekday::Sat));
+        assert!(schedule.active_weekdays.contains(&chrono::Weekday::Sun));
+    }
+
+    #[test]
+    fn from_config_narrow_active_hours() {
+        let mut config = default_schedule_config();
+        config.active_hours_start = 12;
+        config.active_hours_end = 13;
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.start_hour, 12);
+        assert_eq!(schedule.end_hour, 13);
+    }
+
+    #[test]
+    fn from_config_same_start_end_degenerate() {
+        let mut config = default_schedule_config();
+        config.active_hours_start = 15;
+        config.active_hours_end = 15;
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        assert_eq!(schedule.start_hour, 15);
+        assert_eq!(schedule.end_hour, 15);
+    }
+
+    #[test]
+    fn posting_slot_debug_format_contains_hour_minute() {
+        let slot = PostingSlot::parse("14:30").unwrap();
+        let debug = format!("{:?}", slot);
+        assert!(debug.contains("14"));
+        assert!(debug.contains("30"));
+    }
+
+    #[test]
+    fn from_config_overrides_empty_slot_list() {
+        let mut config = default_schedule_config();
+        config
+            .preferred_times_override
+            .insert("Mon".to_string(), vec![]);
+        let schedule = ActiveSchedule::from_config(&config).unwrap();
+        let mon_slots = schedule
+            .preferred_times_override
+            .get(&chrono::Weekday::Mon)
+            .unwrap();
+        assert!(mon_slots.is_empty());
+    }
 }

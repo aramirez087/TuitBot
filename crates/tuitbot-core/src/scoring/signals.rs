@@ -487,4 +487,176 @@ mod tests {
     fn content_type_media_and_quote_zero() {
         assert!((content_type_score(true, true, 10.0) - 0.0).abs() < 0.01);
     }
+
+    // -----------------------------------------------------------------------
+    // Additional signals coverage tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn keyword_relevance_clamped() {
+        let keywords = vec!["rust".to_string()];
+        let score = keyword_relevance("rust", &keywords, 25.0);
+        assert!(score <= 25.0);
+    }
+
+    #[test]
+    fn keyword_relevance_all_multi_word() {
+        let keywords = vec!["rust programming".to_string(), "cli tools".to_string()];
+        // Both match, both weight 2. Total weight 4/4 = max
+        let score = keyword_relevance("rust programming and cli tools are great", &keywords, 30.0);
+        assert!((score - 30.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn keyword_relevance_partial_multi_word() {
+        let keywords = vec![
+            "rust programming".to_string(),
+            "python scripting".to_string(),
+        ];
+        // Only "rust programming" matches (weight 2), total max = 4
+        let score = keyword_relevance("rust programming is great", &keywords, 40.0);
+        assert!((score - 20.0).abs() < 0.01); // 2/4 * 40 = 20
+    }
+
+    #[test]
+    fn follower_score_1() {
+        let score = follower_score(1, 20.0);
+        // log10(1) = 0 => score = 0
+        assert!((score - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn follower_score_10() {
+        let score = follower_score(10, 20.0);
+        // log10(10)/5 = 0.2 * 20 = 4.0
+        assert!((score - 4.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn recency_exactly_5_minutes() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(5)).to_rfc3339();
+        let score = recency_score_at(&created, 15.0, now);
+        // At 5 min boundary: still in 0-5 bracket = 100%
+        assert!((score - 15.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn recency_exactly_30_minutes() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(30)).to_rfc3339();
+        let score = recency_score_at(&created, 15.0, now);
+        // At 30 min: 5-30 bracket, t=1.0 => 80%
+        let expected = 0.8 * 15.0;
+        assert!((score - expected).abs() < 0.5);
+    }
+
+    #[test]
+    fn recency_exactly_60_minutes() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(60)).to_rfc3339();
+        let score = recency_score_at(&created, 15.0, now);
+        // At 60 min: 30-60 bracket, t=1.0 => 50%
+        let expected = 0.5 * 15.0;
+        assert!((score - expected).abs() < 0.5);
+    }
+
+    #[test]
+    fn recency_exactly_6_hours() {
+        let now = Utc::now();
+        let created = (now - Duration::hours(6)).to_rfc3339();
+        let score = recency_score_at(&created, 15.0, now);
+        // At 360 min: 1-6 hour bracket, t=1.0 => 25%
+        let expected = 0.25 * 15.0;
+        assert!((score - expected).abs() < 0.5);
+    }
+
+    #[test]
+    fn recency_score_convenience_wrapper() {
+        let now = Utc::now();
+        let created = (now - Duration::minutes(2)).to_rfc3339();
+        let score = recency_score(&created, 10.0);
+        // Very recent, should be near max
+        assert!(score > 8.0);
+    }
+
+    #[test]
+    fn reply_count_10_replies() {
+        let score = reply_count_score(10, 15.0);
+        // (1 - 10/20) * 15 = 0.5 * 15 = 7.5
+        assert!((score - 7.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn reply_count_19_replies() {
+        let score = reply_count_score(19, 15.0);
+        // (1 - 19/20) * 15 = 0.05 * 15 = 0.75
+        assert!((score - 0.75).abs() < 0.01);
+    }
+
+    #[test]
+    fn reply_count_1_reply() {
+        let score = reply_count_score(1, 15.0);
+        // (1 - 1/20) * 15 = 0.95 * 15 = 14.25
+        assert!((score - 14.25).abs() < 0.01);
+    }
+
+    #[test]
+    fn targeted_follower_100() {
+        let score = targeted_follower_score(100, 15.0);
+        // 100 followers: 0.5 * 15 = 7.5
+        assert!((score - 7.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn targeted_follower_500() {
+        let score = targeted_follower_score(500, 15.0);
+        // 500 followers: 0.5 + (500-100)/1800 = 0.5 + 0.222 = 0.722
+        let expected = 0.722 * 15.0;
+        assert!((score - expected as f32).abs() < 0.2);
+    }
+
+    #[test]
+    fn targeted_follower_10000() {
+        let score = targeted_follower_score(10_000, 15.0);
+        // Sweet spot: 100%
+        assert!((score - 15.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn targeted_follower_50000() {
+        let score = targeted_follower_score(50_000, 15.0);
+        // 50K: decay zone. t = (50000-10000)/90000 = 0.444
+        // fraction = 1.0 - 0.444*0.75 = 0.667
+        let expected = 0.667 * 15.0;
+        assert!((score - expected as f32).abs() < 0.2);
+    }
+
+    #[test]
+    fn targeted_follower_1_million() {
+        let score = targeted_follower_score(1_000_000, 15.0);
+        // > 100K: floor at 25%
+        assert!((score - 3.75).abs() < 0.01);
+    }
+
+    #[test]
+    fn content_type_zero_max_score() {
+        assert!((content_type_score(false, false, 0.0) - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn engagement_mixed_metrics() {
+        // 20 likes + 10 RTs + 5 replies = 35 on 1000 followers = 3.5%
+        let score = engagement_rate(20, 10, 5, 1000, 25.0);
+        // rate=0.035, score = (0.035/0.05)*25 = 17.5
+        assert!((score - 17.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn engagement_1_like_1_follower() {
+        // edge case: 1 engagement on 1 follower = 100%
+        let score = engagement_rate(1, 0, 0, 1, 25.0);
+        // rate=1.0, capped at 1.0 => max
+        assert!((score - 25.0).abs() < 0.01);
+    }
 }

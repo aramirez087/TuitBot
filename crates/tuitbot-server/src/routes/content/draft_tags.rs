@@ -109,3 +109,24 @@ pub async fn unassign_draft_tag(
         json!({ "status": if removed { "removed" } else { "not_found" } }),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_tag_body_deserializes_with_color() {
+        let json = r##"{"name": "urgent", "color": "#ff0000"}"##;
+        let body: CreateTagBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.name, "urgent");
+        assert_eq!(body.color.as_deref(), Some("#ff0000"));
+    }
+
+    #[test]
+    fn create_tag_body_deserializes_without_color() {
+        let json = r#"{"name": "backlog"}"#;
+        let body: CreateTagBody = serde_json::from_str(json).expect("deser");
+        assert_eq!(body.name, "backlog");
+        assert!(body.color.is_none());
+    }
+}

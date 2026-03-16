@@ -286,4 +286,300 @@ mod tests {
         let parsed: ToolCategory = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, ToolCategory::EnterpriseAdmin);
     }
+
+    // --- PolicyAction serde ---
+
+    #[test]
+    fn policy_action_allow_serde() {
+        let json = serde_json::to_string(&PolicyAction::Allow).unwrap();
+        let back: PolicyAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, PolicyAction::Allow);
+    }
+
+    #[test]
+    fn policy_action_deny_serde() {
+        let action = PolicyAction::Deny {
+            reason: "blocked".into(),
+        };
+        let json = serde_json::to_string(&action).unwrap();
+        let back: PolicyAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            back,
+            PolicyAction::Deny {
+                reason: "blocked".into()
+            }
+        );
+    }
+
+    #[test]
+    fn policy_action_require_approval_serde() {
+        let action = PolicyAction::RequireApproval {
+            reason: "needs review".into(),
+        };
+        let json = serde_json::to_string(&action).unwrap();
+        let back: PolicyAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            back,
+            PolicyAction::RequireApproval {
+                reason: "needs review".into()
+            }
+        );
+    }
+
+    #[test]
+    fn policy_action_dry_run_serde() {
+        let json = serde_json::to_string(&PolicyAction::DryRun).unwrap();
+        let back: PolicyAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, PolicyAction::DryRun);
+    }
+
+    // --- RuleConditions ---
+
+    #[test]
+    fn rule_conditions_default() {
+        let rc = RuleConditions::default();
+        assert!(rc.tools.is_empty());
+        assert!(rc.categories.is_empty());
+        assert!(rc.modes.is_empty());
+        assert!(rc.schedule_window.is_none());
+    }
+
+    #[test]
+    fn rule_conditions_serde_roundtrip() {
+        let rc = RuleConditions {
+            tools: vec!["post_tweet".into()],
+            categories: vec![ToolCategory::Write],
+            modes: vec![OperatingMode::Autopilot],
+            schedule_window: Some(ScheduleWindow {
+                start_hour: 9,
+                end_hour: 17,
+                timezone: "UTC".into(),
+                days: vec!["mon".into(), "fri".into()],
+            }),
+        };
+        let json = serde_json::to_string(&rc).unwrap();
+        let back: RuleConditions = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tools, vec!["post_tweet"]);
+        assert_eq!(back.categories, vec![ToolCategory::Write]);
+        let sw = back.schedule_window.unwrap();
+        assert_eq!(sw.start_hour, 9);
+        assert_eq!(sw.end_hour, 17);
+        assert_eq!(sw.days.len(), 2);
+    }
+
+    // --- PolicyRule ---
+
+    #[test]
+    fn policy_rule_serde_roundtrip() {
+        let rule = PolicyRule {
+            id: "rule1".into(),
+            priority: 100,
+            label: "Test rule".into(),
+            enabled: true,
+            conditions: RuleConditions::default(),
+            action: PolicyAction::Allow,
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        let back: PolicyRule = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "rule1");
+        assert_eq!(back.priority, 100);
+        assert_eq!(back.label, "Test rule");
+        assert!(back.enabled);
+    }
+
+    // --- PolicyRateLimit ---
+
+    #[test]
+    fn policy_rate_limit_serde_roundtrip() {
+        let rl = PolicyRateLimit {
+            key: "mcp:like_tweet:hourly".into(),
+            dimension: RateLimitDimension::Tool,
+            match_value: "like_tweet".into(),
+            max_count: 10,
+            period_seconds: 3600,
+        };
+        let json = serde_json::to_string(&rl).unwrap();
+        let back: PolicyRateLimit = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.key, "mcp:like_tweet:hourly");
+        assert_eq!(back.dimension, RateLimitDimension::Tool);
+        assert_eq!(back.max_count, 10);
+        assert_eq!(back.period_seconds, 3600);
+    }
+
+    // --- RateLimitDimension ---
+
+    #[test]
+    fn rate_limit_dimension_serde_roundtrip() {
+        for dim in [
+            RateLimitDimension::Tool,
+            RateLimitDimension::Category,
+            RateLimitDimension::EngagementType,
+            RateLimitDimension::Global,
+        ] {
+            let json = serde_json::to_string(&dim).unwrap();
+            let back: RateLimitDimension = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, dim);
+        }
+    }
+
+    // --- PolicyTemplateName ---
+
+    #[test]
+    fn policy_template_name_display() {
+        assert_eq!(PolicyTemplateName::SafeDefault.to_string(), "safe_default");
+        assert_eq!(
+            PolicyTemplateName::GrowthAggressive.to_string(),
+            "growth_aggressive"
+        );
+        assert_eq!(PolicyTemplateName::AgencyMode.to_string(), "agency_mode");
+    }
+
+    #[test]
+    fn policy_template_name_from_str() {
+        assert_eq!(
+            "safe_default".parse::<PolicyTemplateName>().unwrap(),
+            PolicyTemplateName::SafeDefault
+        );
+        assert_eq!(
+            "growth_aggressive".parse::<PolicyTemplateName>().unwrap(),
+            PolicyTemplateName::GrowthAggressive
+        );
+        assert_eq!(
+            "agency_mode".parse::<PolicyTemplateName>().unwrap(),
+            PolicyTemplateName::AgencyMode
+        );
+        assert!("invalid".parse::<PolicyTemplateName>().is_err());
+    }
+
+    #[test]
+    fn policy_template_name_serde_roundtrip() {
+        for name in [
+            PolicyTemplateName::SafeDefault,
+            PolicyTemplateName::GrowthAggressive,
+            PolicyTemplateName::AgencyMode,
+        ] {
+            let json = serde_json::to_string(&name).unwrap();
+            let back: PolicyTemplateName = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, name);
+        }
+    }
+
+    // --- ScheduleWindow ---
+
+    #[test]
+    fn schedule_window_serde_roundtrip() {
+        let sw = ScheduleWindow {
+            start_hour: 0,
+            end_hour: 23,
+            timezone: "America/Chicago".into(),
+            days: vec!["mon".into(), "tue".into(), "wed".into()],
+        };
+        let json = serde_json::to_string(&sw).unwrap();
+        let back: ScheduleWindow = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.start_hour, 0);
+        assert_eq!(back.end_hour, 23);
+        assert_eq!(back.timezone, "America/Chicago");
+        assert_eq!(back.days.len(), 3);
+    }
+
+    #[test]
+    fn schedule_window_default_timezone() {
+        let json = r#"{"start_hour": 9, "end_hour": 17}"#;
+        let sw: ScheduleWindow = serde_json::from_str(json).unwrap();
+        assert_eq!(sw.timezone, "UTC");
+        assert!(sw.days.is_empty());
+    }
+
+    // --- ToolCategory Display all variants ---
+
+    #[test]
+    fn tool_category_display_all_variants() {
+        assert_eq!(ToolCategory::Engage.to_string(), "engage");
+        assert_eq!(ToolCategory::Media.to_string(), "media");
+        assert_eq!(ToolCategory::Thread.to_string(), "thread");
+        assert_eq!(ToolCategory::Delete.to_string(), "delete");
+    }
+
+    // --- ToolCategory serde all variants ---
+
+    #[test]
+    fn tool_category_serde_all_variants() {
+        for cat in [
+            ToolCategory::Read,
+            ToolCategory::Write,
+            ToolCategory::Engage,
+            ToolCategory::Media,
+            ToolCategory::Thread,
+            ToolCategory::Delete,
+            ToolCategory::UniversalRequest,
+            ToolCategory::EnterpriseAdmin,
+        ] {
+            let json = serde_json::to_string(&cat).unwrap();
+            let back: ToolCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, cat, "roundtrip failed for {json}");
+        }
+    }
+
+    // --- PolicyAuditRecordV2 ---
+
+    #[test]
+    fn policy_audit_record_v2_serialize() {
+        let rec = PolicyAuditRecordV2 {
+            tool_name: "post_tweet".into(),
+            category: "write".into(),
+            decision: "allow".into(),
+            reason: Some("matched rule".into()),
+            matched_rule_id: Some("r1".into()),
+            matched_rule_label: Some("allow writes".into()),
+            rate_limit_key: None,
+        };
+        let json = serde_json::to_string(&rec).unwrap();
+        assert!(json.contains("post_tweet"));
+        assert!(json.contains("allow"));
+    }
+
+    // --- tool_category additional coverage ---
+
+    #[test]
+    fn tool_category_new_read_tools() {
+        assert_eq!(tool_category("x_get_home_timeline"), ToolCategory::Read);
+        assert_eq!(tool_category("get_x_usage"), ToolCategory::Read);
+        assert_eq!(tool_category("get_policy_status"), ToolCategory::Read);
+    }
+
+    #[test]
+    fn tool_category_engage_variants() {
+        assert_eq!(tool_category("x_like_tweet"), ToolCategory::Engage);
+        assert_eq!(tool_category("x_follow_user"), ToolCategory::Engage);
+        assert_eq!(tool_category("x_unfollow_user"), ToolCategory::Engage);
+        assert_eq!(tool_category("x_retweet"), ToolCategory::Engage);
+        assert_eq!(tool_category("x_unretweet"), ToolCategory::Engage);
+        assert_eq!(tool_category("unfollow_user"), ToolCategory::Engage);
+        assert_eq!(tool_category("unretweet"), ToolCategory::Engage);
+    }
+
+    #[test]
+    fn tool_category_write_variants() {
+        assert_eq!(tool_category("x_post_tweet"), ToolCategory::Write);
+        assert_eq!(tool_category("x_reply_to_tweet"), ToolCategory::Write);
+        assert_eq!(tool_category("x_quote_tweet"), ToolCategory::Write);
+        assert_eq!(tool_category("compose_tweet"), ToolCategory::Write);
+    }
+
+    #[test]
+    fn tool_category_media_and_thread() {
+        assert_eq!(tool_category("x_upload_media"), ToolCategory::Media);
+        assert_eq!(tool_category("post_tweet_with_media"), ToolCategory::Media);
+        assert_eq!(tool_category("x_post_thread"), ToolCategory::Thread);
+        assert_eq!(tool_category("compose_thread"), ToolCategory::Thread);
+        assert_eq!(
+            tool_category("propose_and_queue_replies"),
+            ToolCategory::Thread
+        );
+    }
+
+    #[test]
+    fn tool_category_delete_variants() {
+        assert_eq!(tool_category("x_delete_tweet"), ToolCategory::Delete);
+    }
 }

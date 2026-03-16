@@ -493,4 +493,292 @@ mod tests {
         let count = get_actions_count(&pool, None, None).await.expect("count");
         assert_eq!(count, 2);
     }
+
+    #[tokio::test]
+    async fn actions_count_empty_db() {
+        let pool = init_test_db().await.expect("init db");
+        let count = get_actions_count(&pool, None, None).await.expect("count");
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn paginated_offset_beyond_data_returns_empty() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action(&pool, "search", "success", None, None)
+            .await
+            .expect("log");
+        log_action(&pool, "reply", "success", None, None)
+            .await
+            .expect("log");
+
+        let page = get_actions_paginated(&pool, 10, 100, None, None)
+            .await
+            .expect("page");
+        assert!(page.is_empty(), "offset past data should return empty");
+    }
+
+    #[tokio::test]
+    async fn get_recent_actions_returns_limited_set() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action(&pool, "search", "success", Some("first"), None)
+            .await
+            .expect("log");
+        log_action(&pool, "reply", "success", Some("second"), None)
+            .await
+            .expect("log");
+        log_action(&pool, "tweet", "success", Some("third"), None)
+            .await
+            .expect("log");
+
+        let recent = get_recent_actions(&pool, 2).await.expect("get");
+        assert_eq!(recent.len(), 2, "should respect limit");
+
+        let all = get_recent_actions(&pool, 10).await.expect("get all");
+        assert_eq!(all.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn log_action_with_null_message_and_metadata() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action(&pool, "cleanup", "success", None, None)
+            .await
+            .expect("log");
+
+        let actions = get_actions_since(&pool, "2000-01-01T00:00:00Z", None)
+            .await
+            .expect("get");
+        assert_eq!(actions.len(), 1);
+        assert!(actions[0].message.is_none());
+        assert!(actions[0].metadata.is_none());
+    }
+
+    #[tokio::test]
+    async fn action_counts_since_future_returns_empty() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action(&pool, "search", "success", None, None)
+            .await
+            .expect("log");
+
+        let counts = get_action_counts_since(&pool, "2099-01-01T00:00:00Z")
+            .await
+            .expect("counts");
+        assert!(counts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn paginated_type_and_status_combined_count() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action(&pool, "reply", "success", None, None)
+            .await
+            .expect("log");
+        log_action(&pool, "reply", "failure", None, None)
+            .await
+            .expect("log");
+        log_action(&pool, "reply", "success", None, None)
+            .await
+            .expect("log");
+        log_action(&pool, "tweet", "success", None, None)
+            .await
+            .expect("log");
+
+        let count = get_actions_count(&pool, Some("reply"), Some("success"))
+            .await
+            .expect("count");
+        assert_eq!(count, 2);
+
+        let page = get_actions_paginated(&pool, 10, 0, Some("reply"), Some("success"))
+            .await
+            .expect("page");
+        assert_eq!(page.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn log_action_for_different_accounts() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action_for(&pool, "acct_a", "search", "success", Some("a"), None)
+            .await
+            .expect("log a");
+        log_action_for(&pool, "acct_b", "search", "success", Some("b"), None)
+            .await
+            .expect("log b");
+        log_action_for(&pool, "acct_a", "reply", "success", Some("a2"), None)
+            .await
+            .expect("log a2");
+
+        let actions_a = get_actions_since_for(&pool, "acct_a", "2000-01-01T00:00:00Z", None)
+            .await
+            .expect("get a");
+        assert_eq!(actions_a.len(), 2);
+
+        let actions_b = get_actions_since_for(&pool, "acct_b", "2000-01-01T00:00:00Z", None)
+            .await
+            .expect("get b");
+        assert_eq!(actions_b.len(), 1);
+
+        let count_a = get_actions_count_for(&pool, "acct_a", None, None)
+            .await
+            .expect("count a");
+        assert_eq!(count_a, 2);
+
+        let count_b = get_actions_count_for(&pool, "acct_b", None, None)
+            .await
+            .expect("count b");
+        assert_eq!(count_b, 1);
+    }
+
+    #[tokio::test]
+    async fn get_recent_actions_respects_limit() {
+        let pool = init_test_db().await.expect("init db");
+
+        for i in 0..5 {
+            log_action(
+                &pool,
+                "search",
+                "success",
+                Some(&format!("Action {i}")),
+                None,
+            )
+            .await
+            .expect("log");
+        }
+
+        let recent = get_recent_actions(&pool, 0).await.expect("get");
+        assert!(recent.is_empty(), "limit 0 should return empty");
+
+        let recent = get_recent_actions(&pool, 1).await.expect("get");
+        assert_eq!(recent.len(), 1);
+    }
+
+    // ================================================================
+    // Account-scoped `_for` variant isolation tests
+    // ================================================================
+
+    #[tokio::test]
+    async fn get_action_counts_since_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action_for(&pool, "acct_x", "search", "success", None, None)
+            .await
+            .expect("log x");
+        log_action_for(&pool, "acct_x", "search", "success", None, None)
+            .await
+            .expect("log x2");
+        log_action_for(&pool, "acct_x", "reply", "success", None, None)
+            .await
+            .expect("log x3");
+        log_action_for(&pool, "acct_y", "search", "success", None, None)
+            .await
+            .expect("log y");
+
+        let counts_x = get_action_counts_since_for(&pool, "acct_x", "2000-01-01T00:00:00Z")
+            .await
+            .expect("counts x");
+        assert_eq!(counts_x.get("search"), Some(&2));
+        assert_eq!(counts_x.get("reply"), Some(&1));
+
+        let counts_y = get_action_counts_since_for(&pool, "acct_y", "2000-01-01T00:00:00Z")
+            .await
+            .expect("counts y");
+        assert_eq!(counts_y.get("search"), Some(&1));
+        assert!(counts_y.get("reply").is_none());
+    }
+
+    #[tokio::test]
+    async fn get_actions_paginated_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+
+        for i in 0..5 {
+            log_action_for(
+                &pool,
+                "acct_p",
+                "search",
+                "success",
+                Some(&format!("P{i}")),
+                None,
+            )
+            .await
+            .expect("log p");
+        }
+        for i in 0..3 {
+            log_action_for(
+                &pool,
+                "acct_q",
+                "reply",
+                "failure",
+                Some(&format!("Q{i}")),
+                None,
+            )
+            .await
+            .expect("log q");
+        }
+
+        // Paginate acct_p
+        let page1 = get_actions_paginated_for(&pool, "acct_p", 3, 0, None, None)
+            .await
+            .expect("page1");
+        assert_eq!(page1.len(), 3);
+
+        let page2 = get_actions_paginated_for(&pool, "acct_p", 3, 3, None, None)
+            .await
+            .expect("page2");
+        assert_eq!(page2.len(), 2);
+
+        // acct_q should have its own data
+        let q_all = get_actions_paginated_for(&pool, "acct_q", 10, 0, None, None)
+            .await
+            .expect("q all");
+        assert_eq!(q_all.len(), 3);
+        assert!(q_all.iter().all(|a| a.action_type == "reply"));
+
+        // Filter by type within account
+        let q_filtered =
+            get_actions_paginated_for(&pool, "acct_q", 10, 0, Some("reply"), Some("failure"))
+                .await
+                .expect("q filtered");
+        assert_eq!(q_filtered.len(), 3);
+
+        // Cross-check: acct_p should have no reply actions
+        let p_replies = get_actions_paginated_for(&pool, "acct_p", 10, 0, Some("reply"), None)
+            .await
+            .expect("p replies");
+        assert!(p_replies.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_recent_actions_for_account_isolation() {
+        let pool = init_test_db().await.expect("init db");
+
+        log_action_for(&pool, "acct_r", "search", "success", Some("R1"), None)
+            .await
+            .expect("log r1");
+        log_action_for(&pool, "acct_r", "reply", "success", Some("R2"), None)
+            .await
+            .expect("log r2");
+        log_action_for(&pool, "acct_s", "tweet", "success", Some("S1"), None)
+            .await
+            .expect("log s1");
+
+        let recent_r = get_recent_actions_for(&pool, "acct_r", 10)
+            .await
+            .expect("recent r");
+        assert_eq!(recent_r.len(), 2);
+
+        let recent_s = get_recent_actions_for(&pool, "acct_s", 10)
+            .await
+            .expect("recent s");
+        assert_eq!(recent_s.len(), 1);
+        assert_eq!(recent_s[0].message.as_deref(), Some("S1"));
+
+        // Limit works per account
+        let recent_r1 = get_recent_actions_for(&pool, "acct_r", 1)
+            .await
+            .expect("recent r limited");
+        assert_eq!(recent_r1.len(), 1);
+    }
 }

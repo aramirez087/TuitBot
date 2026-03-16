@@ -439,3 +439,192 @@ fn extract_drive_id(provider_id: &str) -> Result<String, SourceError> {
         Ok(provider_id.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_drive_id ─────────────────────────────────────────────
+
+    #[test]
+    fn extract_drive_id_with_prefix_and_name() {
+        let id = extract_drive_id("gdrive://abc123/doc.md").unwrap();
+        assert_eq!(id, "abc123");
+    }
+
+    #[test]
+    fn extract_drive_id_with_prefix_no_name() {
+        let id = extract_drive_id("gdrive://abc123").unwrap();
+        assert_eq!(id, "abc123");
+    }
+
+    #[test]
+    fn extract_drive_id_raw_id() {
+        let id = extract_drive_id("abc123").unwrap();
+        assert_eq!(id, "abc123");
+    }
+
+    #[test]
+    fn extract_drive_id_with_nested_path() {
+        let id = extract_drive_id("gdrive://xyz/folder/file.txt").unwrap();
+        assert_eq!(id, "xyz");
+    }
+
+    #[test]
+    fn extract_drive_id_empty_after_prefix() {
+        let id = extract_drive_id("gdrive://").unwrap();
+        assert_eq!(id, "");
+    }
+
+    // ── is_revocation_error ──────────────────────────────────────────
+
+    #[test]
+    fn revocation_error_detects_revoked() {
+        assert!(is_revocation_error("Token has been revoked by user"));
+    }
+
+    #[test]
+    fn revocation_error_detects_invalid_grant() {
+        assert!(is_revocation_error("invalid_grant: token expired"));
+    }
+
+    #[test]
+    fn revocation_error_detects_expired_or_revoked() {
+        assert!(is_revocation_error("Token has been expired or revoked"));
+    }
+
+    #[test]
+    fn revocation_error_returns_false_for_network_error() {
+        assert!(!is_revocation_error("connection timeout"));
+    }
+
+    #[test]
+    fn revocation_error_case_insensitive() {
+        assert!(is_revocation_error("REVOKED"));
+        assert!(is_revocation_error("Invalid_Grant"));
+    }
+
+    // ── GoogleDriveProvider construction ─────────────────────────────
+
+    #[test]
+    fn new_creates_service_account_provider() {
+        let provider =
+            GoogleDriveProvider::new("folder123".to_string(), "/path/to/key.json".to_string());
+        assert_eq!(provider.folder_id, "folder123");
+        assert!(matches!(
+            provider.auth_strategy,
+            DriveAuthStrategy::ServiceAccount { .. }
+        ));
+    }
+
+    #[test]
+    fn source_type_is_google_drive() {
+        let provider =
+            GoogleDriveProvider::new("folder123".to_string(), "/path/to/key.json".to_string());
+        assert_eq!(provider.source_type(), "google_drive");
+    }
+
+    #[test]
+    fn with_client_creates_provider_with_custom_http_client() {
+        let client = reqwest::Client::new();
+        let provider = GoogleDriveProvider::with_client(
+            "folder123".to_string(),
+            "/path/to/key.json".to_string(),
+            client,
+        );
+        assert_eq!(provider.folder_id, "folder123");
+    }
+
+    #[test]
+    fn token_cache_starts_empty() {
+        let provider =
+            GoogleDriveProvider::new("folder123".to_string(), "/path/to/key.json".to_string());
+        let cache = provider.token_cache.lock().unwrap();
+        assert!(cache.is_none());
+    }
+
+    #[test]
+    fn extract_drive_id_for_test_helper() {
+        let id = GoogleDriveProvider::extract_drive_id_for_test("gdrive://myid/name.md");
+        assert_eq!(id, "myid");
+    }
+
+    // ── extract_drive_id edge cases ──────────────────────────────────
+
+    #[test]
+    fn extract_drive_id_long_id() {
+        let id = extract_drive_id("gdrive://1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/doc.md")
+            .unwrap();
+        assert_eq!(id, "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms");
+    }
+
+    #[test]
+    fn extract_drive_id_special_chars_in_name() {
+        let id = extract_drive_id("gdrive://abc123/my file (1).md").unwrap();
+        assert_eq!(id, "abc123");
+    }
+
+    // ── is_revocation_error edge cases ───────────────────────────────
+
+    #[test]
+    fn revocation_error_empty_string() {
+        assert!(!is_revocation_error(""));
+    }
+
+    #[test]
+    fn revocation_error_partial_match() {
+        assert!(!is_revocation_error("revo")); // partial "revoked"
+    }
+
+    #[test]
+    fn revocation_error_with_surrounding_text() {
+        assert!(is_revocation_error(
+            "Error: token has been expired or revoked by user"
+        ));
+    }
+
+    // ── GoogleDriveProvider constructors ──────────────────────────────
+
+    #[test]
+    fn new_preserves_folder_id() {
+        let provider = GoogleDriveProvider::new("folder_abc".to_string(), "/key.json".to_string());
+        assert_eq!(provider.folder_id, "folder_abc");
+    }
+
+    #[test]
+    fn new_provider_source_type() {
+        let provider = GoogleDriveProvider::new("f".to_string(), "/k.json".to_string());
+        assert_eq!(provider.source_type(), "google_drive");
+    }
+
+    // ── DriveAuthStrategy matching ───────────────────────────────────
+
+    #[test]
+    fn service_account_strategy_matches() {
+        let provider = GoogleDriveProvider::new("folder".to_string(), "/path/key.json".to_string());
+        assert!(matches!(
+            provider.auth_strategy,
+            DriveAuthStrategy::ServiceAccount { .. }
+        ));
+    }
+
+    // ── CachedToken usage ────────────────────────────────────────────
+
+    #[test]
+    fn cached_token_expires_at_is_in_future() {
+        let token = CachedToken {
+            access_token: "tok".to_string(),
+            expires_at: Instant::now() + Duration::from_secs(3600),
+        };
+        assert!(token.expires_at > Instant::now());
+    }
+
+    #[test]
+    fn cached_token_expired() {
+        let token = CachedToken {
+            access_token: "old_tok".to_string(),
+            expires_at: Instant::now() - Duration::from_secs(1),
+        };
+        assert!(token.expires_at < Instant::now());
+    }
+}

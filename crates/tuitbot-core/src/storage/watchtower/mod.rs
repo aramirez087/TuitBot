@@ -11,6 +11,8 @@ mod sources;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_storage;
 
 pub use chunks::*;
 pub use connections::*;

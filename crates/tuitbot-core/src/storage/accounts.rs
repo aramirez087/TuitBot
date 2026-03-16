@@ -526,4 +526,153 @@ mod tests {
             PathBuf::from("/home/user/.tuitbot/accounts/abc-123/tokens.json")
         );
     }
+
+    #[tokio::test]
+    async fn ensure_default_account_idempotent() {
+        let pool = init_test_db().await.expect("init db");
+        // Call ensure twice — should not error
+        ensure_default_account(&pool).await.expect("first call");
+        ensure_default_account(&pool).await.expect("second call");
+
+        let account = get_account(&pool, DEFAULT_ACCOUNT_ID)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(account.label, "Default");
+    }
+
+    #[tokio::test]
+    async fn update_account_config_overrides() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "ConfigTest")
+            .await
+            .expect("create");
+
+        let overrides_json = r#"{"business":{"product_name":"TestProd"}}"#;
+        update_account(
+            &pool,
+            &id,
+            UpdateAccountParams {
+                config_overrides: Some(overrides_json),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+
+        let account = get_account(&pool, &id).await.expect("get").expect("found");
+        assert_eq!(account.config_overrides, overrides_json);
+    }
+
+    #[tokio::test]
+    async fn update_account_token_path_and_status() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "TokenTest")
+            .await
+            .expect("create");
+
+        update_account(
+            &pool,
+            &id,
+            UpdateAccountParams {
+                token_path: Some("/data/tokens.json"),
+                status: Some("paused"),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+
+        let account = get_account(&pool, &id).await.expect("get").expect("found");
+        assert_eq!(account.token_path.as_deref(), Some("/data/tokens.json"));
+        assert_eq!(account.status, "paused");
+    }
+
+    #[tokio::test]
+    async fn account_exists_after_archive() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "ArchiveCheck")
+            .await
+            .expect("create");
+        assert!(account_exists(&pool, &id).await.expect("check"));
+
+        delete_account(&pool, &id).await.expect("archive");
+        // account_exists only returns active accounts
+        assert!(!account_exists(&pool, &id)
+            .await
+            .expect("check after archive"));
+    }
+
+    #[tokio::test]
+    async fn role_for_non_default_account_unknown_actor() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "RoleCheck")
+            .await
+            .expect("create");
+
+        // Unknown actor on non-default account should return None
+        let role = get_role(&pool, &id, "unknown_actor")
+            .await
+            .expect("get role");
+        assert!(role.is_none());
+    }
+
+    #[tokio::test]
+    async fn create_account_auto_grants_dashboard_admin() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "AutoGrant")
+            .await
+            .expect("create");
+
+        let roles = list_roles(&pool, &id).await.expect("list");
+        assert!(roles
+            .iter()
+            .any(|r| r.actor == "dashboard" && r.role == "admin"));
+    }
+
+    #[tokio::test]
+    async fn new_account_has_blank_overrides() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "OverrideCheck")
+            .await
+            .expect("create");
+
+        let account = get_account(&pool, &id).await.expect("get").expect("found");
+        // Config overrides should contain blank product_name
+        let overrides: serde_json::Value =
+            serde_json::from_str(&account.config_overrides).expect("parse");
+        assert_eq!(overrides["business"]["product_name"].as_str(), Some(""));
+    }
+
+    #[tokio::test]
+    async fn update_account_only_provided_fields() {
+        let pool = init_test_db().await.expect("init db");
+        let id = uuid::Uuid::new_v4().to_string();
+        create_account(&pool, &id, "PartialUpdate")
+            .await
+            .expect("create");
+
+        // Only update label, leave everything else
+        update_account(
+            &pool,
+            &id,
+            UpdateAccountParams {
+                label: Some("NewLabel"),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("update");
+
+        let account = get_account(&pool, &id).await.expect("get").expect("found");
+        assert_eq!(account.label, "NewLabel");
+        assert!(account.x_user_id.is_none()); // unchanged
+        assert!(account.x_username.is_none()); // unchanged
+    }
 }
