@@ -473,9 +473,14 @@ jobs:
         run: |
           set -euo pipefail
           sbom_file="dist/tuitbot-${TAG}-sbom.cdx.json"
+          # syft rejects extensionless config paths like /dev/null.
+          empty_syft_config="$(mktemp /tmp/syft-empty-config-XXXXXX)"
+          mv "$empty_syft_config" "${empty_syft_config}.yaml"
+          empty_syft_config="${empty_syft_config}.yaml"
+          trap 'rm -f "$empty_syft_config"' EXIT
           # Scan both the Rust workspace root and the Node dashboard
           syft dir:. \
-            --config /dev/null \
+            --config "${empty_syft_config}" \
             --scope all-layers \
             --output cyclonedx-json="${sbom_file}"
           echo "SBOM written to: ${sbom_file}"
