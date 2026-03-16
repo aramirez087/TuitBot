@@ -27,7 +27,7 @@ tokio-util = "0.7"
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
 dirs = "6"
 open = "5"
-dialoguer = "0.11"
+dialoguer = "0.12"
 console = "0.16"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
