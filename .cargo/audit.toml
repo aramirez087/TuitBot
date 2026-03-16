@@ -2,4 +2,7 @@
 ignore = [
     # sqlx-mysql is not used by this project (SQLite-only), and the advisory has no fixed upgrade.
     "RUSTSEC-2023-0071",
+    # rquest 5.1.0 is pinned to lru 0.13.0 (soundness issue). Awaiting upstream rquest update.
+    # Our code does not call lru IterMut directly (transitive dep). Remove when rquest upgrades lru.
+    "RUSTSEC-2026-0002",
 ]

@@ -5,7 +5,7 @@
 //! LLM produces distinctly different content depending on the chosen
 //! framework.
 
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 
 // ============================================================================
 // Reply archetypes
@@ -41,7 +41,7 @@ impl ReplyArchetype {
         ];
 
         let total: u32 = choices.iter().map(|(_, w)| w).sum();
-        let mut roll = rng.gen_range(0..total);
+        let mut roll = rng.random_range(0..total);
         for (archetype, weight) in choices {
             if roll < *weight {
                 return *archetype;
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn reply_archetype_select_returns_valid() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..100 {
             let _ = ReplyArchetype::select(&mut rng);
         }
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn reply_archetype_select_distribution() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut counts = [0u32; 5];
         for _ in 0..1000 {
             let archetype = ReplyArchetype::select(&mut rng);
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn tweet_format_select_avoids_recent() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let recent = vec![TweetFormat::List, TweetFormat::Tip, TweetFormat::Question];
 
         for _ in 0..50 {
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn tweet_format_select_clears_when_all_recent() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let recent: Vec<TweetFormat> = TweetFormat::ALL.to_vec();
         // When all are recent, should still pick one
         let format = TweetFormat::select(&recent, &mut rng);
@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn thread_structure_select_returns_valid() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..50 {
             let structure = ThreadStructure::select(&mut rng);
             assert!(ThreadStructure::ALL.contains(&structure));
