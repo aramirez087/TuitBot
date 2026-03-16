@@ -61,7 +61,37 @@ Check `.github/workflows/coverage.yml`:
 
 Both uploads are **non-blocking** (`fail_ci_if_error: false`) — CI won't fail if Codecov is unreachable or the token is missing.
 
-### 4. Test the Integration
+### 4. Verify Coverage Artifacts
+
+Before testing, verify that the coverage workflows produce valid artifacts.
+
+**Verify Rust coverage (tarpaulin):**
+```bash
+cd /tmp/TuitBot
+cargo tarpaulin --workspace \
+  --exclude-files "crates/*/src/bin/**" \
+  --timeout 120 \
+  --out xml \
+  --output-dir coverage/ \
+  -- \
+  --skip tools::benchmark
+
+# Check output
+ls -la coverage/cobertura.xml
+```
+
+**Verify Frontend coverage (Vitest):**
+```bash
+cd /tmp/TuitBot/dashboard
+npm run test:coverage
+
+# Check output
+ls -la coverage/lcov.info
+```
+
+Both files must exist with content for Codecov upload to succeed.
+
+### 5. Test the Integration
 
 **Option A: Trigger via PR**
 1. Create a feature branch
