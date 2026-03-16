@@ -377,14 +377,14 @@ jobs:
           Compress-Archive -Path dist/server-package/* -DestinationPath "dist/tuitbot-server-$env:TARGET.zip" -Force
 
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuitbot-${{ matrix.target }}
           path: dist/tuitbot-${{ matrix.target }}.${{ matrix.archive_ext }}
           if-no-files-found: error
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuitbot-server-${{ matrix.target }}
           path: dist/tuitbot-server-${{ matrix.target }}.${{ matrix.archive_ext }}
