@@ -11,6 +11,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+  # benchmark-action/github-action-benchmark still declares node20 upstream.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
