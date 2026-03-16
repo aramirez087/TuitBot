@@ -39,13 +39,12 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-bench-
 
       - name: Run benchmarks (bencher output for trend tracking)
-        # --output-format bencher emits the standard cargo-bench text format:
+        # criterion 0.8+ outputs bencher-compatible format by default:
         #   test <name> ... bench: <ns/iter> (+/- <variance>)
         # which github-action-benchmark can parse and store.
         run: |
           mkdir -p bench-output
           cargo bench -p tuitbot-core \
-            -- --output-format bencher \
             2>&1 | tee bench-output/rust.txt
 
       - name: Upload criterion HTML report (artifact)
