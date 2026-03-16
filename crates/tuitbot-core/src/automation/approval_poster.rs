@@ -13,18 +13,22 @@ use tokio_util::sync::CancellationToken;
 use crate::storage::{self, DbPool};
 use crate::x_api::XApiClient;
 
-/// Run the approval poster loop.
+/// Run the approval poster loop for a specific account.
 ///
-/// Polls the approval queue for approved items and posts them to X.
+/// Polls the approval queue for approved items belonging to `account_id`
+/// and posts them to X using the provided `x_client` (which must be
+/// constructed with that account's credentials).
+///
 /// Uses randomized delay between `min_delay` and `max_delay` to appear human-like.
 pub async fn run_approval_poster(
     pool: DbPool,
     x_client: Arc<dyn XApiClient>,
+    account_id: String,
     min_delay: Duration,
     max_delay: Duration,
     cancel: CancellationToken,
 ) {
-    tracing::info!("Approval poster loop started");
+    tracing::info!(account_id = %account_id, "Approval poster loop started");
 
     // Poll interval when no items are found.
     let idle_interval = Duration::from_secs(15);
@@ -39,10 +43,11 @@ pub async fn run_approval_poster(
             () = tokio::time::sleep(idle_interval) => {}
         }
 
-        match storage::approval_queue::get_next_approved(&pool).await {
+        match storage::approval_queue::get_next_approved_for(&pool, &account_id).await {
             Ok(Some(item)) => {
                 tracing::info!(
                     id = item.id,
+                    account_id = %account_id,
                     action_type = %item.action_type,
                     "Posting approved item"
                 );
@@ -91,8 +96,13 @@ pub async fn run_approval_poster(
                             tweet_id = %tweet_id,
                             "Approved item posted successfully"
                         );
-                        if let Err(e) =
-                            storage::approval_queue::mark_posted(&pool, item.id, &tweet_id).await
+                        if let Err(e) = storage::approval_queue::mark_posted_for(
+                            &pool,
+                            &account_id,
+                            item.id,
+                            &tweet_id,
+                        )
+                        .await
                         {
                             tracing::warn!(
                                 id = item.id,
@@ -102,14 +112,15 @@ pub async fn run_approval_poster(
                         }
 
                         // Propagate vault provenance to original_tweets record.
-                        propagate_provenance(&pool, &item, &tweet_id).await;
+                        propagate_provenance(&pool, &account_id, &item, &tweet_id).await;
 
                         // Write loop-back metadata to source notes.
-                        execute_loopback_for_provenance(&pool, &item, &tweet_id).await;
+                        execute_loopback_for_provenance(&pool, &account_id, &item, &tweet_id).await;
 
                         // Log the action.
-                        let _ = storage::action_log::log_action(
+                        let _ = storage::action_log::log_action_for(
                             &pool,
+                            &account_id,
                             &format!("{}_posted", item.action_type),
                             "success",
                             Some(&format!("Posted approved item {}", item.id)),
@@ -123,14 +134,16 @@ pub async fn run_approval_poster(
                             error = %e,
                             "Failed to post approved item"
                         );
-                        let _ = storage::approval_queue::mark_failed(
+                        let _ = storage::approval_queue::mark_failed_for(
                             &pool,
+                            &account_id,
                             item.id,
                             &format!("Posting failed: {e}"),
                         )
                         .await;
-                        let _ = storage::action_log::log_action(
+                        let _ = storage::action_log::log_action_for(
                             &pool,
+                            &account_id,
                             &format!("{}_posted", item.action_type),
                             "error",
                             Some(&format!("Failed to post approved item {}: {}", item.id, e)),
@@ -155,7 +168,7 @@ pub async fn run_approval_poster(
         }
     }
 
-    tracing::info!("Approval poster loop stopped");
+    tracing::info!(account_id = %account_id, "Approval poster loop stopped");
 }
 
 /// Post a reply to a tweet via toolkit.
@@ -224,13 +237,14 @@ async fn upload_media(
 /// If the approval item has a `source_node_id`, inserts an `original_tweets`
 /// record with that node ID set, and copies provenance links from the
 /// `approval_queue` entity to the new `original_tweet` entity.
+///
+/// `account_id` must match the account that owns the approval item.
 async fn propagate_provenance(
     pool: &DbPool,
+    account_id: &str,
     item: &storage::approval_queue::ApprovalItem,
     tweet_id: &str,
 ) {
-    use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
-
     // Insert an original_tweets record for provenance tracking.
     if item.source_node_id.is_some() || item.source_seed_id.is_some() {
         let tweet = storage::threads::OriginalTweet {
@@ -248,15 +262,12 @@ async fn propagate_provenance(
             error_message: None,
         };
 
-        match storage::threads::insert_original_tweet_for(pool, DEFAULT_ACCOUNT_ID, &tweet).await {
+        match storage::threads::insert_original_tweet_for(pool, account_id, &tweet).await {
             Ok(ot_id) => {
                 // Set source_node_id on the original_tweet.
                 if let Some(node_id) = item.source_node_id {
                     let _ = storage::threads::set_original_tweet_source_node_for(
-                        pool,
-                        DEFAULT_ACCOUNT_ID,
-                        ot_id,
-                        node_id,
+                        pool, account_id, ot_id, node_id,
                     )
                     .await;
                 }
@@ -264,7 +275,7 @@ async fn propagate_provenance(
                 // Copy provenance links from approval_queue to original_tweet.
                 let _ = storage::provenance::copy_links_for(
                     pool,
-                    DEFAULT_ACCOUNT_ID,
+                    account_id,
                     "approval_queue",
                     item.id,
                     "original_tweet",
@@ -287,33 +298,30 @@ async fn propagate_provenance(
 ///
 /// Looks up provenance links for the approval queue item, deduplicates by
 /// `node_id`, and calls `execute_loopback()` for each unique node.
+///
+/// `account_id` must match the account that owns the approval item.
 async fn execute_loopback_for_provenance(
     pool: &DbPool,
+    account_id: &str,
     item: &storage::approval_queue::ApprovalItem,
     tweet_id: &str,
 ) {
     use crate::automation::watchtower::loopback;
-    use crate::storage::accounts::DEFAULT_ACCOUNT_ID;
     use std::collections::HashSet;
 
     let url = format!("https://x.com/i/status/{tweet_id}");
     let content_type = &item.action_type;
 
     // Collect unique node_ids from provenance links.
-    let links = match storage::provenance::get_links_for(
-        pool,
-        DEFAULT_ACCOUNT_ID,
-        "approval_queue",
-        item.id,
-    )
-    .await
-    {
-        Ok(l) => l,
-        Err(e) => {
-            tracing::debug!(id = item.id, error = %e, "No provenance links for loopback");
-            return;
-        }
-    };
+    let links =
+        match storage::provenance::get_links_for(pool, account_id, "approval_queue", item.id).await
+        {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::debug!(id = item.id, error = %e, "No provenance links for loopback");
+                return;
+            }
+        };
 
     let mut seen = HashSet::new();
     for link in &links {
