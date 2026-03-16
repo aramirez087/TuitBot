@@ -27,7 +27,7 @@
 		"@types/node": "^25.5.0",
 		"@vitest/coverage-v8": "^4.1.0",
 		"jsdom": "^29.0.0",
-		"svelte": "^5.51.0",
+		"svelte": "^5.53.12",
 		"svelte-check": "^4.4.5",
 		"tailwindcss": "^4.2.1",
 		"typescript": "^5.9.3",
