@@ -295,10 +295,10 @@ pub struct PkceChallenge {
 /// Generate a PKCE code verifier, challenge, and state parameter.
 pub fn generate_pkce() -> PkceChallenge {
     use rand::Rng;
-    let random_bytes: [u8; 32] = rand::thread_rng().gen();
+    let random_bytes: [u8; 32] = rand::rng().random();
     let verifier = URL_SAFE_NO_PAD.encode(random_bytes);
     let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-    let state_bytes: [u8; 16] = rand::thread_rng().gen();
+    let state_bytes: [u8; 16] = rand::rng().random();
     let state = URL_SAFE_NO_PAD.encode(state_bytes);
     PkceChallenge {
         verifier,

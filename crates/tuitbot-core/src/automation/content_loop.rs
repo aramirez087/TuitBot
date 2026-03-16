@@ -9,7 +9,7 @@ use super::loop_helpers::{
 };
 use super::schedule::{apply_slot_jitter, schedule_gate, ActiveSchedule};
 use super::scheduler::LoopScheduler;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::SeedableRng;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
@@ -109,7 +109,7 @@ impl ContentLoop {
             .max(min_recent)
             .min(self.topics.len());
         let mut recent_topics: Vec<String> = Vec::with_capacity(max_recent);
-        let mut rng = rand::rngs::StdRng::from_entropy();
+        let mut rng = rand::rngs::StdRng::from_os_rng();
 
         loop {
             if cancel.is_cancelled() {
@@ -278,7 +278,7 @@ impl ContentLoop {
                 if self.topics.is_empty() {
                     return ContentResult::NoTopics;
                 }
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 self.topics
                     .choose(&mut rng)
                     .expect("topics is non-empty")
@@ -364,7 +364,7 @@ impl ContentLoop {
         rng: &mut impl rand::Rng,
     ) -> String {
         if let Some(scorer) = &self.topic_scorer {
-            let roll: f64 = rng.gen();
+            let roll: f64 = rng.random();
             if roll < EXPLOIT_RATIO {
                 // Exploit: try to pick from top-performing topics
                 if let Ok(top_topics) = scorer.get_top_topics(10).await {
@@ -956,7 +956,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::TooSoon { .. }));
     }
@@ -983,7 +983,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = content.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ContentResult::Posted { .. }));
         assert_eq!(storage.posted_count(), 1);
@@ -1035,7 +1035,7 @@ mod tests {
     fn pick_topic_avoids_recent() {
         let topics = make_topics();
         let mut recent = vec!["Rust".to_string(), "CLI tools".to_string()];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..20 {
             let topic = pick_topic(&topics, &mut recent, &mut rng);
@@ -1049,7 +1049,7 @@ mod tests {
     fn pick_topic_clears_when_all_recent() {
         let topics = make_topics();
         let mut recent = topics.clone();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // Should clear recent and pick any topic
         let topic = pick_topic(&topics, &mut recent, &mut rng);
@@ -1203,7 +1203,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let topic = content
             .pick_topic_epsilon_greedy(&mut recent, &mut rng)
@@ -1225,7 +1225,7 @@ mod tests {
         fn low_roll() -> Self {
             Self {
                 first_u64: Some(0),
-                inner: rand::thread_rng(),
+                inner: rand::rng(),
             }
         }
 
@@ -1233,7 +1233,7 @@ mod tests {
         fn high_roll() -> Self {
             Self {
                 first_u64: Some(u64::MAX),
-                inner: rand::thread_rng(),
+                inner: rand::rng(),
             }
         }
     }
@@ -1251,9 +1251,6 @@ mod tests {
         }
         fn fill_bytes(&mut self, dest: &mut [u8]) {
             self.inner.fill_bytes(dest);
-        }
-        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-            self.inner.try_fill_bytes(dest)
         }
     }
 }

@@ -7,7 +7,7 @@
 use super::loop_helpers::{ContentLoopError, ContentSafety, ContentStorage, ThreadPoster};
 use super::schedule::{apply_slot_jitter, schedule_gate, ActiveSchedule};
 use super::scheduler::LoopScheduler;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::SeedableRng;
 use std::sync::Arc;
 use std::time::Duration;
@@ -122,7 +122,7 @@ impl ThreadLoop {
             .max(min_recent)
             .min(self.topics.len());
         let mut recent_topics: Vec<String> = Vec::with_capacity(max_recent);
-        let mut rng = rand::rngs::StdRng::from_entropy();
+        let mut rng = rand::rngs::StdRng::from_os_rng();
 
         loop {
             if cancel.is_cancelled() {
@@ -252,7 +252,7 @@ impl ThreadLoop {
                 if self.topics.is_empty() {
                     return ThreadResult::NoTopics;
                 }
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 self.topics
                     .choose(&mut rng)
                     .expect("topics is non-empty")
@@ -1061,7 +1061,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = thread_loop.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ThreadResult::TooSoon { .. }));
     }
@@ -1089,7 +1089,7 @@ mod tests {
         );
 
         let mut recent = Vec::new();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let result = thread_loop.run_iteration(&mut recent, 3, &mut rng).await;
         assert!(matches!(result, ThreadResult::Posted { .. }));
         assert_eq!(poster.posted_count(), 5);
