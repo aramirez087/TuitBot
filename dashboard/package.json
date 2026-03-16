@@ -43,6 +43,6 @@
 		"@tauri-apps/plugin-store": "^2.0.0-rc",
 		"@tauri-apps/plugin-updater": "^2.0.0-rc",
 		"chart.js": "^4.5.1",
-		"lucide-svelte": "^0.575.0"
+		"lucide-svelte": "^0.577.0"
 	}
 }
