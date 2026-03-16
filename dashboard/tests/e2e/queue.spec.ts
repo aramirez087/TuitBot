@@ -2,7 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 
 /**
  * E2E Tests: Approval Queue / Scheduled Items
- * Covers: Queue list display, item filtering, reordering, deletion/approval
+ * Hard assertions: Tests fail if critical UI is missing.
  */
 
 const TEST_PASSPHRASE = process.env.TEST_PASSPHRASE || 'test test test test';
@@ -22,142 +22,105 @@ test.describe('Approval Queue / Scheduled Items', () => {
 		await authenticateOnce(page);
 	});
 
-	test('should display approval queue on /approval route', async ({ page }) => {
+	test('should navigate to approval queue page', async ({ page }) => {
+		// Hard assert: must be able to reach /approval
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
-
-		// Should show queue title/header
-		const header = page.locator('h1, h2').filter({ hasText: /approval|queue|pending/i }).first();
 		
-		// Either header exists OR we're on the right page
-		const headerVisible = await header.isVisible().catch(() => false);
-		expect(headerVisible || page.url().includes('/approval')).toBeTruthy();
+		expect(page.url()).toContain('/approval');
 	});
 
-	test('should display queue items in a list', async ({ page }) => {
+	test('should display approval queue header', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Look for queue items or action buttons
-		const queueItems = page.locator('div[role="listitem"], div.queue-item, button:has-text("Approve"), button:has-text("Reject")').first();
-		
-		// Queue may be empty in test environment — skip if no items
-		if (await queueItems.isVisible().catch(() => false)) {
-			await expect(queueItems).toBeVisible();
-		}
+		// Hard assert: queue must have a header/title
+		const header = page.locator('h1, h2, [role="heading"]').first();
+		await expect(header).toBeVisible();
 	});
 
-	test('should allow filtering queue by status', async ({ page }) => {
+	test('should have queue list or empty state', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Look for status filter buttons/dropdowns
-		const filterPending = page.locator('button:has-text("Pending"), button:has-text("pending"), select').first();
+		// Hard assert: either queue items exist OR empty state is shown
+		const queueItems = page.locator('[role="listitem"], .queue-item').first();
+		const emptyState = page.locator('text=/no items|empty|nothing/i').first();
 		
-		if (await filterPending.isVisible().catch(() => false)) {
-			await filterPending.click();
-			await page.waitForLoadState('networkidle');
-		}
+		const hasItems = await queueItems.isVisible().catch(() => false);
+		const isEmpty = await emptyState.isVisible().catch(() => false);
+		
+		expect(hasItems || isEmpty).toBeTruthy();
 	});
 
-	test('should allow reordering queue items with keyboard', async ({ page }) => {
+	test('should support status filtering', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Focus on queue and press keyboard nav
-		const queueContainer = page.locator('div[role="list"], .queue-container, .approval-feed').first();
+		// Hard assert: filtering UI must exist (button, dropdown, etc)
+		const filterBtn = page.locator('button:has-text("pending"), button:has-text("Pending"), select, [role="combobox"]').first();
+		await expect(filterBtn).toBeVisible();
 		
-		if (await queueContainer.isVisible().catch(() => false)) {
-			// Try keyboard navigation
-			await page.keyboard.press('j');
-			// Just verify no error thrown
-			await expect(page).toHaveURL(/approval/);
-		}
+		// Verify it's interactive
+		await expect(filterBtn).toBeEnabled();
 	});
 
-	test('should display approve/reject buttons for queue items', async ({ page }) => {
+	test('should have action buttons for queue items', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Look for action buttons
-		const approveBtn = page.locator('button:has-text("Approve"), button[title*="approve" i]').first();
-		const rejectBtn = page.locator('button:has-text("Reject"), button[title*="reject" i]').first();
+		// Hard assert: at least one action button must exist
+		const approveBtn = page.locator('button:has-text("Approve")').first();
+		const rejectBtn = page.locator('button:has-text("Reject")').first();
 		
 		const hasApprove = await approveBtn.isVisible().catch(() => false);
 		const hasReject = await rejectBtn.isVisible().catch(() => false);
 		
-		// At least one action button should exist (may be empty queue in test)
-		expect(hasApprove || hasReject || page.url().includes('/approval')).toBeTruthy();
+		expect(hasApprove || hasReject).toBeTruthy();
 	});
 
-	test('should allow approving a queue item', async ({ page }) => {
+	test('should display queue statistics', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Find approve button
-		const approveBtn = page.locator('button:has-text("Approve"), button[title*="approve" i]').first();
-		
-		if (await approveBtn.isVisible().catch(() => false)) {
-			// Verify button is interactive
-			await expect(approveBtn).toBeEnabled();
-		}
-	});
-
-	test('should allow rejecting a queue item', async ({ page }) => {
-		await page.goto('/approval');
-		await page.waitForLoadState('networkidle');
-
-		// Find reject button
-		const rejectBtn = page.locator('button:has-text("Reject"), button[title*="reject" i]').first();
-		
-		if (await rejectBtn.isVisible().catch(() => false)) {
-			// Verify button is interactive
-			await expect(rejectBtn).toBeEnabled();
-		}
-	});
-
-	test('should display queue stats/counts', async ({ page }) => {
-		await page.goto('/approval');
-		await page.waitForLoadState('networkidle');
-
-		// Look for approval stats section
+		// Hard assert: stats must be visible (pending count, etc)
 		const stats = page.locator('text=/pending|approved|rejected|total/i').first();
-		
-		if (await stats.isVisible().catch(() => false)) {
-			await expect(stats).toBeVisible();
-		}
+		await expect(stats).toBeVisible();
 	});
 
-	test('should allow bulk actions on queue', async ({ page }) => {
+	test('should support keyboard navigation', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Look for "approve all" or bulk action button
-		const bulkBtn = page.locator('button:has-text("Approve all"), button:has-text("Bulk"), button[title*="bulk" i]').first();
+		// Hard assert: page must be on /approval after keyboard navigation
+		await page.keyboard.press('j');
 		
-		if (await bulkBtn.isVisible().catch(() => false)) {
-			await expect(bulkBtn).toBeVisible();
-		}
+		// Should not crash and remain on /approval
+		expect(page.url()).toContain('/approval');
 	});
 
-	test('should support exporting queue data', async ({ page }) => {
+	test('should have export functionality', async ({ page }) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
-		// Look for export button
-		const exportBtn = page.locator('button:has-text("Export"), button[title*="export" i]').first();
+		// Hard assert: export button must be visible
+		const exportBtn = page.locator('button:has-text("Export")').first();
+		await expect(exportBtn).toBeVisible();
 		
-		if (await exportBtn.isVisible().catch(() => false)) {
-			await expect(exportBtn).toBeVisible();
-			
-			// Click to show export options
-			await exportBtn.click();
-			
-			// Should show CSV/JSON options
-			const csvOption = page.locator('button:has-text("CSV"), text=/csv/i').first();
-			const hasExportOptions = await csvOption.isVisible().catch(() => false);
-			
-			expect(hasExportOptions || await exportBtn.isVisible()).toBeTruthy();
-		}
+		// Click to reveal export options
+		await exportBtn.click();
+		
+		// Hard assert: export format options appear
+		const csvOption = page.locator('text=/csv|json/i').first();
+		await expect(csvOption).toBeVisible();
+	});
+
+	test('should display queue container with proper role', async ({ page }) => {
+		await page.goto('/approval');
+		await page.waitForLoadState('networkidle');
+
+		// Hard assert: queue must have proper list semantics
+		const queueList = page.locator('[role="list"], .queue-container').first();
+		await expect(queueList).toBeVisible();
 	});
 });

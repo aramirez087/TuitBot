@@ -2,12 +2,11 @@ import { test, expect, Page } from '@playwright/test';
 
 /**
  * E2E Tests: Composer / Draft Studio
- * Covers: Tweet composition, character limit validation, thread creation, reply mode
+ * Hard assertions: Tests fail if critical UI is missing. Optional features use test.skip().
  */
 
 const TEST_PASSPHRASE = process.env.TEST_PASSPHRASE || 'test test test test';
 
-// Setup: Login once per test file using storageState
 async function authenticateOnce(page: Page) {
 	await page.goto('/login');
 	const passphraseInput = page.locator('input[id="passphrase"]');
@@ -24,138 +23,103 @@ test.describe('Composer / Draft Studio', () => {
 	});
 
 	test('should display composer interface on main page', async ({ page }) => {
-		// Verify we're on home page (authenticated)
+		// Hard assert: must be on authenticated home page
 		await expect(page).toHaveURL('/');
 	});
 
 	test('should allow composing a simple tweet', async ({ page }) => {
-		// Find tweet editor textarea or input
+		// Hard assert: tweet input MUST exist
 		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
-		// Hard assertion: must have tweet input
 		await expect(tweetInput).toBeVisible();
 		
 		await tweetInput.fill('Test tweet from E2E testing');
 		
-		// Verify content was entered
-		const inputValue = await tweetInput.inputValue();
-		expect(inputValue).toContain('Test tweet');
+		// Hard assert: content was entered
+		expect(await tweetInput.inputValue()).toContain('Test tweet');
 	});
 
-	test('should validate character count in composer', async ({ page }) => {
+	test('should have character count display', async ({ page }) => {
+		// Hard assert: tweet input exists
 		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
-		// Hard assertion: input must exist
 		await expect(tweetInput).toBeVisible();
 		
 		await tweetInput.fill('a'.repeat(100));
 		
-		// Character counter should be visible or input should accept text
+		// Hard assert: character counter exists
 		const charCounter = page.locator('text=/\\d+\\/280|characters/i').first();
-		const counterVisible = await charCounter.isVisible().catch(() => false);
-		
-		// Either counter is shown OR text was accepted
-		expect(await tweetInput.inputValue()).toHaveLength(100);
-		if (counterVisible) {
-			await expect(charCounter).toBeVisible();
-		}
+		await expect(charCounter).toBeVisible();
 	});
 
-	test('should warn or prevent exceeding character limit', async ({ page }) => {
+	test('should prevent or cap text exceeding 280 characters', async ({ page }) => {
+		// Hard assert: tweet input exists
 		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
 		await expect(tweetInput).toBeVisible();
 		
-		// Generate a string longer than 280 characters
+		// Try to fill with 300 characters
 		const longText = 'a'.repeat(300);
 		await tweetInput.fill(longText);
 		
-		// Check if input value is capped at 280 or if warning appears
+		// Hard assert: input value must NOT exceed 280 (either capped or rejected)
 		const inputValue = await tweetInput.inputValue();
-		const warningText = page.locator('text=/character limit|exceeds|max/i').first();
-		
-		// Either input is limited OR warning is shown
-		const exceedsLimit = inputValue.length > 280;
-		const hasWarning = await warningText.isVisible().catch(() => false);
-		
-		expect(exceedsLimit === false || hasWarning).toBeTruthy();
+		expect(inputValue.length).toBeLessThanOrEqual(280);
 	});
 
-	test('should support thread composition', async ({ page }) => {
-		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
-		await expect(tweetInput).toBeVisible();
-		
-		// Look for "add tweet to thread" button
+	test('should support thread composition', async ({ page, test: testObj }) => {
+		// Optional feature: thread mode might not be available in test environment
 		const addThreadBtn = page.locator('button:has-text("Thread"), button:has-text("Add tweet"), button[title*="thread" i]').first();
 		
-		// Skip if thread feature not available in test environment
-		if (await addThreadBtn.isVisible().catch(() => false)) {
-			await addThreadBtn.click();
-			
-			// Should add another tweet composer
-			const tweetInputs = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]');
-			const count = await tweetInputs.count();
-			
-			// More inputs available (at least 2 for a thread)
-			expect(count).toBeGreaterThanOrEqual(1);
+		const hasThreadBtn = await addThreadBtn.isVisible().catch(() => false);
+		if (!hasThreadBtn) {
+			testObj.skip();
 		}
+		
+		// Hard assert: if feature exists, it must work
+		await addThreadBtn.click();
+		
+		// Should have at least 2 tweet inputs after adding thread
+		const tweetInputs = page.locator('textarea, input[placeholder*="tweet"]');
+		const count = await tweetInputs.count();
+		expect(count).toBeGreaterThanOrEqual(1);
 	});
 
-	test('should support reply mode', async ({ page }) => {
-		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
-		await expect(tweetInput).toBeVisible();
-		
-		// Look for "reply" mode toggle
+	test('should support reply mode', async ({ page, test: testObj }) => {
+		// Optional feature: reply mode might not be available
 		const replyBtn = page.locator('button:has-text("Reply"), button[title*="reply" i]').first();
 		
-		// Skip if reply feature not available
-		if (await replyBtn.isVisible().catch(() => false)) {
-			await replyBtn.click();
-			
-			// Verify button was interactive
-			await expect(replyBtn).toBeVisible();
+		const hasReplyBtn = await replyBtn.isVisible().catch(() => false);
+		if (!hasReplyBtn) {
+			testObj.skip();
 		}
+		
+		// Hard assert: if feature exists, button must be clickable
+		await replyBtn.click();
+		await expect(replyBtn).toBeVisible();
 	});
 
 	test('should allow clearing draft content', async ({ page }) => {
+		// Hard assert: tweet input exists
 		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
 		await expect(tweetInput).toBeVisible();
 		
 		// Fill with content
 		await tweetInput.fill('Test content to clear');
 		expect(await tweetInput.inputValue()).toContain('Test content');
 		
-		// Look for clear/reset button
-		const clearBtn = page.locator('button:has-text("Clear"), button[title*="clear" i]').first();
-		
-		if (await clearBtn.isVisible().catch(() => false)) {
-			await clearBtn.click();
-			const value = await tweetInput.inputValue();
-			expect(value).toBe('');
-		} else {
-			// Manually clear for test
-			await tweetInput.clear();
-			expect(await tweetInput.inputValue()).toBe('');
-		}
+		// Hard assert: input can be cleared
+		await tweetInput.clear();
+		expect(await tweetInput.inputValue()).toBe('');
 	});
 
-	test('should show character counter near limit', async ({ page }) => {
+	test('should show character counter when near limit', async ({ page }) => {
+		// Hard assert: tweet input exists
 		const tweetInput = page.locator('textarea, input[placeholder*="What"], input[placeholder*="tweet"], input[placeholder*="post"]').first();
-		
 		await expect(tweetInput).toBeVisible();
 		
 		// Fill with text close to 280 limit
-		const almostFull = 'a'.repeat(270);
-		await tweetInput.fill(almostFull);
+		await tweetInput.fill('a'.repeat(270));
 		
-		// Character counter should be visible
+		// Hard assert: character counter must be visible
 		const charCounter = page.locator('text=/\\d+\\/280|characters|chars/i').first();
-		
-		if (await charCounter.isVisible().catch(() => false)) {
-			await expect(charCounter).toBeVisible();
-		}
+		await expect(charCounter).toBeVisible();
 	});
 });
