@@ -3,7 +3,17 @@ name: Performance Benchmarks
 on:
   push:
     branches: [main]
-  pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'dashboard/src/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ── Rust benchmarks via cargo-criterion ──
