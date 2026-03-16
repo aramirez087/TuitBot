@@ -74,46 +74,46 @@ test.describe('Safety Guardrails & Rate Limits', () => {
 	});
 
 	// State-dependent tests: skip if rate limit data unavailable
-	test('should display rate limit section (skip if unavailable)', async ({ page, test: testObj }) => {
+	test('should display rate limit section (skip if unavailable)', async ({ page }, testInfo) => {
 		await page.goto('/activity');
 		await page.waitForLoadState('networkidle');
 
 		const rateSection = page.locator('text=/rate limit|daily limit/i').first();
 		
 		if (!(await rateSection.isVisible().catch(() => false))) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		await expect(rateSection).toBeVisible();
 	});
 
-	test('should show limit usage numbers (skip if unavailable)', async ({ page, test: testObj }) => {
+	test('should show limit usage numbers (skip if unavailable)', async ({ page }, testInfo) => {
 		await page.goto('/activity');
 		await page.waitForLoadState('networkidle');
 
 		const usage = page.locator('text=/\\d+\\/\\d+/').first();
 		
 		if (!(await usage.isVisible().catch(() => false))) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		await expect(usage).toBeVisible();
 	});
 
-	test('should display progress bar (skip if unavailable)', async ({ page, test: testObj }) => {
+	test('should display progress bar (skip if unavailable)', async ({ page }, testInfo) => {
 		await page.goto('/activity');
 		await page.waitForLoadState('networkidle');
 
 		const progress = page.locator('[role="progressbar"], .progress-bar, .limit-bar').first();
 		
 		if (!(await progress.isVisible().catch(() => false))) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		await expect(progress).toBeVisible();
 	});
 
-	test('should show limit types (skip if unavailable)', async ({ page, test: testObj }) => {
+	test('should show limit types (skip if unavailable)', async ({ page }, testInfo) => {
 		await page.goto('/activity');
 		await page.waitForLoadState('networkidle');
 
@@ -121,13 +121,13 @@ test.describe('Safety Guardrails & Rate Limits', () => {
 		const count = await limitLabels.count().catch(() => 0);
 		
 		if (count === 0) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		expect(count).toBeGreaterThan(0);
 	});
 
-	test('should display activity feed (skip if empty)', async ({ page, test: testObj }) => {
+	test('should display activity feed (skip if empty)', async ({ page }, testInfo) => {
 		await page.goto('/activity');
 		await page.waitForLoadState('networkidle');
 
@@ -135,7 +135,7 @@ test.describe('Safety Guardrails & Rate Limits', () => {
 		const isEmpty = await page.locator('text=/no activity|empty/i').isVisible().catch(() => false);
 		
 		if (isEmpty || !(await feed.isVisible().catch(() => false))) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		await expect(feed).toBeVisible();
@@ -154,14 +154,14 @@ test.describe('Safety Guardrails & Rate Limits', () => {
 		await expect(counter).toBeVisible();
 	});
 
-	test('should support activity pagination (skip if no pagination needed)', async ({ page, test: testObj }) => {
+	test('should support activity pagination (skip if no pagination needed)', async ({ page }, testInfo) => {
 		await page.goto('/activity');
 		await page.waitForLoadState('networkidle');
 
 		const loadMore = page.locator('button:has-text("Load more"), [role="button"]:has-text("more")').first();
 		
 		if (!(await loadMore.isVisible().catch(() => false))) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		await expect(loadMore).toBeVisible();

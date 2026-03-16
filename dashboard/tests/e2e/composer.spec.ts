@@ -64,13 +64,13 @@ test.describe('Composer / Draft Studio', () => {
 		expect(inputValue.length).toBeLessThanOrEqual(280);
 	});
 
-	test('should support thread composition', async ({ page, test: testObj }) => {
+	test('should support thread composition', async ({ page }, testInfo) => {
 		// Optional feature: thread mode might not be available in test environment
 		const addThreadBtn = page.locator('button:has-text("Thread"), button:has-text("Add tweet"), button[title*="thread" i]').first();
 		
 		const hasThreadBtn = await addThreadBtn.isVisible().catch(() => false);
 		if (!hasThreadBtn) {
-			testObj.skip();
+			testInfo.skip();
 		}
 		
 		// Hard assert: if feature exists, it must work
@@ -82,13 +82,13 @@ test.describe('Composer / Draft Studio', () => {
 		expect(count).toBeGreaterThanOrEqual(1);
 	});
 
-	test('should support reply mode', async ({ page, test: testObj }) => {
+	test('should support reply mode', async ({ page }, testInfo) => {
 		// Optional feature: reply mode might not be available
 		const replyBtn = page.locator('button:has-text("Reply"), button[title*="reply" i]').first();
 		
 		const hasReplyBtn = await replyBtn.isVisible().catch(() => false);
 		if (!hasReplyBtn) {
-			testObj.skip();
+			testInfo.skip();
 		}
 		
 		// Hard assert: if feature exists, button must be clickable

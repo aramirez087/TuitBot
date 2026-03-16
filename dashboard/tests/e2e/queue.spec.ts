@@ -55,7 +55,7 @@ test.describe('Approval Queue', () => {
 	});
 
 	// State-dependent tests: skip if queue is empty
-	test('should display queue items (skip if empty)', async ({ page, test: testObj }) => {
+	test('should display queue items (skip if empty)', async ({ page }, testInfo) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
@@ -63,19 +63,19 @@ test.describe('Approval Queue', () => {
 		const isEmpty = await page.locator('text=/no items|empty|nothing/i').isVisible().catch(() => false);
 		
 		if (isEmpty || !(await queueItems.isVisible().catch(() => false))) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		await expect(queueItems).toBeVisible();
 	});
 
-	test('should have approve/reject buttons for items (skip if empty)', async ({ page, test: testObj }) => {
+	test('should have approve/reject buttons for items (skip if empty)', async ({ page }, testInfo) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
 		const isEmpty = await page.locator('text=/no items|empty/i').isVisible().catch(() => false);
 		if (isEmpty) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		const approveBtn = page.locator('button:has-text("Approve")').first();
@@ -84,19 +84,19 @@ test.describe('Approval Queue', () => {
 		const hasAction = await approveBtn.isVisible().catch(() => false) || await rejectBtn.isVisible().catch(() => false);
 		
 		if (!hasAction) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		expect(hasAction).toBeTruthy();
 	});
 
-	test('should display queue stats (skip if empty)', async ({ page, test: testObj }) => {
+	test('should display queue stats (skip if empty)', async ({ page }, testInfo) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
 		const isEmpty = await page.locator('text=/no items|empty/i').isVisible().catch(() => false);
 		if (isEmpty) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		const stats = page.locator('text=/pending|approved|rejected/i').first();
@@ -113,13 +113,13 @@ test.describe('Approval Queue', () => {
 		expect(page.url()).toContain('/approval');
 	});
 
-	test('should have queue list structure (skip if empty)', async ({ page, test: testObj }) => {
+	test('should have queue list structure (skip if empty)', async ({ page }, testInfo) => {
 		await page.goto('/approval');
 		await page.waitForLoadState('networkidle');
 
 		const isEmpty = await page.locator('text=/no items|empty/i').isVisible().catch(() => false);
 		if (isEmpty) {
-			testObj.skip();
+			testInfo.skip();
 		}
 
 		const queueList = page.locator('[role="list"], .approval-feed, .queue-container').first();
