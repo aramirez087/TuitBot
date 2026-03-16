@@ -22,7 +22,7 @@ oauth2 = { version = "4", default-features = false, features = ["reqwest", "rust
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
-rand = "0.8"
+rand = "0.9"
 async-trait = "0.1"
 dirs = "5"
 sha2 = "0.10"
@@ -34,7 +34,7 @@ scraper = "0.23.1"
 bcrypt = "0.16"
 hex = "0.4"
 notify = "7"
-notify-debouncer-full = "0.4"
+notify-debouncer-full = "0.7"
 serde_yaml = "0.9"
 glob = "0.3"
 aes-gcm = "0.10"
@@ -49,3 +49,8 @@ tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 wiremock = "0.6"
 tokio-test = "0.4"
+criterion = { workspace = true }
+
+[[bench]]
+name = "core_operations"
+harness = false
