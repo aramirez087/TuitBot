@@ -23,28 +23,28 @@ vi.mock('$lib/utils/threadOps', () => ({
 			id: 'block-default-1',
 			text: '',
 			media_paths: [],
-			created_at: new Date().toISOString()
+			order: 0
 		}
 	]),
 	sortBlocks: vi.fn((blocks) => blocks),
 	validateThread: vi.fn((blocks) => ({
-		valid: blocks.length >= 2 && blocks.some(b => b.text.trim().length > 0),
+		valid: blocks.length >= 2 && blocks.some((b: {text: string}) => b.text.trim().length > 0),
 		errors: []
 	})),
 	addBlock: vi.fn((blocks) => ({
-		blocks: [...blocks, { id: 'new-block', text: '', media_paths: [], created_at: new Date().toISOString() }],
+		blocks: [...blocks, { id: 'new-block', text: '', media_paths: [], order: 0 } as ThreadBlock],
 		newId: 'new-block'
 	})),
 	addBlockAfter: vi.fn((blocks, afterId) => ({
-		blocks: [...blocks, { id: 'new-block-after', text: '', media_paths: [], created_at: new Date().toISOString() }],
+		blocks: [...blocks, { id: 'new-block-after', text: '', media_paths: [], order: 0 } as ThreadBlock],
 		newId: 'new-block-after'
 	})),
-	removeBlock: vi.fn((blocks, id) => blocks.filter(b => b.id !== id)),
+	removeBlock: vi.fn((blocks, id) => blocks.filter((b: {id: string}) => b.id !== id)),
 	updateBlockText: vi.fn((blocks, id, text) => 
-		blocks.map(b => b.id === id ? { ...b, text } : b)
+		blocks.map((b: ThreadBlock) => b.id === id ? { ...b, text } : b)
 	),
 	updateBlockMedia: vi.fn((blocks, id, paths) =>
-		blocks.map(b => b.id === id ? { ...b, media_paths: paths } : b)
+		blocks.map((b: ThreadBlock) => b.id === id ? { ...b, media_paths: paths } : b)
 	),
 	moveBlock: vi.fn((blocks, blockId, newIndex) => blocks),
 	mergeBlocks: vi.fn((blocks, blockId) => blocks),
@@ -65,7 +65,7 @@ const createMockBlock = (overrides: Partial<ThreadBlock> = {}): ThreadBlock => (
 	id: `block-${Math.random().toString(36).slice(2)}`,
 	text: 'Sample thread content',
 	media_paths: [],
-	created_at: new Date().toISOString(),
+	order: 0,
 	...overrides
 });
 

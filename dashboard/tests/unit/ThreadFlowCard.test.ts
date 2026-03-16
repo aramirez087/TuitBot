@@ -21,7 +21,7 @@ const createMockBlock = (overrides: Partial<ThreadBlock> = {}): ThreadBlock => (
 	id: 'block-1',
 	text: 'Test tweet content',
 	media_paths: [],
-	created_at: new Date().toISOString(),
+	order: 0,
 	...overrides
 });
 
