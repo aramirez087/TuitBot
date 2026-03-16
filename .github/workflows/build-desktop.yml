@@ -54,7 +54,7 @@ jobs:
         run: cd dashboard && npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuitbot-desktop-${{ matrix.target }}
           path: dashboard/src-tauri/target/${{ matrix.target }}/release/bundle/
