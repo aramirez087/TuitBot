@@ -1,0 +1,88 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── Rust coverage via cargo-tarpaulin (Linux only; tarpaulin is Linux-specific) ──
+  rust-coverage:
+    name: Rust coverage (tarpaulin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-coverage-
+            ${{ runner.os }}-cargo-
+
+      - name: Install cargo-tarpaulin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-tarpaulin
+
+      - name: Run Rust tests + collect coverage
+        run: |
+          cargo tarpaulin \
+            --workspace \
+            --exclude-files "crates/*/src/bin/**" \
+            --timeout 120 \
+            --out xml \
+            --output-dir coverage/ \
+            -- \
+            --skip tools::benchmark
+        env:
+          RUSTFLAGS: "-D warnings"
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+
+      - name: Upload Rust coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/cobertura.xml
+          flags: rust
+          fail_ci_if_error: false   # don't break CI if token is missing
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # ── Frontend coverage via Vitest ──
+  frontend-coverage:
+    name: Frontend coverage (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: cd dashboard && npm ci
+
+      - name: Run Vitest + collect coverage
+        run: cd dashboard && npm run test:coverage
+
+      - name: Upload frontend coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: dashboard/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false   # don't break CI if token is missing
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
