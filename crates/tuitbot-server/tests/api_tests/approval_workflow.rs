@@ -335,21 +335,14 @@ async fn approval_approve_requires_auth() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn approval_approve_already_approved_returns_error() {
-    // BUG FINDING: approve_item does not check current status before acting.
-    // A second approve on an already-approved item silently succeeds (200).
-    // This means a network retry or race condition could trigger a double-post to X.
-    //
-    // Expected behavior: 409 Conflict or 400 Bad Request.
-    // Actual behavior: 200 OK (bug — route must guard against re-approval).
-    //
-    // This test documents the current broken behavior so the route fix is
-    // tracked and does not regress once corrected.
+async fn approval_approve_already_approved_returns_409() {
+    // Guard: approve_item rejects re-approval with 409 Conflict.
+    // Prevents double-post to X API via retry or race condition.
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
 
     let id = seed_pending_item(&pool).await;
 
-    // First approve — should always succeed.
+    // First approve — must succeed.
     let (status, _) = post_json(
         router.clone(),
         &format!("/api/approval/{id}/approve"),
@@ -358,40 +351,28 @@ async fn approval_approve_already_approved_returns_error() {
     .await;
     assert_eq!(status, StatusCode::OK, "first approve must succeed");
 
-    // Second approve on an already-approved item.
-    let (status2, _) = post_json(
+    // Second approve on an already-approved item — must be 409.
+    let (status2, body2) = post_json(
         router,
         &format!("/api/approval/{id}/approve"),
         serde_json::json!({}),
     )
     .await;
-
-    // TODO(bug): should be 409 or 400 — double-approve is dangerous.
-    // Currently returns 200 because approve_item has no status-guard.
-    // Update this assertion to `assert_eq!(status2, StatusCode::CONFLICT)`
-    // once the route is fixed.
-    assert!(
-        status2 == StatusCode::CONFLICT
-            || status2 == StatusCode::BAD_REQUEST
-            || status2 == StatusCode::OK,
-        "double-approve returned unexpected {status2}; expected 409/400 (or 200 if unfixed)"
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "double-approve must return 409 Conflict, got {status2}: {body2}"
     );
 }
 
 #[tokio::test]
-async fn approval_reject_already_rejected_returns_error() {
-    // BUG FINDING: reject_item does not check current status before acting.
-    // A second reject on an already-rejected item silently succeeds (200).
-    //
-    // Expected behavior: 409 Conflict or 400 Bad Request.
-    // Actual behavior: 200 OK (bug — route must guard against re-rejection).
-    //
-    // This test documents the current broken behavior.
+async fn approval_reject_already_rejected_returns_409() {
+    // Guard: reject_item rejects re-rejection with 409 Conflict.
     let (router, pool, _dir) = router_with_pool_and_tokens().await;
 
     let id = seed_pending_item(&pool).await;
 
-    // First reject — should always succeed.
+    // First reject — must succeed.
     let (status, _) = post_json(
         router.clone(),
         &format!("/api/approval/{id}/reject"),
@@ -400,20 +381,80 @@ async fn approval_reject_already_rejected_returns_error() {
     .await;
     assert_eq!(status, StatusCode::OK, "first reject must succeed");
 
-    // Second reject on an already-rejected item.
-    let (status2, _) = post_json(
+    // Second reject on an already-rejected item — must be 409.
+    let (status2, body2) = post_json(
         router,
         &format!("/api/approval/{id}/reject"),
         serde_json::json!({}),
     )
     .await;
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "double-reject must return 409 Conflict, got {status2}: {body2}"
+    );
+}
 
-    // TODO(bug): should be 409 or 400.
-    // Currently returns 200 because reject_item has no status-guard.
-    assert!(
-        status2 == StatusCode::CONFLICT
-            || status2 == StatusCode::BAD_REQUEST
-            || status2 == StatusCode::OK,
-        "double-reject returned unexpected {status2}; expected 409/400 (or 200 if unfixed)"
+// ---------------------------------------------------------------------------
+// Cross-state guard tests (approve-rejected, reject-approved, scheduled)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn approval_approve_already_rejected_returns_409() {
+    // Guard: cannot approve an item that was already rejected.
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+
+    let id = seed_pending_item(&pool).await;
+
+    // Reject first.
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/reject"),
+        serde_json::json!({"actor": "dashboard"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "first reject must succeed");
+
+    // Now try to approve the rejected item — must be 409.
+    let (status2, body2) = post_json(
+        router,
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "approve-after-reject must return 409 Conflict, got {status2}: {body2}"
+    );
+}
+
+#[tokio::test]
+async fn approval_reject_already_approved_returns_409() {
+    // Guard: cannot reject an item that was already approved.
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+
+    let id = seed_pending_item(&pool).await;
+
+    // Approve first.
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({"actor": "dashboard"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "first approve must succeed");
+
+    // Now try to reject the approved item — must be 409.
+    let (status2, body2) = post_json(
+        router,
+        &format!("/api/approval/{id}/reject"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "reject-after-approve must return 409 Conflict, got {status2}: {body2}"
     );
 }
