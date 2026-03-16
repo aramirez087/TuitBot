@@ -135,12 +135,14 @@
 
 <div class="step">
 	<h2 class="step-title">
-		{hasInference ? 'Review Your Profile' : 'Your Profile'}
+		{enrichDone ? 'Review Your Profile' : 'Your Profile'}
 	</h2>
 	<p class="step-description">
-		{#if hasInference && allLowConfidence}
+		{#if enriching}
+			Analyzing your profile and inferring details...
+		{:else if enrichDone && allLowConfidence}
 			Tell us about your product or personal brand. We couldn't infer much from your profile.
-		{:else if hasInference}
+		{:else if enrichDone}
 			We analyzed your X account and pre-filled these fields. Edit anything that doesn't look right.
 		{:else}
 			Tell Tuitbot about yourself so it can find relevant conversations and generate on-brand content.

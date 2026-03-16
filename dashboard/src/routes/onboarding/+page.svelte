@@ -17,15 +17,15 @@
 	import { Zap, RefreshCw } from 'lucide-svelte';
 	import { onboardingSession } from '$lib/stores/onboarding-session';
 	import { submitOnboarding } from '$lib/utils/submitOnboarding';
+	import { saveOnboardingState, loadOnboardingState, clearOnboardingState } from '$lib/utils/onboardingFormState';
 	import OnboardingStepNav from './OnboardingStepNav.svelte';
 	import OnboardingActions from './OnboardingActions.svelte';
 
 	// Optional steps that can be skipped during progressive activation.
 	const OPTIONAL_STEPS = new Set(['LLM', 'Language', 'Vault', 'Validate']);
+	let optionalStepsSet = $derived(OPTIONAL_STEPS);
 
-	// Step flow varies by mode:
-	// API mode: Welcome → X Access → LLM → Profile → Language → Vault → Validate → Review [→ Secure]
-	// Scraper mode: Welcome → X Access → Profile → LLM → Language → Vault → Validate → Review [→ Secure]
+	// Step flow: API mode (Welcome → X Access → LLM → Profile → ...) vs Scraper (... → Profile → LLM → ...)
 	let isScraperMode = $derived($onboardingData.provider_backend === 'scraper');
 	let baseSteps = $derived(
 		isScraperMode
@@ -55,10 +55,7 @@
 	let currentStepName = $derived(steps[currentStep] ?? '');
 	let isLastStep = $derived(currentStep === steps.length - 1);
 	let isClaimStep = $derived(showClaimStep && currentStep === steps.length - 1);
-
-	let canSkipToFinish = $derived(
-		currentStepName === 'Profile' || OPTIONAL_STEPS.has(currentStepName)
-	);
+	let canSkipToFinish = $derived(currentStepName === 'Profile' || OPTIONAL_STEPS.has(currentStepName));
 
 	let hasLlmConfig = $derived(
 		$onboardingData.llm_provider === 'ollama' ||
@@ -68,10 +65,20 @@
 	let unsupportedMode = $state('');
 
 	let prevTrackedStep = $state(-1);
+	let resumedFromSave = $state(false);
+
 	$effect(() => {
 		if (currentStep !== prevTrackedStep) {
 			if (currentStep === 0 && prevTrackedStep === -1) {
-				trackFunnel('onboarding:started', { mode: isScraperMode ? 'scraper' : 'api' });
+				// Check for saved state on initial render
+				const saved = loadOnboardingState();
+				if (saved && saved.step > 0) {
+					currentStep = saved.step;
+					resumedFromSave = true;
+					trackFunnel('onboarding:resumed', { from_step: steps[saved.step] ?? 'unknown' });
+				} else {
+					trackFunnel('onboarding:started', { mode: isScraperMode ? 'scraper' : 'api' });
+				}
 			}
 			if (currentStep > 0) {
 				trackFunnel('onboarding:step-entered', { step: currentStepName, index: currentStep });
@@ -86,6 +93,16 @@
 			window.addEventListener('beforeunload', handler);
 			return () => window.removeEventListener('beforeunload', handler);
 		}
+	});
+
+	// Persist form state to localStorage for mid-onboarding recovery
+	$effect(() => {
+		saveOnboardingState(currentStep, {
+			...Object.fromEntries(
+				Object.entries($onboardingData).filter(([, v]) => v !== undefined && v !== null)
+			),
+			claimPassphrase,
+		});
 	});
 
 	function canAdvance(): boolean {
@@ -152,6 +169,7 @@
 			});
 			if (result.kind === 'error') { errorMsg = result.message; return; }
 			onboardingData.reset();
+			clearOnboardingState(); // Clean up saved state after successful completion
 			goto(result.to);
 		} finally {
 			submitting = false;
@@ -184,7 +202,16 @@
 		</div>
 
 		<div class="onboarding-content">
-			<OnboardingStepNav {steps} {currentStep} {skippedSteps} />
+			{#if resumedFromSave}
+				<div class="resume-banner">
+					<span>Resuming onboarding from "<strong>{steps[currentStep]}</strong>"</span>
+					<button type="button" class="resume-clear-btn" onclick={() => { clearOnboardingState(); currentStep = 0; resumedFromSave = false; }}>
+						Start over
+					</button>
+				</div>
+			{/if}
+
+			<OnboardingStepNav {steps} {currentStep} {skippedSteps} optionalSteps={optionalStepsSet} />
 
 			<div class="step-content">
 				{#if currentStepName === 'Welcome'}
@@ -312,6 +339,36 @@
 	.error-retry-btn:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.resume-banner {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 10px 14px;
+		background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+		border: 1px solid color-mix(in srgb, var(--color-accent) 20%, var(--color-border-subtle));
+		border-radius: 8px;
+		color: var(--color-text-muted);
+		font-size: 13px;
+	}
+
+	.resume-clear-btn {
+		padding: 4px 10px;
+		font-size: 11px;
+		font-weight: 500;
+		color: var(--color-accent);
+		background: transparent;
+		border: 1px solid var(--color-accent);
+		border-radius: 4px;
+		cursor: pointer;
+		transition: all 0.15s;
+		white-space: nowrap;
+	}
+
+	.resume-clear-btn:hover {
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 	}
 
 	.unsupported-banner {
