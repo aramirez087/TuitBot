@@ -35,10 +35,10 @@ jobs:
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin --locked
 
-      - name: Run tarpaulin
+      - name: Run tarpaulin (core crates, 75% threshold)
         # RUST COVERAGE GATE (Task 4.1): --fail-under 75
-        # Enforces minimum 75% line coverage across all Rust crates (excluding tuitbot-mcp).
-        # Note: tuitbot-mcp inclusion is tracked in Task 4.3 (separate gate).
+        # Enforces minimum 75% line coverage on core Rust crates.
+        # Excludes tuitbot-mcp (Task 4.3 separate gate) and tuitbot-cli (binary, not coverage-critical).
         run: |
           cargo tarpaulin \
             --workspace \
@@ -47,6 +47,20 @@ jobs:
             --out Xml \
             --output-dir coverage/ \
             --fail-under 75 \
+            --timeout 300
+        env:
+          RUSTFLAGS: "-D warnings"
+
+      - name: Run tarpaulin (tuitbot-mcp only, 60% threshold)
+        # TUITBOT-MCP COVERAGE GATE (Task 4.3): --fail-under 60
+        # Enforces minimum 60% line coverage on MCP tools (manifest, admin, write, etc).
+        # Separate gate allows lower threshold due to tool complexity and handler testing requirements.
+        run: |
+          cargo tarpaulin \
+            -p tuitbot-mcp \
+            --out Xml \
+            --output-dir coverage/ \
+            --fail-under 60 \
             --timeout 300
         env:
           RUSTFLAGS: "-D warnings"

@@ -78,13 +78,22 @@ release-plz update --config release-plz.toml --allow-dirty
 cargo package --workspace --allow-dirty
 ```
 
-## Coverage Thresholds (Task 4.1)
+## Coverage Thresholds
 
 **Rust Coverage (Cargo Tarpaulin):**
-- Global minimum: **75% lines** (enforced by `cargo tarpaulin --fail-under 75`)
-- Scope: All workspace crates except `tuitbot-mcp` (inclusion tracked in Task 4.3)
+
+*Core Crates (Task 4.1):*
+- Minimum: **75% lines** (enforced by `cargo tarpaulin --fail-under 75`)
+- Scope: All workspace crates except `tuitbot-mcp` and `tuitbot-cli`
 - CI fails if coverage drops below 75%
-- Measurement: `cargo tarpaulin --workspace --exclude tuitbot-mcp --out Xml --fail-under 75`
+- Measurement: `cargo tarpaulin --workspace --exclude tuitbot-mcp --exclude tuitbot-cli --out Xml --fail-under 75`
+
+*tuitbot-mcp Tools (Task 4.3):*
+- Minimum: **60% lines** (enforced by `cargo tarpaulin -p tuitbot-mcp --fail-under 60`)
+- Scope: MCP tool handlers (manifest, admin, write, workflow, etc.)
+- CI fails if coverage drops below 60%
+- Separate gate due to tool complexity (many small handlers, request validation, etc.)
+- Measurement: `cargo tarpaulin -p tuitbot-mcp --out Xml --fail-under 60`
 
 **Frontend Coverage (Vitest):**
 - Global minimum: **70% lines** (enforced in `dashboard/vitest.config.ts`)
