@@ -52,7 +52,7 @@ jobs:
 
       - name: Upload benchmark results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: criterion-results-${{ github.run_id }}
           path: |
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload bundle artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dashboard-build-${{ github.run_id }}
           path: dashboard/build
