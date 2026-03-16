@@ -13,12 +13,41 @@ export const selectedType = writable('all');
 export const reviewerFilter = writable('');
 export const dateFilter = writable('all');
 export const focusedIndex = writable(0);
+export const currentPage = writable(1);
+export const pageSize = writable(20);
+export const searchQuery = writable('');
 
 // --- Derived stores ---
 
 export const focusedItem = derived([items, focusedIndex], ([$items, $idx]) => $items[$idx] ?? null);
 export const isEmpty = derived([items, loading], ([$items, $loading]) => !$loading && $items.length === 0);
 export const pendingCount = derived(stats, ($s) => $s?.pending ?? 0);
+
+// Search + filter items
+const searchedItems = derived([items, searchQuery], ([$items, $search]) => {
+	if (!$search.trim()) return $items;
+	const q = $search.toLowerCase();
+	return $items.filter(
+		(i) =>
+			i.generated_content.toLowerCase().includes(q) ||
+			i.target_author.toLowerCase().includes(q) ||
+			i.topic.toLowerCase().includes(q)
+	);
+});
+
+// Paginate searched items
+export const paginatedItems = derived(
+	[searchedItems, currentPage, pageSize],
+	([$searched, $page, $size]) => {
+		const start = ($page - 1) * $size;
+		return $searched.slice(start, start + $size);
+	}
+);
+
+export const totalCount = derived(searchedItems, ($s) => $s.length);
+export const totalPages = derived([totalCount, pageSize], ([$count, $size]) =>
+	Math.ceil($count / $size)
+);
 
 // --- Data loading ---
 
@@ -120,22 +149,35 @@ export async function approveAllItems() {
 
 export function setStatusFilter(status: string) {
 	selectedStatus.set(status);
+	currentPage.set(1);
 	loadItems(true);
 }
 
 export function setTypeFilter(type: string) {
 	selectedType.set(type);
+	currentPage.set(1);
 	loadItems(true);
 }
 
 export function setReviewerFilter(reviewer: string) {
 	reviewerFilter.set(reviewer);
+	currentPage.set(1);
 	loadItems(true);
 }
 
 export function setDateFilter(range: string) {
 	dateFilter.set(range);
+	currentPage.set(1);
 	loadItems(true);
+}
+
+export function setCurrentPage(page: number) {
+	currentPage.set(Math.max(1, page));
+}
+
+export function setSearchQuery(q: string) {
+	searchQuery.set(q);
+	currentPage.set(1);
 }
 
 export function moveFocus(delta: number) {
