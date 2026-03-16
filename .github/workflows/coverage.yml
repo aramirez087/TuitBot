@@ -3,7 +3,27 @@ name: Coverage
 on:
   push:
     branches: [main]
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'dashboard/src/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+      - 'dashboard/vitest.config.*'
   pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'dashboard/src/**'
+      - 'dashboard/package.json'
+      - 'dashboard/package-lock.json'
+      - 'dashboard/vitest.config.*'
+
+concurrency:
+  group: coverage-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always

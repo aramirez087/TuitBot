@@ -5,12 +5,49 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mcp: ${{ steps.filter.outputs.mcp }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+            frontend:
+              - 'dashboard/src/**'
+              - 'dashboard/package.json'
+              - 'dashboard/package-lock.json'
+              - 'dashboard/svelte.config.js'
+              - 'dashboard/vite.config.ts'
+              - 'dashboard/tsconfig.json'
+            mcp:
+              - 'crates/tuitbot-mcp/**'
+              - 'crates/tuitbot-core/**'
+
   test:
     name: Test (${{ matrix.os }})
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -46,6 +83,7 @@ jobs:
           TUITBOT_SKIP_DASHBOARD_BUILD: '1'
 
       - name: Conformance gates
+        if: needs.detect-changes.outputs.mcp == 'true'
         run: |
           cargo test -p tuitbot-mcp conformance_all_kernel_tools
           cargo test -p tuitbot-mcp golden_snapshot_matches
@@ -71,6 +109,8 @@ jobs:
 
   frontend:
     name: Frontend checks
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -216,6 +256,8 @@ jobs:
 
   manifest-sync:
     name: MCP manifest sync
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
