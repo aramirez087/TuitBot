@@ -49,3 +49,8 @@ tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 wiremock = "0.6"
 tokio-test = "0.4"
+criterion = { workspace = true }
+
+[[bench]]
+name = "core_operations"
+harness = false

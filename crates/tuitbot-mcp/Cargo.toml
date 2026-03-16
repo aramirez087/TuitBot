@@ -24,3 +24,8 @@ async-trait = "0.1"
 
 [dev-dependencies]
 tuitbot-core = { version = "0.1.32", path = "../tuitbot-core", features = ["test-helpers"] }
+criterion = { workspace = true }
+
+[[bench]]
+name = "mcp_server"
+harness = false
