@@ -41,18 +41,25 @@ vi.mock('$lib/stores/websocket', () => ({
 
 import * as store from '../../src/lib/stores/approval';
 
-/** Build an ApprovalItem stub matching the shape expected by the store. */
+/** Build an ApprovalItem stub matching the full ApprovalItem interface. */
 function makeItem(id: number, content = `Generated content ${id}`) {
 	return {
 		id,
-		generated_content: content,
+		action_type: 'tweet',
+		target_tweet_id: '',
 		target_author: `author_${id}`,
+		generated_content: content,
 		topic: 'test-topic',
+		archetype: 'default',
+		score: 0.8,
 		status: 'pending',
-		type: 'tweet',
 		created_at: '2026-01-01T00:00:00Z',
-		account_id: 'acc-1',
-		reviewer_id: null
+		media_paths: [],
+		detected_risks: [],
+		qa_score: 1.0,
+		qa_hard_flags: [],
+		qa_soft_flags: [],
+		qa_requires_override: false
 	};
 }
 
