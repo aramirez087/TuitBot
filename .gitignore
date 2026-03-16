@@ -1,6 +1,8 @@
 # Rust / Cargo
 /target/
 **/*.rs.bk
+*.bak
+*.rs.bak
 
 # SQLite
 *.db
