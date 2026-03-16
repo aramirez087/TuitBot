@@ -459,7 +459,6 @@ product_keywords = ["base"]
     assert_eq!(config.x_api.client_id, "test-client-id");
 }
 
-
 // ============================================================
 // Analytics summary + recent-performance (Task 3.4)
 // ============================================================
