@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773688586116,
+  "lastUpdate": 1773695243448,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -57,6 +57,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 936.62,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "aramirez087@users.noreply.github.com",
+            "name": "Alexander",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "aramirez087@users.noreply.github.com",
+            "name": "Alexander",
+            "username": "aramirez087"
+          },
+          "distinct": true,
+          "id": "135d64e295747596a5c329104fddcca959e39467",
+          "message": "chore(ci): remove deprecated build-desktop.yml\n\nConsolidated into release.yml build-desktop job.\nTriggered and verified on app-v0.1.0 — artifacts confirmed successful.",
+          "timestamp": "2026-03-16T15:01:27-06:00",
+          "tree_id": "dd9c94b73c1a4cd3e2b06418db16ecf33f4c6ea3",
+          "url": "https://github.com/aramirez087/TuitBot/commit/135d64e295747596a5c329104fddcca959e39467"
+        },
+        "date": 1773695242259,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 935.9,
             "unit": "ps"
           }
         ]
