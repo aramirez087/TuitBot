@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Clock, X } from 'lucide-svelte';
+	import { Clock, X, Loader2 } from 'lucide-svelte';
 	import { formatInAccountTz, toAccountTzParts, nowInAccountTz } from '$lib/utils/timezone';
 	import { trackFunnel } from '$lib/analytics/funnel';
 	import SchedulePickerSlots from './SchedulePickerSlots.svelte';
@@ -30,6 +30,8 @@
 
 	let customTime = $state('');
 	let customDate = $state('');
+	// Brief loading state for "next free slot" — gives visual feedback even though the calc is synchronous.
+	let loadingNextSlot = $state(false);
 
 	const tzLabel = $derived(() => {
 		try {
@@ -90,6 +92,15 @@
 	}
 
 	function handleNextFreeSlot() {
+		loadingNextSlot = true;
+		// Calc is synchronous; setTimeout lets Svelte flush the loading state to DOM before we resolve.
+		setTimeout(() => {
+			_resolveNextFreeSlot();
+			loadingNextSlot = false;
+		}, 0);
+	}
+
+	function _resolveNextFreeSlot() {
 		const now = nowInAccountTz(timezone);
 		const [nowH, nowM] = now.time.split(':').map(Number);
 		const nowMinutes = nowH * 60 + nowM;
@@ -189,6 +200,7 @@
 		{hasSelection}
 		{status}
 		{compact}
+		{loadingNextSlot}
 		onselecttime={selectPreferredTime}
 		onquickslot={handleNextFreeSlot}
 		{onunschedule}

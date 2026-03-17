@@ -96,6 +96,7 @@
 										onchange={() =>
 											onToggleChunk(chunk.chunk_id, note.node_id, chunk.heading_path)}
 										class="vault-chunk-cb"
+										aria-label={chunk.heading_path}
 									/>
 									<div class="vault-chunk-info">
 										<span class="vault-chunk-heading">{chunk.heading_path}</span>

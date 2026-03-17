@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Zap, X } from 'lucide-svelte';
+	import { Zap, X, Loader2 } from 'lucide-svelte';
 
 	interface Props {
 		preferredTimes: string[];
@@ -7,6 +7,7 @@
 		hasSelection: boolean;
 		status: 'draft' | 'scheduled' | 'posted';
 		compact?: boolean;
+		loadingNextSlot?: boolean;
 		onselecttime: (time: string) => void;
 		onquickslot: () => void;
 		onunschedule?: () => void;
@@ -18,6 +19,7 @@
 		hasSelection,
 		status,
 		compact = false,
+		loadingNextSlot = false,
 		onselecttime,
 		onquickslot,
 		onunschedule,
@@ -45,9 +47,15 @@
 		class="quick-btn"
 		type="button"
 		onclick={onquickslot}
+		disabled={loadingNextSlot}
 		aria-label="Schedule for next free slot"
+		aria-busy={loadingNextSlot}
 	>
-		<Zap size={12} />
+		{#if loadingNextSlot}
+			<Loader2 size={12} class="animate-spin" />
+		{:else}
+			<Zap size={12} />
+		{/if}
 		Next free slot
 	</button>
 	{#if hasSelection && status !== 'scheduled'}

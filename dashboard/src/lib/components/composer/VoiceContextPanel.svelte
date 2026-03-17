@@ -72,6 +72,16 @@
 		}
 	}
 
+	// Ctrl/Cmd+Enter saves cue to history; Escape clears focus so composer regains it.
+	function handleCueKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+			e.preventDefault();
+			saveCueToHistory();
+		} else if (e.key === 'Escape') {
+			(e.currentTarget as HTMLElement).blur();
+		}
+	}
+
 	// Ensure settings are loaded
 	$effect(() => {
 		const current = get(config);
@@ -119,6 +129,7 @@
 				placeholder="Tone cue (e.g., 'more casual')"
 				value={cue}
 				oninput={(e) => oncuechange(e.currentTarget.value)}
+				onkeydown={handleCueKeydown}
 				onfocus={() => { if (savedCues.length > 0) showSavedDropdown = true; }}
 				onblur={() => { setTimeout(() => { showSavedDropdown = false; }, 150); }}
 			/>
@@ -175,6 +186,7 @@
 						placeholder="Tone cue (e.g., 'more casual', 'add a hot take')"
 						value={cue}
 						oninput={(e) => oncuechange(e.currentTarget.value)}
+						onkeydown={handleCueKeydown}
 						onfocus={() => { if (savedCues.length > 0) showSavedDropdown = true; }}
 						onblur={() => { setTimeout(() => { showSavedDropdown = false; }, 150); }}
 					/>
