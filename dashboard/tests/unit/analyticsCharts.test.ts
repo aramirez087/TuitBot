@@ -121,14 +121,7 @@ describe('AnalyticsDashboard', () => {
 		expect(() => render(AnalyticsDashboard)).not.toThrow();
 	});
 
-	it('renders without throwing with full props', () => {
-		expect(() =>
-			render(AnalyticsDashboard, {
-				props: {
-					items: [mockPerformanceItem()],
-					snapshots: [mockFollowerSnapshot()]
-				}
-			})
-		).not.toThrow();
+	it('renders without throwing (store-driven, no props)', () => {
+		expect(() => render(AnalyticsDashboard)).not.toThrow();
 	});
 });
