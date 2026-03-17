@@ -21,7 +21,7 @@
 
 	{#if $loading}
 		<div class="flex flex-col items-center justify-center min-h-80 gap-4 text-gray-500">
-			<Loader2 size={32} style="animation: spin 1s linear infinite;" />
+			<Loader2 size={32} class="animate-spin" />
 			<p>Loading analytics...</p>
 		</div>
 	{:else if $error}
@@ -96,11 +96,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-</style>
