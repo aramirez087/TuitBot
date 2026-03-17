@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773758440782,
+  "lastUpdate": 1773760002653,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -155,6 +155,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1187127,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "db066f5b80df9d863d977283e6ccaaad71e06ded",
+          "message": "Merge pull request #210 from aramirez087/release-plz-2026-03-17T14-41-06Z\n\nchore: release",
+          "timestamp": "2026-03-17T09:05:51-06:00",
+          "tree_id": "9e9a3f649104591ec5c80c9126b4891512776cd8",
+          "url": "https://github.com/aramirez087/TuitBot/commit/db066f5b80df9d863d977283e6ccaaad71e06ded"
+        },
+        "date": 1773760002035,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 856112,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 291769,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1187132,
             "unit": "bytes"
           }
         ]
