@@ -58,3 +58,12 @@ export async function loadCosts(days: number = 30) {
 		loading.set(false);
 	}
 }
+
+// --- Account switching integration ---
+
+// When user switches accounts, refetch all cost data for the new account.
+if (typeof window !== 'undefined') {
+	window.addEventListener('tuitbot:account-switched', () => {
+		loadCosts();
+	});
+}

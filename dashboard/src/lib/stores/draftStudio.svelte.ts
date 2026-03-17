@@ -528,3 +528,13 @@ export function clearError(): void {
 export function setSyncStatus(status: typeof syncStatus): void {
 	syncStatus = status;
 }
+
+// --- Account switching integration ---
+
+// When user switches accounts, refetch all drafts for the new account.
+if (typeof window !== 'undefined') {
+	window.addEventListener('tuitbot:account-switched', () => {
+		selectedId = null;
+		loadDrafts();
+	});
+}

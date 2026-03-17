@@ -63,3 +63,12 @@ export async function loadAll() {
 		loading.set(false);
 	}
 }
+
+// --- Account switching integration ---
+
+// When user switches accounts, refetch all observability data for the new account.
+if (typeof window !== 'undefined') {
+	window.addEventListener('tuitbot:account-switched', () => {
+		loadAll();
+	});
+}
