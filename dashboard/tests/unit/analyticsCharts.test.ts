@@ -51,21 +51,21 @@ import BestTimeHeatmap from '../../src/lib/components/charts/BestTimeHeatmap.sve
 import AnalyticsDashboard from '../../src/lib/components/AnalyticsDashboard.svelte';
 
 const mockPerformanceItem = () => ({
-	post_id: 'p1',
+	content_type: 'tweet',
 	content_preview: 'Test tweet content here',
 	posted_at: '2026-03-17T10:00:00Z',
 	likes: 10,
 	retweets: 5,
 	replies_received: 2,
 	impressions: 200,
-	engagement_rate: 0.085
+	performance_score: 0.85
 });
 
 const mockFollowerSnapshot = () => ({
-	date: '2026-03-17',
+	snapshot_date: '2026-03-17',
 	follower_count: 1500,
 	following_count: 200,
-	delta: 10
+	tweet_count: 42
 });
 
 describe('EngagementChart', () => {
