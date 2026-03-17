@@ -37,8 +37,6 @@
 
 		const { Chart } = await import('chart.js');
 		if (!canvasEl) return;
-
-		if (!canvasEl) return;
 		const ctx = canvasEl.getContext('2d');
 		if (!ctx) return;
 

@@ -356,4 +356,52 @@ describe('VoiceContextPanel', () => {
 		const { container } = render(VoiceContextPanel, { props: defaultProps });
 		expect(container).toBeTruthy();
 	});
+
+	it('saves cue to history on Ctrl+Enter keydown', async () => {
+		localStorage.removeItem('tuitbot:voice:saved-cues');
+		const { container } = render(VoiceContextPanel, {
+			props: { ...defaultProps, cue: 'be witty', inline: true }
+		});
+		const cueInput = container.querySelector('.cue-input') as HTMLInputElement;
+		expect(cueInput).toBeTruthy();
+		await fireEvent.keyDown(cueInput, { key: 'Enter', ctrlKey: true });
+		const stored = JSON.parse(localStorage.getItem('tuitbot:voice:saved-cues') || '[]');
+		expect(stored).toContain('be witty');
+	});
+
+	it('saves cue to history on Meta+Enter keydown', async () => {
+		localStorage.removeItem('tuitbot:voice:saved-cues');
+		const { container } = render(VoiceContextPanel, {
+			props: { ...defaultProps, cue: 'hot take', inline: true }
+		});
+		const cueInput = container.querySelector('.cue-input') as HTMLInputElement;
+		expect(cueInput).toBeTruthy();
+		await fireEvent.keyDown(cueInput, { key: 'Enter', metaKey: true });
+		const stored = JSON.parse(localStorage.getItem('tuitbot:voice:saved-cues') || '[]');
+		expect(stored).toContain('hot take');
+	});
+
+	it('blurs input on Escape keydown', async () => {
+		const { container } = render(VoiceContextPanel, {
+			props: { ...defaultProps, inline: true }
+		});
+		const cueInput = container.querySelector('.cue-input') as HTMLInputElement;
+		expect(cueInput).toBeTruthy();
+		cueInput.focus();
+		expect(document.activeElement).toBe(cueInput);
+		await fireEvent.keyDown(cueInput, { key: 'Escape' });
+		expect(document.activeElement).not.toBe(cueInput);
+	});
+
+	it('does not save on plain Enter (no modifier)', async () => {
+		localStorage.removeItem('tuitbot:voice:saved-cues');
+		const { container } = render(VoiceContextPanel, {
+			props: { ...defaultProps, cue: 'nope', inline: true }
+		});
+		const cueInput = container.querySelector('.cue-input') as HTMLInputElement;
+		expect(cueInput).toBeTruthy();
+		await fireEvent.keyDown(cueInput, { key: 'Enter' });
+		const stored = localStorage.getItem('tuitbot:voice:saved-cues');
+		expect(stored).toBeFalsy();
+	});
 });
