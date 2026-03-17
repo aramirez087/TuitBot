@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773694935584,
+  "lastUpdate": 1773758440782,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -116,6 +116,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1182992,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a0391c13069b349ec4cba452ab30e080f20b338b",
+          "message": "Merge pull request #209 from aramirez087/refactor/sprint-1\n\nfeat: Sprint 2 features — approval safety guard, onboarding polish, scraper health",
+          "timestamp": "2026-03-17T08:39:54-06:00",
+          "tree_id": "df341631863fec4e439af0594b0f580f6adeec1b",
+          "url": "https://github.com/aramirez087/TuitBot/commit/a0391c13069b349ec4cba452ab30e080f20b338b"
+        },
+        "date": 1773758440048,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 856108,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 291769,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1187127,
             "unit": "bytes"
           }
         ]
