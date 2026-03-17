@@ -1,0 +1,109 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e8]: Tuitbot
+    - button "Default" [ref=e10] [cursor=pointer]:
+      - img [ref=e11]
+      - generic [ref=e12]: Default
+      - img [ref=e13]
+    - navigation [ref=e14]:
+      - link "Home" [ref=e15] [cursor=pointer]:
+        - /url: /
+        - img [ref=e16]
+        - generic [ref=e17]: Home
+      - link "Activity" [ref=e18] [cursor=pointer]:
+        - /url: /activity
+        - img [ref=e19]
+        - generic [ref=e20]: Activity
+      - link "Approval" [ref=e21] [cursor=pointer]:
+        - /url: /approval
+        - img [ref=e22]
+        - generic [ref=e23]: Approval
+      - link "Content" [ref=e24] [cursor=pointer]:
+        - /url: /content
+        - img [ref=e25]
+        - generic [ref=e26]: Content
+      - link "Discovery" [ref=e27] [cursor=pointer]:
+        - /url: /discovery
+        - img [ref=e28]
+        - generic [ref=e29]: Discovery
+      - link "Targets" [ref=e30] [cursor=pointer]:
+        - /url: /targets
+        - img [ref=e31]
+        - generic [ref=e32]: Targets
+      - link "Strategy" [ref=e33] [cursor=pointer]:
+        - /url: /strategy
+        - img [ref=e34]
+        - generic [ref=e35]: Strategy
+      - link "Costs" [ref=e36] [cursor=pointer]:
+        - /url: /costs
+        - img [ref=e37]
+        - generic [ref=e38]: Costs
+      - link "MCP" [ref=e39] [cursor=pointer]:
+        - /url: /mcp
+        - img [ref=e40]
+        - generic [ref=e41]: MCP
+      - link "Observability" [ref=e42] [cursor=pointer]:
+        - /url: /observability
+        - img [ref=e43]
+        - generic [ref=e44]: Observability
+      - link "Settings" [ref=e45] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e46]
+        - generic [ref=e47]: Settings
+    - generic [ref=e48]:
+      - generic "Server connected" [ref=e49]:
+        - generic [ref=e51]: Connected
+      - generic "Tuitbot v0.1.17" [ref=e52]: v0.1.17
+      - generic [ref=e53]:
+        - button "Dark" [ref=e54] [cursor=pointer]:
+          - img [ref=e55]
+          - generic [ref=e56]: Dark
+        - button "Collapse sidebar" [ref=e57] [cursor=pointer]:
+          - img [ref=e58]
+  - main [ref=e59]:
+    - generic [ref=e61]:
+      - generic [ref=e63]:
+        - tablist "Draft tabs" [ref=e64]:
+          - tab "Drafts 0" [selected] [ref=e65] [cursor=pointer]:
+            - text: Drafts
+            - generic [ref=e66]: "0"
+          - tab "Scheduled 0" [ref=e67] [cursor=pointer]:
+            - text: Scheduled
+            - generic [ref=e68]: "0"
+          - tab "Posted 0" [ref=e69] [cursor=pointer]:
+            - text: Posted
+            - generic [ref=e70]: "0"
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - img [ref=e74]
+            - textbox "Search drafts..." [ref=e75]
+          - button "Last edited" [ref=e77] [cursor=pointer]:
+            - generic [ref=e78]: Last edited
+            - img [ref=e79]
+        - listbox "Drafts list" [ref=e80]:
+          - generic [ref=e82]: No drafts yet
+        - button "New Draft" [ref=e84] [cursor=pointer]:
+          - img [ref=e85]
+          - generic [ref=e86]: New Draft
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - button "Drafts" [ref=e89] [cursor=pointer]:
+            - img [ref=e90]
+            - generic [ref=e91]: Drafts
+          - button "New" [ref=e92] [cursor=pointer]:
+            - img [ref=e93]
+            - generic [ref=e94]: New
+        - generic [ref=e95]:
+          - generic [ref=e96]: Unexpected token '<', "<!doctype "... is not valid JSON
+          - button "Dismiss" [ref=e97] [cursor=pointer]
+        - generic [ref=e98]:
+          - img [ref=e100]
+          - heading "Start writing" [level=2] [ref=e101]
+          - paragraph [ref=e102]: Create your first draft to begin composing.
+          - button "New Draft" [ref=e103] [cursor=pointer]
+```

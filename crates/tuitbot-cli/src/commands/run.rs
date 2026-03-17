@@ -86,9 +86,12 @@ pub async fn execute(config: &Config, status_interval: u64) -> anyhow::Result<()
         let cancel = runtime.cancel_token();
         let pool = deps.pool.clone();
         let xc = deps.dyn_client.clone();
+        // CLI is single-account — always uses the default account.
+        // Multi-account dispatch (server-driven) spawns one poster per account.
+        let account_id = tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID.to_string();
         runtime.spawn(
             "approval-poster",
-            run_approval_poster(pool, xc, min_delay, max_delay, cancel),
+            run_approval_poster(pool, xc, account_id, min_delay, max_delay, cancel),
         );
     }
 

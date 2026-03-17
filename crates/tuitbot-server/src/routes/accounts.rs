@@ -394,8 +394,17 @@ pub async fn sync_profile(
             // No OAuth tokens — try the cookie transport.
             tracing::info!(account_id = %id, "sync_profile: no OAuth, falling back to cookie transport");
             let account_dir = accounts::account_data_dir(&state.data_dir, &id);
-            let client =
-                tuitbot_core::x_api::LocalModeXClient::with_session(false, &account_dir).await;
+            // Pass the shared health handle so the sync outcome is reflected in /health.
+            let client = if let Some(ref health) = state.scraper_health {
+                tuitbot_core::x_api::LocalModeXClient::with_session_and_health(
+                    false,
+                    &account_dir,
+                    health.clone(),
+                )
+                .await
+            } else {
+                tuitbot_core::x_api::LocalModeXClient::with_session(false, &account_dir).await
+            };
             client
                 .get_me()
                 .await

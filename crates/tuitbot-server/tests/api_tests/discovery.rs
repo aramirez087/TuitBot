@@ -127,6 +127,7 @@ async fn connector_status_with_connection() {
         content_generators: Mutex::new(std::collections::HashMap::new()),
         runtimes: Mutex::new(std::collections::HashMap::new()),
         circuit_breaker: None,
+        scraper_health: None,
         watchtower_cancel: tokio::sync::RwLock::new(None),
         content_sources: tokio::sync::RwLock::new(Default::default()),
         connector_config: Default::default(),

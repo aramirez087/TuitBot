@@ -44,6 +44,16 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/analytics/recent-performance",
             get(routes::analytics::recent_performance),
         )
+        .route(
+            "/analytics/engagement-rate",
+            get(routes::analytics::engagement_rate),
+        )
+        .route("/analytics/reach", get(routes::analytics::reach))
+        .route(
+            "/analytics/follower-growth",
+            get(routes::analytics::follower_growth),
+        )
+        .route("/analytics/best-times", get(routes::analytics::best_times))
         // Approval
         .route("/approval/export", get(routes::approval::export_items))
         .route("/approval", get(routes::approval::list_items))

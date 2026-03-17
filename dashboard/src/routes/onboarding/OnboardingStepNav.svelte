@@ -3,9 +3,10 @@
 		steps: string[];
 		currentStep: number;
 		skippedSteps: Set<string>;
+		optionalSteps?: Set<string>;
 	}
 
-	const { steps, currentStep, skippedSteps }: Props = $props();
+	const { steps, currentStep, skippedSteps, optionalSteps = new Set() }: Props = $props();
 </script>
 
 <div class="progress">
@@ -26,7 +27,12 @@
 					{displayIdx + 1}
 				{/if}
 			</div>
-			<span class="progress-label">{step}</span>
+			<span class="progress-label">
+				{step}
+				{#if optionalSteps.has(step)}
+					<span class="optional-badge">[Optional]</span>
+				{/if}
+			</span>
 		</div>
 		{#if displayIdx < steps.length - 1}
 			<div class="progress-line" class:filled={displayIdx < currentStep}></div>
@@ -95,6 +101,17 @@
 		font-size: 11px;
 		color: var(--color-text-subtle);
 		white-space: nowrap;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.optional-badge {
+		font-size: 9px;
+		font-weight: 500;
+		color: var(--color-text-subtle);
+		opacity: 0.75;
 	}
 
 	.progress-step.active .progress-label {

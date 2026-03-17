@@ -16,6 +16,7 @@ use tuitbot_core::content::ContentGenerator;
 use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage;
 use tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID;
+use tuitbot_core::x_api::scraper_health::new_scraper_health;
 
 use tokio_util::sync::CancellationToken;
 use tuitbot_core::automation::WatchtowerLoop;
@@ -235,6 +236,14 @@ async fn main() -> Result<()> {
         runtimes: Mutex::new(HashMap::new()),
         content_generators: Mutex::new(content_generators),
         circuit_breaker: None,
+        // Initialise a shared health handle when the scraper backend is configured.
+        // Ephemeral `LocalModeXClient` instances created by server routes are given
+        // this handle so their operation outcomes aggregate into a single tracker
+        // that the `/health` endpoint reads.
+        scraper_health: loaded_config
+            .as_ref()
+            .filter(|c| c.x_api.provider_backend == "scraper")
+            .map(|_| new_scraper_health()),
         watchtower_cancel: tokio::sync::RwLock::new(watchtower_cancel),
         content_sources: tokio::sync::RwLock::new(content_sources),
         connector_config,

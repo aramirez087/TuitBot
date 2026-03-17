@@ -19,6 +19,7 @@ use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage::accounts::{self, DEFAULT_ACCOUNT_ID};
 use tuitbot_core::storage::DbPool;
 use tuitbot_core::x_api::auth::TokenManager;
+use tuitbot_core::x_api::ScraperHealth;
 
 use tuitbot_core::error::XApiError;
 use tuitbot_core::x_api::auth;
@@ -65,6 +66,8 @@ pub struct AppState {
     pub content_generators: Mutex<HashMap<String, Arc<ContentGenerator>>>,
     /// Optional circuit breaker for X API rate-limit protection.
     pub circuit_breaker: Option<Arc<CircuitBreaker>>,
+    /// Optional scraper health tracker (populated when provider_backend = "scraper").
+    pub scraper_health: Option<ScraperHealth>,
     /// Cancellation token for the Watchtower filesystem watcher (None if not running).
     pub watchtower_cancel: RwLock<Option<CancellationToken>>,
     /// Content sources configuration for the Watchtower.

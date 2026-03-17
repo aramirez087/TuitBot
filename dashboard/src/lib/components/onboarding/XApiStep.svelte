@@ -33,6 +33,7 @@
 	);
 
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let timeoutCounter = $state(0);
 
 	$effect(() => {
 		onboardingData.updateField('client_id', clientId);
@@ -125,6 +126,20 @@
 
 	function startPolling() {
 		if (pollTimer) clearInterval(pollTimer);
+		const TIMEOUT_MS = 300_000; // 5 minutes
+		const COUNTDOWN_INTERVAL_MS = 1000; // update every 1 second
+		let elapsed = 0;
+		
+		// Countdown timer: update every second
+		const countdownTimer = setInterval(() => {
+			elapsed += COUNTDOWN_INTERVAL_MS;
+			timeoutCounter = Math.max(0, Math.floor((TIMEOUT_MS - elapsed) / 1000));
+			if (elapsed >= TIMEOUT_MS) {
+				clearInterval(countdownTimer);
+			}
+		}, COUNTDOWN_INTERVAL_MS);
+		
+		// Poll for auth status every 2 seconds
 		pollTimer = setInterval(async () => {
 			try {
 				const status = await api.onboarding.authStatus();
@@ -138,7 +153,9 @@
 					onboardingData.updateField('x_avatar_url', user.profile_image_url ?? '');
 					if (pollTimer) {
 						clearInterval(pollTimer);
+						clearInterval(countdownTimer);
 						pollTimer = null;
+						timeoutCounter = 0;
 					}
 					runInlineAnalysis();
 				}
@@ -147,10 +164,13 @@
 			}
 		}, 2000);
 
+		// Timeout handler: clear timers and show error after 5 minutes
 		setTimeout(() => {
 			if (pollTimer) {
 				clearInterval(pollTimer);
+				clearInterval(countdownTimer);
 				pollTimer = null;
+				timeoutCounter = 0;
 				if (!$onboardingSession.x_connected) {
 					trackFunnel('onboarding:x-auth-error', { error: 'timeout' });
 					onboardingSession.setError(
@@ -158,7 +178,7 @@
 					);
 				}
 			}
-		}, 300_000);
+		}, TIMEOUT_MS);
 	}
 
 	async function runInlineAnalysis() {
@@ -191,6 +211,7 @@
 		<XApiConnectPanel
 			heroMode={true}
 			{analysisPhase}
+			{timeoutCounter}
 			onStartAuth={startXAuth}
 			onSetScraperMode={() => setMode('scraper')}
 		/>
@@ -246,6 +267,7 @@
 				<XApiConnectPanel
 					heroMode={false}
 					{analysisPhase}
+					{timeoutCounter}
 					onStartAuth={startXAuth}
 					onSetScraperMode={() => setMode('scraper')}
 				/>

@@ -26,12 +26,12 @@
 </script>
 
 {#if enriching}
-	<div class="enrich-banner">
+	<div class="enrich-banner" role="status" aria-live="polite" aria-label="Profile enrichment in progress">
 		<span class="spinner"><Loader2 size={14} /></span>
 		<span>Enriching profile with AI...</span>
 	</div>
 {:else if enrichDone}
-	<div class="enrich-banner enrich-done">
+	<div class="enrich-banner enrich-done" role="status" aria-live="polite" aria-label="Profile enrichment complete">
 		<Sparkles size={14} />
 		<span>Profile enriched with AI — review the updated fields below.</span>
 	</div>

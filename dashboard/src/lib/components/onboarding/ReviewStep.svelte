@@ -44,10 +44,10 @@
 
 	let tierDescription = $derived(
 		hasLlmConfig && hasXCredentials
-			? 'You can discover conversations, generate AI drafts, and compose replies.'
+			? 'Full AI-powered content generation. Find conversations on X, draft replies with AI assistance, and schedule posts.'
 			: hasXCredentials
-				? 'You can discover and explore conversations. Add an LLM provider in Settings to enable AI drafts.'
-				: 'Dashboard access is available. Configure X credentials and an LLM in Settings to unlock more features.',
+				? 'Discovery mode enabled. Explore conversations on X and read analytics. Enable AI drafting by adding an LLM provider in Settings.'
+				: 'Basic dashboard access only. Connect your X account and add an LLM provider in Settings to enable discovery and AI drafting.',
 	);
 
 	let deferredItems = $derived.by(() => {

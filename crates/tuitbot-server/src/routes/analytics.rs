@@ -107,3 +107,80 @@ pub async fn recent_performance(
             .await?;
     Ok(Json(json!(items)))
 }
+
+/// Query parameters for engagement-rate endpoint.
+#[derive(Deserialize)]
+pub struct EngagementRateQuery {
+    /// Maximum number of posts to return (default: 20).
+    #[serde(default = "default_engagement_limit")]
+    pub limit: u32,
+}
+
+fn default_engagement_limit() -> u32 {
+    20
+}
+
+/// `GET /api/analytics/engagement-rate` — top posts by engagement rate (for charting).
+pub async fn engagement_rate(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Query(params): Query<EngagementRateQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let metrics =
+        analytics::get_engagement_rate_for(&state.db, &ctx.account_id, params.limit).await?;
+    Ok(Json(json!(metrics)))
+}
+
+/// Query parameters for reach endpoint.
+#[derive(Deserialize)]
+pub struct ReachQuery {
+    /// Number of days of reach data to return (default: 7).
+    #[serde(default = "default_reach_days")]
+    pub window: u32,
+}
+
+fn default_reach_days() -> u32 {
+    7
+}
+
+/// `GET /api/analytics/reach` — reach time-series by day (for charting).
+pub async fn reach(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Query(params): Query<ReachQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let snapshots = analytics::get_reach_for(&state.db, &ctx.account_id, params.window).await?;
+    Ok(Json(json!(snapshots)))
+}
+
+/// Query parameters for follower-growth endpoint.
+#[derive(Deserialize)]
+pub struct FollowerGrowthQuery {
+    /// Number of days of follower growth data to return (default: 30).
+    #[serde(default = "default_growth_days")]
+    pub window: u32,
+}
+
+fn default_growth_days() -> u32 {
+    30
+}
+
+/// `GET /api/analytics/follower-growth` — follower growth time-series with deltas (for charting).
+pub async fn follower_growth(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Query(params): Query<FollowerGrowthQuery>,
+) -> Result<Json<Value>, ApiError> {
+    let snapshots =
+        analytics::get_follower_growth_for(&state.db, &ctx.account_id, params.window).await?;
+    Ok(Json(json!(snapshots)))
+}
+
+/// `GET /api/analytics/best-times` — ranked posting time slots by engagement.
+pub async fn best_times(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+) -> Result<Json<Value>, ApiError> {
+    let slots = analytics::get_best_times_for(&state.db, &ctx.account_id).await?;
+    Ok(Json(json!(slots)))
+}

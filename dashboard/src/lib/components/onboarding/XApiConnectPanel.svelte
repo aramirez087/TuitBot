@@ -5,11 +5,12 @@
 	interface Props {
 		heroMode: boolean;
 		analysisPhase: 'idle' | 'running' | 'done' | 'failed';
+		timeoutCounter?: number;
 		onStartAuth: () => void;
 		onSetScraperMode: () => void;
 	}
 
-	const { heroMode, analysisPhase, onStartAuth, onSetScraperMode }: Props = $props();
+	const { heroMode, analysisPhase, timeoutCounter = 0, onStartAuth, onSetScraperMode }: Props = $props();
 </script>
 
 <div class="connect-section">
@@ -36,14 +37,19 @@
 		</div>
 
 		{#if analysisPhase === 'running'}
-			<div class="analysis-status">
+			<div class="analysis-status" role="status" aria-live="polite" aria-label="Profile analysis in progress">
 				<span class="spinner"><Loader2 size={14} /></span>
 				<span>Analyzing your profile...</span>
 			</div>
 		{:else if analysisPhase === 'done'}
-			<div class="analysis-status analysis-done">
+			<div class="analysis-status analysis-done" role="status" aria-live="polite" aria-label="Profile analysis complete">
 				<Sparkles size={14} />
 				<span>Profile analyzed — fields pre-filled below.</span>
+			</div>
+		{:else if analysisPhase === 'failed'}
+			<div class="analysis-status analysis-failed" role="alert" aria-live="assertive">
+				<span class="error-icon">⚠</span>
+				<span>Profile analysis failed. You can fill in the fields manually below.</span>
 			</div>
 		{/if}
 	{:else if heroMode}
@@ -86,6 +92,9 @@
 			{#if $onboardingSession.auth_loading}
 				<p class="connect-hint">
 					Complete the sign-in in the window that opened, then return here.
+					{#if timeoutCounter > 0}
+						<span class="timeout-hint">(Expires in {timeoutCounter}s)</span>
+					{/if}
 				</p>
 			{/if}
 		</div>
@@ -139,6 +148,9 @@
 			{#if $onboardingSession.auth_loading}
 				<p class="connect-hint">
 					Complete the sign-in in the window that opened, then return here.
+					{#if timeoutCounter > 0}
+						<span class="timeout-hint">(Expires in {timeoutCounter}s)</span>
+					{/if}
 				</p>
 			{/if}
 
@@ -257,6 +269,15 @@
 		text-align: center;
 	}
 
+	.timeout-hint {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+		font-weight: 500;
+		font-style: normal;
+		display: block;
+		margin-top: 2px;
+	}
+
 	.connect-skip {
 		font-size: 12px;
 		color: var(--color-text-subtle);
@@ -346,6 +367,17 @@
 		background: color-mix(in srgb, var(--color-success, #22c55e) 6%, var(--color-base));
 		border-color: color-mix(in srgb, var(--color-success, #22c55e) 25%, var(--color-border));
 		color: var(--color-success, #22c55e);
+	}
+
+	.analysis-failed {
+		background: color-mix(in srgb, var(--color-danger) 6%, var(--color-base));
+		border-color: color-mix(in srgb, var(--color-danger) 25%, var(--color-border));
+		color: var(--color-danger);
+	}
+
+	.error-icon {
+		font-size: 14px;
+		font-weight: 600;
 	}
 
 	.spinner {

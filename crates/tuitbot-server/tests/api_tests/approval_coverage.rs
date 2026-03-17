@@ -165,3 +165,84 @@ async fn approval_edit_history_empty() {
     assert!(body.is_array());
     assert!(body.as_array().unwrap().is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Status guard: approve-after-scheduled (cross-state, P0 safety)
+// ---------------------------------------------------------------------------
+
+/// Build a router backed by a real tempdir with dummy tokens.json.
+async fn router_with_tokens_and_pool() -> (
+    axum::Router,
+    tuitbot_core::storage::DbPool,
+    tempfile::TempDir,
+) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let token_path = tuitbot_core::storage::accounts::account_token_path(
+        dir.path(),
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+    );
+    let tokens = tuitbot_core::x_api::auth::Tokens {
+        access_token: "test_access".to_string(),
+        refresh_token: "test_refresh".to_string(),
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
+        scopes: vec!["tweet.read".to_string(), "tweet.write".to_string()],
+    };
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("write dummy tokens.json");
+
+    (router, pool, dir)
+}
+
+#[tokio::test]
+async fn approval_approve_scheduled_item_returns_409() {
+    // Guard: cannot re-approve an item whose status is "scheduled".
+    // Prevents duplicate scheduled_content rows from double-approval.
+    let (router, pool, _dir) = router_with_tokens_and_pool().await;
+
+    let future = (chrono::Utc::now() + chrono::TimeDelta::hours(24))
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+
+    // Seed item with a future scheduled_for so approve_item bridges to "scheduled".
+    let id = tuitbot_core::storage::approval_queue::enqueue_with_context_for(
+        &pool,
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+        "tweet",
+        "",
+        "",
+        "Scheduled content",
+        "General",
+        "",
+        0.9,
+        "[]",
+        None,
+        None,
+        Some(&future),
+    )
+    .await
+    .expect("enqueue scheduled item");
+
+    // First approve — bridges item to "scheduled" status.
+    let (status, body) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "first approve must succeed: {body}");
+    assert_eq!(body["status"], "scheduled");
+
+    // Second approve on a scheduled item — must be 409.
+    let (status2, body2) = post_json(
+        router,
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "approve-after-scheduled must return 409 Conflict, got {status2}: {body2}"
+    );
+}
