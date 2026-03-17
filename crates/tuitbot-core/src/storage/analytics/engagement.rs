@@ -124,19 +124,25 @@ pub async fn get_reach(pool: &DbPool, days: u32) -> Result<Vec<ReachSnapshot>, S
 }
 
 /// Insert or update engagement metrics for a post.
+/// Input for upserting engagement metrics for a single post.
+pub struct UpsertEngagementInput<'a> {
+    pub post_id: &'a str,
+    pub impressions: i64,
+    pub likes: i64,
+    pub retweets: i64,
+    pub replies: i64,
+    pub bookmarks: i64,
+    pub posted_at: Option<&'a str>,
+}
+
 pub async fn upsert_engagement_metric_for(
     pool: &DbPool,
     account_id: &str,
-    post_id: &str,
-    impressions: i64,
-    likes: i64,
-    retweets: i64,
-    replies: i64,
-    bookmarks: i64,
-    posted_at: Option<&str>,
+    input: UpsertEngagementInput<'_>,
 ) -> Result<(), StorageError> {
-    let engagement_rate = if impressions > 0 {
-        (likes + retweets + replies + bookmarks) as f64 / impressions as f64
+    let engagement_rate = if input.impressions > 0 {
+        (input.likes + input.retweets + input.replies + input.bookmarks) as f64
+            / input.impressions as f64
     } else {
         0.0
     };
@@ -157,14 +163,14 @@ pub async fn upsert_engagement_metric_for(
          fetched_at = excluded.fetched_at",
     )
     .bind(account_id)
-    .bind(post_id)
-    .bind(impressions)
-    .bind(likes)
-    .bind(retweets)
-    .bind(replies)
-    .bind(bookmarks)
+    .bind(input.post_id)
+    .bind(input.impressions)
+    .bind(input.likes)
+    .bind(input.retweets)
+    .bind(input.replies)
+    .bind(input.bookmarks)
     .bind(engagement_rate)
-    .bind(posted_at)
+    .bind(input.posted_at)
     .bind(&now)
     .bind(&now)
     .execute(pool)
