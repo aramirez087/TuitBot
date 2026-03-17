@@ -473,9 +473,14 @@ jobs:
         run: |
           set -euo pipefail
           sbom_file="dist/tuitbot-${TAG}-sbom.cdx.json"
+          # syft rejects extensionless config paths like /dev/null.
+          empty_syft_config="$(mktemp /tmp/syft-empty-config-XXXXXX)"
+          mv "$empty_syft_config" "${empty_syft_config}.yaml"
+          empty_syft_config="${empty_syft_config}.yaml"
+          trap 'rm -f "$empty_syft_config"' EXIT
           # Scan both the Rust workspace root and the Node dashboard
           syft dir:. \
-            --config /dev/null \
+            --config "${empty_syft_config}" \
             --scope all-layers \
             --output cyclonedx-json="${sbom_file}"
           echo "SBOM written to: ${sbom_file}"
@@ -537,7 +542,12 @@ jobs:
         run: |
           set -euo pipefail
           # Upload all artifacts (binaries + signatures)
-          gh release upload "$TAG" dist/* --clobber --repo "$GH_REPO"
+          mapfile -d '' files < <(find dist -maxdepth 1 -type f -print0 | sort -z)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No release files found in dist."
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber --repo "$GH_REPO"
 
   # ── Desktop app build (Tauri) — triggered on app-v* tags ──
   build-desktop:
@@ -549,7 +559,7 @@ jobs:
         include:
           - os: macos-14
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-15-intel
             target: x86_64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -557,9 +567,9 @@ jobs:
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
 
@@ -568,7 +578,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry and Tauri build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -591,8 +601,8 @@ jobs:
         run: cd dashboard && npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: tuitbot-desktop-${{ matrix.target }}
+          name: desktop-bundle-${{ matrix.target }}
           path: dashboard/src-tauri/target/${{ matrix.target }}/release/bundle/
           retention-days: 30

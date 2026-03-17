@@ -36,6 +36,7 @@
 		const replies = aggregated.map((d) => d.replies);
 
 		const { Chart } = await import('chart.js');
+		if (!canvasEl) return;
 
 		if (!canvasEl) return;
 		const ctx = canvasEl.getContext('2d');

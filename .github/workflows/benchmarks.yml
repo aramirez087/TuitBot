@@ -11,6 +11,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+  # benchmark-action/github-action-benchmark still declares node20 upstream.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
@@ -23,13 +25,13 @@ jobs:
       contents: write   # required by benchmark-action to push to gh-pages
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry + build artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -38,18 +40,27 @@ jobs:
           key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-bench-
 
-      - name: Run benchmarks (bencher output for trend tracking)
-        # --output-format bencher emits the standard cargo-bench text format:
-        #   test <name> ... bench: <ns/iter> (+/- <variance>)
-        # which github-action-benchmark can parse and store.
+      - name: Run benchmarks
         run: |
           mkdir -p bench-output
           cargo bench -p tuitbot-core \
-            -- --output-format bencher \
-            2>&1 | tee bench-output/rust.txt
+            2>&1 | tee bench-output/raw.txt
+
+      - name: Convert criterion output to JSON
+        # criterion 0.8 outputs: <name>  time:  [low median high]
+        # Convert to customSmallerIsBetter JSON for benchmark-action.
+        run: |
+          grep 'time:' bench-output/raw.txt | awk '{
+            name = $1
+            # fields: $3=low $4=low_unit $5=median $6=med_unit $7=high $8=high_unit
+            # strip trailing ] from high_unit
+            gsub(/\]/, "", $8)
+            med = $5; unit = $6
+            printf "{\"name\": \"%s\", \"unit\": \"%s\", \"value\": %s}\n", name, unit, med
+          }' | jq -s '.' > bench-output/rust.json
 
       - name: Upload criterion HTML report (artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: criterion-report
           path: target/criterion/
@@ -59,8 +70,8 @@ jobs:
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Rust Benchmarks
-          tool: cargo
-          output-file-path: bench-output/rust.txt
+          tool: customSmallerIsBetter
+          output-file-path: bench-output/rust.json
           # Alert when a benchmark regresses by more than 10% vs stored baseline.
           alert-threshold: '110%'
           comment-on-alert: true
@@ -80,10 +91,10 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -125,7 +136,7 @@ jobs:
           echo "  Total: $(numfmt --to=iec $total_bytes)"
 
       - name: Upload bundle-size JSON (artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-size
           path: bundle-size.json

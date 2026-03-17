@@ -6,17 +6,18 @@
  * Chart.js canvas rendering is mocked (no actual canvas in jsdom).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/svelte';
 
-// Mock Chart.js — jsdom has no canvas
-vi.mock('chart.js', () => ({
-	Chart: vi.fn().mockImplementation(() => ({
-		destroy: vi.fn(),
-		update: vi.fn()
-	})),
-	registerables: []
-}));
+// Mock Chart.js — jsdom has no canvas.
+// Use a real class so `new Chart(...)` works as a constructor.
+vi.mock('chart.js', () => {
+	class MockChart {
+		destroy = vi.fn();
+		update = vi.fn();
+	}
+	return { Chart: MockChart, registerables: [] };
+});
 
 // Stub canvas getContext so chart onMount handlers don't throw in jsdom
 if (typeof HTMLCanvasElement !== 'undefined') {
@@ -49,6 +50,7 @@ import ReachChart from '../../src/lib/components/charts/ReachChart.svelte';
 import FollowerGrowthChart from '../../src/lib/components/charts/FollowerGrowthChart.svelte';
 import BestTimeHeatmap from '../../src/lib/components/charts/BestTimeHeatmap.svelte';
 import AnalyticsDashboard from '../../src/lib/components/AnalyticsDashboard.svelte';
+import { recentPerformance, followerSnapshots, loading, error } from '../../src/lib/stores/analytics';
 
 const mockPerformanceItem = () => ({
 	content_type: 'tweet',
@@ -121,7 +123,12 @@ describe('AnalyticsDashboard', () => {
 		expect(() => render(AnalyticsDashboard)).not.toThrow();
 	});
 
-	it('renders without throwing (store-driven, no props)', () => {
+	it('renders without throwing when stores have data', () => {
+		// AnalyticsDashboard reads from stores, not props — populate stores before render
+		recentPerformance.set([mockPerformanceItem()]);
+		followerSnapshots.set([mockFollowerSnapshot()]);
+		loading.set(false);
+		error.set(null);
 		expect(() => render(AnalyticsDashboard)).not.toThrow();
 	});
 });

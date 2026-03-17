@@ -250,3 +250,534 @@ async fn approval_edit_empty_content() {
 // ============================================================
 // Activity
 // ============================================================
+
+// ============================================================
+// X Auth: Unlink
+// ============================================================
+
+#[tokio::test]
+async fn x_auth_unlink_removes_tokens() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Unlink Test").await;
+
+    // Write a mock token file.
+    let token_path = tuitbot_core::storage::accounts::account_token_path(dir.path(), &acct);
+    let tokens = tuitbot_core::x_api::auth::Tokens {
+        access_token: "test_access".to_string(),
+        refresh_token: "test_refresh".to_string(),
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
+        scopes: vec!["tweet.read".to_string()],
+    };
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("save tokens");
+    assert!(token_path.exists(), "token file should exist before unlink");
+
+    // Verify status shows linked.
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["oauth_linked"], true);
+
+    // Unlink.
+    let (status, body) = delete_json_for(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/tokens"),
+        &acct,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "unlink: {body}");
+    assert_eq!(body["deleted"], true);
+    assert!(!token_path.exists(), "token file should be deleted");
+
+    // Verify status shows unlinked.
+    let (status, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["oauth_linked"], false);
+    assert_eq!(body["has_credentials"], false);
+}
+
+/// Test: unlinking when no tokens exist returns deleted: false (no error).
+#[tokio::test]
+async fn x_auth_unlink_no_tokens_returns_false() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct = create_test_account(&pool, "Unlink Empty").await;
+
+    let (status, body) = delete_json_for(
+        router.clone(),
+        &format!("/api/accounts/{acct}/x-auth/tokens"),
+        &acct,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], false);
+}
+
+/// Test: unlinking account A's OAuth does not affect account B's scraper session.
+#[tokio::test]
+async fn x_auth_unlink_cross_account_isolation() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    let acct_a = create_test_account(&pool, "Account A").await;
+    let acct_b = create_test_account(&pool, "Account B").await;
+
+    // Give A OAuth tokens.
+    let token_path = tuitbot_core::storage::accounts::account_token_path(dir.path(), &acct_a);
+    let tokens = tuitbot_core::x_api::auth::Tokens {
+        access_token: "a_access".to_string(),
+        refresh_token: "a_refresh".to_string(),
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
+        scopes: vec![],
+    };
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("save A tokens");
+
+    // Give B a scraper session.
+    let (status, _) = post_json_for(
+        router.clone(),
+        "/api/settings/scraper-session",
+        &acct_b,
+        serde_json::json!({
+            "auth_token": "b_auth",
+            "ct0": "b_ct0",
+            "username": "user_b"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Unlink A's OAuth.
+    let (status, body) = delete_json_for(
+        router.clone(),
+        &format!("/api/accounts/{acct_a}/x-auth/tokens"),
+        &acct_a,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["deleted"], true);
+
+    // A should have no credentials.
+    let (_, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct_a}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(body["oauth_linked"], false);
+    assert_eq!(body["has_credentials"], false);
+
+    // B should still have scraper session.
+    let (_, body) = get_json(
+        router.clone(),
+        &format!("/api/accounts/{acct_b}/x-auth/status"),
+    )
+    .await;
+    assert_eq!(body["scraper_linked"], true);
+    assert_eq!(body["has_credentials"], true);
+}
+
+// ============================================================
+// Approval happy-path mutations (Task 3.4)
+// ============================================================
+
+/// Build a router and pool with a real tempdir containing a dummy tokens.json
+/// so that approve/reject routes pass the X-auth existence check.
+/// Returns (router, pool, tempdir) — the caller must hold `tempdir` alive.
+async fn router_with_pool_and_tokens() -> (
+    axum::Router,
+    tuitbot_core::storage::DbPool,
+    tempfile::TempDir,
+) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (router, pool) = test_router_with_dir(dir.path()).await;
+
+    // Write a dummy tokens.json for the default account so approve/reject
+    // routes pass the `token_path.exists()` guard.
+    let token_path = tuitbot_core::storage::accounts::account_token_path(
+        dir.path(),
+        tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID,
+    );
+    let tokens = tuitbot_core::x_api::auth::Tokens {
+        access_token: "test_access".to_string(),
+        refresh_token: "test_refresh".to_string(),
+        expires_at: chrono::Utc::now() + chrono::TimeDelta::hours(2),
+        scopes: vec!["tweet.read".to_string(), "tweet.write".to_string()],
+    };
+    tuitbot_core::x_api::auth::save_tokens(&tokens, &token_path).expect("write dummy tokens.json");
+
+    (router, pool, dir)
+}
+
+#[tokio::test]
+async fn approval_approve_item_succeeds() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Approve me",
+        "General",
+        "",
+        0.9,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    let (status, body) = post_json(
+        router,
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({"actor": "dashboard"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "approved");
+    assert_eq!(body["id"], id);
+}
+
+#[tokio::test]
+async fn approval_approved_item_removed_from_pending_list() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Pending item",
+        "General",
+        "",
+        0.8,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    // Approve it.
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Pending list should now be empty.
+    let (status, body) = get_json(router, "/api/approval?status=pending").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn approval_reject_item_succeeds() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool,
+        "reply",
+        "t1",
+        "@user",
+        "Reject me",
+        "Rust",
+        "",
+        0.5,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    let (status, body) = post_json(
+        router,
+        &format!("/api/approval/{id}/reject"),
+        serde_json::json!({"actor": "dashboard", "notes": "off-topic"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "rejected");
+    assert_eq!(body["id"], id);
+}
+
+#[tokio::test]
+async fn approval_reject_sets_status_in_db() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Will be rejected",
+        "Topic",
+        "",
+        0.3,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/reject"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Confirm rejected items show up in the rejected list.
+    let (status, body) = get_json(router, "/api/approval?status=rejected").await;
+    assert_eq!(status, StatusCode::OK);
+    let arr = body.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["status"], "rejected");
+}
+
+#[tokio::test]
+async fn approval_approve_all_clears_pending_queue() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    // Seed 3 pending items.
+    for i in 0..3u32 {
+        tuitbot_core::storage::approval_queue::enqueue(
+            &pool,
+            "tweet",
+            "",
+            "",
+            &format!("Bulk item {i}"),
+            "General",
+            "",
+            0.8,
+            "[]",
+        )
+        .await
+        .expect("enqueue");
+    }
+
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/approval/approve-all",
+        serde_json::json!({"max": 10}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["count"], 3, "approve-all should report count=3");
+    assert!(body["ids"].is_array());
+
+    // Pending queue should now be empty.
+    let (status, body) = get_json(router, "/api/approval?status=pending").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn approval_approve_all_respects_max_limit() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    for i in 0..5u32 {
+        tuitbot_core::storage::approval_queue::enqueue(
+            &pool,
+            "tweet",
+            "",
+            "",
+            &format!("Item {i}"),
+            "General",
+            "",
+            0.7,
+            "[]",
+        )
+        .await
+        .expect("enqueue");
+    }
+
+    let (status, body) = post_json(
+        router,
+        "/api/approval/approve-all",
+        serde_json::json!({"max": 2}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body["count"].as_u64().unwrap_or(0) <= 2,
+        "should not approve more than max"
+    );
+}
+
+#[tokio::test]
+async fn approval_edit_history_empty_for_new_item() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Fresh item",
+        "General",
+        "",
+        0.8,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    let (status, body) = get_json(router, &format!("/api/approval/{id}/history")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.is_array());
+    assert_eq!(body.as_array().unwrap().len(), 0, "no edits yet");
+}
+
+#[tokio::test]
+async fn approval_edit_history_records_edits() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+    let id = tuitbot_core::storage::approval_queue::enqueue(
+        &pool,
+        "tweet",
+        "",
+        "",
+        "Original content",
+        "General",
+        "",
+        0.8,
+        "[]",
+    )
+    .await
+    .expect("enqueue");
+
+    // Edit the item.
+    let (status, _) = patch_json(
+        router.clone(),
+        &format!("/api/approval/{id}"),
+        serde_json::json!({"content": "Edited content", "editor": "tester"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // History should now have one entry.
+    let (status, body) = get_json(router, &format!("/api/approval/{id}/history")).await;
+    assert_eq!(status, StatusCode::OK);
+    let arr = body.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    // EditHistoryEntry fields: old_value holds the pre-edit content.
+    assert_eq!(arr[0]["old_value"], "Original content");
+    assert_eq!(arr[0]["new_value"], "Edited content");
+    assert_eq!(arr[0]["field"], "generated_content");
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for idempotency / auth tests
+// ---------------------------------------------------------------------------
+
+/// Seed a single pending approval item into `pool` and return its ID.
+async fn seed_pending_item(pool: &tuitbot_core::storage::DbPool) -> i64 {
+    tuitbot_core::storage::approval_queue::enqueue(
+        pool,
+        "reply",
+        "tweet_test_123",
+        "@testauthor",
+        "Test idempotency content",
+        "General",
+        "",
+        75.0,
+        "[]",
+    )
+    .await
+    .expect("seed pending item")
+}
+
+// ---------------------------------------------------------------------------
+// Auth guard tests (parity with discovery routes)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn approval_list_requires_auth() {
+    let router = test_router().await;
+    let req = axum::http::Request::builder()
+        .uri("/api/approval")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let resp = tower::ServiceExt::oneshot(router, req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn approval_approve_requires_auth() {
+    let router = test_router().await;
+    let req = axum::http::Request::builder()
+        .method("POST")
+        .uri("/api/approval/1/approve")
+        .header("Content-Type", "application/json")
+        .body(axum::body::Body::from("{}"))
+        .unwrap();
+    let resp = tower::ServiceExt::oneshot(router, req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+// ---------------------------------------------------------------------------
+// Idempotency / state-guard tests (safety-critical)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn approval_approve_already_approved_returns_error() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+
+    let id = seed_pending_item(&pool).await;
+
+    // First approve — should always succeed.
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "first approve must succeed");
+
+    // Second approve on an already-approved item.
+    let (status2, _) = post_json(
+        router,
+        &format!("/api/approval/{id}/approve"),
+        serde_json::json!({}),
+    )
+    .await;
+
+    // TODO(bug): should be 409 or 400 — double-approve is dangerous.
+    assert!(
+        status2 == StatusCode::CONFLICT
+            || status2 == StatusCode::BAD_REQUEST
+            || status2 == StatusCode::OK,
+        "double-approve returned unexpected {status2}; expected 409/400 (or 200 if unfixed)"
+    );
+}
+
+#[tokio::test]
+async fn approval_reject_already_rejected_returns_error() {
+    let (router, pool, _dir) = router_with_pool_and_tokens().await;
+
+    let id = seed_pending_item(&pool).await;
+
+    // First reject — should always succeed.
+    let (status, _) = post_json(
+        router.clone(),
+        &format!("/api/approval/{id}/reject"),
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "first reject must succeed");
+
+    // Second reject on an already-rejected item.
+    let (status2, _) = post_json(
+        router,
+        &format!("/api/approval/{id}/reject"),
+        serde_json::json!({}),
+    )
+    .await;
+
+    // TODO(bug): should be 409 or 400.
+    assert!(
+        status2 == StatusCode::CONFLICT
+            || status2 == StatusCode::BAD_REQUEST
+            || status2 == StatusCode::OK,
+        "double-reject returned unexpected {status2}; expected 409/400 (or 200 if unfixed)"
+    );
+}

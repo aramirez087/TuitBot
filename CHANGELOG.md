@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.38](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.37...tuitbot-cli-v0.1.38) - 2026-03-17
+
+### Added
+
+- *(core,server)* wire shared scraper health into AppState for /health endpoint
+
+### Fixed
+
+- *(core)* scope run_approval_poster to account_id
+- *(core)* remove unused import in best_times tests (-D warnings)
+
+### Other
+
+- Merge pull request #209 from aramirez087/refactor/sprint-1
+- *(core)* extract UpsertEngagementInput struct to fix clippy::too_many_arguments
+- Implement analytics depth signals (engagement rate, reach, follower growth, best-time-to-post)
+
+## [0.1.37](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.36...tuitbot-cli-v0.1.37) - 2026-03-16
+
+### Other
+
+- update Cargo.toml dependencies
+
 ## [0.1.36](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.35...tuitbot-cli-v0.1.36) - 2026-03-14
 
 ### Other
