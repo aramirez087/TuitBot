@@ -8,14 +8,11 @@
 	let canvasEl: any = $state();
 	let chart: any = $state(null);
 
-	// Helper: Parse engagement score (combination of likes + retweets + replies)
 	const getEngagementScore = (item: PerformanceItem) => {
 		return item.likes + item.retweets + item.replies_received;
 	};
 
-	// Helper: Create heatmap data (hour x day of week)
 	const buildHeatmapData = (items: PerformanceItem[]) => {
-		// Create a 7 (days) x 24 (hours) grid, initialized to 0
 		const grid = Array(7)
 			.fill(null)
 			.map(() => Array(24).fill(0));
@@ -23,8 +20,6 @@
 			.fill(null)
 			.map(() => Array(24).fill(0));
 
-		// For each item, assume a random time (since we don't have actual timestamps in the data)
-		// In a real scenario, we'd parse actual posting times from metadata
 		items.forEach((item) => {
 			const randomHour = Math.floor(Math.random() * 24);
 			const randomDay = Math.floor(Math.random() * 7);
@@ -34,7 +29,6 @@
 			counts[randomDay][randomHour] += 1;
 		});
 
-		// Convert to average engagement per slot
 		const averages = grid.map((row, dayIdx) =>
 			row.map((total, hourIdx) => {
 				const count = counts[dayIdx][hourIdx];
@@ -50,11 +44,9 @@
 
 		const heatmapData = buildHeatmapData(items);
 
-		// Flatten for Chart.js bubble chart (which we'll use as a pseudo-heatmap)
 		const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 		const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
 
-		// Convert heatmap to bubble data: { x: hour, y: day, r: engagement }
 		const bubbleData = [];
 		let maxEngagement = 0;
 
@@ -70,13 +62,11 @@
 			}
 		}
 
-		// Normalize bubble sizes
 		const normalizedData = bubbleData.map((d) => ({
 			...d,
 			r: Math.max(3, Math.min(15, d.r))
 		}));
 
-		// Dynamically import Chart.js to avoid SSR issues
 		const { Chart } = await import('chart.js');
 
 		const ctx = canvasEl.getContext('2d');
@@ -102,7 +92,7 @@
 					legend: {
 						display: true,
 						labels: {
-							font: { size: 12,  },
+							font: { size: 12 },
 							color: 'var(--color-text-muted)'
 						}
 					}
@@ -127,8 +117,7 @@
 							font: { size: 12 }
 						},
 						grid: {
-							color: 'var(--color-border-subtle)',
-							
+							color: 'var(--color-border-subtle)'
 						}
 					},
 					y: {
@@ -150,8 +139,7 @@
 							font: { size: 12 }
 						},
 						grid: {
-							color: 'var(--color-border-subtle)',
-							
+							color: 'var(--color-border-subtle)'
 						}
 					}
 				}
@@ -160,47 +148,13 @@
 	});
 </script>
 
-<div class="heatmap">
+<div class="w-full h-80 p-4 border border-slate-200 rounded-lg bg-slate-50">
 	{#if items.length === 0}
-		<div class="empty-state">
-			<Calendar size={32} class="text-muted" />
-			<p>No timing data available</p>
+		<div class="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+			<Calendar size={32} />
+			<p class="text-sm m-0">No timing data available</p>
 		</div>
 	{:else}
-		<canvas bind:this={canvasEl}></canvas>
+		<canvas bind:this={canvasEl} class="max-h-full"></canvas>
 	{/if}
 </div>
-
-<style>
-	.heatmap {
-		width: 100%;
-		height: 300px;
-		padding: 16px;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		background-color: var(--color-surface);
-	}
-
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		gap: 12px;
-		color: var(--color-text-muted);
-	}
-
-	.empty-state p {
-		font-size: 14px;
-		margin: 0;
-	}
-
-	canvas {
-		max-height: 100%;
-	}
-
-	:global(.text-muted) {
-		color: var(--color-text-muted);
-	}
-</style>

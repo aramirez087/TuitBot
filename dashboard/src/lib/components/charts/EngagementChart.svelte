@@ -5,17 +5,14 @@
 
 	let { items = [] }: { items?: PerformanceItem[] } = $props();
 
-	let canvasEl: any = $state(); HTMLCanvasElement;
+	let canvasEl: any = $state();
 	let chart: any = $state(null);
 
 	const aggregateByDate = (items: PerformanceItem[]) => {
 		const map = new Map<string, { likes: number; retweets: number; replies: number }>();
 
 		items.forEach((item) => {
-			// Extract date from content preview or use a placeholder
-			// For now, we'll aggregate all items into one group per item
-			// In a real scenario, you'd extract dates from content metadata
-			const key = item.content_preview.substring(0, 20); // Use first 20 chars as unique key
+			const key = item.content_preview.substring(0, 20);
 			if (!map.has(key)) {
 				map.set(key, { likes: 0, retweets: 0, replies: 0 });
 			}
@@ -40,7 +37,6 @@
 		const retweets = aggregated.map((d) => d.retweets);
 		const replies = aggregated.map((d) => d.replies);
 
-		// Dynamically import Chart.js to avoid SSR issues
 		const { Chart } = await import('chart.js');
 
 		const ctx = canvasEl.getContext('2d');
@@ -54,21 +50,21 @@
 					{
 						label: 'Likes',
 						data: likes,
-						backgroundColor: 'rgb(239, 68, 68)', // red-500
+						backgroundColor: 'rgb(239, 68, 68)',
 						borderColor: 'rgb(239, 68, 68)',
 						borderWidth: 0
 					},
 					{
 						label: 'Retweets',
 						data: retweets,
-						backgroundColor: 'rgb(34, 197, 94)', // green-500
+						backgroundColor: 'rgb(34, 197, 94)',
 						borderColor: 'rgb(34, 197, 94)',
 						borderWidth: 0
 					},
 					{
 						label: 'Replies',
 						data: replies,
-						backgroundColor: 'rgb(59, 130, 246)', // blue-500
+						backgroundColor: 'rgb(59, 130, 246)',
 						borderColor: 'rgb(59, 130, 246)',
 						borderWidth: 0
 					}
@@ -83,7 +79,7 @@
 						position: 'top' as const,
 						labels: {
 							padding: 12,
-							font: { size: 12,  },
+							font: { size: 12 },
 							color: 'var(--color-text-muted)'
 						}
 					}
@@ -96,8 +92,7 @@
 							font: { size: 11 }
 						},
 						grid: {
-							color: 'var(--color-border-subtle)',
-							
+							color: 'var(--color-border-subtle)'
 						}
 					},
 					x: {
@@ -115,47 +110,13 @@
 	});
 </script>
 
-<div class="engagement-chart">
+<div class="w-full h-80 p-4 border border-slate-200 rounded-lg bg-slate-50">
 	{#if items.length === 0}
-		<div class="empty-state">
-			<BarChart size={32} class="text-muted" />
-			<p>No engagement data available</p>
+		<div class="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+			<BarChart size={32} />
+			<p class="text-sm m-0">No engagement data available</p>
 		</div>
 	{:else}
-		<canvas bind:this={canvasEl}></canvas>
+		<canvas bind:this={canvasEl} class="max-h-full"></canvas>
 	{/if}
 </div>
-
-<style>
-	.engagement-chart {
-		width: 100%;
-		height: 300px;
-		padding: 16px;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		background-color: var(--color-surface);
-	}
-
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		gap: 12px;
-		color: var(--color-text-muted);
-	}
-
-	.empty-state p {
-		font-size: 14px;
-		margin: 0;
-	}
-
-	canvas {
-		max-height: 100%;
-	}
-
-	:global(.text-muted) {
-		color: var(--color-text-muted);
-	}
-</style>

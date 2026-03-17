@@ -5,7 +5,7 @@
 
 	let { snapshots = [] }: { snapshots?: FollowerSnapshot[] } = $props();
 
-	let canvasEl: any = $state(); HTMLCanvasElement;
+	let canvasEl: any = $state();
 	let chart: any = $state(null);
 
 	onMount(async () => {
@@ -18,7 +18,6 @@
 
 		const followerCounts = snapshots.map((s) => s.follower_count);
 
-		// Dynamically import Chart.js to avoid SSR issues
 		const { Chart } = await import('chart.js');
 
 		const ctx = canvasEl.getContext('2d');
@@ -32,7 +31,7 @@
 					{
 						label: 'Followers',
 						data: followerCounts,
-						borderColor: 'rgb(168, 85, 247)', // purple-500
+						borderColor: 'rgb(168, 85, 247)',
 						backgroundColor: 'rgba(168, 85, 247, 0.1)',
 						borderWidth: 2,
 						fill: true,
@@ -58,7 +57,7 @@
 						position: 'top' as const,
 						labels: {
 							padding: 12,
-							font: { size: 12,  },
+							font: { size: 12 },
 							color: 'var(--color-text-muted)'
 						}
 					}
@@ -74,8 +73,7 @@
 							}
 						},
 						grid: {
-							color: 'var(--color-border-subtle)',
-							
+							color: 'var(--color-border-subtle)'
 						}
 					},
 					x: {
@@ -93,47 +91,13 @@
 	});
 </script>
 
-<div class="follower-growth-chart">
+<div class="w-full h-80 p-4 border border-slate-200 rounded-lg bg-slate-50">
 	{#if snapshots.length === 0}
-		<div class="empty-state">
-			<TrendingUp size={32} class="text-muted" />
-			<p>No follower data available</p>
+		<div class="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+			<TrendingUp size={32} />
+			<p class="text-sm m-0">No follower data available</p>
 		</div>
 	{:else}
-		<canvas bind:this={canvasEl}></canvas>
+		<canvas bind:this={canvasEl} class="max-h-full"></canvas>
 	{/if}
 </div>
-
-<style>
-	.follower-growth-chart {
-		width: 100%;
-		height: 300px;
-		padding: 16px;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		background-color: var(--color-surface);
-	}
-
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		gap: 12px;
-		color: var(--color-text-muted);
-	}
-
-	.empty-state p {
-		font-size: 14px;
-		margin: 0;
-	}
-
-	canvas {
-		max-height: 100%;
-	}
-
-	:global(.text-muted) {
-		color: var(--color-text-muted);
-	}
-</style>

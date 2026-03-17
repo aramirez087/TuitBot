@@ -5,14 +5,13 @@
 
 	let { items = [] }: { items?: PerformanceItem[] } = $props();
 
-	let canvasEl: any = $state(); HTMLCanvasElement;
+	let canvasEl: any = $state();
 	let chart: any = $state(null);
 
 	const aggregateReach = (items: PerformanceItem[]) => {
 		const map = new Map<string, { impressions: number; replies: number }>();
 
 		items.forEach((item) => {
-			// Group by content type (tweets, threads, replies)
 			const key = item.content_type || 'unknown';
 			if (!map.has(key)) {
 				map.set(key, { impressions: 0, replies: 0 });
@@ -36,7 +35,6 @@
 		const impressions = aggregated.map((d) => d.impressions);
 		const replies = aggregated.map((d) => d.replies);
 
-		// Dynamically import Chart.js to avoid SSR issues
 		const { Chart } = await import('chart.js');
 
 		const ctx = canvasEl.getContext('2d');
@@ -50,14 +48,14 @@
 					{
 						label: 'Impressions',
 						data: impressions,
-						backgroundColor: 'rgb(129, 140, 248)', // indigo-400
+						backgroundColor: 'rgb(129, 140, 248)',
 						borderColor: 'rgb(129, 140, 248)',
 						borderWidth: 0
 					},
 					{
 						label: 'Replies',
 						data: replies,
-						backgroundColor: 'rgb(249, 115, 22)', // amber-500
+						backgroundColor: 'rgb(249, 115, 22)',
 						borderColor: 'rgb(249, 115, 22)',
 						borderWidth: 0
 					}
@@ -72,7 +70,7 @@
 						position: 'top' as const,
 						labels: {
 							padding: 12,
-							font: { size: 12,  },
+							font: { size: 12 },
 							color: 'var(--color-text-muted)'
 						}
 					}
@@ -91,8 +89,7 @@
 							}
 						},
 						grid: {
-							color: 'var(--color-border-subtle)',
-							
+							color: 'var(--color-border-subtle)'
 						}
 					},
 					x: {
@@ -110,47 +107,13 @@
 	});
 </script>
 
-<div class="reach-chart">
+<div class="w-full h-80 p-4 border border-slate-200 rounded-lg bg-slate-50">
 	{#if items.length === 0}
-		<div class="empty-state">
-			<Eye size={32} class="text-muted" />
-			<p>No reach data available</p>
+		<div class="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+			<Eye size={32} />
+			<p class="text-sm m-0">No reach data available</p>
 		</div>
 	{:else}
-		<canvas bind:this={canvasEl}></canvas>
+		<canvas bind:this={canvasEl} class="max-h-full"></canvas>
 	{/if}
 </div>
-
-<style>
-	.reach-chart {
-		width: 100%;
-		height: 300px;
-		padding: 16px;
-		border: 1px solid var(--color-border-subtle);
-		border-radius: 8px;
-		background-color: var(--color-surface);
-	}
-
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		gap: 12px;
-		color: var(--color-text-muted);
-	}
-
-	.empty-state p {
-		font-size: 14px;
-		margin: 0;
-	}
-
-	canvas {
-		max-height: 100%;
-	}
-
-	:global(.text-muted) {
-		color: var(--color-text-muted);
-	}
-</style>
