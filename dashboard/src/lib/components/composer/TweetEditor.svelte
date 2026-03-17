@@ -140,31 +140,36 @@
 	}
 </script>
 
-<div class="tweet-compose" class:has-avatar={!!avatarUrl}>
-	{#if avatarUrl}
-		<img src={avatarUrl} alt="" class="compose-avatar" />
-	{/if}
-	<div class="compose-main">
-		{#if displayName || handle}
-			<div class="compose-identity">
-				{#if displayName}<span class="compose-display-name">{displayName}</span>{/if}
-				{#if handle}<span class="compose-handle">@{handle}</span>{/if}
-			</div>
+<div class="tweet-compose">
+	<div class="compose-header-row">
+		{#if avatarUrl}
+			<img src={avatarUrl} alt="" class="compose-avatar" />
+		{:else}
+			<div class="compose-avatar-placeholder"></div>
 		{/if}
-		<textarea
-			class="compose-input"
-			class:over-limit={tweetOverLimit}
-			placeholder="What's on your mind?"
-			value={text}
-			oninput={(e) => onchange(e.currentTarget.value)}
-			ondrop={handleDrop}
-			ondragover={handleDragOver}
-			onpaste={handlePaste}
-			rows={4}
-			aria-label="Tweet content"
-		></textarea>
-		<div class="char-ring-row">
-			<CharRing current={tweetChars} max={TWEET_MAX} />
+		<div class="compose-identity">
+			{#if displayName}<span class="compose-display-name">{displayName}</span>{/if}
+			{#if handle}<span class="compose-handle">@{handle}</span>{/if}
+		</div>
+	</div>
+	<div class="compose-body-row">
+		<div class="compose-spine-spacer"></div>
+		<div class="compose-main">
+			<textarea
+				class="compose-input"
+				class:over-limit={tweetOverLimit}
+				placeholder="What's on your mind?"
+				value={text}
+				oninput={(e) => onchange(e.currentTarget.value)}
+				ondrop={handleDrop}
+				ondragover={handleDragOver}
+				onpaste={handlePaste}
+				rows={4}
+				aria-label="Tweet content"
+			></textarea>
+			<div class="char-ring-row">
+				<CharRing current={tweetChars} max={TWEET_MAX} />
+			</div>
 		</div>
 	</div>
 </div>
@@ -189,13 +194,18 @@
 
 <style>
 	.tweet-compose {
-		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0;
 	}
 
-	.tweet-compose.has-avatar {
+	/* Top row: avatar + name + handle */
+	.compose-header-row {
 		display: flex;
-		gap: 12px;
-		align-items: flex-start;
+		align-items: center;
+		gap: 10px;
+		padding-top: 4px;
+		margin-bottom: 2px;
 	}
 
 	.compose-main {
@@ -207,8 +217,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 6px;
-		padding-top: 2px;
-		margin-bottom: 1px;
+		min-width: 0;
 	}
 
 	.compose-display-name {
@@ -218,7 +227,7 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		max-width: 200px;
+		max-width: 220px;
 	}
 
 	.compose-handle {
@@ -233,12 +242,31 @@
 		border-radius: 50%;
 		object-fit: cover;
 		flex-shrink: 0;
-		margin-top: 16px;
+	}
+
+	.compose-avatar-placeholder {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		background: var(--color-surface-active);
+		flex-shrink: 0;
+	}
+
+	/* Body row: spine spacer + main content */
+	.compose-body-row {
+		display: flex;
+		gap: 10px;
+	}
+
+	/* Spine spacer aligns the textarea under the avatar */
+	.compose-spine-spacer {
+		width: 36px;
+		flex-shrink: 0;
 	}
 
 	.compose-input {
 		width: 100%;
-		padding: 16px 0;
+		padding: 8px 0;
 		border: none;
 		border-radius: 0;
 		background: transparent;

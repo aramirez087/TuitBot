@@ -207,6 +207,7 @@ pub fn run() {
                     pending_oauth: Mutex::new(HashMap::new()),
                     token_managers: Mutex::new(HashMap::new()),
                     x_client_id,
+                    scraper_health: None,
                 })
             });
 
