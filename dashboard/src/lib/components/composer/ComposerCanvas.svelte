@@ -3,6 +3,7 @@
 	import type { Snippet } from 'svelte';
 	import type { ThreadBlock } from '$lib/api';
 	import { saveAutoSave, clearAutoSave as clearAutoSaveStorage, readAutoSave, restoreMedia, wasNavigationExit, markSessionActive, AUTOSAVE_DEBOUNCE_MS } from '$lib/utils/composerAutosave';
+	import type { RecoveryData } from '$lib/stores/composerAutosave';
 	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
 	import ThreadFlowLane from './ThreadFlowLane.svelte';
@@ -29,7 +30,7 @@
 		attachedMedia = $bindable<AttachedMedia[]>([]),
 		initialized = $bindable(false),
 		showRecovery = $bindable(false),
-		recoveryData = $bindable<{ mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number; tweetMedia?: Array<{ path: string; mediaType: string; altText?: string }> } | null>(null),
+		recoveryData = $bindable<RecoveryData | null>(null),
 		showUndo = $bindable(false),
 		undoMessage = $bindable('Content replaced.'),
 		// Refs (bindable so parent can read them)
@@ -55,7 +56,7 @@
 		attachedMedia?: AttachedMedia[];
 		initialized?: boolean;
 		showRecovery?: boolean;
-		recoveryData?: { mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number; tweetMedia?: Array<{ path: string; mediaType: string; altText?: string }> } | null;
+		recoveryData?: RecoveryData | null;
 		showUndo?: boolean;
 		undoMessage?: string;
 		threadFlowRef?: ThreadFlowLane;

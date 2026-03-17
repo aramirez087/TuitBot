@@ -5,6 +5,7 @@
 	import { buildComposeRequest } from '$lib/utils/composeHandlers';
 	import { buildScheduledFor } from '$lib/utils/timezone';
 	import { clearSessionFlag, markSessionActive } from '$lib/utils/composerAutosave';
+	import type { RecoveryData } from '$lib/stores/composerAutosave';
 	import ThreadFlowLane from './ThreadFlowLane.svelte';
 	import ComposerShell from './ComposerShell.svelte';
 	import ComposerHeaderBar from './ComposerHeaderBar.svelte';
@@ -72,7 +73,7 @@
 	let voiceCue = $state('');
 	let initialized = $state(false);
 	let showRecovery = $state(false);
-	let recoveryData = $state<{ mode: string; tweetText: string; blocks: ThreadBlock[]; timestamp: number; tweetMedia?: Array<{ path: string; mediaType: string; altText?: string }> } | null>(null);
+	let recoveryData = $state<RecoveryData | null>(null);
 	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[]; media?: AttachedMedia[]; selectedTime?: string | null; scheduledDate?: string | null } | null>(null);
 
 
