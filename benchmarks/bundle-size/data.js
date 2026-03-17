@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773760002653,
+  "lastUpdate": 1773768726247,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -194,6 +194,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1187132,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9b9f23bc2f6e186cc2e6c9f14e7798f56e974709",
+          "message": "Merge pull request #211 from aramirez087/feat/dashboard-analytics-multiacccount\n\nfeat(dashboard): analytics charts + multi-account UI",
+          "timestamp": "2026-03-17T11:31:19-06:00",
+          "tree_id": "f5da2852cd3e2c8ab06e3f7c39632912a31dbeb9",
+          "url": "https://github.com/aramirez087/TuitBot/commit/9b9f23bc2f6e186cc2e6c9f14e7798f56e974709"
+        },
+        "date": 1773768725589,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 871693,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 296065,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1207008,
             "unit": "bytes"
           }
         ]
