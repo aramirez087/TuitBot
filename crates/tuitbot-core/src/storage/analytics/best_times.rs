@@ -183,7 +183,6 @@ pub async fn get_follower_growth(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn confidence_score_high() {
