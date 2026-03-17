@@ -138,3 +138,14 @@ export function stopAutoRefresh() {
 		refreshInterval = null;
 	}
 }
+
+// --- Account switching integration ---
+
+// When user switches accounts, refetch all activity for the new account.
+if (typeof window !== 'undefined') {
+	window.addEventListener('tuitbot:account-switched', () => {
+		currentOffset.set(0);
+		selectedFilter.set('all');
+		loadActivity(true);
+	});
+}

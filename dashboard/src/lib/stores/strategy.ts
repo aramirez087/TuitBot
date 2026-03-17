@@ -56,3 +56,12 @@ export async function refreshReport() {
 		error.set(e instanceof Error ? e.message : 'Failed to refresh report');
 	}
 }
+
+// --- Account switching integration ---
+
+// When user switches accounts, refetch all strategy data for the new account.
+if (typeof window !== 'undefined') {
+	window.addEventListener('tuitbot:account-switched', () => {
+		loadStrategy();
+	});
+}
