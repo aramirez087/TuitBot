@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773806923664,
+  "lastUpdate": 1773844683752,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -231,6 +231,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.34,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "94da81bc32d4068302d84a389b505cc87e7f0a87",
+          "message": "Merge pull request #214 from aramirez087/ci/tauri-clippy\n\nci: add tauri-clippy job to lint src-tauri Rust code",
+          "timestamp": "2026-03-18T08:31:54-06:00",
+          "tree_id": "4973ea8d72cbe13e49c95e90aa4620f32a67f9cb",
+          "url": "https://github.com/aramirez087/TuitBot/commit/94da81bc32d4068302d84a389b505cc87e7f0a87"
+        },
+        "date": 1773844681445,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.28,
             "unit": "ps"
           }
         ]
