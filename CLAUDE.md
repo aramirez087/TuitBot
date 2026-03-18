@@ -78,6 +78,14 @@ release-plz update --config release-plz.toml --allow-dirty
 cargo package --workspace --allow-dirty
 ```
 
+**Note:** These commands are now automatically enforced in CI via the `release-verify` job (runs on every Rust change). The manual validation above is still required locally before opening a PR, but CI will catch any issues before merge.
+
+**CI Validation Details:**
+- `release-plz update --dry-run`: Detects invalid version bumps and dependency issues
+- `cargo package --workspace`: Verifies all crates have complete metadata (description, license, keywords, etc.)
+- Both gates must pass on every Rust change PR
+- Fails immediately on missing/invalid metadata before reaching release.yml
+
 ## Coverage Thresholds
 
 **Rust Coverage (Cargo Tarpaulin):**
