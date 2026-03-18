@@ -167,6 +167,45 @@ jobs:
         env:
           RUSTFLAGS: "-D warnings"
 
+  release-verify:
+    name: Validate release-plz and cargo package
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-verify-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-verify-
+            ${{ runner.os }}-cargo-
+
+      - name: Install release-plz
+        run: |
+          RELEASE_PLZ_VER=0.3.157
+          curl -fsSL "https://github.com/release-plz/release-plz/releases/download/release-plz-v${RELEASE_PLZ_VER}/release-plz-x86_64-unknown-linux-gnu.tar.gz" \
+            -o /tmp/release-plz.tar.gz
+          mkdir -p /tmp/rplz && tar -xzf /tmp/release-plz.tar.gz -C /tmp/rplz
+          echo "/tmp/rplz" >> $GITHUB_PATH
+
+      - name: Run release-plz update (dry run)
+        run: release-plz update --config release-plz.toml --allow-dirty --dry-run
+
+      - name: Run cargo package (verify metadata)
+        run: cargo package --workspace --allow-dirty
+        env:
+          TUITBOT_SKIP_DASHBOARD_BUILD: '1'
+
   audit:
     name: Security audit (Rust)
     runs-on: ubuntu-latest
