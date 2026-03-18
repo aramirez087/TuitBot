@@ -112,3 +112,4 @@ cargo package --workspace --allow-dirty
 
 ## Always Do First
 - **Invoke the `frontend-design` skill** before writing any frontend code, every session, no exceptions.
+- **Run tests before committing frontend changes**: `cd dashboard && npx vitest run` to catch test failures before they hit CI. If a component's rendering behavior changes, update its corresponding test file in `dashboard/tests/unit/`.
