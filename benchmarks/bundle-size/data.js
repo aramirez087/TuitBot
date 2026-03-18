@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773844380232,
+  "lastUpdate": 1773845616803,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -350,6 +350,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1208052,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e30aeed1ce7eedc9b57e082142c96c40438298e6",
+          "message": "Merge pull request #215 from aramirez087/ci/release-verify\n\nci: add release-verify job to validate crate packaging",
+          "timestamp": "2026-03-18T08:52:49-06:00",
+          "tree_id": "5c742f39f226f887d3fb34e85ff2d93e78f242cd",
+          "url": "https://github.com/aramirez087/TuitBot/commit/e30aeed1ce7eedc9b57e082142c96c40438298e6"
+        },
+        "date": 1773845616196,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 872199,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 296607,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1208057,
             "unit": "bytes"
           }
         ]
