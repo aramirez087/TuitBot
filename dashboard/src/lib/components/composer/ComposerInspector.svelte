@@ -138,7 +138,10 @@
 	export async function handleGenerateFromVault(selectedNodeIds: number[]) {
 		if (selectedNodeIds.length === 0) return;
 		try {
-			const result = await api.assist.thread(topicWithCue(voiceCue, `Use vault nodes: ${selectedNodeIds.join(',')}`));
+			const topic = topicWithCue(voiceCue, 'the insights and ideas provided in the context above');
+			const result = mode === 'tweet'
+				? await api.assist.tweet(topic, selectedNodeIds).then(r => ({ tweets: [r.content] }))
+				: await api.assist.thread(topic, selectedNodeIds);
 			if (mode === 'thread') {
 				threadBlocks = result.tweets.map((text, i) => ({
 					id: crypto.randomUUID(), text, media_paths: [], order: i
