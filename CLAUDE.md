@@ -28,6 +28,41 @@ cd dashboard && npm run tauri dev        # dev mode
 cd dashboard && npm run tauri build      # production → DMG/MSI/AppImage
 ```
 
+## Branch Protection
+
+**Status:** Enabled on `main` branch (as of 2026-03-18).
+
+**Rule:** Branch protection enforces strict status checks via `required_status_checks.strict=true`. This means:
+- All PRs must have passing CI checks before merge
+- **Merged branches must be up-to-date with `main`** — prevents stale merges that cause silent conflicts
+- Avoids the refactor/sprint-1 scenario where outdated PRs merged without rebasing
+
+**To apply rule programmatically:**
+```bash
+cat > /tmp/protection.json << 'EOF'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": []
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+EOF
+gh api repos/aramirez087/TuitBot/branches/main/protection -X PUT --input /tmp/protection.json
+```
+
+**To verify rule is active:**
+```bash
+gh api repos/aramirez087/TuitBot/branches/main/protection | jq '.required_status_checks.strict'
+# Output: true
+```
+
+**Test:** Attempt to merge a PR from a stale branch (not rebased onto latest main). GitHub will block it with message: *"Base branch is not up to date with target branch."*
+
 ## Mandatory CI Checklist
 
 Run before handing off **any** Rust change — fix all failures:
