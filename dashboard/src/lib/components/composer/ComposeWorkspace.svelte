@@ -269,7 +269,7 @@
 				isMobile={false}
 				bind:assisting bind:voiceCue bind:notesPanelMode bind:showUndo bind:undoMessage
 				bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
-				{mode} {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
+				bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
 				onundo={handleUndo}
 				onsubmiterror={(msg) => { submitError = msg; }}
 			/>
@@ -282,7 +282,7 @@
 			isMobile={true}
 			bind:assisting bind:voiceCue bind:notesPanelMode bind:showUndo bind:undoMessage
 			bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
-			{mode} {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
+			bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
 			onclose={() => { inspectorOpen = false; }}
 			onundo={handleUndo}
 			onsubmiterror={(msg) => { submitError = msg; }}

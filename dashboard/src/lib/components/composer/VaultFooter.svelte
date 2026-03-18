@@ -2,32 +2,52 @@
 	interface Props {
 		selectionCount: number;
 		maxSelections: number;
-		mode: 'tweet' | 'thread';
+		outputFormat: 'tweet' | 'thread';
 		generating: boolean;
 		confirmReplace: boolean;
 		showUndo: boolean;
 		onundo?: () => void;
 		onGenerate: () => void;
 		onCancelReplace: () => void;
+		onformatchange: (format: 'tweet' | 'thread') => void;
 	}
 
 	const {
 		selectionCount,
 		maxSelections,
-		mode,
+		outputFormat,
 		generating,
 		confirmReplace,
 		showUndo,
 		onundo,
 		onGenerate,
 		onCancelReplace,
+		onformatchange,
 	}: Props = $props();
 </script>
 
 <div class="vault-footer">
-	<span class="vault-selection-count">
-		{selectionCount} of {maxSelections} selected
-	</span>
+	<div class="vault-footer-row">
+		<span class="vault-selection-count">
+			{selectionCount} of {maxSelections} selected
+		</span>
+		<div class="vault-format-toggle" role="radiogroup" aria-label="Output format">
+			<button
+				class="vault-format-opt"
+				class:active={outputFormat === 'tweet'}
+				role="radio"
+				aria-checked={outputFormat === 'tweet'}
+				onclick={() => onformatchange('tweet')}
+			>Tweet</button>
+			<button
+				class="vault-format-opt"
+				class:active={outputFormat === 'thread'}
+				role="radio"
+				aria-checked={outputFormat === 'thread'}
+				onclick={() => onformatchange('thread')}
+			>Thread</button>
+		</div>
+	</div>
 
 	{#if confirmReplace}
 		<div class="vault-replace-banner" role="alert">
@@ -45,9 +65,9 @@
 		>
 			{generating
 				? 'Generating...'
-				: mode === 'thread'
-					? 'Generate thread from vault'
-					: 'Generate tweet from vault'}
+				: outputFormat === 'thread'
+					? 'Generate thread'
+					: 'Generate tweet'}
 		</button>
 	{/if}
 
@@ -64,9 +84,46 @@
 		gap: 6px;
 	}
 
+	.vault-footer-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
 	.vault-selection-count {
 		font-size: 11px;
 		color: var(--color-text-subtle);
+	}
+
+	.vault-format-toggle {
+		display: flex;
+		border: 1px solid var(--color-border);
+		border-radius: 5px;
+		overflow: hidden;
+	}
+
+	.vault-format-opt {
+		padding: 3px 10px;
+		border: none;
+		background: transparent;
+		color: var(--color-text-subtle);
+		font-size: 11px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.12s ease;
+	}
+
+	.vault-format-opt:first-child {
+		border-right: 1px solid var(--color-border);
+	}
+
+	.vault-format-opt.active {
+		background: var(--color-accent);
+		color: #fff;
+	}
+
+	.vault-format-opt:hover:not(.active) {
+		background: var(--color-surface-hover);
 	}
 
 	.vault-generate-btn {
