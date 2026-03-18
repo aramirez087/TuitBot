@@ -123,12 +123,10 @@
 
 	<!-- Main content -->
 	<div class="card-body">
-		{#if displayName || handle}
-			<div class="card-identity">
-				{#if displayName}<span class="card-display-name">{displayName}</span>{/if}
-				{#if handle}<span class="card-handle">@{handle}</span>{/if}
-			</div>
-		{/if}
+		<div class="card-identity">
+			{#if displayName}<span class="card-display-name">{displayName}</span>{/if}
+			{#if handle}<span class="card-handle">@{handle}</span>{/if}
+		</div>
 		<div class="card-writing-area" class:over-limit={overLimit}>
 			<textarea
 				bind:this={textareaEl}
@@ -259,7 +257,8 @@
 		align-items: baseline;
 		gap: 6px;
 		padding-top: 2px;
-		margin-bottom: 1px;
+		margin-bottom: 4px;
+		min-height: 20px;
 	}
 
 	.card-display-name {

@@ -15,7 +15,7 @@
 		undoMessage = $bindable('Content replaced.'),
 		tweetText = $bindable(''),
 		threadBlocks = $bindable<ThreadBlock[]>([]),
-		mode,
+		mode = $bindable<'tweet' | 'thread'>('tweet'),
 		schedule,
 		selectedTime = $bindable<string | null>(null),
 		scheduledDate = $bindable<string | null>(null),
@@ -37,7 +37,7 @@
 		undoMessage?: string;
 		tweetText?: string;
 		threadBlocks?: ThreadBlock[];
-		mode: 'tweet' | 'thread';
+		mode?: 'tweet' | 'thread';
 		schedule: ScheduleConfig | null;
 		selectedTime?: string | null;
 		scheduledDate?: string | null;
@@ -135,17 +135,20 @@
 		startUndoTimer();
 	}
 
-	export async function handleGenerateFromVault(selectedNodeIds: number[]) {
+	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode) {
 		if (selectedNodeIds.length === 0) return;
 		try {
-			const result = await api.assist.thread(topicWithCue(voiceCue, `Use vault nodes: ${selectedNodeIds.join(',')}`));
-			if (mode === 'thread') {
+			const topic = topicWithCue(voiceCue, 'the insights and ideas provided in the context above');
+			if (outputFormat === 'thread') {
+				const result = await api.assist.thread(topic, selectedNodeIds);
 				threadBlocks = result.tweets.map((text, i) => ({
 					id: crypto.randomUUID(), text, media_paths: [], order: i
 				}));
 			} else {
-				tweetText = result.tweets[0] ?? '';
+				const result = await api.assist.tweet(topic, selectedNodeIds);
+				tweetText = result.content;
 			}
+			mode = outputFormat;
 			voicePanelRef?.saveCueToHistory();
 			notesPanelMode = null;
 			startUndoTimer();

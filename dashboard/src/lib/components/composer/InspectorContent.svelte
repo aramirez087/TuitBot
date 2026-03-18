@@ -47,7 +47,7 @@
 		onopenotes: () => void;
 		onopenvault: () => void;
 		ongenerate: (notes: string) => Promise<void>;
-		ongeneratefromvault: (selectedNodeIds: number[]) => Promise<void>;
+		ongeneratefromvault: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread') => Promise<void>;
 		onclosenotes: () => void;
 		onundo: () => void;
 		voicePanelRef?: VoiceContextPanel;

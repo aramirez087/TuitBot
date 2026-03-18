@@ -40,16 +40,14 @@ describe('ThreadPreviewRail', () => {
 
 	it('renders tweet text when provided', () => {
 		render(ThreadPreviewRail, {
-			props: { ...defaultProps, mode: 'tweet', tweetText: 'Hello from test!' }
+			props: { ...defaultProps, mode: 'tweet', tweetText: 'Hello from test!', previewMode: true }
 		});
-		// Text should appear somewhere in the rendered output
 		expect(document.body.innerHTML).toContain('Hello from test!');
 	});
 
 	it('renders with custom handle (shown when text is present)', () => {
-		// The handle is only rendered inside tweet previews — needs tweetText to show.
 		render(ThreadPreviewRail, {
-			props: { ...defaultProps, handle: '@myhandle', tweetText: 'Hello!' }
+			props: { ...defaultProps, handle: '@myhandle', tweetText: 'Hello!', previewMode: true }
 		});
 		expect(document.body.innerHTML).toContain('@myhandle');
 	});
@@ -60,7 +58,7 @@ describe('ThreadPreviewRail', () => {
 			{ id: 'b2', text: 'Second tweet in thread', media_paths: [] }
 		];
 		const { container } = render(ThreadPreviewRail, {
-			props: { ...defaultProps, mode: 'thread', blocks }
+			props: { ...defaultProps, mode: 'thread', blocks, previewMode: true }
 		});
 		expect(container).toBeTruthy();
 		expect(document.body.innerHTML).toContain('First tweet in thread');
@@ -125,9 +123,8 @@ describe('ThreadPreviewRail', () => {
 			media_paths: []
 		}));
 		render(ThreadPreviewRail, {
-			props: { ...defaultProps, mode: 'thread', blocks }
+			props: { ...defaultProps, mode: 'thread', blocks, previewMode: true }
 		});
-		// Should contain at least some of the tweet texts
 		expect(document.body.innerHTML).toContain('Tweet number 1');
 	});
 });

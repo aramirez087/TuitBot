@@ -66,6 +66,8 @@
 	} = $props();
 
 	const avatarUrl = $derived($currentAccount?.x_avatar_url ?? null);
+	const displayName = $derived($currentAccount?.x_display_name ?? null);
+	const handle = $derived($currentAccount?.x_username ?? null);
 
 	// ── Autosave ───────────────────────────────────────────
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -200,6 +202,8 @@
 				onmediachange={(m) => { attachedMedia = m; }}
 				onerror={(msg) => { onsubmiterror?.(msg); }}
 				{avatarUrl}
+				{displayName}
+				{handle}
 			/>
 			<AddTweetDivider onclick={() => { onswitchtothread?.() ?? switchToThread(); }} disabled={!tweetText.trim()} />
 		{:else}
@@ -207,6 +211,8 @@
 				bind:this={threadFlowRef}
 				blocks={threadBlocks}
 				{avatarUrl}
+				{displayName}
+				{handle}
 				onchange={(b) => { threadBlocks = b; }}
 				onvalidchange={(v) => { threadValid = v; }}
 			/>

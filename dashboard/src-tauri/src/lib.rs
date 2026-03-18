@@ -13,6 +13,9 @@ use tuitbot_server::state::AppState;
 use tuitbot_server::ws::AccountWsEvent;
 
 /// Shared reference to the embedded server's application state.
+/// Held in Tauri's managed state to keep the `Arc` alive for the
+/// lifetime of the application.
+#[allow(dead_code)]
 struct EmbeddedState(Arc<AppState>);
 
 /// Read the API token from ~/.tuitbot/api_token.
@@ -207,6 +210,7 @@ pub fn run() {
                     pending_oauth: Mutex::new(HashMap::new()),
                     token_managers: Mutex::new(HashMap::new()),
                     x_client_id,
+                    scraper_health: None,
                 })
             });
 

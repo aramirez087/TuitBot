@@ -7,20 +7,23 @@
 	import VaultFooter from './VaultFooter.svelte';
 
 	let {
-		mode,
+		mode = 'tweet',
 		hasExistingContent = false,
 		ongenerate,
 		onclose,
 		onundo,
 		showUndo = false,
 	}: {
-		mode: 'tweet' | 'thread';
+		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
-		ongenerate: (selectedNodeIds: number[]) => Promise<void>;
+		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread') => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;
 	} = $props();
+
+	let outputFormat: 'tweet' | 'thread' = $state('tweet');
+	$effect(() => { outputFormat = mode; });
 
 	const MAX_SELECTIONS = 3;
 
@@ -98,7 +101,7 @@
 		confirmReplace = false;
 		try {
 			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
-			await ongenerate(nodeIds);
+			await ongenerate(nodeIds, outputFormat);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
@@ -175,13 +178,14 @@
 		<VaultFooter
 			{selectionCount}
 			maxSelections={MAX_SELECTIONS}
-			{mode}
+			{outputFormat}
 			{generating}
 			{confirmReplace}
 			{showUndo}
 			{onundo}
 			onGenerate={handleGenerate}
 			onCancelReplace={cancelReplace}
+			onformatchange={(f) => { outputFormat = f; }}
 		/>
 	{/if}
 </div>
