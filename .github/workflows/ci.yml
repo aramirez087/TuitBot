@@ -22,6 +22,7 @@ jobs:
       rust: ${{ steps.filter.outputs.rust }}
       frontend: ${{ steps.filter.outputs.frontend }}
       mcp: ${{ steps.filter.outputs.mcp }}
+      tauri: ${{ steps.filter.outputs.tauri }}
     steps:
       - uses: actions/checkout@v6
 
@@ -43,6 +44,10 @@ jobs:
             mcp:
               - 'crates/tuitbot-mcp/**'
               - 'crates/tuitbot-core/**'
+            tauri:
+              - 'dashboard/src-tauri/**'
+              - 'dashboard/package.json'
+              - 'dashboard/package-lock.json'
 
   test:
     name: Test (${{ matrix.os }})
@@ -127,6 +132,40 @@ jobs:
 
       - name: Build
         run: cd dashboard && npm run build
+
+  tauri-clippy:
+    name: Tauri clippy linter
+    needs: detect-changes
+    if: needs.detect-changes.outputs.tauri == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+
+      - name: Install GTK3 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            dashboard/src-tauri/target
+          key: ${{ runner.os }}-cargo-tauri-${{ hashFiles('dashboard/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-tauri-
+
+      - name: Run clippy on src-tauri
+        run: cd dashboard/src-tauri && cargo clippy -- -D warnings
+        env:
+          RUSTFLAGS: "-D warnings"
 
   audit:
     name: Security audit (Rust)
