@@ -1,6 +1,5 @@
 //! PostAction enum and queue creation.
 
-use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 /// Default bounded channel capacity for the posting queue.
