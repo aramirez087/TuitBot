@@ -1,127 +1,94 @@
-//! Type definitions for QA evaluation.
+//! QA type definitions and structures.
 
 use serde::{Deserialize, Serialize};
 
-/// Severity used for QA flags.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+/// Severity level for QA flags.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum QaSeverity {
-    /// Blocks approval/publish unless explicitly overridden.
-    Hard,
     /// Warning-level issue that should be reviewed.
     Soft,
+    /// Blocks approval/publish unless explicitly overridden.
+    Hard,
 }
 
-/// QA category for scoring and grouping.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
+/// Category of QA issue.
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum QaCategory {
-    /// Language and bilingual policy checks.
+    /// Language policy or detection issue.
     Language,
-    /// Brand voice style and glossary checks.
+    /// Brand voice or tone issue.
     Brand,
-    /// Compliance checks (claims, links, UTM requirements).
+    /// Legal/regulatory compliance issue.
     Compliance,
 }
 
-/// Structured issue emitted by the evaluator.
+/// A single QA flag/issue found during evaluation.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct QaFlag {
-    /// Stable identifier for the rule that fired.
+    /// Machine-readable code for this flag (e.g., "language_mismatch").
     pub code: String,
-    /// Hard vs soft severity.
+    /// Severity level (soft warning vs hard blocker).
     pub severity: QaSeverity,
-    /// Category used for score rollups.
+    /// Category of the issue.
     pub category: QaCategory,
-    /// Human-readable summary.
+    /// Human-readable message describing the issue.
     pub message: String,
-    /// Optional excerpt/value that triggered the flag.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional evidence/example text that triggered the flag.
     pub evidence: Option<String>,
-    /// Optional remediation guidance.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional remediation suggestion.
     pub suggestion: Option<String>,
 }
 
-/// Aggregate score rollup for UI display.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+/// Language detection result.
+// TODO: used by language detection helpers once integrated into full QA pipeline
+#[allow(dead_code)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LanguageDetection {
+    /// ISO 639-1 language code (e.g., "en", "es", "fr").
+    pub code: String,
+    /// Confidence score (0.0 to 1.0).
+    pub confidence: f64,
+}
+
+/// Per-category QA scores.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct QaScoreSummary {
-    /// Overall score in [0, 100].
+    /// Overall QA score (0–100).
     pub overall: f32,
-    /// Language-policy dimension score in [0, 100].
+    /// Language policy compliance score (0–100).
     pub language: f32,
-    /// Brand dimension score in [0, 100].
+    /// Brand voice alignment score (0–100).
     pub brand: f32,
-    /// Compliance dimension score in [0, 100].
+    /// Regulatory compliance score (0–100).
     pub compliance: f32,
 }
 
-impl Default for QaScoreSummary {
-    fn default() -> Self {
-        Self {
-            overall: 100.0,
-            language: 100.0,
-            brand: 100.0,
-            compliance: 100.0,
-        }
-    }
-}
-
-/// Captures language detection context.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+/// Language detection context for a report.
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct QaLanguages {
-    /// Detected source language.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Detected language of source/input text.
     pub source: Option<String>,
-    /// Detected output language.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Detected language of generated output.
     pub output: Option<String>,
-    /// Policy-selected target language.
+    /// Target language per policy.
     pub policy_target: String,
 }
 
-/// Complete QA report artifact.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+/// Complete QA evaluation report.
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct QaReport {
-    /// Hard failures requiring override/edit.
-    pub hard_flags: Vec<QaFlag>,
-    /// Soft warnings for reviewer visibility.
-    pub soft_flags: Vec<QaFlag>,
-    /// Consolidated remediation recommendations.
-    pub recommendations: Vec<String>,
-    /// Quality score rollup.
-    pub score: QaScoreSummary,
-    /// Language metadata used by checks.
-    pub languages: QaLanguages,
-    /// `true` when hard flags exist.
+    /// Whether hard flags require explicit override before publishing.
     pub requires_override: bool,
-}
-
-impl Default for QaReport {
-    fn default() -> Self {
-        Self {
-            hard_flags: Vec::new(),
-            soft_flags: Vec::new(),
-            recommendations: Vec::new(),
-            score: QaScoreSummary {
-                overall: 100.0,
-                language: 100.0,
-                brand: 100.0,
-                compliance: 100.0,
-            },
-            languages: QaLanguages {
-                source: None,
-                output: None,
-                policy_target: "en".to_string(),
-            },
-            requires_override: false,
-        }
-    }
-}
-
-/// Internal type capturing language detection results.
-#[derive(Debug, Clone)]
-pub(super) struct LanguageDetection {
-    pub code: String,
-    pub confidence: f32,
+    /// Language context and detection results.
+    pub languages: QaLanguages,
+    /// Hard (blocking) flags found.
+    pub hard_flags: Vec<QaFlag>,
+    /// Soft (warning) flags found.
+    pub soft_flags: Vec<QaFlag>,
+    /// List of remediation recommendations.
+    pub recommendations: Vec<String>,
+    /// QA scores by category.
+    pub score: QaScoreSummary,
 }

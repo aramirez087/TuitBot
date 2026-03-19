@@ -1,46 +1,12 @@
-//! Queue dispatch logic, consumer loop, and traits for posting/approval.
-
-use rand::Rng;
 use std::sync::Arc;
 use std::time::Duration;
+
+use rand::Rng;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::super::circuit_breaker::CircuitBreaker;
-use super::queue::PostAction;
-
-/// Trait for executing post actions against the X API.
-///
-/// This trait decouples the posting queue from the actual API client,
-/// allowing the queue to be tested with mock executors.
-#[async_trait::async_trait]
-pub trait PostExecutor: Send + Sync {
-    /// Post a reply to a specific tweet. Returns the posted tweet ID.
-    async fn execute_reply(
-        &self,
-        tweet_id: &str,
-        content: &str,
-        media_ids: &[String],
-    ) -> Result<String, String>;
-
-    /// Post a new original tweet. Returns the posted tweet ID.
-    async fn execute_tweet(&self, content: &str, media_ids: &[String]) -> Result<String, String>;
-}
-
-/// Trait for queueing actions for human approval instead of posting.
-#[async_trait::async_trait]
-pub trait ApprovalQueue: Send + Sync {
-    /// Queue a reply for human review. Returns the queue item ID.
-    async fn queue_reply(
-        &self,
-        tweet_id: &str,
-        content: &str,
-        media_paths: &[String],
-    ) -> Result<i64, String>;
-
-    /// Queue a tweet for human review. Returns the queue item ID.
-    async fn queue_tweet(&self, content: &str, media_paths: &[String]) -> Result<i64, String>;
-}
+use crate::automation::circuit_breaker::CircuitBreaker;
+use crate::automation::posting_queue::queue::{ApprovalQueue, PostAction, PostExecutor};
 
 /// Run the posting queue consumer loop.
 ///
@@ -147,7 +113,7 @@ pub async fn run_posting_queue_with_approval(
 }
 
 /// Whether an error message indicates a rate limit or forbidden response.
-fn is_rate_limit_error(msg: &str) -> bool {
+pub fn is_rate_limit_error(msg: &str) -> bool {
     let lower = msg.to_lowercase();
     lower.contains("rate limit")
         || lower.contains("too many requests")
@@ -288,7 +254,7 @@ async fn execute_and_respond(action: PostAction, executor: &Arc<dyn PostExecutor
 }
 
 /// Compute a randomized delay between `min` and `max`.
-pub(super) fn randomized_delay(min: Duration, max: Duration) -> Duration {
+pub fn randomized_delay(min: Duration, max: Duration) -> Duration {
     if min >= max || min.is_zero() && max.is_zero() {
         return min;
     }
@@ -296,13 +262,3 @@ pub(super) fn randomized_delay(min: Duration, max: Duration) -> Duration {
     let max_ms = max.as_millis() as u64;
     Duration::from_millis(rand::rng().random_range(min_ms..=max_ms))
 }
-
-/// Expose for testing
-#[cfg(test)]
-pub(super) fn is_rate_limit_error_test(msg: &str) -> bool {
-    is_rate_limit_error(msg)
-}
-
-#[cfg(test)]
-#[path = "dispatch_tests.rs"]
-mod dispatch_tests;
