@@ -17,7 +17,6 @@ updates:
       prefix: "chore(deps)"
     groups:
       all-dependencies:
-        dependency-type: "all"
         patterns:
           - "*"
     allow:
@@ -43,7 +42,6 @@ updates:
       prefix: "chore(deps): dashboard"
     groups:
       all-dependencies:
-        dependency-type: "all"
         patterns:
           - "*"
 
@@ -64,7 +62,6 @@ updates:
       prefix: "chore(deps): openclaw plugin"
     groups:
       all-dependencies:
-        dependency-type: "all"
         patterns:
           - "*"
 
@@ -73,7 +70,6 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-      day: "first"
     labels:
       - "dependencies"
       - "ci"
