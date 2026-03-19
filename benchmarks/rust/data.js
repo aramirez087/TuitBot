@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773892342524,
+  "lastUpdate": 1773931407314,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -347,6 +347,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.06,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d70b74ec191f39649d451e7a671badbb8d88fad4",
+          "message": "Merge pull request #218 from aramirez087/ci/sbom-release\n\nci(security): add cargo-cyclonedx SBOM generation to release pipeline",
+          "timestamp": "2026-03-19T08:41:08-06:00",
+          "tree_id": "68560671935cd5dc6a657b9f6a0e4a21f951d12c",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d70b74ec191f39649d451e7a671badbb8d88fad4"
+        },
+        "date": 1773931406870,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.5,
             "unit": "ps"
           }
         ]
