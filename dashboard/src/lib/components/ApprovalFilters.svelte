@@ -4,6 +4,7 @@
 		Clock,
 		CheckCircle,
 		XCircle,
+		AlertCircle,
 		MessageSquare,
 		FileText,
 		BookOpen
@@ -42,7 +43,8 @@
 		{ value: 'all', label: 'All', icon: List },
 		{ value: 'pending', label: 'Pending', icon: Clock },
 		{ value: 'approved', label: 'Approved', icon: CheckCircle },
-		{ value: 'rejected', label: 'Rejected', icon: XCircle }
+		{ value: 'rejected', label: 'Rejected', icon: XCircle },
+		{ value: 'failed', label: 'Failed', icon: AlertCircle }
 	] as const;
 
 	const typeFilters = [
