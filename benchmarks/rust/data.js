@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773961914236,
+  "lastUpdate": 1773961939482,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -577,6 +577,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 932.71,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8d20892cbee7079f5f577cd76820bcf20a3daf9e",
+          "message": "Merge pull request #228 from aramirez087/fix/ci-release-plz-detached-head\n\nfix(ci): add fetch-depth: 0 to release-plz verify step",
+          "timestamp": "2026-03-19T17:06:52-06:00",
+          "tree_id": "b7a70f8934e4c147f5a6e74b49385a84c14f5929",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8d20892cbee7079f5f577cd76820bcf20a3daf9e"
+        },
+        "date": 1773961938868,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 939.41,
             "unit": "ps"
           }
         ]
