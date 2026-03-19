@@ -292,6 +292,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
+      - name: Install Windows native build dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # NASM is required by boring-sys2 (BoringSSL assembly optimizations)
+          choco install nasm -y
+          echo "C:\Program Files\NASM" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          # LLVM/libclang is required by bindgen for FFI generation
+          choco install llvm -y
+          echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
       - name: Clean cached aarch64 target artifacts
         if: matrix.cross
         run: cargo clean --target aarch64-unknown-linux-gnu
