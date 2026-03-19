@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773892294708,
+  "lastUpdate": 1773892342524,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -318,6 +318,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 932.93,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0f705deb6ac0dcce1e08ad51a33d5c3d64ff562e",
+          "message": "Merge pull request #217 from aramirez087/ci/branch-protection\n\ndocs: add Branch Protection section with command and verification",
+          "timestamp": "2026-03-18T21:49:58-06:00",
+          "tree_id": "18642984a3d9a4d4a4bfb0e6045ddda867d2f50d",
+          "url": "https://github.com/aramirez087/TuitBot/commit/0f705deb6ac0dcce1e08ad51a33d5c3d64ff562e"
+        },
+        "date": 1773892341412,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.06,
             "unit": "ps"
           }
         ]
