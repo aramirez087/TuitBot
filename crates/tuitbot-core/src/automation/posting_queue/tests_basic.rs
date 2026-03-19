@@ -1,7 +1,11 @@
 #[cfg(test)]
 mod tests_basic {
     use super::super::*;
-    use std::sync::Mutex;
+    use super::super::dispatch::{is_rate_limit_error, randomized_delay};
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use tokio::sync::oneshot;
+    use tokio_util::sync::CancellationToken;
 
     /// Mock executor that records all calls.
     struct MockExecutor {
@@ -91,7 +95,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect("oneshot recv");
         assert_eq!(result, Ok("reply-id-123".to_string()));
 
         cancel.cancel();
@@ -120,7 +124,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect("oneshot recv");
         assert_eq!(result, Ok("tweet-id-456".to_string()));
 
         cancel.cancel();
@@ -149,7 +153,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect("oneshot recv");
         assert_eq!(result, Ok("reply-id-123".to_string()));
 
         cancel.cancel();
@@ -209,7 +213,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect("oneshot recv");
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "mock error");
 
@@ -396,7 +400,7 @@ mod tests_basic {
         .await
         .expect("send");
 
-        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("recv");
+        let result: Result<String, String> = result_rx.await.expect("recv");
         assert!(result.is_ok());
         assert!(result.unwrap().starts_with("queued:"));
 
