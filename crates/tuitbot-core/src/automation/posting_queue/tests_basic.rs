@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests_basic {
-    use super::super::*;
     use super::super::dispatch::{is_rate_limit_error, randomized_delay};
+    use super::super::*;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use tokio::sync::oneshot;

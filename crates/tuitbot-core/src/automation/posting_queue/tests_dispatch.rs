@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests_dispatch {
-    use super::super::*;
     use super::super::dispatch::{is_rate_limit_error, randomized_delay};
+    use super::super::*;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use tokio::sync::oneshot;
@@ -490,5 +490,4 @@ mod tests_dispatch {
         let d = randomized_delay(min, max);
         assert_eq!(d, min);
     }
-
 }
