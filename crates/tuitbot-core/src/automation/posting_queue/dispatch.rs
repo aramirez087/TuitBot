@@ -1,38 +1,12 @@
-pub trait PostExecutor: Send + Sync {
-    /// Post a reply to a specific tweet. Returns the posted tweet ID.
-    async fn execute_reply(
-        &self,
-        tweet_id: &str,
-        content: &str,
-        media_ids: &[String],
-    ) -> Result<String, String>;
+use std::sync::Arc;
+use std::time::Duration;
 
-    /// Post a new original tweet. Returns the posted tweet ID.
-    async fn execute_tweet(&self, content: &str, media_ids: &[String]) -> Result<String, String>;
-}
+use rand::Rng;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
-/// Create a bounded posting queue channel.
-///
-/// Returns `(sender, receiver)`. Clone the sender for each automation loop.
-/// Pass the receiver to [`run_posting_queue`].
-pub fn create_posting_queue() -> (mpsc::Sender<PostAction>, mpsc::Receiver<PostAction>) {
-    mpsc::channel(QUEUE_CAPACITY)
-}
-
-/// Trait for queueing actions for human approval instead of posting.
-#[async_trait::async_trait]
-pub trait ApprovalQueue: Send + Sync {
-    /// Queue a reply for human review. Returns the queue item ID.
-    async fn queue_reply(
-        &self,
-        tweet_id: &str,
-        content: &str,
-        media_paths: &[String],
-    ) -> Result<i64, String>;
-
-    /// Queue a tweet for human review. Returns the queue item ID.
-    async fn queue_tweet(&self, content: &str, media_paths: &[String]) -> Result<i64, String>;
-}
+use crate::automation::circuit_breaker::CircuitBreaker;
+use crate::automation::posting_queue::queue::{ApprovalQueue, PostAction, PostExecutor, QUEUE_CAPACITY, create_posting_queue};
 
 /// Run the posting queue consumer loop.
 ///
@@ -139,7 +113,7 @@ pub async fn run_posting_queue_with_approval(
 }
 
 /// Whether an error message indicates a rate limit or forbidden response.
-fn is_rate_limit_error(msg: &str) -> bool {
+pub fn is_rate_limit_error(msg: &str) -> bool {
     let lower = msg.to_lowercase();
     lower.contains("rate limit")
         || lower.contains("too many requests")
@@ -280,7 +254,7 @@ async fn execute_and_respond(action: PostAction, executor: &Arc<dyn PostExecutor
 }
 
 /// Compute a randomized delay between `min` and `max`.
-fn randomized_delay(min: Duration, max: Duration) -> Duration {
+pub fn randomized_delay(min: Duration, max: Duration) -> Duration {
     if min >= max || min.is_zero() && max.is_zero() {
         return min;
     }

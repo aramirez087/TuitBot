@@ -81,7 +81,7 @@ mod tests_basic {
             run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
         });
 
-        let (result_tx, result_rx) = oneshot::channel();
+        let (result_tx, result_rx) = oneshot::channel::<Result<String, String>>();
         tx.send(PostAction::Reply {
             tweet_id: "t1".to_string(),
             content: "hello".to_string(),
@@ -91,7 +91,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result = result_rx.await.expect("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
         assert_eq!(result, Ok("reply-id-123".to_string()));
 
         cancel.cancel();
@@ -111,7 +111,7 @@ mod tests_basic {
             run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
         });
 
-        let (result_tx, result_rx) = oneshot::channel();
+        let (result_tx, result_rx) = oneshot::channel::<Result<String, String>>();
         tx.send(PostAction::Tweet {
             content: "my tweet".to_string(),
             media_ids: vec![],
@@ -120,7 +120,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result = result_rx.await.expect("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
         assert_eq!(result, Ok("tweet-id-456".to_string()));
 
         cancel.cancel();
@@ -139,7 +139,7 @@ mod tests_basic {
             run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
         });
 
-        let (result_tx, result_rx) = oneshot::channel();
+        let (result_tx, result_rx) = oneshot::channel::<Result<String, String>>();
         tx.send(PostAction::ThreadTweet {
             content: "thread part 2".to_string(),
             in_reply_to: "prev-id".to_string(),
@@ -149,7 +149,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result = result_rx.await.expect("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
         assert_eq!(result, Ok("reply-id-123".to_string()));
 
         cancel.cancel();
@@ -200,7 +200,7 @@ mod tests_basic {
             run_posting_queue(rx, exec_clone, Duration::ZERO, cancel_clone).await;
         });
 
-        let (result_tx, result_rx) = oneshot::channel();
+        let (result_tx, result_rx) = oneshot::channel::<Result<String, String>>();
         tx.send(PostAction::Tweet {
             content: "will fail".to_string(),
             media_ids: vec![],
@@ -209,7 +209,7 @@ mod tests_basic {
         .await
         .expect("send failed");
 
-        let result = result_rx.await.expect("oneshot recv");
+        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("oneshot recv");
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "mock error");
 
@@ -386,7 +386,7 @@ mod tests_basic {
             .await;
         });
 
-        let (result_tx, result_rx) = oneshot::channel();
+        let (result_tx, result_rx) = oneshot::channel::<Result<String, String>>();
         tx.send(PostAction::Reply {
             tweet_id: "t1".to_string(),
             content: "hello".to_string(),
@@ -396,7 +396,7 @@ mod tests_basic {
         .await
         .expect("send");
 
-        let result = result_rx.await.expect("recv");
+        let result: Result<String, String> = result_rx.await.expect::<Result<String, String>>("recv");
         assert!(result.is_ok());
         assert!(result.unwrap().starts_with("queued:"));
 
@@ -467,6 +467,4 @@ mod tests_basic {
         assert!(debug.contains("Tweet"));
         assert!(debug.contains("media_count"));
     }
-
-    #[test]
 }

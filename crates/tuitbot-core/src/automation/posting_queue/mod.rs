@@ -5,8 +5,8 @@
 //! globally. A single consumer task processes actions sequentially with
 //! configurable delays between posts.
 
-pub use dispatch::{ApprovalQueue, PostExecutor, run_posting_queue, run_posting_queue_with_approval};
-pub use queue::{create_posting_queue, PostAction, QUEUE_CAPACITY};
+pub use dispatch::{run_posting_queue, run_posting_queue_with_approval};
+pub use queue::{create_posting_queue, ApprovalQueue, PostAction, PostExecutor, QUEUE_CAPACITY};
 
 mod dispatch;
 mod queue;

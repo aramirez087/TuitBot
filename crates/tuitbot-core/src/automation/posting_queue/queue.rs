@@ -5,13 +5,7 @@
 //! globally. A single consumer task processes actions sequentially with
 //! configurable delays between posts.
 
-use rand::Rng;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
-use tokio_util::sync::CancellationToken;
-
-use super::circuit_breaker::CircuitBreaker;
 
 /// Default bounded channel capacity for the posting queue.
 pub const QUEUE_CAPACITY: usize = 100;
@@ -118,3 +112,15 @@ pub fn create_posting_queue() -> (mpsc::Sender<PostAction>, mpsc::Receiver<PostA
 
 /// Trait for queueing actions for human approval instead of posting.
 #[async_trait::async_trait]
+pub trait ApprovalQueue: Send + Sync {
+    /// Queue a reply for human review. Returns the queue item ID.
+    async fn queue_reply(
+        &self,
+        tweet_id: &str,
+        content: &str,
+        media_paths: &[String],
+    ) -> Result<i64, String>;
+
+    /// Queue a tweet for human review. Returns the queue item ID.
+    async fn queue_tweet(&self, content: &str, media_paths: &[String]) -> Result<i64, String>;
+}
