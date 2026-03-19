@@ -118,6 +118,31 @@ cargo package --workspace --allow-dirty
 - Both Rust and Frontend gates must pass for merge
 - Codecov reports uploaded to tracking history
 
+## Automated Release Cadence
+
+**Workflow:** `.github/workflows/release-plz-weekly.yml`
+
+**Purpose:** Enforce a predictable weekly release schedule by automatically opening a `release-plz` PR every Monday at 09:00 UTC, regardless of whether changes exist.
+
+**How it works:**
+1. Cron trigger: `0 9 * * 1` (Mondays 09:00 UTC)
+2. Runs: `release-plz release-pr` — reads `release-plz.toml`, bumps versions if changes exist
+3. **Key behavior:**
+   - If changes warrant a release, opens/updates a PR (title: `chore(release)`)
+   - If no changes exist, exits cleanly (no empty PR created) — prevents spam
+4. Workflow dispatch: Can be manually triggered via GitHub Actions UI for testing
+5. Permissions: `contents: write` (bump versions), `pull-requests: write` (create PR)
+
+**Why this pattern:**
+- Predictable cadence (no surprise releases on random days)
+- Changes are batched (weekly cutoff) — good for testing and announcements
+- Automated versioning via `release-plz` (SemVer, changelog, tag, publish)
+- No manual intervention needed — PR is ready-to-review-and-merge
+
+**Related files:**
+- `release-plz.toml` — defines versioning rules and changelog format
+- `.github/workflows/release.yml` — runs on PR merge → builds, tests, publishes
+
 ## Always Do First
 - **Invoke the `frontend-design` skill** before writing any frontend code, every session, no exceptions.
 - **Run tests before committing frontend changes**: `cd dashboard && npx vitest run` to catch test failures before they hit CI. If a component's rendering behavior changes, update its corresponding test file in `dashboard/tests/unit/`.
