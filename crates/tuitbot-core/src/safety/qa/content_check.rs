@@ -5,6 +5,8 @@ use crate::config::Config;
 
 /// Rule-based QA evaluator.
 pub struct QaEvaluator<'a> {
+    // TODO: used in full evaluation logic once config is extended with language/brand/glossary fields
+    #[allow(dead_code)]
     config: &'a Config,
 }
 

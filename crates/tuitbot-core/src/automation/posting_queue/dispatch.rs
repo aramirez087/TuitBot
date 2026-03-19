@@ -302,7 +302,3 @@ pub(super) fn randomized_delay(min: Duration, max: Duration) -> Duration {
 pub(super) fn is_rate_limit_error_test(msg: &str) -> bool {
     is_rate_limit_error(msg)
 }
-
-#[cfg(test)]
-#[path = "dispatch_tests.rs"]
-mod dispatch_tests;

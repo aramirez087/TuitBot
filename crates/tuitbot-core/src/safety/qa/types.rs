@@ -120,6 +120,8 @@ impl Default for QaReport {
 }
 
 /// Internal type capturing language detection results.
+// TODO: used by language detection helpers once integrated into full QA pipeline
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(super) struct LanguageDetection {
     pub code: String,
