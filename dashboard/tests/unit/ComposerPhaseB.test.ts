@@ -89,32 +89,36 @@ describe('AC2: VoiceContextPanel Escape blur', () => {
 // ============================================================================
 describe('AC3: FromVaultPanel chunk checkboxes', () => {
 	it('renders chunk items as input[type=checkbox]', async () => {
-		// Mock note data with chunks
-		const mockNotes = [
+		// Mock note data with correct VaultNoteItem types
+		const mockNotes: any[] = [
 			{
 				node_id: 1,
+				source_id: 1,
 				title: 'Test Note',
-				snippet: 'Test content',
-				chunks: [
-					{ chunk_id: 101, heading: 'Section 1', text: 'Content 1' },
-					{ chunk_id: 102, heading: 'Section 2', text: 'Content 2' },
-				],
+				relative_path: 'test/note.md',
+				tags: null,
+				status: 'active',
+				chunk_count: 2,
+				updated_at: '2026-03-19T00:00:00Z',
 			},
 		];
+
+		const expandedNote: any = {
+			node_id: 1,
+			source_id: 1,
+			title: 'Test Note',
+			chunks: [
+				{ chunk_id: 101, heading_path: 'Section 1', snippet: 'Content 1', retrieval_boost: 0.8 },
+				{ chunk_id: 102, heading_path: 'Section 2', snippet: 'Content 2', retrieval_boost: 0.7 },
+			],
+		};
 
 		const { container } = render(VaultNoteList, {
 			props: {
 				notes: mockNotes,
 				loading: false,
 				expandedNodeId: 1,
-				expandedNote: {
-					node_id: 1,
-					title: 'Test Note',
-					chunks: [
-						{ chunk_id: 101, heading: 'Section 1', text: 'Content 1' },
-						{ chunk_id: 102, heading: 'Section 2', text: 'Content 2' },
-					],
-				},
+				expandedNote,
 				expanding: false,
 				selectedChunks: new Map(),
 				atLimit: false,
@@ -139,25 +143,32 @@ describe('AC3: FromVaultPanel chunk checkboxes', () => {
 describe('AC4: FromVaultPanel Space toggles chunk', () => {
 	it('Space keypress on chunk checkbox toggles selection', async () => {
 		const onToggleChunk = vi.fn();
-		const mockNotes = [
+		const mockNotes: any[] = [
 			{
 				node_id: 1,
+				source_id: 1,
 				title: 'Test',
-				snippet: 'Test',
-				chunks: [{ chunk_id: 101, heading: 'H1', text: 'T1' }],
+				relative_path: 'test.md',
+				tags: null,
+				status: 'active',
+				chunk_count: 1,
+				updated_at: '2026-03-19T00:00:00Z',
 			},
 		];
+
+		const expandedNote: any = {
+			node_id: 1,
+			source_id: 1,
+			title: 'Test',
+			chunks: [{ chunk_id: 101, heading_path: 'H1', snippet: 'T1', retrieval_boost: 0.8 }],
+		};
 
 		const { container } = render(VaultNoteList, {
 			props: {
 				notes: mockNotes,
 				loading: false,
 				expandedNodeId: 1,
-				expandedNote: {
-					node_id: 1,
-					title: 'Test',
-					chunks: [{ chunk_id: 101, heading: 'H1', text: 'T1' }],
-				},
+				expandedNote,
 				expanding: false,
 				selectedChunks: new Map(),
 				atLimit: false,
