@@ -554,22 +554,29 @@ jobs:
 
       - name: Sign release artifacts with GPG
         if: env.HAS_GPG == 'true'
+        continue-on-error: true
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
           cd dist
-          # Sign each artifact with detached signature (.asc)
+          # Sign each artifact with detached signature (.sig = armored ASCII format)
+          # Non-blocking on error: signing failure does not block release publication
+          signature_count=0
           for artifact in *; do
-            if [ -f "$artifact" ] && [[ "$artifact" != *.asc ]]; then
+            if [ -f "$artifact" ] && [[ "$artifact" != *.sig && "$artifact" != *.asc ]]; then
               echo "Signing $artifact..."
-              gpg --batch --no-tty --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
-                --detach-sign --armor "$artifact" || \
-                echo "Warning: Failed to sign $artifact (GPG may not be configured)"
+              if gpg --batch --no-tty --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+                --detach-sign --armor "$artifact" -o "${artifact}.sig" 2>/dev/null; then
+                echo "✅ Generated ${artifact}.sig"
+                signature_count=$((signature_count + 1))
+              else
+                echo "⚠️  Warning: Failed to sign $artifact (GPG key may not be configured correctly)"
+              fi
             fi
           done
-          ls -la *.asc 2>/dev/null | wc -l | xargs echo "Generated signatures:"
+          echo "Signing complete: $signature_count artifact(s) signed"
 
       - name: Upload assets to GitHub release
         env:
