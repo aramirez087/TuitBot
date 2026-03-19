@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773892205049,
+  "lastUpdate": 1773892251632,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -413,6 +413,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/f2f3dd665bf5e43c5a51bfc4872ad49ffefcf21b"
         },
         "date": 1773892203900,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 872199,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 296607,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1208057,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0f705deb6ac0dcce1e08ad51a33d5c3d64ff562e",
+          "message": "Merge pull request #217 from aramirez087/ci/branch-protection\n\ndocs: add Branch Protection section with command and verification",
+          "timestamp": "2026-03-18T21:49:58-06:00",
+          "tree_id": "18642984a3d9a4d4a4bfb0e6045ddda867d2f50d",
+          "url": "https://github.com/aramirez087/TuitBot/commit/0f705deb6ac0dcce1e08ad51a33d5c3d64ff562e"
+        },
+        "date": 1773892250548,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
