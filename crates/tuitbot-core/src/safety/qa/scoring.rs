@@ -8,6 +8,8 @@
 use super::types::{QaFlag, QaScoreSummary};
 
 /// Compute aggregate QA scores from hard and soft flags.
+// TODO: wired into QaEvaluator::evaluate once config is extended
+#[allow(dead_code)]
 pub(super) fn score_summary(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> QaScoreSummary {
     let hard_count = hard_flags.len() as f32;
     let soft_count = soft_flags.len() as f32;
@@ -28,6 +30,7 @@ pub(super) fn score_summary(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> QaS
 }
 
 /// Collect unique remediation recommendations from flags.
+#[allow(dead_code)]
 pub(super) fn collect_recommendations(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> Vec<String> {
     let mut recommendations = std::collections::HashSet::new();
 

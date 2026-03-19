@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::automation::circuit_breaker::CircuitBreaker;
-use crate::automation::posting_queue::queue::{ApprovalQueue, PostAction, PostExecutor, QUEUE_CAPACITY, create_posting_queue};
+use crate::automation::posting_queue::queue::{ApprovalQueue, PostAction, PostExecutor};
 
 /// Run the posting queue consumer loop.
 ///
