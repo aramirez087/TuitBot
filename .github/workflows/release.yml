@@ -76,6 +76,15 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - name: Generate Rust SBOM with cargo-cyclonedx
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cargo install cargo-cyclonedx
+          cargo cyclonedx -q --manifest-path Cargo.toml -o cyclone-dist/sbom.xml || true
+          mkdir -p sbom-dist
+          [ -f cyclone-dist/sbom.xml ] && mv cyclone-dist/sbom.xml sbom-dist/sbom.xml || echo "Warning: SBOM generation failed (non-blocking)"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -96,6 +105,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Upload SBOM artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-sbom
+          path: sbom-dist/
+          if-no-files-found: ignore
+          retention-days: 1
 
       - name: Resolve released tag metadata
         id: release-meta
@@ -411,6 +429,25 @@ jobs:
           pattern: tuitbot-*
           merge-multiple: true
           path: dist
+
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: release-sbom
+          path: sbom-download
+        continue-on-error: true
+
+      - name: Rename and stage SBOM for release
+        env:
+          TAG: ${{ needs.release.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [ -f "sbom-download/sbom.xml" ] && [ -n "$TAG" ]; then
+            cp "sbom-download/sbom.xml" "dist/tuitbot-${TAG}-sbom.xml"
+            echo "✅ SBOM staged as dist/tuitbot-${TAG}-sbom.xml"
+          else
+            echo "⚠️  No SBOM artifact found or release tag unavailable (continuing anyway)"
+          fi
 
       - name: Verify complete release asset set
         env:
