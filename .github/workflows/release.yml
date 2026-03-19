@@ -570,7 +570,7 @@ jobs:
               if gpg --batch --no-tty --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
                 --detach-sign --armor "$artifact" -o "${artifact}.sig" 2>/dev/null; then
                 echo "✅ Generated ${artifact}.sig"
-                ((++signature_count))
+                signature_count=$((signature_count + 1))
               else
                 echo "⚠️  Warning: Failed to sign $artifact (GPG key may not be configured correctly)"
               fi
