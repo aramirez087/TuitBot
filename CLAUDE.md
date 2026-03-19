@@ -178,6 +178,35 @@ cargo package --workspace --allow-dirty
 - `release-plz.toml` — defines versioning rules and changelog format
 - `.github/workflows/release.yml` — runs on PR merge → builds, tests, publishes
 
+## SBOM (Software Bill of Materials) Generation
+
+**Workflow:** `.github/workflows/release.yml` (publish-assets job)
+
+**Purpose:** Generate a machine-readable inventory of all Rust dependencies for supply chain compliance and vulnerability tracking.
+
+**Tool & Format:**
+- **Tool:** `cargo-cyclonedx` (preferred CycloneDX format)
+- **Output:** `sbom.xml` (CycloneDX XML format per NTIA standards)
+- **Rationale:** cargo-cyclonedx integrates directly with Cargo.lock, capturing the exact dependency tree at build time. CycloneDX XML is widely supported by compliance tools and vulnerability scanners (e.g., Dependabot, SPDX tools, SBOM databases).
+
+**Implementation Details:**
+1. **Step 1 (release job):** Install cargo-cyclonedx and generate sbom.xml from Cargo.lock
+   - Runs after Rust toolchain setup
+   - Non-blocking on error (`continue-on-error: true`) — tool failure does not block release
+   - Output: `sbom-dist/sbom.xml`
+2. **Step 2 (publish-assets job):** Download SBOM artifact and stage for GitHub Release upload
+   - Renames to `tuitbot-{RELEASE_TAG}-sbom.xml` for clarity
+   - Uploaded alongside binaries and checksums
+
+**Error Handling:**
+- If SBOM generation fails (tool not installed, Cargo.lock parsing issues, etc.), a warning is logged but the release proceeds
+- This is intentional: release cadence should not be blocked by optional security metadata
+- Failed SBOM generation is still visible in workflow logs for manual investigation
+
+**Verification:**
+- Generated SBOM can be validated with: `cyclonedx-cli validate --input-file tuitbot-{TAG}-sbom.xml`
+- Tools like Syft, SPDX converters, and vulnerability scanners consume the SBOM directly from GitHub Releases
+
 ## Always Do First
 - **Invoke the `frontend-design` skill** before writing any frontend code, every session, no exceptions.
 - **Run tests before committing frontend changes**: `cd dashboard && npx vitest run` to catch test failures before they hit CI. If a component's rendering behavior changes, update its corresponding test file in `dashboard/tests/unit/`.
