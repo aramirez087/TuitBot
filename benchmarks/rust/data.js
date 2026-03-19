@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773845712654,
+  "lastUpdate": 1773892294708,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -289,6 +289,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 932.84,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f2f3dd665bf5e43c5a51bfc4872ad49ffefcf21b",
+          "message": "Merge pull request #216 from aramirez087/ci/release-plz-weekly\n\nci: add weekly release-plz PR workflow",
+          "timestamp": "2026-03-18T21:49:13-06:00",
+          "tree_id": "c36da31ef33206153788558be29a1f999b7c6645",
+          "url": "https://github.com/aramirez087/TuitBot/commit/f2f3dd665bf5e43c5a51bfc4872ad49ffefcf21b"
+        },
+        "date": 1773892294174,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 932.93,
             "unit": "ps"
           }
         ]
