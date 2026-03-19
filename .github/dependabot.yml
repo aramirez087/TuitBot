@@ -1,75 +1,85 @@
 version: 2
 updates:
-  # ── Rust / Cargo ──────────────────────────────────────────────────────────
+  # Cargo dependencies - weekly, grouped by ecosystem
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    allow:
-      - dependency-type: "direct"
-    reviewers:
-      - "aramirez087"
+      time: "09:00"
     labels:
       - "dependencies"
       - "rust"
-    commit-message:
-      prefix: "chore(deps)"
-    open-pull-requests-limit: 10
-
-  # ── GitHub Actions ────────────────────────────────────────────────────────
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
     reviewers:
       - "aramirez087"
-    labels:
-      - "dependencies"
-      - "ci"
+    open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(deps)"
-    open-pull-requests-limit: 5
+    groups:
+      # Group all non-breaking updates together to reduce PR noise
+      - dependency-type: "all"
+        patterns:
+          - "*"
+    # Allow auto-merging for patch updates (non-breaking)
+    allow:
+      - dependency-type: "indirect"
+      - dependency-type: "direct"
+    # Skip dev dependencies that are only for testing
+    ignore:
+      - dependency-name: "criterion"
+        # Keep criterion updates manual for benchmark verification
 
-  # ── Node.js / dashboard ───────────────────────────────────────────────────
+  # npm dependencies - dashboard (weekly)
   - package-ecosystem: "npm"
     directory: "/dashboard"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    allow:
-      - dependency-type: "direct"
-    reviewers:
-      - "aramirez087"
+      time: "10:00"
     labels:
       - "dependencies"
       - "frontend"
-    commit-message:
-      prefix: "chore(deps)"
+    reviewers:
+      - "aramirez087"
     open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps): dashboard"
+    groups:
+      - dependency-type: "all"
+        patterns:
+          - "*"
 
-  # ── Node.js / openclaw plugin ─────────────────────────────────────────────
+  # npm dependencies - openclaw plugin (weekly)
   - package-ecosystem: "npm"
     directory: "/plugins/openclaw-tuitbot"
     schedule:
       interval: "weekly"
       day: "monday"
-      time: "06:00"
-      timezone: "America/Costa_Rica"
-    allow:
-      - dependency-type: "direct"
-    reviewers:
-      - "aramirez087"
+      time: "11:00"
     labels:
       - "dependencies"
-      - "plugin"
+      - "openclaw-plugin"
+    reviewers:
+      - "aramirez087"
+    open-pull-requests-limit: 10
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore(deps): openclaw plugin"
+    groups:
+      - dependency-type: "all"
+        patterns:
+          - "*"
+
+  # GitHub Actions - monthly (less churn)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "first"
+    labels:
+      - "dependencies"
+      - "ci"
+    reviewers:
+      - "aramirez087"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci): actions"
