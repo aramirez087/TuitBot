@@ -198,8 +198,8 @@ jobs:
           mkdir -p /tmp/rplz && tar -xzf /tmp/release-plz.tar.gz -C /tmp/rplz
           echo "/tmp/rplz" >> $GITHUB_PATH
 
-      - name: Run release-plz update (dry run)
-        run: release-plz update --config release-plz.toml --allow-dirty --dry-run
+      - name: Run release-plz update (validation)
+        run: release-plz update --config release-plz.toml --allow-dirty
 
       - name: Run cargo package (verify metadata)
         run: cargo package --workspace --allow-dirty
