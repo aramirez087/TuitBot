@@ -1,94 +1,127 @@
-//! QA type definitions and structures.
+//! Type definitions for QA evaluation.
 
 use serde::{Deserialize, Serialize};
 
-/// Severity level for QA flags.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+/// Severity used for QA flags.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum QaSeverity {
-    /// Warning-level issue that should be reviewed.
-    Soft,
     /// Blocks approval/publish unless explicitly overridden.
     Hard,
+    /// Warning-level issue that should be reviewed.
+    Soft,
 }
 
-/// Category of QA issue.
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize, Hash)]
+/// QA category for scoring and grouping.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum QaCategory {
-    /// Language policy or detection issue.
+    /// Language and bilingual policy checks.
     Language,
-    /// Brand voice or tone issue.
+    /// Brand voice style and glossary checks.
     Brand,
-    /// Legal/regulatory compliance issue.
+    /// Compliance checks (claims, links, UTM requirements).
     Compliance,
 }
 
-/// A single QA flag/issue found during evaluation.
+/// Structured issue emitted by the evaluator.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct QaFlag {
-    /// Machine-readable code for this flag (e.g., "language_mismatch").
+    /// Stable identifier for the rule that fired.
     pub code: String,
-    /// Severity level (soft warning vs hard blocker).
+    /// Hard vs soft severity.
     pub severity: QaSeverity,
-    /// Category of the issue.
+    /// Category used for score rollups.
     pub category: QaCategory,
-    /// Human-readable message describing the issue.
+    /// Human-readable summary.
     pub message: String,
-    /// Optional evidence/example text that triggered the flag.
+    /// Optional excerpt/value that triggered the flag.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub evidence: Option<String>,
-    /// Optional remediation suggestion.
+    /// Optional remediation guidance.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
 }
 
-/// Language detection result.
-// TODO: used by language detection helpers once integrated into full QA pipeline
-#[allow(dead_code)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct LanguageDetection {
-    /// ISO 639-1 language code (e.g., "en", "es", "fr").
-    pub code: String,
-    /// Confidence score (0.0 to 1.0).
-    pub confidence: f64,
-}
-
-/// Per-category QA scores.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+/// Aggregate score rollup for UI display.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct QaScoreSummary {
-    /// Overall QA score (0–100).
+    /// Overall score in [0, 100].
     pub overall: f32,
-    /// Language policy compliance score (0–100).
+    /// Language-policy dimension score in [0, 100].
     pub language: f32,
-    /// Brand voice alignment score (0–100).
+    /// Brand dimension score in [0, 100].
     pub brand: f32,
-    /// Regulatory compliance score (0–100).
+    /// Compliance dimension score in [0, 100].
     pub compliance: f32,
 }
 
-/// Language detection context for a report.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl Default for QaScoreSummary {
+    fn default() -> Self {
+        Self {
+            overall: 100.0,
+            language: 100.0,
+            brand: 100.0,
+            compliance: 100.0,
+        }
+    }
+}
+
+/// Captures language detection context.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct QaLanguages {
-    /// Detected language of source/input text.
+    /// Detected source language.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
-    /// Detected language of generated output.
+    /// Detected output language.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
-    /// Target language per policy.
+    /// Policy-selected target language.
     pub policy_target: String,
 }
 
-/// Complete QA evaluation report.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Complete QA report artifact.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct QaReport {
-    /// Whether hard flags require explicit override before publishing.
-    pub requires_override: bool,
-    /// Language context and detection results.
-    pub languages: QaLanguages,
-    /// Hard (blocking) flags found.
+    /// Hard failures requiring override/edit.
     pub hard_flags: Vec<QaFlag>,
-    /// Soft (warning) flags found.
+    /// Soft warnings for reviewer visibility.
     pub soft_flags: Vec<QaFlag>,
-    /// List of remediation recommendations.
+    /// Consolidated remediation recommendations.
     pub recommendations: Vec<String>,
-    /// QA scores by category.
+    /// Quality score rollup.
     pub score: QaScoreSummary,
+    /// Language metadata used by checks.
+    pub languages: QaLanguages,
+    /// `true` when hard flags exist.
+    pub requires_override: bool,
+}
+
+impl Default for QaReport {
+    fn default() -> Self {
+        Self {
+            hard_flags: Vec::new(),
+            soft_flags: Vec::new(),
+            recommendations: Vec::new(),
+            score: QaScoreSummary {
+                overall: 100.0,
+                language: 100.0,
+                brand: 100.0,
+                compliance: 100.0,
+            },
+            languages: QaLanguages {
+                source: None,
+                output: None,
+                policy_target: "en".to_string(),
+            },
+            requires_override: false,
+        }
+    }
+}
+
+/// Internal type capturing language detection results.
+#[derive(Debug, Clone)]
+pub(super) struct LanguageDetection {
+    pub code: String,
+    pub confidence: f32,
 }

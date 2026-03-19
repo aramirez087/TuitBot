@@ -1,46 +1,51 @@
-//! QA scoring and recommendation collection.
-//!
-//! Functions in this module are currently unused pending full content_check.rs
-//! implementation once Config struct is updated with QA-specific fields.
+//! QA scoring and recommendation generation.
 
-#![allow(dead_code)]
+use std::collections::{HashMap, HashSet};
 
-use super::types::{QaFlag, QaScoreSummary};
+use super::types::{QaCategory, QaFlag, QaScoreSummary};
 
-/// Compute aggregate QA scores from hard and soft flags.
-// TODO: wired into QaEvaluator::evaluate once config is extended
-#[allow(dead_code)]
-pub(super) fn score_summary(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> QaScoreSummary {
-    let hard_count = hard_flags.len() as f32;
-    let soft_count = soft_flags.len() as f32;
+/// Generate a score summary from hard and soft flags.
+///
+/// Hard flags incur a 35-point penalty per flag, soft flags incur a 12-point penalty.
+/// Each category's score is independently computed, then the overall score is the average.
+pub fn score_summary(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> QaScoreSummary {
+    let mut penalties: HashMap<QaCategory, f32> = HashMap::new();
+    for flag in hard_flags {
+        *penalties.entry(flag.category.clone()).or_insert(0.0) += 35.0;
+    }
+    for flag in soft_flags {
+        *penalties.entry(flag.category.clone()).or_insert(0.0) += 12.0;
+    }
 
-    // Penalty-based scoring: each hard flag deducts 20 points, each soft flag deducts 5 points.
-    let overall = if hard_count == 0.0 && soft_count == 0.0 {
-        100.0
-    } else {
-        (100.0 - (hard_count * 20.0) - (soft_count * 5.0)).max(0.0)
-    };
+    let language = (100.0 - penalties.get(&QaCategory::Language).copied().unwrap_or(0.0)).max(0.0);
+    let brand = (100.0 - penalties.get(&QaCategory::Brand).copied().unwrap_or(0.0)).max(0.0);
+    let compliance = (100.0
+        - penalties
+            .get(&QaCategory::Compliance)
+            .copied()
+            .unwrap_or(0.0))
+    .max(0.0);
+    let overall = ((language + brand + compliance) / 3.0).clamp(0.0, 100.0);
 
     QaScoreSummary {
         overall,
-        language: 100.0,
-        brand: 100.0,
-        compliance: 100.0,
+        language,
+        brand,
+        compliance,
     }
 }
 
-/// Collect unique remediation recommendations from flags.
-#[allow(dead_code)]
-pub(super) fn collect_recommendations(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> Vec<String> {
-    let mut recommendations = std::collections::HashSet::new();
+/// Collect deduplicated remediation recommendations from flag suggestions.
+pub fn collect_recommendations(hard_flags: &[QaFlag], soft_flags: &[QaFlag]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut recommendations = Vec::new();
 
     for flag in hard_flags.iter().chain(soft_flags.iter()) {
         if let Some(suggestion) = &flag.suggestion {
-            recommendations.insert(suggestion.clone());
+            if seen.insert(suggestion.clone()) {
+                recommendations.push(suggestion.clone());
+            }
         }
     }
-
-    let mut result: Vec<String> = recommendations.into_iter().collect();
-    result.sort();
-    result
+    recommendations
 }

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 //! Content-level QA evaluation.
 
 use crate::config::Config;
@@ -7,6 +8,15 @@ use super::types::{QaLanguages, QaReport};
 /// Rule-based QA evaluator for generated content.
 pub struct QaEvaluator<'a> {
     #[allow(dead_code)]
+=======
+//! QA content evaluation and rule-based checking.
+
+use super::types::{QaLanguages, QaReport};
+use crate::config::Config;
+
+/// Rule-based QA evaluator.
+pub struct QaEvaluator<'a> {
+>>>>>>> 388a639 (refactor: split schedule.rs (1478 lines) → schedule/{mod,planner,executor,recurrence})
     config: &'a Config,
 }
 
@@ -18,14 +28,19 @@ impl<'a> QaEvaluator<'a> {
 
     /// Evaluate generated content against policy.
     ///
+<<<<<<< HEAD
     /// Returns a `QaReport` with flags, scores, and recommendations.
     /// `recent_outputs` provides context for similarity checks.
+=======
+    /// `recent_outputs` is optional context for similarity warnings.
+>>>>>>> 388a639 (refactor: split schedule.rs (1478 lines) → schedule/{mod,planner,executor,recurrence})
     pub fn evaluate(
         &self,
         _source_text: &str,
         _generated_text: &str,
         _recent_outputs: &[String],
     ) -> QaReport {
+<<<<<<< HEAD
         // Stub: Full evaluation logic pending config struct updates for:
         // - language_policy (LanguagePolicyMode, supported_languages, default_reply_language)
         // - glossary_terms (term, approved_aliases, preserve_exact)
@@ -35,6 +50,9 @@ impl<'a> QaEvaluator<'a> {
         //
         // For now, return a passing report. Once config is extended, this
         // stub will be replaced with full rule-based evaluation logic.
+=======
+        // Note: Full QA evaluation is stubbed pending config struct additions
+>>>>>>> 388a639 (refactor: split schedule.rs (1478 lines) → schedule/{mod,planner,executor,recurrence})
         QaReport {
             requires_override: false,
             languages: QaLanguages {
@@ -45,12 +63,16 @@ impl<'a> QaEvaluator<'a> {
             hard_flags: vec![],
             soft_flags: vec![],
             recommendations: vec![],
+<<<<<<< HEAD
             score: super::types::QaScoreSummary {
                 overall: 100.0,
                 language: 100.0,
                 brand: 100.0,
                 compliance: 100.0,
             },
+=======
+            score: Default::default(),
+>>>>>>> 388a639 (refactor: split schedule.rs (1478 lines) → schedule/{mod,planner,executor,recurrence})
         }
     }
 }
