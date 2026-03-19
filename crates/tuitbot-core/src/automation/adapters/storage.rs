@@ -266,6 +266,105 @@ impl ContentStorage for ContentStorageAdapter {
             .await
             .map_err(|e| ContentLoopError::StorageError(e.to_string()))
     }
+
+    async fn mark_failed_permanent(
+        &self,
+        thread_id: &str,
+        error: &str,
+    ) -> Result<(), ContentLoopError> {
+        let id: i64 = thread_id
+            .parse()
+            .map_err(|_| ContentLoopError::StorageError("invalid thread_id".to_string()))?;
+
+        // Update thread status to failed
+        sqlx::query(
+            "UPDATE threads SET status = ?1, failure_kind = ?2, last_error = ?3, failed_at = datetime('now') WHERE id = ?4",
+        )
+        .bind("failed")
+        .bind("permanent")
+        .bind(error)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        // Fetch thread details for approval queue entry
+        // Concatenate all thread tweets into a single content string for the approval queue
+        let row: (String, u32) =
+            sqlx::query_as("SELECT topic, retry_count FROM threads WHERE id = ?1")
+                .bind(id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        let (topic, retry_count) = row;
+
+        // Fetch all tweets in the thread and concatenate them
+        let tweets: Vec<(String,)> = sqlx::query_as(
+            "SELECT content FROM thread_tweets WHERE thread_id = ?1 ORDER BY position",
+        )
+        .bind(id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        let content = if tweets.is_empty() {
+            format!("Failed thread id={}", id)
+        } else {
+            tweets
+                .iter()
+                .map(|t| t.0.as_str())
+                .collect::<Vec<_>>()
+                .join("\n---\n")
+        };
+
+        // Build metadata JSON for the approval queue entry
+        let metadata = format!(
+            "Failed thread id={}, retries={}, error: {}",
+            id, retry_count, error
+        );
+
+        // Insert into approval_queue with status="pending" for human review
+        sqlx::query(
+            "INSERT INTO approval_queue (action_type, generated_content, topic, status, reason) VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .bind("failed_post_recovery")
+        .bind(content)
+        .bind(topic)
+        .bind("pending")
+        .bind(metadata)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn increment_retry(&self, thread_id: &str, error: &str) -> Result<u32, ContentLoopError> {
+        let id: i64 = thread_id
+            .parse()
+            .map_err(|_| ContentLoopError::StorageError("invalid thread_id".to_string()))?;
+
+        // Increment retry_count and update failure metadata
+        sqlx::query(
+            "UPDATE threads SET retry_count = retry_count + 1, failure_kind = ?1, last_error = ?2, failed_at = datetime('now') WHERE id = ?3",
+        )
+        .bind("transient")
+        .bind(error)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        // Fetch updated retry_count
+        let row: (i64,) = sqlx::query_as("SELECT retry_count FROM threads WHERE id = ?1")
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ContentLoopError::StorageError(e.to_string()))?;
+
+        Ok(row.0 as u32)
+    }
 }
 
 /// Adapts `DbPool` to the `TargetStorage` port trait.

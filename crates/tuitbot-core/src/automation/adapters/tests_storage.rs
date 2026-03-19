@@ -335,3 +335,56 @@ async fn topic_scorer_empty_db() {
     let topics = adapter.get_top_topics(5).await.unwrap();
     assert!(topics.is_empty());
 }
+
+// ============================================================================
+// Dead-Letter + Approval Queue Integration (Task C2)
+// ============================================================================
+
+#[tokio::test]
+async fn content_storage_mark_failed_permanent_creates_approval_queue_entry() {
+    let pool = init_test_db().await.expect("init db");
+    let (tx, _rx) = test_post_channel();
+    let adapter = ContentStorageAdapter::new(pool.clone(), tx);
+
+    // Create a thread that will fail
+    let thread_id = adapter.create_thread("Rust reliability", 2).await.unwrap();
+    let content = "This is a tweet that will fail to post";
+    adapter
+        .store_thread_tweet(&thread_id, 0, "mock_id_1", content)
+        .await
+        .unwrap();
+
+    // Mark as permanently failed
+    let error_msg = "X API error: 503 Service Unavailable after 3 retries";
+    let result = adapter.mark_failed_permanent(&thread_id, error_msg).await;
+    assert!(result.is_ok(), "mark_failed_permanent should succeed");
+
+    // Verify thread is marked as failed
+    let thread_row: (String, String) =
+        sqlx::query_as("SELECT status, failure_kind FROM threads WHERE id = ?1")
+            .bind(thread_id.parse::<i64>().unwrap())
+            .fetch_one(&pool)
+            .await
+            .expect("thread should exist");
+    assert_eq!(thread_row.0, "failed");
+    assert_eq!(thread_row.1, "permanent");
+
+    // Verify approval queue entry was created
+    let queue_row: (String, String, String) = sqlx::query_as(
+        "SELECT action_type, status, reason FROM approval_queue WHERE action_type = 'failed_post_recovery' ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("approval queue entry should exist");
+
+    assert_eq!(queue_row.0, "failed_post_recovery");
+    assert_eq!(queue_row.1, "pending");
+    assert!(
+        queue_row.2.contains(&thread_id),
+        "reason should contain thread_id"
+    );
+    assert!(
+        queue_row.2.contains("retries=0"),
+        "reason should contain retry count"
+    );
+}
