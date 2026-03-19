@@ -6,6 +6,7 @@ use super::types::{QaLanguages, QaReport};
 
 /// Rule-based QA evaluator for generated content.
 pub struct QaEvaluator<'a> {
+    #[allow(dead_code)]
     config: &'a Config,
 }
 
