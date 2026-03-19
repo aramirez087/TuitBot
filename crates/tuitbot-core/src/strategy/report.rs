@@ -130,6 +130,134 @@ pub async fn refresh_current(
     get_or_compute_current(pool, config).await
 }
 
+// ── Per-account variants ──────────────────────────────────────────────────────
+
+/// Compute a fresh strategy report for the week containing `week_of`, scoped
+/// to a single X account.
+pub async fn compute_report_for(
+    pool: &DbPool,
+    config: &Config,
+    account_id: &str,
+    week_of: NaiveDate,
+) -> Result<StrategyReportRow, StorageError> {
+    let (monday, sunday) = week_bounds(week_of);
+    let start = format!("{monday}T00:00:00Z");
+    let end_date = sunday.succ_opt().unwrap_or(sunday);
+    let end = format!("{end_date}T00:00:00Z");
+
+    let actions = metrics::count_actions_in_range_for(pool, account_id, &start, &end).await?;
+    let follower_start = metrics::get_follower_at_date_for(pool, account_id, &monday.to_string())
+        .await?
+        .unwrap_or(0);
+    let follower_end = metrics::get_follower_at_date_for(pool, account_id, &sunday.to_string())
+        .await?
+        .unwrap_or(follower_start);
+    let follower_delta = follower_end - follower_start;
+
+    let avg_reply_score =
+        metrics::avg_reply_score_in_range_for(pool, account_id, &start, &end).await?;
+    let avg_tweet_score =
+        metrics::avg_tweet_score_in_range_for(pool, account_id, &start, &end).await?;
+    let acceptance_rate =
+        metrics::reply_acceptance_rate_for(pool, account_id, &start, &end).await?;
+    let top_topics = metrics::top_topics_in_range_for(pool, account_id, &start, &end, 5).await?;
+    let bottom_topics =
+        metrics::bottom_topics_in_range_for(pool, account_id, &start, &end, 5).await?;
+    let top_content = metrics::top_content_in_range_for(pool, account_id, &start, &end, 5).await?;
+    let distinct_topic_count =
+        metrics::distinct_topic_count_for(pool, account_id, &start, &end).await?;
+
+    let total_output = actions.replies + actions.tweets + actions.threads + actions.target_replies;
+    let estimated_follow_conversion = if total_output > 0 {
+        follower_delta.max(0) as f64 / total_output as f64
+    } else {
+        0.0
+    };
+
+    let prev_monday = monday - chrono::Duration::days(7);
+    let previous = crate::storage::strategy::get_strategy_report_for(
+        pool,
+        account_id,
+        &prev_monday.to_string(),
+    )
+    .await?;
+
+    let week_metrics = WeekMetrics {
+        replies_sent: actions.replies,
+        tweets_posted: actions.tweets,
+        threads_posted: actions.threads,
+        target_replies: actions.target_replies,
+        follower_delta,
+        avg_reply_score,
+        avg_tweet_score,
+        reply_acceptance_rate: acceptance_rate,
+        top_topics: top_topics.clone(),
+        bottom_topics: bottom_topics.clone(),
+        distinct_topic_count,
+        max_replies_per_week: i64::from(config.limits.max_replies_per_day) * 7,
+        max_tweets_per_week: i64::from(config.limits.max_tweets_per_day) * 7,
+    };
+    let recs = recommendations::generate(&week_metrics, previous.as_ref());
+
+    let top_topics_json = serde_json::to_string(&top_topics).unwrap_or_else(|_| "[]".to_string());
+    let bottom_topics_json =
+        serde_json::to_string(&bottom_topics).unwrap_or_else(|_| "[]".to_string());
+    let top_content_json = serde_json::to_string(&top_content).unwrap_or_else(|_| "[]".to_string());
+    let recommendations_json = serde_json::to_string(&recs).unwrap_or_else(|_| "[]".to_string());
+
+    Ok(StrategyReportRow {
+        id: 0,
+        week_start: monday.to_string(),
+        week_end: sunday.to_string(),
+        replies_sent: actions.replies,
+        tweets_posted: actions.tweets,
+        threads_posted: actions.threads,
+        target_replies: actions.target_replies,
+        follower_start,
+        follower_end,
+        follower_delta,
+        avg_reply_score,
+        avg_tweet_score,
+        reply_acceptance_rate: acceptance_rate,
+        estimated_follow_conversion,
+        top_topics_json,
+        bottom_topics_json,
+        top_content_json,
+        recommendations_json,
+        created_at: String::new(),
+    })
+}
+
+/// Get the current week's report for one account, computing it if missing.
+pub async fn get_or_compute_current_for(
+    pool: &DbPool,
+    config: &Config,
+    account_id: &str,
+) -> Result<StrategyReportRow, StorageError> {
+    let today = Utc::now().date_naive();
+    let (monday, _sunday) = week_bounds(today);
+
+    let report = compute_report_for(pool, config, account_id, today).await?;
+    crate::storage::strategy::insert_strategy_report_for(pool, account_id, &report).await?;
+
+    crate::storage::strategy::get_strategy_report_for(pool, account_id, &monday.to_string())
+        .await
+        .map(|opt| opt.unwrap_or(report))
+}
+
+/// Force-recompute the current week's report for one account.
+pub async fn refresh_current_for(
+    pool: &DbPool,
+    config: &Config,
+    account_id: &str,
+) -> Result<StrategyReportRow, StorageError> {
+    let today = Utc::now().date_naive();
+    let (monday, _) = week_bounds(today);
+    crate::storage::strategy::delete_strategy_report_for(pool, account_id, &monday.to_string())
+        .await?;
+    get_or_compute_current_for(pool, config, account_id).await
+}
+
 /// Return the Monday and Sunday bounding the ISO week containing `date`.
 fn week_bounds(date: NaiveDate) -> (NaiveDate, NaiveDate) {
     let weekday = date.weekday();
