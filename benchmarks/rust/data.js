@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773948816550,
+  "lastUpdate": 1773957491469,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -432,6 +432,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 932.73,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe4ad488906a7360f1f8143b32a28d66a8e94c02",
+          "message": "Merge pull request #225 from aramirez087/ci/fix-release-verify-dry-run\n\nfix(ci): remove unsupported --dry-run from release-plz update step",
+          "timestamp": "2026-03-19T15:55:47-06:00",
+          "tree_id": "f5c480dd214408ab31163e483f877df3153cda93",
+          "url": "https://github.com/aramirez087/TuitBot/commit/fe4ad488906a7360f1f8143b32a28d66a8e94c02"
+        },
+        "date": 1773957490290,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 932.89,
             "unit": "ps"
           }
         ]
