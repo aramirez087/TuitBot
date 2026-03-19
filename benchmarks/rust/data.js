@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773957923305,
+  "lastUpdate": 1773961914236,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -548,6 +548,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.79,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "99f1ccead80b5efa0e6dbc9fe0990b13b0edd1d7",
+          "message": "Merge pull request #230 from aramirez087/fix/windows-release-build\n\nci: fix Windows release build (NASM + LLVM)",
+          "timestamp": "2026-03-19T17:06:24-06:00",
+          "tree_id": "b60ba1aa9e09f191b452f5097a0a22fce6f2984f",
+          "url": "https://github.com/aramirez087/TuitBot/commit/99f1ccead80b5efa0e6dbc9fe0990b13b0edd1d7"
+        },
+        "date": 1773961913857,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 932.71,
             "unit": "ps"
           }
         ]
