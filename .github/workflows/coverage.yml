@@ -85,7 +85,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Rust coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage/cobertura.xml
@@ -145,7 +145,7 @@ jobs:
           retention-days: 30
 
       - name: Upload frontend coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: dashboard/coverage/lcov.info
