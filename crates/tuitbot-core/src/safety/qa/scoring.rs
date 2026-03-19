@@ -1,4 +1,9 @@
 //! QA scoring and recommendation collection.
+//!
+//! Functions in this module are currently unused pending full content_check.rs
+//! implementation once Config struct is updated with QA-specific fields.
+
+#![allow(dead_code)]
 
 use super::types::{QaFlag, QaScoreSummary};
 
