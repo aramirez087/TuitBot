@@ -16,18 +16,15 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     groups:
-      # Group all non-breaking updates together to reduce PR noise
-      - dependency-type: "all"
+      all-dependencies:
+        dependency-type: "all"
         patterns:
           - "*"
-    # Allow auto-merging for patch updates (non-breaking)
     allow:
       - dependency-type: "indirect"
       - dependency-type: "direct"
-    # Skip dev dependencies that are only for testing
     ignore:
       - dependency-name: "criterion"
-        # Keep criterion updates manual for benchmark verification
 
   # npm dependencies - dashboard (weekly)
   - package-ecosystem: "npm"
@@ -45,7 +42,8 @@ updates:
     commit-message:
       prefix: "chore(deps): dashboard"
     groups:
-      - dependency-type: "all"
+      all-dependencies:
+        dependency-type: "all"
         patterns:
           - "*"
 
@@ -65,7 +63,8 @@ updates:
     commit-message:
       prefix: "chore(deps): openclaw plugin"
     groups:
-      - dependency-type: "all"
+      all-dependencies:
+        dependency-type: "all"
         patterns:
           - "*"
 
