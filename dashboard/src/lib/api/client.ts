@@ -41,6 +41,7 @@ import type {
 	McpToolMetrics,
 	McpErrorBreakdown,
 	McpTelemetryEntry,
+	McpAvailableTool,
 	LinkResponse,
 	ConnectorStatusResponse,
 	DisconnectResponse,
@@ -646,7 +647,9 @@ export const api = {
 		telemetryErrors: (hours: number = 24) =>
 			request<McpErrorBreakdown[]>(`/api/mcp/telemetry/errors?hours=${hours}`),
 		telemetryRecent: (limit: number = 50) =>
-			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`)
+			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`),
+		// Discovery: list all available MCP tools with their parameter hints.
+		tools: () => request<McpAvailableTool[]>('/api/mcp/tools')
 	},
 
 	connectors: {

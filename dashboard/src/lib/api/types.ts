@@ -856,3 +856,18 @@ export interface VaultNoteDetail {
 	updated_at: string;
 	chunks: VaultChunkSummary[];
 }
+
+// MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.
+export interface McpToolParam {
+	name: string;
+	type: string;
+	description: string;
+	required: boolean;
+}
+
+export interface McpAvailableTool {
+	name: string;
+	description: string;
+	category: string;
+	params: McpToolParam[];
+}
