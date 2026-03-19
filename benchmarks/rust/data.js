@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773931407314,
+  "lastUpdate": 1773935250581,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -376,6 +376,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.5,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "d3e92a576561b21d02c4a3d49628ae2366ac229e",
+          "message": "test(integration): Publisher integration test coverage — 5 tests\n\nIntegration tests for content_loop/publisher.rs retry + dead-letter flow:\n- publisher_no_scheduled_items_returns_none: happy path (no scheduled items)\n- publisher_successful_post_logs_action: successful post and action logging\n- publisher_dry_run_mode_does_not_post: verify dry_run mode doesn't post\n- publisher_storage_interface_contract: verify storage trait interface\n- publisher_calls_storage_methods_in_sequence: ContentLoop calls storage correctly\n\nUses existing test mocks (MockGenerator, MockSafety, MockStorage) to avoid\nreal API calls while verifying publisher/storage interaction contract.\n\nAll tests deterministic, no timing dependencies, pass on CI matrix.",
+          "timestamp": "2026-03-19T09:45:02-06:00",
+          "tree_id": "150f8cfa02dbd232473e015992596df8da1b77a0",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d3e92a576561b21d02c4a3d49628ae2366ac229e"
+        },
+        "date": 1773935249261,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.15,
             "unit": "ps"
           }
         ]
