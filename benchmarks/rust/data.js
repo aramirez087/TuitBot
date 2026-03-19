@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773957737309,
+  "lastUpdate": 1773957923305,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -519,6 +519,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.15,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "24e6df436bfa1870ee3109070f781ca180ca4409",
+          "message": "Merge pull request #221 from aramirez087/ci/gpg-signing-release\n\nchore: enhance GPG signing for release artifacts (Roadmap §4.4)",
+          "timestamp": "2026-03-19T16:02:56-06:00",
+          "tree_id": "c1f65f477f88ffc4d00668cf00ec2a9fd6ecc0c8",
+          "url": "https://github.com/aramirez087/TuitBot/commit/24e6df436bfa1870ee3109070f781ca180ca4409"
+        },
+        "date": 1773957921962,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 934.79,
             "unit": "ps"
           }
         ]
