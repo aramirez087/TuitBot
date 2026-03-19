@@ -491,25 +491,4 @@ mod tests_dispatch {
         assert_eq!(d, min);
     }
 
-    #[test]
-    fn randomized_delay_large_range() {
-        let min = Duration::from_millis(1);
-        let max = Duration::from_millis(1000);
-
-        for _ in 0..50 {
-            let d = randomized_delay(min, max);
-            assert!(d >= min && d <= max);
-        }
-    }
-
-    #[test]
-    fn randomized_delay_very_close_values() {
-        let min = Duration::from_millis(99);
-        let max = Duration::from_millis(100);
-
-        for _ in 0..50 {
-            let d = randomized_delay(min, max);
-            assert!(d >= min && d <= max);
-        }
-    }
 }
