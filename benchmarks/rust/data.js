@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773967741493,
+  "lastUpdate": 1773973928745,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -664,6 +664,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.39,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b3fc5b050ddc5d12836582983cec5d23ed7637c3",
+          "message": "Merge pull request #236 from aramirez087/fix/ci-benchmarks-dirty-worktree\n\nfix(ci): clean worktree before benchmark gh-pages push",
+          "timestamp": "2026-03-19T20:26:38-06:00",
+          "tree_id": "dbdb795baa093b03c229eef2ea6eb15ceadfecf7",
+          "url": "https://github.com/aramirez087/TuitBot/commit/b3fc5b050ddc5d12836582983cec5d23ed7637c3"
+        },
+        "date": 1773973928269,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 939.67,
             "unit": "ps"
           }
         ]
