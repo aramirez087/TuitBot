@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773978060053,
+  "lastUpdate": 1773983519436,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -838,6 +838,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.06,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3f02cfcbb7016fdf1352769537a9ea41d1588f98",
+          "message": "refactor(safety): modularize qa.rs (1985 lines) → qa/ directory\n\n* test(q2): Composer Phase B a11y regression tests (corrected)\n\nAC1-2: VoiceContextPanel keyboard interactions (Ctrl+Enter save, Escape blur) ✅\nAC3: VaultNoteList chunk items render as input[type=checkbox] ✅\nAC4: Space keypress on chunk toggles selection ✅\nAC5: Enter key triggers ongenerate callback ✅\nAC6: SchedulePicker loading state during slot computation ✅\n\nAll 6 tests passing, actual component behavior verified per lead spec.\n\n* fix(q2): Type corrections in a11y tests — svelte-check 0 errors\n\n- VaultNoteItem fixtures now include source_id, relative_path, tags, status, chunk_count, updated_at\n- VaultChunkSummary uses heading_path (not heading) and retrieval_boost\n- All 6 tests passing, all type errors resolved\n\n* refactor(qa): extract types to safety/qa/types.rs\n\n* refactor(qa): modularize qa.rs into qa/ directory with types, content_check, scoring, account_check, tests\n\n* chore(qa): suppress dead_code warnings for stubbed scoring functions\n\n* chore(qa): suppress dead_code warning on config field in stubbed QaEvaluator\n\n* fix(c1): populate QaScoreSummary with 100.0 baseline instead of Default::default()\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-19T23:06:30-06:00",
+          "tree_id": "e1c8d8cd48ea0de6950e6b98b9fa56c68cdb7f13",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3f02cfcbb7016fdf1352769537a9ea41d1588f98"
+        },
+        "date": 1773983518924,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.59,
             "unit": "ps"
           }
         ]
