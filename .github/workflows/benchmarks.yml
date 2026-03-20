@@ -66,6 +66,9 @@ jobs:
           path: target/criterion/
           retention-days: 30
 
+      - name: Clean working tree before gh-pages push
+        run: git checkout -- .
+
       - name: Store benchmark results + alert on regression
         uses: benchmark-action/github-action-benchmark@v1
         with:
