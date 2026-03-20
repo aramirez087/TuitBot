@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { get } from 'svelte/store';
+import type { ApprovalItem } from '$lib/api';
 
 // --- Mocks (hoisted) --------------------------------------------------------
 
@@ -484,5 +485,103 @@ describe('startAutoRefresh / stopAutoRefresh', () => {
 		expect(() => store.startAutoRefresh(2000)).not.toThrow();
 		store.stopAutoRefresh();
 		vi.useRealTimers();
+	});
+});
+
+// --- Tests for failed_post_recovery filter (Core C2 integration) -----------
+
+describe('Failed Post Recovery Filter', () => {
+	it('should load failed posts when selectedStatus is set to "failed"', async () => {
+		const mockItems = [
+			{
+				id: 100,
+				action_type: 'failed_post_recovery',
+				status: 'pending',
+				generated_content: 'Failed thread retry',
+				target_tweet_id: '',
+				target_author: '',
+				topic: 'Tech',
+				archetype: 'builder',
+				score: 0,
+				created_at: '2026-03-19T00:00:00.000Z',
+				media_paths: [],
+				detected_risks: [],
+				qa_score: 0.5,
+				qa_hard_flags: [],
+				qa_soft_flags: [],
+				qa_requires_override: false
+			}
+		];
+
+		vi.mocked(api.approval.list).mockResolvedValue(mockItems);
+
+		store.selectedStatus.set('failed');
+		await store.loadItems(true);
+
+		// Should pass action_type=failed_post_recovery and status=pending to API
+		expect(vi.mocked(api.approval.list)).toHaveBeenCalledWith({
+			status: 'pending',
+			type: undefined,
+			reviewed_by: undefined,
+			since: undefined,
+			action_type: 'failed_post_recovery'
+		});
+
+		expect(get(store.items)).toEqual(mockItems);
+	});
+
+	it('should pass action_type=undefined when status is not "failed"', async () => {
+		vi.mocked(api.approval.list).mockResolvedValue([]);
+
+		store.selectedStatus.set('approved');
+		await store.loadItems(true);
+
+		expect(vi.mocked(api.approval.list)).toHaveBeenCalledWith({
+			status: 'approved',
+			type: undefined,
+			reviewed_by: undefined,
+			since: undefined,
+			action_type: undefined
+		});
+	});
+
+	it('should switch from pending to failed filter', async () => {
+		const pendingItem = makeItem(10, 'pending');
+		const failedItem: ApprovalItem = {
+			id: 20,
+			action_type: 'failed_post_recovery',
+			status: 'pending',
+			generated_content: 'Failed post',
+			target_tweet_id: '',
+			target_author: '',
+			topic: 'test',
+			archetype: 'builder',
+			score: 0,
+			created_at: '2026-03-19T00:00:00.000Z',
+			media_paths: [],
+			detected_risks: [],
+			qa_score: 0.5,
+			qa_hard_flags: [],
+			qa_soft_flags: [],
+			qa_requires_override: false
+		};
+
+		// First load pending
+		vi.mocked(api.approval.list).mockResolvedValueOnce([pendingItem]);
+		store.selectedStatus.set('pending');
+		await store.loadItems(true);
+		expect(get(store.items)).toEqual([pendingItem]);
+
+		// Then switch to failed
+		vi.mocked(api.approval.list).mockResolvedValueOnce([failedItem]);
+		await store.setStatusFilter('failed');
+		expect(vi.mocked(api.approval.list)).toHaveBeenLastCalledWith({
+			status: 'pending',
+			type: undefined,
+			reviewed_by: undefined,
+			since: undefined,
+			action_type: 'failed_post_recovery'
+		});
+		expect(get(store.items)).toEqual([failedItem]);
 	});
 });

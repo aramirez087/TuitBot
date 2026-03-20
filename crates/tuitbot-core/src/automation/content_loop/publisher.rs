@@ -2,7 +2,15 @@
 //!
 //! Implements the `try_post_scheduled` and `post_scheduled_thread` methods
 //! on [`ContentLoop`].
+//!
+//! ## Retry & Dead-Letter Strategy
+//!
+//! Both single tweets and thread chains implement exponential backoff retry:
+//! - Transient failures (429, 5xx, timeout): retry up to 3 times with 30s base backoff
+//! - Permanent failures (401, 403, bad request): fail immediately, mark as `failed-permanent`
+//! - Exhausted retries: mark as `failed-permanent` for manual review
 
+use super::super::loop_helpers::{is_transient_error, thread_retry_backoff};
 use super::{ContentLoop, ContentResult};
 
 impl ContentLoop {
@@ -77,6 +85,11 @@ impl ContentLoop {
     }
 
     /// Post a scheduled thread as a reply chain using the `ThreadPoster`.
+    ///
+    /// Implements retry logic for transient failures:
+    /// - Retries up to 3 times with exponential backoff (30s base, 2x per attempt)
+    /// - Permanent errors (401, 403, validation) fail immediately
+    /// - Exhausted retries marked as `failed-permanent` for manual review
     async fn post_scheduled_thread(&self, id: i64, content: &str) -> Result<(), String> {
         let poster = self.thread_poster.as_ref().ok_or_else(|| {
             "No thread poster configured — cannot post scheduled threads".to_string()
@@ -101,26 +114,108 @@ impl ContentLoop {
         // Post first tweet, then reply chain.
         let mut prev_id: Option<String> = None;
         for (i, text) in tweets.iter().enumerate() {
-            let result = if let Some(ref reply_to) = prev_id {
-                poster.reply_to_tweet(reply_to, text).await
-            } else {
-                poster.post_tweet(text).await
-            };
+            let mut post_result: Result<String, String> = Err("not attempted".to_string());
 
-            match result {
+            // Retry loop: up to 3 attempts for transient failures
+            for attempt in 0..3 {
+                let result = if let Some(ref reply_to) = prev_id {
+                    poster.reply_to_tweet(reply_to, text).await
+                } else {
+                    poster.post_tweet(text).await
+                };
+
+                match result {
+                    Ok(tweet_id) => {
+                        post_result = Ok(tweet_id);
+                        break; // Success, exit retry loop
+                    }
+                    Err(e) => {
+                        let error_msg = e.to_string();
+
+                        // Check if transient (retryable) or permanent (dead-letter)
+                        if !is_transient_error(&error_msg) {
+                            // Permanent error — fail immediately
+                            tracing::error!(
+                                scheduled_id = id,
+                                tweet_index = i,
+                                error = %error_msg,
+                                "Permanent failure in scheduled thread tweet {}/{}",
+                                i + 1,
+                                tweets.len()
+                            );
+                            let _ = self
+                                .storage
+                                .mark_failed_permanent(&format!("scheduled-{id}"), &error_msg)
+                                .await;
+                            return Err(format!(
+                                "Scheduled thread id={id} failed permanently at tweet {}/{}: {}",
+                                i + 1,
+                                tweets.len(),
+                                error_msg
+                            ));
+                        }
+
+                        // Transient error — retry if attempts remain
+                        if attempt < 2 {
+                            let retry_count = attempt as u32 + 1;
+                            let backoff = thread_retry_backoff(retry_count);
+                            tracing::warn!(
+                                scheduled_id = id,
+                                tweet_index = i,
+                                attempt = attempt + 1,
+                                backoff_secs = backoff.as_secs(),
+                                error = %error_msg,
+                                "Transient error in scheduled thread tweet {}/{}, retrying after {:?}",
+                                i + 1,
+                                tweets.len(),
+                                backoff
+                            );
+                            // Increment retry count in storage
+                            let _ = self
+                                .storage
+                                .increment_retry(&format!("scheduled-{id}"), &error_msg)
+                                .await;
+                            tokio::time::sleep(backoff).await;
+                        } else {
+                            // Exhausted retries for transient error
+                            tracing::error!(
+                                scheduled_id = id,
+                                tweet_index = i,
+                                error = %error_msg,
+                                "Exhausted retries for scheduled thread tweet {}/{} (marked for dead-letter)",
+                                i + 1,
+                                tweets.len()
+                            );
+                            let _ = self
+                                .storage
+                                .increment_retry(&format!("scheduled-{id}"), &error_msg)
+                                .await;
+                        }
+                    }
+                }
+            }
+
+            match post_result {
                 Ok(tweet_id) => prev_id = Some(tweet_id),
                 Err(e) => {
+                    // All retries exhausted
                     tracing::error!(
+                        scheduled_id = id,
+                        tweet_index = i,
                         error = %e,
-                        index = i,
-                        "Scheduled thread id={id} failed at tweet {}/{}",
+                        "Scheduled thread tweet {}/{} failed after all retries",
                         i + 1,
                         tweets.len()
                     );
+                    let _ = self
+                        .storage
+                        .mark_failed_permanent(&format!("scheduled-{id}"), &e)
+                        .await;
                     return Err(format!(
-                        "Thread failed at tweet {}/{}: {e}",
+                        "Scheduled thread id={id} failed at tweet {}/{} after retries: {}",
                         i + 1,
-                        tweets.len()
+                        tweets.len(),
+                        e
                     ));
                 }
             }

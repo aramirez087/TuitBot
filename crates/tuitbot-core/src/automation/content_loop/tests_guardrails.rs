@@ -477,7 +477,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn try_post_scheduled_thread_partial_failure() {
+    async fn try_post_scheduled_thread_permanent_failure() {
         use crate::automation::thread_loop::test_mocks::MockPoster;
         let tweets = serde_json::to_string(&vec!["Tweet 1", "Tweet 2", "Tweet 3"]).unwrap();
         let storage = ScheduledMockStorage::with_item(13, "thread", &tweets);
@@ -502,7 +502,11 @@ mod tests {
         assert!(result.is_some());
         match result.unwrap() {
             ContentResult::Failed { error } => {
-                assert!(error.contains("Thread failed at tweet 2/3"), "got: {error}");
+                // "API error" is not a transient error, so it's marked as permanent failure
+                assert!(
+                    error.contains("failed permanently") && error.contains("tweet 2/3"),
+                    "got: {error}"
+                );
             }
             other => panic!("expected Failed, got {other:?}"),
         }

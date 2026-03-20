@@ -289,6 +289,288 @@ pub async fn distinct_topic_count(
     Ok(row.0)
 }
 
+// ── Per-account variants ──────────────────────────────────────────────────────
+//
+// These mirror the global functions above but add `AND <table>.account_id = ?`
+// to scope results to a single X account. Used by compute_report_for().
+
+/// Count actions by type in a date range, scoped to one account.
+pub async fn count_actions_in_range_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+) -> Result<ActionCounts, StorageError> {
+    let rows: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT action_type, COUNT(*) as cnt FROM action_log \
+         WHERE created_at >= ? AND created_at < ? AND status = 'success' \
+         AND account_id = ? \
+         GROUP BY action_type",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let mut counts = ActionCounts::default();
+    for (action_type, count) in rows {
+        match action_type.as_str() {
+            "reply" => counts.replies = count,
+            "tweet" => counts.tweets = count,
+            "thread" => counts.threads = count,
+            "target_reply" => counts.target_replies = count,
+            _ => {}
+        }
+    }
+    Ok(counts)
+}
+
+/// Get the follower count at or before a given date, scoped to one account.
+pub async fn get_follower_at_date_for(
+    pool: &DbPool,
+    account_id: &str,
+    date: &str,
+) -> Result<Option<i64>, StorageError> {
+    let row: Option<(i64,)> = sqlx::query_as(
+        "SELECT follower_count FROM follower_snapshots \
+         WHERE snapshot_date <= ? AND account_id = ? \
+         ORDER BY snapshot_date DESC LIMIT 1",
+    )
+    .bind(date)
+    .bind(account_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(|r| r.0))
+}
+
+/// Average reply performance score in a date range, scoped to one account.
+pub async fn avg_reply_score_in_range_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+) -> Result<f64, StorageError> {
+    let row: (f64,) = sqlx::query_as(
+        "SELECT COALESCE(AVG(rp.performance_score), 0.0) \
+         FROM reply_performance rp \
+         JOIN replies_sent rs ON rs.reply_tweet_id = rp.reply_id \
+         WHERE rs.created_at >= ? AND rs.created_at < ? AND rs.account_id = ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.0)
+}
+
+/// Average tweet performance score in a date range, scoped to one account.
+pub async fn avg_tweet_score_in_range_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+) -> Result<f64, StorageError> {
+    let row: (f64,) = sqlx::query_as(
+        "SELECT COALESCE(AVG(tp.performance_score), 0.0) \
+         FROM tweet_performance tp \
+         JOIN original_tweets ot ON ot.tweet_id = tp.tweet_id \
+         WHERE ot.created_at >= ? AND ot.created_at < ? AND ot.account_id = ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.0)
+}
+
+/// Reply acceptance rate scoped to one account.
+pub async fn reply_acceptance_rate_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+) -> Result<f64, StorageError> {
+    let row: (i64, i64) = sqlx::query_as(
+        "SELECT \
+            COUNT(*) as total, \
+            SUM(CASE WHEN rp.replies_received > 0 THEN 1 ELSE 0 END) as accepted \
+         FROM replies_sent rs \
+         JOIN reply_performance rp ON rp.reply_id = rs.reply_tweet_id \
+         WHERE rs.created_at >= ? AND rs.created_at < ? AND rs.account_id = ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    if row.0 == 0 {
+        return Ok(0.0);
+    }
+    Ok(row.1 as f64 / row.0 as f64)
+}
+
+/// Top topics by performance score in a date range, scoped to one account.
+pub async fn top_topics_in_range_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+    limit: u32,
+) -> Result<Vec<TopicPerformance>, StorageError> {
+    let rows: Vec<(String, String, f64, i64)> = sqlx::query_as(
+        "SELECT ot.topic, COALESCE(ot.topic, '') as format, \
+                AVG(tp.performance_score) as avg_score, COUNT(*) as post_count \
+         FROM tweet_performance tp \
+         JOIN original_tweets ot ON ot.tweet_id = tp.tweet_id \
+         WHERE ot.created_at >= ? AND ot.created_at < ? AND ot.topic IS NOT NULL \
+         AND ot.account_id = ? \
+         GROUP BY ot.topic \
+         HAVING post_count >= 1 \
+         ORDER BY avg_score DESC \
+         LIMIT ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| TopicPerformance {
+            topic: r.0,
+            format: r.1,
+            avg_score: r.2,
+            post_count: r.3,
+        })
+        .collect())
+}
+
+/// Bottom topics by performance score in a date range, scoped to one account.
+pub async fn bottom_topics_in_range_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+    limit: u32,
+) -> Result<Vec<TopicPerformance>, StorageError> {
+    let rows: Vec<(String, String, f64, i64)> = sqlx::query_as(
+        "SELECT ot.topic, COALESCE(ot.topic, '') as format, \
+                AVG(tp.performance_score) as avg_score, COUNT(*) as post_count \
+         FROM tweet_performance tp \
+         JOIN original_tweets ot ON ot.tweet_id = tp.tweet_id \
+         WHERE ot.created_at >= ? AND ot.created_at < ? AND ot.topic IS NOT NULL \
+         AND ot.account_id = ? \
+         GROUP BY ot.topic \
+         HAVING post_count >= 3 \
+         ORDER BY avg_score ASC \
+         LIMIT ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| TopicPerformance {
+            topic: r.0,
+            format: r.1,
+            avg_score: r.2,
+            post_count: r.3,
+        })
+        .collect())
+}
+
+/// Top-performing content items in a date range, scoped to one account.
+pub async fn top_content_in_range_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+    limit: u32,
+) -> Result<Vec<ContentHighlight>, StorageError> {
+    let rows: Vec<(String, String, f64, i64, i64)> = sqlx::query_as(
+        "SELECT content_type, content_preview, performance_score, likes, replies_received FROM ( \
+            SELECT 'reply' as content_type, \
+                   SUBSTR(rs.reply_content, 1, 120) as content_preview, \
+                   rp.performance_score, rp.likes_received as likes, \
+                   rp.replies_received, rs.created_at as posted_at \
+            FROM reply_performance rp \
+            JOIN replies_sent rs ON rs.reply_tweet_id = rp.reply_id \
+            WHERE rs.created_at >= ? AND rs.created_at < ? AND rs.account_id = ? \
+            UNION ALL \
+            SELECT 'tweet' as content_type, \
+                   SUBSTR(ot.content, 1, 120) as content_preview, \
+                   tp.performance_score, tp.likes_received as likes, \
+                   tp.replies_received, ot.created_at as posted_at \
+            FROM tweet_performance tp \
+            JOIN original_tweets ot ON ot.tweet_id = tp.tweet_id \
+            WHERE ot.created_at >= ? AND ot.created_at < ? AND ot.account_id = ? \
+         ) ORDER BY performance_score DESC LIMIT ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| ContentHighlight {
+            content_type: r.0,
+            content_preview: r.1,
+            performance_score: r.2,
+            likes: r.3,
+            replies_received: r.4,
+        })
+        .collect())
+}
+
+/// Count distinct topics in a date range, scoped to one account.
+pub async fn distinct_topic_count_for(
+    pool: &DbPool,
+    account_id: &str,
+    start: &str,
+    end: &str,
+) -> Result<i64, StorageError> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(DISTINCT topic) FROM original_tweets \
+         WHERE created_at >= ? AND created_at < ? AND topic IS NOT NULL \
+         AND topic != '' AND account_id = ?",
+    )
+    .bind(start)
+    .bind(end)
+    .bind(account_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

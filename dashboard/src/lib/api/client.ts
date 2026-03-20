@@ -41,6 +41,7 @@ import type {
 	McpToolMetrics,
 	McpErrorBreakdown,
 	McpTelemetryEntry,
+	McpAvailableTool,
 	LinkResponse,
 	ConnectorStatusResponse,
 	DisconnectResponse,
@@ -372,6 +373,7 @@ export const api = {
 				type?: string;
 				reviewed_by?: string;
 				since?: string;
+				action_type?: string;
 			} = {}
 		) => {
 			const query = new URLSearchParams();
@@ -379,6 +381,7 @@ export const api = {
 			if (params.type) query.set('type', params.type);
 			if (params.reviewed_by) query.set('reviewed_by', params.reviewed_by);
 			if (params.since) query.set('since', params.since);
+			if (params.action_type) query.set('action_type', params.action_type);
 			const qs = query.toString();
 			return request<ApprovalItem[]>(`/api/approval${qs ? `?${qs}` : ''}`);
 		},
@@ -644,7 +647,9 @@ export const api = {
 		telemetryErrors: (hours: number = 24) =>
 			request<McpErrorBreakdown[]>(`/api/mcp/telemetry/errors?hours=${hours}`),
 		telemetryRecent: (limit: number = 50) =>
-			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`)
+			request<McpTelemetryEntry[]>(`/api/mcp/telemetry/recent?limit=${limit}`),
+		// Discovery: list all available MCP tools with their parameter hints.
+		tools: () => request<McpAvailableTool[]>('/api/mcp/tools')
 	},
 
 	connectors: {

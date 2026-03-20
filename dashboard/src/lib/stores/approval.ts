@@ -65,7 +65,17 @@ export async function loadItems(reset = false) {
 		const reviewer = get(reviewerFilter);
 		const dateFilt = get(dateFilter);
 
-		const statusParam = status === 'all' ? 'pending,approved,rejected' : status;
+		// Handle "failed" status: maps to action_type=failed_post_recovery&status=pending
+		let statusParam: string | undefined;
+		let actionTypeParam: string | undefined;
+
+		if (status === 'failed') {
+			statusParam = 'pending';
+			actionTypeParam = 'failed_post_recovery';
+		} else {
+			statusParam = status === 'all' ? 'pending,approved,rejected' : status;
+		}
+
 		const typeParam = type === 'all' ? undefined : type;
 		const reviewerParam = reviewer.trim() || undefined;
 
@@ -81,6 +91,7 @@ export async function loadItems(reset = false) {
 			type: typeParam,
 			reviewed_by: reviewerParam,
 			since: sinceParam,
+			action_type: actionTypeParam,
 		});
 		items.set(data);
 	} catch (e) {

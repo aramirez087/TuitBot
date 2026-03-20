@@ -15,9 +15,10 @@
 	import ToolsSection from './ToolsSection.svelte';
 	import ErrorsSection from './ErrorsSection.svelte';
 	import ExecutionsSection from './ExecutionsSection.svelte';
+	import McpToolBrowser from './McpToolBrowser.svelte';
 
 	let hours = $state(24);
-	let activeTab = $state<'overview' | 'policy' | 'tools' | 'errors' | 'executions'>('overview');
+	let activeTab = $state<'overview' | 'policy' | 'tools' | 'errors' | 'executions' | 'browse'>('overview');
 
 	onMount(() => {
 		loadMcpData(hours);
@@ -100,6 +101,11 @@
 					class:active={activeTab === 'executions'}
 					onclick={() => (activeTab = 'executions')}>Executions</button
 				>
+				<button
+					class="tab-btn"
+					class:active={activeTab === 'browse'}
+					onclick={() => (activeTab = 'browse')}>Browse</button
+				>
 			</div>
 			<div class="period-selector">
 				<button
@@ -135,6 +141,8 @@
 		<ErrorsSection {formatTime} {formatDate} />
 	{:else if activeTab === 'executions'}
 		<ExecutionsSection {formatTime} {formatDate} {formatLatency} />
+	{:else if activeTab === 'browse'}
+		<McpToolBrowser />
 	{/if}
 </div>
 

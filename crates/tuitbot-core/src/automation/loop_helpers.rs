@@ -334,6 +334,26 @@ pub trait ContentStorage: Send + Sync {
     ) -> Result<(), ContentLoopError> {
         Ok(())
     }
+
+    /// Mark a thread as permanently failed (no more retries).
+    /// Stores error reason and failure timestamp.
+    async fn mark_failed_permanent(
+        &self,
+        thread_id: &str,
+        error: &str,
+    ) -> Result<(), ContentLoopError> {
+        // Default: no-op for implementations that don't track failure state.
+        let _ = (thread_id, error);
+        Ok(())
+    }
+
+    /// Increment retry count for a thread (for transient failures).
+    /// Returns the new retry count; implementation tracks failure_kind='transient'.
+    async fn increment_retry(&self, thread_id: &str, error: &str) -> Result<u32, ContentLoopError> {
+        // Default: no-op, return 0 (no retries tracked).
+        let _ = (thread_id, error);
+        Ok(0)
+    }
 }
 
 /// Posts tweets directly to X (for thread reply chains).
@@ -425,6 +445,39 @@ pub fn rate_limit_backoff(retry_after: Option<u64>, attempt: u32) -> Duration {
         let exp = base.saturating_mul(2u64.saturating_pow(attempt));
         Duration::from_secs(exp.min(900)) // cap at 15 minutes
     }
+}
+
+// ============================================================================
+// Retry + Dead-Letter Support (Task C2)
+// ============================================================================
+
+/// Classify an error as transient (retryable) or permanent (dead-letter).
+///
+/// Transient errors: 429 (rate limit), 5xx (server), timeout, connection reset
+/// Permanent errors: 401 (auth), validation, not found, bad request
+pub fn is_transient_error(error_msg: &str) -> bool {
+    let lower = error_msg.to_lowercase();
+    // Rate limit, server error, timeout, connection issues
+    lower.contains("429")
+        || lower.contains("500")
+        || lower.contains("502")
+        || lower.contains("503")
+        || lower.contains("504")
+        || lower.contains("timeout")
+        || lower.contains("timed out")
+        || lower.contains("connection reset")
+        || lower.contains("connection refused")
+        || lower.contains("try again")
+}
+
+/// Compute exponential backoff duration for thread retry.
+///
+/// Base: 30 seconds, doubled per attempt, max 3 retries.
+/// Caps at 3+ minutes (generous for transient failures).
+pub fn thread_retry_backoff(retry_count: u32) -> Duration {
+    let base_secs = 30u64;
+    let exp = base_secs.saturating_mul(2u64.saturating_pow(retry_count));
+    Duration::from_secs(exp.min(300)) // cap at 5 minutes
 }
 
 #[cfg(test)]

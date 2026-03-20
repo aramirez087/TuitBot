@@ -24,14 +24,18 @@ fn default_history_limit() -> u32 {
     12
 }
 
-/// `GET /api/strategy/current` — current week's report (computed on-the-fly if missing).
+/// `GET /api/strategy/current` — current week's report for the requesting account.
 pub async fn current(
     State(state): State<Arc<AppState>>,
-    _ctx: AccountContext,
+    ctx: AccountContext,
 ) -> Result<Json<Value>, ApiError> {
     let config = load_config(&state)?;
-    // TODO: account-scope strategy computation (strategy metrics lack `_for` variants)
-    let report = tuitbot_core::strategy::report::get_or_compute_current(&state.db, &config).await?;
+    let report = tuitbot_core::strategy::report::get_or_compute_current_for(
+        &state.db,
+        &config,
+        &ctx.account_id,
+    )
+    .await?;
     Ok(Json(report_to_json(report)))
 }
 
@@ -47,15 +51,16 @@ pub async fn history(
     Ok(Json(json!(items)))
 }
 
-/// `POST /api/strategy/refresh` — force recompute the current week's report.
+/// `POST /api/strategy/refresh` — force recompute the current week's report for the requesting account.
 pub async fn refresh(
     State(state): State<Arc<AppState>>,
-    _ctx: AccountContext,
+    ctx: AccountContext,
 ) -> Result<Json<Value>, ApiError> {
-    require_mutate(&_ctx)?;
+    require_mutate(&ctx)?;
     let config = load_config(&state)?;
-    // TODO: account-scope strategy computation (strategy metrics lack `_for` variants)
-    let report = tuitbot_core::strategy::report::refresh_current(&state.db, &config).await?;
+    let report =
+        tuitbot_core::strategy::report::refresh_current_for(&state.db, &config, &ctx.account_id)
+            .await?;
     Ok(Json(report_to_json(report)))
 }
 

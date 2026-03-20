@@ -25,7 +25,11 @@
 
 <div class="card-header">
 	<span class="card-type">{typeLabel}</span>
-	<span class="card-badge {statusClass}">{item.status}</span>
+	{#if item.action_type === 'failed_post_recovery'}
+		<span class="card-badge status-failed">Failed</span>
+	{:else}
+		<span class="card-badge {statusClass}">{item.status}</span>
+	{/if}
 	{#if item.score > 0}
 		<span class="card-score">{Math.round(item.score)} pts</span>
 	{/if}
@@ -86,6 +90,11 @@
 	.card-badge.status-scheduled {
 		background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
 		color: var(--color-accent);
+	}
+
+	.card-badge.status-failed {
+		background-color: color-mix(in srgb, var(--color-danger) 15%, transparent);
+		color: var(--color-danger);
 	}
 
 	.card-score {

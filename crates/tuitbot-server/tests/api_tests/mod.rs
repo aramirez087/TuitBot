@@ -33,6 +33,7 @@ mod mcp_policy; // Task 3.8: /api/mcp/* policy + telemetry coverage
 mod route_coverage_extra; // Extra compose, onboarding, media, ingest, assist, draft-studio coverage
 mod settings_accounts; // Settings, accounts, activity, connectors, vault, content, and misc route coverage
 mod settings_init_workflow; // Settings init → get → patch → validate workflow coverage
+mod strategy_account_scope; // C4: strategy route per-account isolation tests
 mod x_auth; // X OAuth unlink tests // Task 3.8: integration tests for 0%-coverage server routes
 
 /// The test API token used across all tests.
