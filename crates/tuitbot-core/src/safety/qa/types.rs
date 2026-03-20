@@ -42,6 +42,8 @@ pub struct QaFlag {
 }
 
 /// Language detection result.
+// TODO: used by language detection helpers once integrated into full QA pipeline
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LanguageDetection {
     /// ISO 639-1 language code (e.g., "en", "es", "fr").
