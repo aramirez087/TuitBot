@@ -2,7 +2,6 @@
 
 use super::*;
 
-
 // --- content_preview tests ---
 
 #[test]
@@ -349,7 +348,8 @@ fn create_studio_draft_body_partial_defaults() {
 
 #[test]
 fn autosave_patch_body_full_deserialize() {
-    let json = r#"{"content":"new content","content_type":"thread","updated_at":"2026-03-15T12:00:00Z"}"#;
+    let json =
+        r#"{"content":"new content","content_type":"thread","updated_at":"2026-03-15T12:00:00Z"}"#;
     let body: AutosavePatchBody = serde_json::from_str(json).expect("deser");
     assert_eq!(body.content, "new content");
     assert_eq!(body.content_type, "thread");
