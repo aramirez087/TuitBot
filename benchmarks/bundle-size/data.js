@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774038740560,
+  "lastUpdate": 1774038755835,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1581,6 +1581,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/e22c13a093dbcd58cc199e2ddddd7b4e2861da33"
         },
         "date": 1774038739848,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877642,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217689,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ebff41200fe544ac5a5bbd7011be830a95c4372",
+          "message": "refactor(scoring): split signals.rs and tests.rs into submodules (≤500L) (#253)\n\nAddresses S6-3: scoring files over 500L split cleanly.\n\nsignals.rs (662L) → signals.rs (201L) + signals_tests.rs (459L):\n- signals.rs: signal functions only\n- signals_tests.rs: signal unit tests\n\ntests.rs (1010L) → tests/{mod,engine,helpers,edge_cases}.rs:\n- tests/mod.rs:       35L (shared imports + helper fns: default_scoring_config, test_tweet)\n- tests/engine.rs:   466L (ScoringEngine scoring and signal tests)\n- tests/helpers.rs:  261L (format helpers and accessor tests)\n- tests/edge_cases.rs:263L (display, edge case, signal range tests)\n\nAll files ≤500L. 143 scoring tests pass, RUSTFLAGS='-D warnings' clean.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-20T14:31:44-06:00",
+          "tree_id": "52bbc11d4c7e7dc6ccb91e9b966ed1304c7bdb63",
+          "url": "https://github.com/aramirez087/TuitBot/commit/9ebff41200fe544ac5a5bbd7011be830a95c4372"
+        },
+        "date": 1774038754790,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
