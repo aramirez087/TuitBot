@@ -4311,7 +4311,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tuitbot-cli"
-version = "0.1.39"
+version = "0.1.40"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4402,7 +4402,7 @@ dependencies = [
 
 [[package]]
 name = "tuitbot-server"
-version = "0.1.36"
+version = "0.1.37"
 dependencies = [
  "anyhow",
  "async-trait",
