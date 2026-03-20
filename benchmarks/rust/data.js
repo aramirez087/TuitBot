@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773974883775,
+  "lastUpdate": 1773977139265,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -780,6 +780,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 937.48,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "015e6d69697029d0ef5d9f69b144afa19c8bfdc3",
+          "message": "Merge pull request #238 from aramirez087/dependabot/cargo/all-dependencies-f43a377bb6\n\nchore(deps): bump the all-dependencies group across 1 directory with 19 updates",
+          "timestamp": "2026-03-19T21:20:07-06:00",
+          "tree_id": "0437f12a8d76e84fece342b42bc4918edade59fd",
+          "url": "https://github.com/aramirez087/TuitBot/commit/015e6d69697029d0ef5d9f69b144afa19c8bfdc3"
+        },
+        "date": 1773977138951,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.25,
             "unit": "ps"
           }
         ]
