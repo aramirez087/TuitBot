@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774027043644,
+  "lastUpdate": 1774027068448,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1440,6 +1440,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1217689,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2ff2bc6d854cd2cd75b471d5b2b20726e42af2e3",
+          "message": "refactor(settings): modularize routes/settings.rs (1602L → 6 files ≤500L) (#248)\n\n* refactor: split winning_dna.rs and startup.rs into submodules\n\nS6-2: Modularize context/winning_dna.rs (1805 lines)\n- winning_dna/mod.rs: 102 lines (constants, structs, re-exports)\n- winning_dna/analysis.rs: 441 lines (classification, retrieval, formatting)\n- winning_dna/scoring.rs: 28 lines (pure scoring functions)\n- winning_dna/tests.rs: 1255 lines (unit + DB integration tests)\n- All external API unchanged via re-exports\n\nS6-4: Modularize startup.rs (1236 lines)\n- startup/mod.rs: 30 lines (re-exports)\n- startup/config.rs: 203 lines (ApiTier, TierCapabilities, StoredTokens, StartupError)\n- startup/db.rs: 113 lines (token I/O, path helpers)\n- startup/services.rs: 256 lines (PKCE, OAuth, banner)\n- startup/tests.rs: 703 lines (all tests)\n- All external API unchanged via re-exports\n\nBoth splits follow task spec: target ≤500 lines per file (tests exceeds due to test count).\nAll 567 core tests pass. Code is clean to a stranger.\n\n* refactor(winning_dna): split tests.rs into tests/ submodule (≤500L per file)\n\nAddresses review feedback: tests.rs exceeded 500L cap.\n\nSplit winning_dna/tests.rs (1255L) → tests/{mod,unit,edge_cases,structs,integration}.rs:\n- tests/mod.rs:          11 lines (module declarations)\n- tests/unit.rs:        344 lines (classification, scoring, helpers, formatting)\n- tests/edge_cases.rs:  420 lines (additional edge case coverage)\n- tests/structs.rs:     255 lines (struct debug/clone, prompt edge cases, constants)\n- tests/integration.rs: 301 lines (async DB tests)\n\nAll files ≤500 lines. 110 winning_dna tests pass.\n\n* style: cargo fmt fixes in winning_dna test files\n\n* refactor(settings): split routes/settings.rs (1602L) into settings/ module\n\nsettings/mod.rs     (129L) — types, re-exports, config_errors helper\nsettings/handlers.rs (454L) — onboarding + config CRUD handlers\nsettings/validation.rs (346L) — TOML utils, credentials, test_llm, factory_reset\nsettings/tests/mod.rs (6L)\nsettings/tests/toml.rs (371L) — json_to_toml, merge_toml, redact tests\nsettings/tests/helpers.rs (246L) — credentials, config_errors, request type tests\n\nAll files ≤500 lines. Zero functional changes. 567 tests pass.\n\nTask: fb50fa20-9de4-4990-8d68-beedc9417308\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-20T11:16:53-06:00",
+          "tree_id": "8d1304ce22278a5399256d4523da4997d175dbf7",
+          "url": "https://github.com/aramirez087/TuitBot/commit/2ff2bc6d854cd2cd75b471d5b2b20726e42af2e3"
+        },
+        "date": 1774027067815,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877638,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217684,
             "unit": "bytes"
           }
         ]
