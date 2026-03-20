@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773966956311,
+  "lastUpdate": 1773967741493,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -635,6 +635,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 935.27,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "61555efbe5b98d327e7b97b4da1d86b6164f7020",
+          "message": "Merge pull request #233 from aramirez087/fix/ci-cargo-package-no-verify\n\nfix(ci): add --no-verify to cargo package step",
+          "timestamp": "2026-03-19T18:46:48-06:00",
+          "tree_id": "41112a744dbd65c8f6864ee8614797fbc515ed2b",
+          "url": "https://github.com/aramirez087/TuitBot/commit/61555efbe5b98d327e7b97b4da1d86b6164f7020"
+        },
+        "date": 1773967740740,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.39,
             "unit": "ps"
           }
         ]
