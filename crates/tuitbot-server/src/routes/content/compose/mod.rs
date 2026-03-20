@@ -230,7 +230,7 @@ pub async fn compose(
     }
 }
 
-/// Handle tweet compose via the unified endpoint.
+// Handle tweet compose via the unified endpoint.
 
 // ---------------------------------------------------------------------------
 // Helpers used by the handlers above (kept here to avoid cross-module imports)
