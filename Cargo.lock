@@ -4379,7 +4379,7 @@ dependencies = [
 
 [[package]]
 name = "tuitbot-server"
-version = "0.1.41"
+version = "0.1.42"
 dependencies = [
  "anyhow",
  "async-trait",
