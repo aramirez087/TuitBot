@@ -5,6 +5,7 @@
 //! to prevent API abuse and duplicate content.
 
 pub mod dedup;
+pub mod qa;
 pub mod redact;
 
 use crate::error::StorageError;
