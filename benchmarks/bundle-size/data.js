@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774030611302,
+  "lastUpdate": 1774038740560,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1557,6 +1557,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1217684,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e22c13a093dbcd58cc199e2ddddd7b4e2861da33",
+          "message": "refactor(x_api/auth): split tests.rs into tests/ submodule (≤500L per file) (#252)\n\nAddresses S6-1: auth/tests.rs (1070L) → auth/tests/{mod,tokens,manager,expiry}.rs\n\n- tests/mod.rs:     3L  (module declarations)\n- tests/tokens.rs: 350L (Tokens struct, serde, save_tokens, load_tokens, permissions)\n- tests/manager.rs:362L (TokenManager, get_access_token, token exchange, refresh)\n- tests/expiry.rs: 366L (token expiry, refresh windows, scopes, TokenRefreshResponse)\n\nAll files ≤500L. 73 auth tests pass, RUSTFLAGS='-D warnings' clean.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-20T14:31:34-06:00",
+          "tree_id": "6110722da5fed76a2972a0cf1249180625fee9bc",
+          "url": "https://github.com/aramirez087/TuitBot/commit/e22c13a093dbcd58cc199e2ddddd7b4e2861da33"
+        },
+        "date": 1774038739848,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877642,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217689,
             "unit": "bytes"
           }
         ]
