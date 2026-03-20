@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773966672804,
+  "lastUpdate": 1773967654923,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -840,6 +840,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/50edc4dae6b6e6030902b4be64690b6772a73924"
         },
         "date": 1773966671857,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 872234,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 296607,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1208092,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "61555efbe5b98d327e7b97b4da1d86b6164f7020",
+          "message": "Merge pull request #233 from aramirez087/fix/ci-cargo-package-no-verify\n\nfix(ci): add --no-verify to cargo package step",
+          "timestamp": "2026-03-19T18:46:48-06:00",
+          "tree_id": "41112a744dbd65c8f6864ee8614797fbc515ed2b",
+          "url": "https://github.com/aramirez087/TuitBot/commit/61555efbe5b98d327e7b97b4da1d86b6164f7020"
+        },
+        "date": 1773967653874,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
