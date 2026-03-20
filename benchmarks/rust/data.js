@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774039020326,
+  "lastUpdate": 1774039039298,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1099,6 +1099,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.8,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ebff41200fe544ac5a5bbd7011be830a95c4372",
+          "message": "refactor(scoring): split signals.rs and tests.rs into submodules (≤500L) (#253)\n\nAddresses S6-3: scoring files over 500L split cleanly.\n\nsignals.rs (662L) → signals.rs (201L) + signals_tests.rs (459L):\n- signals.rs: signal functions only\n- signals_tests.rs: signal unit tests\n\ntests.rs (1010L) → tests/{mod,engine,helpers,edge_cases}.rs:\n- tests/mod.rs:       35L (shared imports + helper fns: default_scoring_config, test_tweet)\n- tests/engine.rs:   466L (ScoringEngine scoring and signal tests)\n- tests/helpers.rs:  261L (format helpers and accessor tests)\n- tests/edge_cases.rs:263L (display, edge case, signal range tests)\n\nAll files ≤500L. 143 scoring tests pass, RUSTFLAGS='-D warnings' clean.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-20T14:31:44-06:00",
+          "tree_id": "52bbc11d4c7e7dc6ccb91e9b966ed1304c7bdb63",
+          "url": "https://github.com/aramirez087/TuitBot/commit/9ebff41200fe544ac5a5bbd7011be830a95c4372"
+        },
+        "date": 1774039027142,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 937.9,
             "unit": "ps"
           }
         ]
