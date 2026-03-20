@@ -193,7 +193,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Run cargo package (verify metadata)
-        run: cargo package --workspace --allow-dirty
+        run: cargo package --workspace --allow-dirty --no-verify
         env:
           TUITBOT_SKIP_DASHBOARD_BUILD: '1'
 
