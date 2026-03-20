@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774040509712,
+  "lastUpdate": 1774045176372,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1713,6 +1713,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1217689,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dccfa6fbc45fef7564cddad375453969639e6564",
+          "message": "refactor(server): modularize compose.rs and draft_studio.rs (S6-6 + S6-7) (#256)\n\n* refactor(compose): split compose.rs into compose/{mod,transforms,tests/} submodule\n\nAddresses S6-6: compose.rs (1334L) → compose/{mod,transforms,tests/{mod,types,routing}}\n\n- compose/mod.rs:           262L (types, public handlers, build_provenance_input)\n- compose/transforms.rs:    491L (private flows: compose_tweet_flow, compose_thread_*_flow, persist_content, build_x_client, try_post_*)\n- compose/tests/mod.rs:       3L (module declarations)\n- compose/tests/types.rs:   227L (ThreadBlockRequest, provenance, deserialization)\n- compose/tests/routing.rs: 376L (validation, legacy parsing, edge cases)\n\nAll files ≤500L. 567 tests pass, RUSTFLAGS='-D warnings' clean.\n\n* refactor(draft_studio): split draft_studio.rs into draft_studio/{mod,handlers,tests/} submodule\n\nAddresses S6-7: draft_studio.rs (1120L) → draft_studio/{mod,handlers,tests/mod}\n\n- draft_studio/mod.rs:        474L (types, helpers, re-exports, unschedule+archive+restore+duplicate+revisions+activity handlers)\n- draft_studio/handlers.rs:   246L (list, get, create, autosave, patch, schedule handlers)\n- draft_studio/tests/mod.rs:  404L (all tests)\n\nAll files ≤500L. 567 tests pass, RUSTFLAGS='-D warnings' clean.\n\n* style: cargo fmt fixes in draft_studio tests\n\n* docs: expand module doc comment in draft_studio/mod.rs\n\n* fix(clippy): convert orphaned doc comment to regular comment in compose/mod.rs\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>\nCo-authored-by: Gateway Main <gateway-main@openclaw.ai>",
+          "timestamp": "2026-03-20T16:18:49-06:00",
+          "tree_id": "f4226b08275bdd38c47a37e73deaa19bad62e09f",
+          "url": "https://github.com/aramirez087/TuitBot/commit/dccfa6fbc45fef7564cddad375453969639e6564"
+        },
+        "date": 1774045175604,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877638,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217684,
             "unit": "bytes"
           }
         ]
