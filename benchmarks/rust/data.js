@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774027315000,
+  "lastUpdate": 1774029395305,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1012,6 +1012,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 577.07,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jaxxbot.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d6726a4e157debee3a4819d48b5851bcaa943b96",
+          "message": "Merge pull request #250 from aramirez087/fix/remove-duplicate-startup-tests\n\nfix: remove duplicate startup/tests.rs (fixes E0761 CI failure)",
+          "timestamp": "2026-03-20T11:54:30-06:00",
+          "tree_id": "0eab911db3e557474cef7a3f3ba32ce835bac37b",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d6726a4e157debee3a4819d48b5851bcaa943b96"
+        },
+        "date": 1774029394946,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.89,
             "unit": "ps"
           }
         ]
