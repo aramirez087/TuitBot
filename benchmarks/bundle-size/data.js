@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774008139602,
+  "lastUpdate": 1774027043644,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1386,6 +1386,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/968114787c4fe5c365d9a20c24f2643009ba0f33"
         },
         "date": 1774008138524,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877642,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217689,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0433863a5344d3f209bbad2192d50cecb0b5ec7",
+          "message": "refactor: S6-2 + S6-4 — Modularize winning_dna.rs and startup.rs (#247)\n\n* refactor: split winning_dna.rs and startup.rs into submodules\n\nS6-2: Modularize context/winning_dna.rs (1805 lines)\n- winning_dna/mod.rs: 102 lines (constants, structs, re-exports)\n- winning_dna/analysis.rs: 441 lines (classification, retrieval, formatting)\n- winning_dna/scoring.rs: 28 lines (pure scoring functions)\n- winning_dna/tests.rs: 1255 lines (unit + DB integration tests)\n- All external API unchanged via re-exports\n\nS6-4: Modularize startup.rs (1236 lines)\n- startup/mod.rs: 30 lines (re-exports)\n- startup/config.rs: 203 lines (ApiTier, TierCapabilities, StoredTokens, StartupError)\n- startup/db.rs: 113 lines (token I/O, path helpers)\n- startup/services.rs: 256 lines (PKCE, OAuth, banner)\n- startup/tests.rs: 703 lines (all tests)\n- All external API unchanged via re-exports\n\nBoth splits follow task spec: target ≤500 lines per file (tests exceeds due to test count).\nAll 567 core tests pass. Code is clean to a stranger.\n\n* refactor(winning_dna): split tests.rs into tests/ submodule (≤500L per file)\n\nAddresses review feedback: tests.rs exceeded 500L cap.\n\nSplit winning_dna/tests.rs (1255L) → tests/{mod,unit,edge_cases,structs,integration}.rs:\n- tests/mod.rs:          11 lines (module declarations)\n- tests/unit.rs:        344 lines (classification, scoring, helpers, formatting)\n- tests/edge_cases.rs:  420 lines (additional edge case coverage)\n- tests/structs.rs:     255 lines (struct debug/clone, prompt edge cases, constants)\n- tests/integration.rs: 301 lines (async DB tests)\n\nAll files ≤500 lines. 110 winning_dna tests pass.\n\n* style: cargo fmt fixes in winning_dna test files\n\n* refactor(startup): split tests.rs into tests/ submodule (≤500L per file)\n\nAddresses S6-4 review: tests.rs (703L) → tests/{mod,tier,tokens,auth,paths}.rs\n\n- tests/mod.rs:    11L (module declarations)\n- tests/tier.rs:   72L (ApiTier, TierCapabilities)\n- tests/tokens.rs: 283L (StoredTokens, file I/O, scope analysis)\n- tests/auth.rs:   201L (StartupError, PKCE, URL building, banner)\n- tests/paths.rs:  158L (path helpers, validate_db_path, resolve_db_path, callback state)\n\nAll files ≤500L. 59 startup tests pass.\n\n* refactor(config): split tests.rs into tests/ submodule (≤500L per file)\n\nAddresses S6-8 review: tests.rs (2438L) → tests/{mod,defaults,sources,deployment,migrations,validation,env_types}.rs\n\n- tests/mod.rs:         67L (fixtures, module declarations)\n- tests/defaults.rs:   235L (load, default values, env override)\n- tests/sources.rs:    312L (BusinessProfile, draft_context, content sources, GDrive)\n- tests/deployment.rs: 472L (deployment mode, preferred source, connection_id, connector)\n- tests/migrations.rs: 404L (backward-compat regression, content source enabled/change_detection)\n- tests/validation.rs: 394L (validate_minimum, validate edge cases)\n- tests/env_types.rs:  436L (env override paths, serde/Default/method coverage)\n\nAll files ≤500L. 396 config tests pass (no test loss).\n\n* refactor(config): remove tests.rs (replaced by tests/ submodule)\n\n* style: cargo fmt fixes in config/tests submodule\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-20T11:16:32-06:00",
+          "tree_id": "be40bf6dd060fd2753a5d772f7f2af997132adea",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d0433863a5344d3f209bbad2192d50cecb0b5ec7"
+        },
+        "date": 1774027043048,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
