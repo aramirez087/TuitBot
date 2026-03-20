@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773983544148,
+  "lastUpdate": 1773984600356,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -896,6 +896,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 941.51,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3985fb6ff4c24e32ffb9653d763c2514b042fa21",
+          "message": "refactor(automation): modularize posting_queue.rs (1250 lines) → posting_queue/ directory\n\n* refactor(posting_queue): modularize into queue.rs, dispatch.rs, tests_basic.rs, tests_dispatch.rs\n\n* fix(posting_queue): resolve compilation errors after modularization\n\n* chore(posting_queue): add allow(dead_code) if needed\n\n* fix(c3): move 2 tests from tests_dispatch to tests_basic to meet 500-line limit\n\n* fix(c3): add missing imports to tests_basic.rs for moved test functions\n\n* fix(c1,c3): format all files + fix qa_report_default_score test regression\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-19T23:24:34-06:00",
+          "tree_id": "e72a63e94fac771cd698a6d29bba882c767d2d19",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3985fb6ff4c24e32ffb9653d763c2514b042fa21"
+        },
+        "date": 1773984599476,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 571.43,
             "unit": "ps"
           }
         ]
