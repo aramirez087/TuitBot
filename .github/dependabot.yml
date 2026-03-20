@@ -24,6 +24,11 @@ updates:
       - dependency-type: "direct"
     ignore:
       - dependency-name: "criterion"
+        # Keep criterion updates manual for benchmark verification
+      - dependency-name: "toml"
+        versions: ["0.9.*", ">=1.0"]
+        # toml 0.9 (TOML spec 1.1) is a breaking change — upgrade requires
+        # migrating commands::upgrade TOML parsing. Track separately.
 
   # npm dependencies - dashboard (weekly)
   - package-ecosystem: "npm"
