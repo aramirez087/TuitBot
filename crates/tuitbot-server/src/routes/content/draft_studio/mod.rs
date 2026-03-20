@@ -1,5 +1,7 @@
 //! Draft Studio API endpoints.
 //!
+//! Provides the canonical `/api/drafts` routes for the Draft Studio workspace.
+//!
 //! Provides the canonical `/api/drafts` routes for the Draft Studio workspace,
 //! including collection queries, CRUD, autosave with conflict detection,
 //! workflow transitions, and revision/activity read endpoints.
