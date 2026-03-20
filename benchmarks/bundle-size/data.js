@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773983234399,
+  "lastUpdate": 1773983261530,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1245,6 +1245,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1208087,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "68a1c6c28ae7562eb58e58aec21e725b75284b56",
+          "message": "fix(strategy): scope current+refresh routes to account_id — resolve TODOs\n\n* fix(strategy): scope current+refresh routes to X-Account-Id\n\n- Added _for variants to all 8 metrics functions in strategy/metrics.rs\n  (count_actions, follower_at_date, avg_reply_score, avg_tweet_score,\n   reply_acceptance_rate, top_topics, bottom_topics, top_content,\n   distinct_topic_count) — each adds AND account_id = ? to the query\n- Added compute_report_for(), get_or_compute_current_for(),\n  refresh_current_for() in strategy/report.rs\n- Wired routes/strategy.rs:\n  - current: was _ctx unused / global → now ctx.account_id scoped ✓\n  - refresh: was _ctx unused / global → now ctx.account_id scoped ✓\n  - history: was already scoped (no change)\n  - inputs: was already scoped (no change)\n- Updated manifest snapshot (5 new tools from C1 added entries)\n- Added strategy_account_scope.rs integration tests:\n  - strategy_current_scoped_to_account\n  - strategy_current_returns_same_week_start_for_both_accounts\n  - strategy_refresh_scoped_to_account\n  - strategy_history_isolated_between_accounts (proves A cannot see B)\n  - strategy_inputs_still_works_after_route_changes\n- All CI gates: fmt ✓ | test (6,303 pass, 0 fail) ✓ | clippy ✓\n\n* test(q5): add DraftRail component tests — 26 tests, 4 components\n\nCovers DraftRail, DraftRailItem, DraftRailTabs, DraftFilterBar.\nAll 26 tests pass with unconditional assertions (no soft guards).\n\nKey patterns:\n- scrollIntoView polyfill in beforeEach (jsdom limitation)\n- DraftFilterBar debounce tested via vi.useFakeTimers()\n- DraftRailItem two-step delete confirmed via aria title state\n- DraftFilterBar prop is 'tags' not 'accountTags' (DraftRail passes accountTags→tags)\n\nCloses Q5 (4ff1f201). Sentinel took over after 3 failed Forge cycles.\n\n* test(q3): MCP tools panel smoke tests — 10 tests, mocked store\n\nToolsSection.svelte renders correctly from mocked metrics store.\nNo real server required — store seeded directly per Q3 AC.\nConsole errors captured and asserted absent on every render.\n\nTests: empty state, tools list, multi-tool, rate/latency formatting,\nfailure highlighting, mutation badge, query badge, table headers.\n\nCloses Q3 (96cc1ca1). Unblocked by U3 (ToolsSection.svelte present).\n\n* feat(core): publisher retry + dead-letter + approval queue surfacing (C2)\n\n- Exponential backoff in content_loop/publisher.rs: 30s base, 2× per retry,\n  max 3 attempts for transient errors (429, 5xx, timeout, connection reset)\n- Permanent errors (401, 403, validation): fail immediately, no retry\n- Dead-letter: mark_failed_permanent() updates threads table\n  (status=failed, failure_kind=permanent, last_error, failed_at)\n- Retry tracking: increment_retry() increments retry_count on threads table\n- Approval queue surfacing (AC3): mark_failed_permanent() also inserts a\n  'failed_post_recovery' pending entry into approval_queue so humans can\n  review failed posts via the existing GET /api/approvals endpoint\n- thread_loop/generator: same retry + dead-letter pattern applied\n- loop_helpers: is_transient_error() and thread_retry_backoff() helpers\n- Migration: 20260312000101_retry_tracking.sql adds retry columns to threads\n\nTests: 3361 passed, 0 failed (was 3334 — 27 net new tests)\nCI: cargo fmt + clippy + RUSTFLAGS=-D warnings all clean\n\n* feat: Add failed_post_recovery support to approval queue UI (Core C2)\n\n- Add action_type filter parameter to approval.list() API client\n- Add 'Failed' status filter option with AlertCircle icon\n- Wire failed filter: status=pending&action_type=failed_post_recovery\n- Add red Failed badge to ApprovalCardHeader for failed_post_recovery items\n- Add unit tests: approvalStore failed filter behavior + ApprovalCardHeader badge\n- Vitest: 538 tests passing, svelte-check: 0 errors\n\nImplements Core C2 contract:\n  - Filter: GET /approval?action_type=failed_post_recovery&status=pending\n  - Badge: Red badge for action_type='failed_post_recovery'\n  - Metadata: reason field contains retry count + error details\n\nTask: Publisher failure state in approval queue (37d88cbd)\nCommit hygiene: dashboard/ only, no crates/ files\n\n* feat(mcp): Add MCP tool browser panel (discovery, read-only)\n\n- Add McpAvailableTool + McpToolParam types to api/types.ts\n- Add api.mcp.tools() calling GET /mcp/tools\n- Add McpToolBrowser.svelte: searchable, expandable tool list with\n  param hints, required/optional badges, category badges\n- Wire into MCP page as new 'Browse' tab\n- 15 tests covering: render states, expand/collapse, search filter,\n  param table, accessibility (role=list, aria-expanded, aria-label)\n- Vitest: 553 passing, svelte-check: 0 errors\n\nTask: MCP tool browser panel (4464de5d)\nCommit hygiene: dashboard/ only, no crates/ files\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-19T23:06:51-06:00",
+          "tree_id": "03cd1c7d3b089fa40d459213ef904c510bb2303f",
+          "url": "https://github.com/aramirez087/TuitBot/commit/68a1c6c28ae7562eb58e58aec21e725b75284b56"
+        },
+        "date": 1773983260507,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877638,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217684,
             "unit": "bytes"
           }
         ]
