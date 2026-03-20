@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.44](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.43...tuitbot-cli-v0.1.44) - 2026-03-20
+
+### Other
+
+- *(S6-9)* split scheduled_content/tests.rs into tests/ submodule ([#254](https://github.com/aramirez087/TuitBot/pull/254))
+- *(scoring)* split signals.rs and tests.rs into submodules (≤500L) ([#253](https://github.com/aramirez087/TuitBot/pull/253))
+- *(x_api/auth)* split tests.rs into tests/ submodule (≤500L per file) ([#252](https://github.com/aramirez087/TuitBot/pull/252))
+
 ## [0.1.43](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.42...tuitbot-cli-v0.1.43) - 2026-03-20
 
 ### Fixed
