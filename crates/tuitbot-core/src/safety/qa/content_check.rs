@@ -45,7 +45,12 @@ impl<'a> QaEvaluator<'a> {
             hard_flags: vec![],
             soft_flags: vec![],
             recommendations: vec![],
-            score: Default::default(),
+            score: super::types::QaScoreSummary {
+                overall: 100.0,
+                language: 100.0,
+                brand: 100.0,
+                compliance: 100.0,
+            },
         }
     }
 }
