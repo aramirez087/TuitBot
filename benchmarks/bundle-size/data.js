@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773984318062,
+  "lastUpdate": 1773985228233,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1323,6 +1323,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1217689,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b979514d3908e7be2a9c150c461cdaef5c048a74",
+          "message": "refactor(automation): modularize schedule.rs (1478 lines) → schedule/ directory\n\n* refactor: split schedule.rs (1478 lines) → schedule/{mod,planner,executor,recurrence}\n\nAll resulting files ≤ 500 lines:\n- mod.rs: 20 lines (re-exports, module declarations)\n- planner.rs: 289 lines (ActiveSchedule, parsing, slot resolution)\n- executor.rs: 35 lines (schedule_gate async gate)\n- recurrence.rs: 59 lines (PostingSlot, apply_slot_jitter)\n- tests.rs: 1067 lines (all unit tests)\n\nTotal: 1470 lines (8 lines saved after removing test blocks from monolithic)\n\nCI: ✓ All 230 schedule tests pass\n    ✓ cargo fmt --all clean\n    ✓ cargo clippy --lib -D warnings clean (no schedule-related issues)\n    ✓ cargo check -p tuitbot-core clean\n\nPattern: Follows content_loop and thread_loop modularization from Sprint 1\nTests: Moved to dedicated tests.rs file following project's tests_guardrails.rs pattern\n\n* refactor(schedule): split tests (1067 lines) → tests/{posting_slot,jitter,active_schedule,slots_and_gate} (each ≤500 lines)\n\n- Extract tests into 4 focused modules organized by concern:\n  - posting_slot.rs (209 lines): parsing, formatting, ordering, conversion\n  - jitter.rs (83 lines): apply_slot_jitter, SLOT_JITTER_SECS, AUTO_PREFERRED_TIMES\n  - active_schedule.rs (288 lines): from_config, is_active, time_until_active, parse_weekday\n  - slots_and_gate.rs (500 lines): preferred times, overrides, next_unused_slot, schedule_gate\n- Create tests/mod.rs with shared default_schedule_config() helper\n- Delete monolithic tests.rs\n- Fix pre-existing broken qa/tests.rs imports (removed helpers.rs references)\n- All 222 schedule tests pass ✓\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-19T23:39:42-06:00",
+          "tree_id": "e4ceaa52ed139f361ef6efebb933d2639a493f64",
+          "url": "https://github.com/aramirez087/TuitBot/commit/b979514d3908e7be2a9c150c461cdaef5c048a74"
+        },
+        "date": 1773985227653,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877638,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 300796,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1217684,
             "unit": "bytes"
           }
         ]
