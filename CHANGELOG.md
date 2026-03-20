@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
+- update Cargo.lock dependencies
 - *(integration)* Publisher integration test coverage — 5 tests
 
 ## [0.1.38](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.37...tuitbot-cli-v0.1.38) - 2026-03-17
