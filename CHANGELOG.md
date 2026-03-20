@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.43](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.42...tuitbot-cli-v0.1.43) - 2026-03-20
+
+### Fixed
+
+- remove duplicate startup tests.rs (E0761)
+
+### Other
+
+- *(settings)* modularize routes/settings.rs (1602L → 6 files ≤500L) ([#248](https://github.com/aramirez087/TuitBot/pull/248))
+- S6-2 + S6-4 — Modularize winning_dna.rs and startup.rs ([#247](https://github.com/aramirez087/TuitBot/pull/247))
+
 ## [0.1.42](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.41...tuitbot-cli-v0.1.42) - 2026-03-20
 
 ### Fixed
