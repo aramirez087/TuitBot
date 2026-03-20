@@ -3,8 +3,7 @@
 
 use crate::context::winning_dna::analysis::{
     classify_for_row, classify_reply_archetype, classify_tweet_format, combine_prompt_blocks,
-    compute_days_since, format_ancestors_prompt, format_seeds_prompt,
-    truncate_at_char_boundary,
+    compute_days_since, format_ancestors_prompt, format_seeds_prompt, truncate_at_char_boundary,
 };
 use crate::context::winning_dna::scoring::{compute_engagement_score, compute_retrieval_weight};
 use crate::context::winning_dna::{
