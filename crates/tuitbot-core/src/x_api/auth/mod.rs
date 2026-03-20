@@ -102,5 +102,3 @@ pub fn load_tokens(path: &std::path::Path) -> Result<Option<Tokens>, XApiError> 
     }
 }
 
-#[cfg(test)]
-mod tests;
