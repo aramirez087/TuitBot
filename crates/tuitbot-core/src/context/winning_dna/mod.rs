@@ -14,6 +14,7 @@ pub mod scoring;
 
 #[cfg(test)]
 mod tests;
+// tests/ is a submodule directory: tests/mod.rs → unit, edge_cases, structs, integration
 
 // Re-export public API so callers use `winning_dna::*` unchanged.
 pub use analysis::{
