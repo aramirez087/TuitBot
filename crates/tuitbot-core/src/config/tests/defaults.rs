@@ -253,3 +253,134 @@ fn openclaw_env_respects_explicit_override() {
         assert!(!config.approval_mode);
     });
 }
+
+#[test]
+fn expand_tilde_works() {
+    let expanded = expand_tilde("~/.tuitbot/config.toml");
+    assert!(!expanded.to_string_lossy().starts_with('~'));
+}
+
+#[test]
+fn split_csv_trims_and_filters() {
+    let result = split_csv("  rust , cli ,, tools  ");
+    assert_eq!(result, vec!["rust", "cli", "tools"]);
+}
+
+#[test]
+fn validate_preferred_times_valid() {
+    let mut config = valid_test_config();
+    config.schedule.preferred_times = vec!["09:15".to_string(), "12:30".to_string()];
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn validate_preferred_times_auto() {
+    let mut config = valid_test_config();
+    config.schedule.preferred_times = vec!["auto".to_string()];
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn validate_preferred_times_invalid_format() {
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.schedule.preferred_times = vec!["9:15".to_string(), "25:00".to_string()];
+    let errors = config.validate().unwrap_err();
+    assert!(errors.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.preferred_times")
+    ));
+}
+
+#[test]
+fn validate_preferred_times_exceeds_max_tweets() {
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.limits.max_tweets_per_day = 2;
+    config.schedule.preferred_times = vec![
+        "09:00".to_string(),
+        "12:00".to_string(),
+        "17:00".to_string(),
+    ];
+    let errors = config.validate().unwrap_err();
+    assert!(errors.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, message } if field == "schedule.preferred_times" && message.contains("3 slots"))
+    ));
+}
+
+#[test]
+fn validate_thread_preferred_day_invalid() {
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.schedule.thread_preferred_day = Some("Monday".to_string());
+    let errors = config.validate().unwrap_err();
+    assert!(errors.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.thread_preferred_day")
+    ));
+}
+
+#[test]
+fn validate_thread_preferred_time_invalid() {
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config.schedule.thread_preferred_time = "25:00".to_string();
+    let errors = config.validate().unwrap_err();
+    assert!(errors.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.thread_preferred_time")
+    ));
+}
+
+#[test]
+fn preferred_times_override_invalid_day() {
+    let mut config = Config::default();
+    config.business.product_name = "Test".to_string();
+    config.business.product_keywords = vec!["test".to_string()];
+    config.llm.provider = "ollama".to_string();
+    config
+        .schedule
+        .preferred_times_override
+        .insert("Monday".to_string(), vec!["09:00".to_string()]);
+    let errors = config.validate().unwrap_err();
+    assert!(errors.iter().any(
+        |e| matches!(e, ConfigError::InvalidValue { field, .. } if field == "schedule.preferred_times_override")
+    ));
+}
+
+#[test]
+fn preferred_times_toml_roundtrip() {
+    let toml_str = r#"
+[x_api]
+client_id = "test"
+
+[business]
+product_name = "Test"
+product_keywords = ["test"]
+
+[llm]
+provider = "ollama"
+model = "llama2"
+
+[schedule]
+timezone = "America/New_York"
+preferred_times = ["09:15", "12:30", "17:00"]
+thread_preferred_day = "Tue"
+thread_preferred_time = "10:00"
+"#;
+    let config: Config = toml::from_str(toml_str).expect("valid TOML");
+    assert_eq!(
+        config.schedule.preferred_times,
+        vec!["09:15", "12:30", "17:00"]
+    );
+    assert_eq!(
+        config.schedule.thread_preferred_day,
+        Some("Tue".to_string())
+    );
+    assert_eq!(config.schedule.thread_preferred_time, "10:00");
+}
