@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773961663746,
+  "lastUpdate": 1773966672804,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -816,6 +816,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1208087,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "50edc4dae6b6e6030902b4be64690b6772a73924",
+          "message": "Merge pull request #232 from aramirez087/fix/ci-drop-release-plz-update\n\nfix(ci): remove release-plz update from CI — incompatible with PR checkout",
+          "timestamp": "2026-03-19T18:30:20-06:00",
+          "tree_id": "7df63c77af6aada5f9ed28651c58b75a7dc06db2",
+          "url": "https://github.com/aramirez087/TuitBot/commit/50edc4dae6b6e6030902b4be64690b6772a73924"
+        },
+        "date": 1773966671857,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 872234,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 296607,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1208092,
             "unit": "bytes"
           }
         ]
