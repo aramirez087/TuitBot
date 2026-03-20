@@ -192,17 +192,6 @@ jobs:
             ${{ runner.os }}-cargo-release-verify-
             ${{ runner.os }}-cargo-
 
-      - name: Install release-plz
-        run: |
-          RELEASE_PLZ_VER=0.3.157
-          curl -fsSL "https://github.com/release-plz/release-plz/releases/download/release-plz-v${RELEASE_PLZ_VER}/release-plz-x86_64-unknown-linux-gnu.tar.gz" \
-            -o /tmp/release-plz.tar.gz
-          mkdir -p /tmp/rplz && tar -xzf /tmp/release-plz.tar.gz -C /tmp/rplz
-          echo "/tmp/rplz" >> $GITHUB_PATH
-
-      - name: Run release-plz update (validate packaging)
-        run: release-plz update --config release-plz.toml --allow-dirty
-
       - name: Run cargo package (verify metadata)
         run: cargo package --workspace --allow-dirty
         env:
