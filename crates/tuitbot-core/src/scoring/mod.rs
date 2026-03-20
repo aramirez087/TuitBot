@@ -164,4 +164,6 @@ impl std::fmt::Display for TweetScore {
 }
 
 #[cfg(test)]
+mod signals_tests;
+#[cfg(test)]
 mod tests;
