@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774039039298,
+  "lastUpdate": 1774039399468,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1128,6 +1128,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 937.9,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d6d7f9eb09fb1a8083d3554514e64aaf4b981e9a",
+          "message": "refactor(S6-9): split scheduled_content/tests.rs into tests/ submodule (#254)\n\nscheduled_content/tests.rs (2007L) → tests/{mod,crud,scheduling,isolation,provenance,coverage}\n\n- tests/mod.rs:         6L  (module declarations)\n- tests/crud.rs:      494L  (archive, restore, duplicate, metadata, revisions, activity, tags)\n- tests/scheduling.rs:469L  (reschedule, edge cases, draft lifecycle, unschedule, autosave)\n- tests/isolation.rs: 498L  (QA fields, provenance, tag/revision helpers)\n- tests/provenance.rs:269L  (account-scoped _for isolation tests)\n- tests/coverage.rs:  295L  (additional deep coverage)\n\nAll files ≤500L. 64 tests pass. RUSTFLAGS='-D warnings' clean.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-20T14:41:06-06:00",
+          "tree_id": "5f16c776112b530d5154391eecfc990ff759ae5e",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d6d7f9eb09fb1a8083d3554514e64aaf4b981e9a"
+        },
+        "date": 1774039399103,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 934.55,
             "unit": "ps"
           }
         ]
