@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773973681611,
+  "lastUpdate": 1773973746037,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1035,6 +1035,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/9183ab5f80e4324b857f832dff3f1154798529a5"
         },
         "date": 1773973680632,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 872230,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 296607,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1208087,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e46f856389726158f51c328175b58f016744b7b",
+          "message": "Merge pull request #235 from aramirez087/dependabot/cargo/all-dependencies-f6117c9de3\n\nchore(deps): bump the all-dependencies group across 1 directory with 22 updates",
+          "timestamp": "2026-03-19T20:28:15-06:00",
+          "tree_id": "aa6c915f41a0c787a0fb8dc1560d2162e1d58d27",
+          "url": "https://github.com/aramirez087/TuitBot/commit/4e46f856389726158f51c328175b58f016744b7b"
+        },
+        "date": 1773973745062,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
