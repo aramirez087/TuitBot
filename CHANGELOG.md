@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.42](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.41...tuitbot-cli-v0.1.42) - 2026-03-20
+
+### Fixed
+
+- *(strategy)* scope current+refresh routes to account_id — resolve TODOs
+
+### Other
+
+- *(automation)* modularize schedule.rs (1478 lines) → schedule/ directory
+- *(automation)* modularize posting_queue.rs (1250 lines) → posting_queue/ directory
+- *(safety)* modularize qa.rs (1985 lines) → qa/ directory
+
 ## [0.1.41](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.40...tuitbot-cli-v0.1.41) - 2026-03-20
 
 ### Other
