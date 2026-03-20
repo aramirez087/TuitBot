@@ -297,8 +297,4 @@ pub(super) fn randomized_delay(min: Duration, max: Duration) -> Duration {
     Duration::from_millis(rand::rng().random_range(min_ms..=max_ms))
 }
 
-/// Expose for testing
-#[cfg(test)]
-pub(super) fn is_rate_limit_error_test(msg: &str) -> bool {
-    is_rate_limit_error(msg)
-}
+
