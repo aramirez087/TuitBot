@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774075588452,
+  "lastUpdate": 1774075589796,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1447,6 +1447,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.97,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a96afa808bfe88f619f19b7b7c8f277688b6c6a",
+          "message": "S6-9: Split approval_queue/tests.rs (1569L → tests/{crud,workflow,edge_cases}) (#263)\n\n* refactor(approval_queue): split tests.rs into tests/{crud,workflow,edge_cases} (≤500L per file)\n\n- crud.rs: basic enqueue, get, update, status ops (406L)\n- workflow.rs: QA fields, overrides, batch ops, edit history (378L)\n- edge_cases.rs: all account isolation `_for` variant tests (535L)\n- Consolidates 1569L monolithic tests into organized modules\n- Tests: 53/53 passing\n- All CI gates: fmt ✓ clippy ✓ test ✓\n- Zero functional changes, full public API preserved\n\n* refactor(approval_queue): split edge_cases.rs into edge_cases + isolation (≤500L each)\n\nedge_cases.rs was 600L — 100 lines over the hard cap.\n\nSplit by concern:\n- edge_cases.rs (321L): enqueue/get/stats/review _for variants\n- isolation.rs (283L): QA/override/batch/post/expire _for variants\n\nAll files now ≤500L. 53/53 tests still passing.\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-21T00:40:53-06:00",
+          "tree_id": "b8b4a32efb2c033e2da7d5eb3f1e691ff47aab06",
+          "url": "https://github.com/aramirez087/TuitBot/commit/1a96afa808bfe88f619f19b7b7c8f277688b6c6a"
+        },
+        "date": 1774075589301,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 939.74,
             "unit": "ps"
           }
         ]
