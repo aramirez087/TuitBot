@@ -273,6 +273,44 @@ pub async fn search_chunks_by_keywords(
     Ok(rows.into_iter().map(ContentChunk::from_row).collect())
 }
 
+/// Find the best-matching chunk for a heading context within a node.
+///
+/// Uses longest prefix match on `heading_path`. If `heading_context` is `None`,
+/// returns the first chunk (document root). Returns `None` if no chunks exist.
+pub async fn find_best_chunk_by_heading_for(
+    pool: &DbPool,
+    account_id: &str,
+    node_id: i64,
+    heading_context: Option<&str>,
+) -> Result<Option<ContentChunk>, StorageError> {
+    let chunks = get_chunks_for_node(pool, account_id, node_id).await?;
+
+    if chunks.is_empty() {
+        return Ok(None);
+    }
+
+    let heading = match heading_context {
+        Some(h) if !h.is_empty() => h,
+        _ => return Ok(Some(chunks.into_iter().next().unwrap())),
+    };
+
+    // Find the chunk whose heading_path is the longest prefix of the provided heading_context.
+    let best = chunks
+        .into_iter()
+        .filter(|c| heading.starts_with(&c.heading_path) || c.heading_path.starts_with(heading))
+        .max_by_key(|c| {
+            // Score: length of the common prefix between chunk heading and query heading.
+            let min_len = c.heading_path.len().min(heading.len());
+            c.heading_path[..min_len]
+                .chars()
+                .zip(heading[..min_len].chars())
+                .take_while(|(a, b)| a == b)
+                .count()
+        });
+
+    Ok(best)
+}
+
 /// Row type for chunk + node context JOIN query.
 type ChunkWithContextRow = (
     i64,            // cc.id

@@ -5,6 +5,8 @@
 //! privacy-safe responses (no raw note bodies — only titles, paths,
 //! tags, heading paths, and truncated snippets).
 
+pub mod selections;
+
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};

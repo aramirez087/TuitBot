@@ -840,3 +840,126 @@ async fn compose_without_schedule_has_no_scheduled_for() {
         "response should not include scheduled_for when not provided"
     );
 }
+
+// ============================================================
+// Selection → Compose provenance flow tests
+// ============================================================
+
+#[tokio::test]
+async fn compose_with_selection_provenance() {
+    let router = test_router().await;
+
+    // 1. Create a selection
+    let (status, sel_body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "notes/test.md",
+            "selected_text": "Important insight about testing",
+            "selection_start_line": 5,
+            "selection_end_line": 10,
+            "note_title": "Test Note"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(sel_body["status"], "received");
+
+    // 2. Compose a tweet with provenance referencing the selection
+    let (status, compose_body) = post_json(
+        router,
+        "/api/content/compose",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Testing insight tweet",
+            "provenance": [{
+                "source_path": "notes/test.md",
+                "heading_path": null,
+                "snippet": "Important insight about testing"
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        compose_body["status"].as_str().unwrap() == "scheduled"
+            || compose_body["status"].as_str().unwrap() == "queued_for_approval"
+    );
+}
+
+#[tokio::test]
+async fn draft_with_selection_provenance() {
+    let router = test_router().await;
+
+    // 1. Create a selection
+    let (status, _sel_body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "notes/draft-source.md",
+            "selected_text": "Draft-worthy content",
+            "selection_start_line": 0,
+            "selection_end_line": 5
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // 2. Create a draft with provenance
+    let (status, draft_body) = post_json(
+        router,
+        "/api/content/drafts",
+        serde_json::json!({
+            "content_type": "tweet",
+            "content": "Draft from selection",
+            "provenance": [{
+                "source_path": "notes/draft-source.md",
+                "snippet": "Draft-worthy content"
+            }]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(draft_body["status"], "draft");
+    assert!(draft_body["id"].as_i64().unwrap() > 0);
+}
+
+#[tokio::test]
+async fn selection_roundtrip_send_and_get() {
+    let router = test_router().await;
+
+    // Send
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "my-vault",
+            "file_path": "daily/2026-03-21.md",
+            "selected_text": "Roundtrip test content",
+            "heading_context": null,
+            "selection_start_line": 3,
+            "selection_end_line": 5,
+            "note_title": "2026-03-21",
+            "frontmatter_tags": ["daily", "notes"]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let session_id = body["session_id"].as_str().unwrap();
+
+    // Get
+    let (status, get_body) = get_json(router, &format!("/api/vault/selection/{session_id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(get_body["vault_name"], "my-vault");
+    assert_eq!(get_body["file_path"], "daily/2026-03-21.md");
+    assert_eq!(get_body["selected_text"], "Roundtrip test content");
+    assert_eq!(get_body["selection_start_line"], 3);
+    assert_eq!(get_body["selection_end_line"], 5);
+    assert_eq!(get_body["note_title"], "2026-03-21");
+    let tags = get_body["frontmatter_tags"].as_array().unwrap();
+    assert_eq!(tags.len(), 2);
+    assert_eq!(tags[0], "daily");
+    assert_eq!(tags[1], "notes");
+}

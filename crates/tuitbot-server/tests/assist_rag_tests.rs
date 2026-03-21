@@ -832,3 +832,297 @@ async fn tweet_with_ancestors_context() {
         "System prompt should contain ancestor-derived winning patterns"
     );
 }
+
+// ============================================================================
+// Tests — Vault selection endpoints
+// ============================================================================
+
+#[tokio::test]
+async fn send_selection_success() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "marketing",
+            "file_path": "notes/test.md",
+            "selected_text": "Some interesting text",
+            "selection_start_line": 5,
+            "selection_end_line": 10
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"], "received");
+    assert!(body["session_id"].as_str().is_some());
+    assert!(body["composer_url"]
+        .as_str()
+        .unwrap()
+        .contains("selection="));
+}
+
+#[tokio::test]
+async fn send_selection_resolves_node_id() {
+    let (router, _captured, _dir) = build_test_router_with_generator(
+        vec!["ok".to_string()],
+        Some(|pool| Box::pin(seed_vault_chunks(pool))),
+    )
+    .await;
+
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "testing-guide.md",
+            "selected_text": "Some text from the note",
+            "selection_start_line": 0,
+            "selection_end_line": 5
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    let session_id = body["session_id"].as_str().unwrap();
+
+    // Retrieve and check resolved IDs
+    let get_req = Request::builder()
+        .uri(&format!("/api/vault/selection/{session_id}"))
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = router.oneshot(get_req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let get_body: serde_json::Value =
+        serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    assert!(
+        get_body["resolved_node_id"].as_i64().is_some(),
+        "resolved_node_id should be populated for indexed note"
+    );
+}
+
+#[tokio::test]
+async fn send_selection_unresolved_path() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "nonexistent/note.md",
+            "selected_text": "Some text",
+            "selection_start_line": 0,
+            "selection_end_line": 1
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK);
+    let session_id = body["session_id"].as_str().unwrap();
+
+    let get_req = Request::builder()
+        .uri(&format!("/api/vault/selection/{session_id}"))
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = router.oneshot(get_req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let get_body: serde_json::Value =
+        serde_json::from_slice(&resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
+
+    assert!(
+        get_body.get("resolved_node_id").is_none() || get_body["resolved_node_id"].is_null(),
+        "resolved_node_id should be null for un-indexed path"
+    );
+}
+
+#[tokio::test]
+async fn send_selection_empty_text_422() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "note.md",
+            "selected_text": "",
+            "selection_start_line": 0,
+            "selection_end_line": 0
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body["error"], "validation_error");
+    assert!(body["message"]
+        .as_str()
+        .unwrap()
+        .contains("must not be empty"));
+}
+
+#[tokio::test]
+async fn send_selection_text_too_long_413() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    let long_text = "a".repeat(10_001);
+    let (status, body) = post_json(
+        router,
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "note.md",
+            "selected_text": long_text,
+            "selection_start_line": 0,
+            "selection_end_line": 0
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(body["error"], "payload_too_large");
+}
+
+#[tokio::test]
+async fn send_selection_missing_fields_422() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    // Missing file_path — serde will reject
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/vault/send-selection")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_vec(&serde_json::json!({
+                "vault_name": "v",
+                "selected_text": "text"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let resp = router.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn send_selection_rate_limit_429() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    // Send 10 selections (should all succeed)
+    for i in 0..10 {
+        let (status, _) = post_json(
+            router.clone(),
+            "/api/vault/send-selection",
+            serde_json::json!({
+                "vault_name": "vault",
+                "file_path": "note.md",
+                "selected_text": format!("text {i}"),
+                "selection_start_line": 0,
+                "selection_end_line": 0
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "request {i} should succeed");
+    }
+
+    // 11th should be rate limited
+    let (status, body) = post_json(
+        router,
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "note.md",
+            "selected_text": "text 11",
+            "selection_start_line": 0,
+            "selection_end_line": 0
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(body["error"], "rate_limited");
+}
+
+#[tokio::test]
+async fn get_selection_not_found_404() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    let req = Request::builder()
+        .uri("/api/vault/selection/nonexistent-session-id")
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = router.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn get_selection_account_isolation() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    // Create selection as default account
+    let (status, body) = post_json(
+        router.clone(),
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "note.md",
+            "selected_text": "secret text",
+            "selection_start_line": 0,
+            "selection_end_line": 0
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let session_id = body["session_id"].as_str().unwrap();
+
+    // Try to retrieve as a different account
+    let req = Request::builder()
+        .uri(&format!("/api/vault/selection/{session_id}"))
+        .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+        .header("X-Account-Id", "other-account-id")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = router.oneshot(req).await.unwrap();
+    // Either 404 (account doesn't exist / not found) or similar
+    assert_ne!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn send_selection_non_md_file_rejected() {
+    let (router, _captured, _dir) =
+        build_test_router_with_generator(vec!["ok".to_string()], None).await;
+
+    let (status, body) = post_json(
+        router,
+        "/api/vault/send-selection",
+        serde_json::json!({
+            "vault_name": "vault",
+            "file_path": "notes/file.txt",
+            "selected_text": "text",
+            "selection_start_line": 0,
+            "selection_end_line": 0
+        }),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(body["message"].as_str().unwrap().contains(".md"));
+}

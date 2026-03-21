@@ -25,6 +25,7 @@ pub mod strategy;
 pub mod target_accounts;
 pub mod threads;
 pub mod tweets;
+pub mod vault_selections;
 pub mod watchtower;
 pub mod x_api_usage;
 
@@ -206,6 +207,7 @@ mod tests {
         // Vault tables
         assert!(table_names.contains(&"content_chunks"));
         assert!(table_names.contains(&"vault_provenance_links"));
+        assert!(table_names.contains(&"vault_selections"));
     }
 
     #[tokio::test]

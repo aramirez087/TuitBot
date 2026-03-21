@@ -199,6 +199,35 @@ pub fn citations_to_chunks_json(citations: &[VaultCitation]) -> String {
 }
 
 // ============================================================================
+// Selection identity resolution
+// ============================================================================
+
+/// Resolve a Ghostwriter selection payload to the best available indexed block identity.
+///
+/// Returns `(Option<node_id>, Option<chunk_id>)`. Both are `None` if the note
+/// isn't indexed yet. Resolution is best-effort — the `selected_text` is always
+/// the authoritative payload.
+pub async fn resolve_selection_identity(
+    pool: &DbPool,
+    account_id: &str,
+    file_path: &str,
+    heading_context: Option<&str>,
+) -> Result<(Option<i64>, Option<i64>), StorageError> {
+    let node = watchtower::find_node_by_path_for(pool, account_id, file_path).await?;
+
+    let node = match node {
+        Some(n) => n,
+        None => return Ok((None, None)),
+    };
+
+    let chunk =
+        watchtower::find_best_chunk_by_heading_for(pool, account_id, node.id, heading_context)
+            .await?;
+
+    Ok((Some(node.id), chunk.map(|c| c.id)))
+}
+
+// ============================================================================
 // Helpers
 // ============================================================================
 

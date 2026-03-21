@@ -90,6 +90,8 @@ pub enum WsEvent {
         cooldown_remaining_seconds: u64,
         timestamp: String,
     },
+    /// A Ghostwriter selection was received from the Obsidian plugin.
+    SelectionReceived { session_id: String },
     /// An error occurred.
     Error { message: String },
 }
@@ -454,6 +456,9 @@ mod tests {
                 error_count: 0,
                 cooldown_remaining_seconds: 0,
                 timestamp: "ts".into(),
+            },
+            WsEvent::SelectionReceived {
+                session_id: "sess-1".into(),
             },
             WsEvent::Error {
                 message: "err".into(),
