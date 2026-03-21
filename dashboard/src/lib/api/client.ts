@@ -477,6 +477,14 @@ export const api = {
 			request<{
 				times: Array<{ hour: number; avg_engagement: number; post_count: number }>;
 			}>('/api/assist/optimal-times'),
+		highlights: (selectedNodeIds: number[]) =>
+			request<{ highlights: string[]; vault_citations?: VaultCitation[] }>(
+				'/api/assist/highlights',
+				{
+					method: 'POST',
+					body: JSON.stringify({ selected_node_ids: selectedNodeIds })
+				}
+			),
 		mode: () => request<{ mode: string; approval_mode: boolean }>('/api/assist/mode')
 	},
 

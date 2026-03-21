@@ -1,0 +1,165 @@
+/**
+ * VaultHighlights.test.ts — Unit tests for VaultHighlights.svelte
+ *
+ * Tests: renders highlights, toggle checkboxes, generate passes only enabled.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, fireEvent } from '@testing-library/svelte';
+import VaultHighlights from '$lib/components/composer/VaultHighlights.svelte';
+
+const defaultHighlights = [
+	{ text: 'Key insight about design patterns', enabled: true },
+	{ text: 'Performance optimization tip', enabled: true },
+	{ text: 'Architecture best practice', enabled: true }
+];
+
+const defaultProps = {
+	highlights: defaultHighlights.map((h) => ({ ...h })),
+	outputFormat: 'tweet' as const,
+	generating: false,
+	ongenerate: vi.fn(),
+	onback: vi.fn(),
+	onformatchange: vi.fn()
+};
+
+beforeEach(() => {
+	vi.clearAllMocks();
+});
+
+describe('VaultHighlights', () => {
+	it('renders without crashing', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		expect(container).toBeTruthy();
+	});
+
+	it('renders Key Highlights header', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const label = container.querySelector('.highlights-label');
+		expect(label?.textContent).toContain('Key Highlights');
+	});
+
+	it('renders all highlight items', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const items = container.querySelectorAll('.highlight-item');
+		expect(items.length).toBe(3);
+	});
+
+	it('renders highlight text content', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const texts = container.querySelectorAll('.highlight-text');
+		expect(texts[0]?.textContent).toBe('Key insight about design patterns');
+		expect(texts[1]?.textContent).toBe('Performance optimization tip');
+	});
+
+	it('renders checkboxes checked by default', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
+		expect(checkboxes.length).toBe(3);
+		checkboxes.forEach((cb) => expect(cb.checked).toBe(true));
+	});
+
+	it('calls onback when back arrow is clicked', async () => {
+		const onback = vi.fn();
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, onback }
+		});
+		const backBtn = container.querySelector('.highlights-back') as HTMLButtonElement;
+		await fireEvent.click(backBtn);
+		expect(onback).toHaveBeenCalled();
+	});
+
+	it('shows correct selection count', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const count = container.querySelector('.highlights-count');
+		expect(count?.textContent).toContain('3 of 3');
+	});
+
+	it('shows Generate tweet button in tweet mode', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const btn = container.querySelector('.highlights-generate-btn');
+		expect(btn?.textContent).toContain('Generate tweet');
+	});
+
+	it('shows Generate thread button in thread mode', () => {
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, outputFormat: 'thread' as const }
+		});
+		const btn = container.querySelector('.highlights-generate-btn');
+		expect(btn?.textContent).toContain('Generate thread');
+	});
+
+	it('disables generate button when generating', () => {
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, generating: true }
+		});
+		const btn = container.querySelector('.highlights-generate-btn') as HTMLButtonElement;
+		expect(btn?.disabled).toBe(true);
+		expect(btn?.textContent).toContain('Generating...');
+	});
+
+	it('calls ongenerate with enabled highlights only', async () => {
+		const ongenerate = vi.fn();
+		const highlights = [
+			{ text: 'First', enabled: true },
+			{ text: 'Second', enabled: false },
+			{ text: 'Third', enabled: true }
+		];
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, highlights, ongenerate }
+		});
+		const btn = container.querySelector('.highlights-generate-btn') as HTMLButtonElement;
+		await fireEvent.click(btn);
+		expect(ongenerate).toHaveBeenCalledWith(['First', 'Third']);
+	});
+
+	it('does not call ongenerate when no highlights are enabled', async () => {
+		const ongenerate = vi.fn();
+		const highlights = [
+			{ text: 'First', enabled: false },
+			{ text: 'Second', enabled: false }
+		];
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, highlights, ongenerate }
+		});
+		const btn = container.querySelector('.highlights-generate-btn') as HTMLButtonElement;
+		await fireEvent.click(btn);
+		expect(ongenerate).not.toHaveBeenCalled();
+	});
+
+	it('disables generate button when all highlights are disabled', () => {
+		const highlights = [
+			{ text: 'First', enabled: false },
+			{ text: 'Second', enabled: false }
+		];
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, highlights }
+		});
+		const btn = container.querySelector('.highlights-generate-btn') as HTMLButtonElement;
+		expect(btn?.disabled).toBe(true);
+	});
+
+	it('renders format toggle with tweet and thread options', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const opts = container.querySelectorAll('.highlights-format-opt');
+		expect(opts.length).toBe(2);
+		expect(opts[0]?.textContent).toBe('Tweet');
+		expect(opts[1]?.textContent).toBe('Thread');
+	});
+
+	it('calls onformatchange when format toggle is clicked', async () => {
+		const onformatchange = vi.fn();
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, onformatchange }
+		});
+		const threadBtn = container.querySelectorAll('.highlights-format-opt')[1] as HTMLButtonElement;
+		await fireEvent.click(threadBtn);
+		expect(onformatchange).toHaveBeenCalledWith('thread');
+	});
+
+	it('has proper aria-label on back button', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const backBtn = container.querySelector('.highlights-back');
+		expect(backBtn?.getAttribute('aria-label')).toBe('Back to notes');
+	});
+});

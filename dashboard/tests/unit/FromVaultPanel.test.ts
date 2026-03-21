@@ -53,6 +53,11 @@ vi.mock('$lib/api', () => ({
 			sources: vi.fn().mockResolvedValue({
 				sources: [{ id: 'source-1', name: 'Knowledge Base' }]
 			})
+		},
+		assist: {
+			highlights: vi.fn().mockResolvedValue({
+				highlights: ['Key insight about design patterns', 'Performance optimization tip', 'Architecture best practice']
+			})
 		}
 	}
 }));
@@ -329,5 +334,23 @@ describe('FromVaultPanel', () => {
 	it('handles long note titles gracefully', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		expect(container).toBeTruthy();
+	});
+
+	it('shows Extract Highlights button instead of Generate', () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+		const buttons = container.querySelectorAll('button');
+		const extractBtn = Array.from(buttons).find(
+			(b) => b.textContent?.includes('Extract Highlights')
+		);
+		expect(extractBtn).toBeTruthy();
+	});
+
+	it('does not show Generate tweet/thread button in initial view', () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+		const buttons = container.querySelectorAll('button');
+		const generateBtn = Array.from(buttons).find(
+			(b) => b.textContent?.includes('Generate tweet') || b.textContent?.includes('Generate thread')
+		);
+		expect(generateBtn).toBeFalsy();
 	});
 });

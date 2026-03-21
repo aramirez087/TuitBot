@@ -26,10 +26,11 @@
 			? "var(--color-danger)"
 			: warning
 				? "var(--color-warning)"
-				: "var(--color-accent)",
+				: "var(--color-text-muted, var(--color-border-subtle))",
 	);
 
-	const trackOpacity = $derived(overLimit || warning ? "0.2" : "0.15");
+	const progressOpacity = $derived(overLimit || warning ? "1" : "0.45");
+	const trackOpacity = $derived(overLimit || warning ? "0.2" : "0.1");
 </script>
 
 <div
@@ -63,6 +64,7 @@
 			stroke-dashoffset={offset}
 			stroke-linecap="round"
 			transform="rotate(-90 14 14)"
+			opacity={progressOpacity}
 			class="ring-progress"
 		/>
 	</svg>
@@ -104,7 +106,8 @@
 	.ring-progress {
 		transition:
 			stroke-dashoffset 0.15s ease,
-			stroke 0.2s ease;
+			stroke 0.2s ease,
+			opacity 0.2s ease;
 	}
 
 	.char-ring.over .ring-progress {

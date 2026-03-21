@@ -135,18 +135,35 @@
 		startUndoTimer();
 	}
 
-	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode) {
+	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[]) {
 		if (selectedNodeIds.length === 0) return;
 		try {
-			const topic = topicWithCue(voiceCue, 'the insights and ideas provided in the context above');
-			if (outputFormat === 'thread') {
-				const result = await api.assist.thread(topic, selectedNodeIds);
-				threadBlocks = result.tweets.map((text, i) => ({
-					id: crypto.randomUUID(), text, media_paths: [], order: i
-				}));
+			if (highlights && highlights.length > 0) {
+				const highlightContext = highlights.join('\n');
+				if (outputFormat === 'thread') {
+					const topic = topicWithCue(voiceCue, 'the key highlights provided');
+					const result = await api.assist.thread(topic, selectedNodeIds);
+					threadBlocks = result.tweets.map((text, i) => ({
+						id: crypto.randomUUID(), text, media_paths: [], order: i
+					}));
+				} else {
+					const context = voiceCue
+						? `${voiceCue}. Expand these key highlights into a polished tweet`
+						: 'Expand these key highlights into a polished tweet';
+					const result = await api.assist.improve(highlightContext, context);
+					tweetText = result.content;
+				}
 			} else {
-				const result = await api.assist.tweet(topic, selectedNodeIds);
-				tweetText = result.content;
+				const topic = topicWithCue(voiceCue, 'the insights and ideas provided in the context above');
+				if (outputFormat === 'thread') {
+					const result = await api.assist.thread(topic, selectedNodeIds);
+					threadBlocks = result.tweets.map((text, i) => ({
+						id: crypto.randomUUID(), text, media_paths: [], order: i
+					}));
+				} else {
+					const result = await api.assist.tweet(topic, selectedNodeIds);
+					tweetText = result.content;
+				}
 			}
 			mode = outputFormat;
 			voicePanelRef?.saveCueToHistory();
