@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774125680163,
+  "lastUpdate": 1774129341916,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2532,6 +2532,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1258272,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "909b85ff3f077c2544485ea88eefa63a7c8cc2b4",
+          "message": "fix: make hooks parser tolerant of LLM formatting variations (#277)\n\n* fix: make hooks parser tolerant of LLM formatting variations\n\nThe parser required exact `STYLE:` and `HOOK:` prefixes but LLMs\n(especially Groq/gpt-oss-20b) frequently output lowercase, markdown\nbold, numbered prefixes, or quoted text — causing parse failures that\nsurfaced as 500 errors on POST /api/assist/hooks.\n\nNow handles: case-insensitive prefixes, **bold** markers, numbered\nlines (1. STYLE:), bullet prefixes, and surrounding quotes.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: set hook text directly as content instead of calling improve API\n\nWhen a hook is selected from HookPicker, it's already a polished\nready-to-use tweet. Previously it was being sent through\napi.assist.improve() which treated it as raw highlights to expand,\nresulting in empty content replacing the draft.\n\nNow when hookStyle is present, the hook text is set directly as\ntweetText (or threadBlocks) without an additional LLM call.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-21T15:41:33-06:00",
+          "tree_id": "4d52fb9026a65b908d90853894bc498adb20ccd8",
+          "url": "https://github.com/aramirez087/TuitBot/commit/909b85ff3f077c2544485ea88eefa63a7c8cc2b4"
+        },
+        "date": 1774129341021,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 902654,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 316490,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1258395,
             "unit": "bytes"
           }
         ]
