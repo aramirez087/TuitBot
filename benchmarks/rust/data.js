@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774107470277,
+  "lastUpdate": 1774119562146,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1679,6 +1679,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 938.61,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c419588d6a3359e5b603ef3e9fce81ca805ce3e",
+          "message": "feat: ghost writer (#273)\n\n* feat: Session 1 — charter and architecture\n\nDefine the implementation charter for the Obsidian Ghostwriter Edge epic.\nSix roadmap artifacts created: epic charter, current-state audit, target\narchitecture, privacy/deployment matrix, phased implementation map, and\nSession 2 handoff. Zero source code changes.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 1 — charter and architecture\n\nAutomated execution of session-01-charter-and-architecture.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — obsidian ingress and transport\n\nObsidian plugin (plugins/obsidian-tuitbot/) with two editor commands that capture selection/block context and POST to the local TuitBot server. Includes transport contract document with JSON schemas, concrete examples, and backend implementation checklist for the receiving endpoint.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — obsidian ingress and transport\n\nAutomated execution of session-02-obsidian-ingress-and-transport.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — backend block contracts\n\nAdd server-side contracts for receiving Ghostwriter selections from the Obsidian plugin, resolving them against indexed vault data via best-effort block identity matching, and preserving provenance through the existing compose/draft pipeline. Includes transient vault_selections table with 30-minute TTL, rate limiting (10/min/account), Cloud mode privacy gate, and SelectionReceived WebSocket event.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — backend block contracts\n\nAutomated execution of session-03-backend-block-contracts.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — dashboard ghostwriter ux\n\nWire Obsidian selection ingress through the dashboard composer via URL param and WebSocket, add selection review UX with metadata/text preview, update CTA copy (\"Extract key points\", \"Generate from selection\"), and add heading-anchor deep-links to citation chips.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — dashboard ghostwriter ux\n\nAutomated execution of session-04-dashboard-ghostwriter-ux.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — hook generation engine\n\nAdds POST /api/assist/hooks endpoint that generates 5 differentiated tweet hook options from Ghostwriter context. Reuses TweetFormat taxonomy with always-include Question + ContrarianTake strategy, single LLM call with structured parsing, and selection-aware RAG context resolution. Splits assist.rs into module directory to stay under file size limits.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — hook generation engine\n\nAutomated execution of session-05-hook-generation-engine.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 6 — hook first compose flow\n\nIntegrate hook generation into the Ghostwriter compose flow with a new HookPicker\ncomponent. Users now generate 5 differentiated hooks after curating highlights,\ncompare them side-by-side with style labels and confidence badges, then select one\nto seed tweet or thread generation. Both chunk-selection and Obsidian-selection\npaths support the hook step with full context preservation across retries.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 6 — hook first compose flow\n\nAutomated execution of session-06-hook-first-compose-flow.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 7 — provenance & hook propagation through content lifecycle\n\nPropagate vault provenance links and hook style context through the full\ncontent pipeline: compose → draft/approval/schedule → publish. The compose\nendpoint now accepts provenance refs and hook_style, stores provenance in\nvault_provenance_links, and encodes hook style into the source field as\n\"assist:hook:<style>\". Draft Studio displays provenance as citation chips\nand hook style as a metadata badge.\n\nBackend: provenance insert at all 4 persist paths, copy-on-bridge for\napproval→scheduled, GET /drafts/:id/provenance endpoint, 5 regression tests.\nFrontend: compose request wiring, citation chips in details pane, hook badge\nin metadata section, 13 new unit tests.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* feat: Session 7 — native workflow polish\n\nAutomated execution of session-07-native-workflow-polish.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 8 — deployment-aware privacy & local-first Ghostwriter\n\nDesktop + local vault now has a defensible local-first claim with privacy labels\npropagated through core types, server routes, frontend UI, and the Obsidian plugin.\nSelf-host and Cloud modes are explicit about their privacy envelope via honest copy.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 8 — local first privacy mode\n\nAutomated execution of session-08-local-first-privacy-mode.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 9 — validation and release readiness\n\nFull validation sweep of Ghostwriter Edge (Sessions 2-8) against the epic charter: 16/16 requirements pass, all CI gates green, one mock consistency fix applied. Produced QA matrix, release-readiness report (CONDITIONAL GO), and session handoff.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 9 — validation and release readiness\n\nAutomated execution of session-09-validation-and-release-readiness.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* chore: clean up session artifacts\n\nRemove 37 session files (prompts, plans, logs, handoffs).\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* test: add coverage for ghost-writer patch (VaultSelectionReview, DraftStudio*, CitationChips, client hooks)\n\nAddresses codecov/patch failure on PR #273 by covering the 150 missing\nlines across new/changed components and API endpoints.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: add missing created_at field to ProvenanceLink test fixture\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-03-21T12:53:50-06:00",
+          "tree_id": "e7a4f552911085bb411f7ab9511ad81fdb5e92da",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8c419588d6a3359e5b603ef3e9fce81ca805ce3e"
+        },
+        "date": 1774119561145,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 935.33,
             "unit": "ps"
           }
         ]
