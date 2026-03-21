@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.46](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.45...tuitbot-cli-v0.1.46) - 2026-03-21
+
+### Added
+
+- Twitter-faithful preview + AI key highlights ([#264](https://github.com/aramirez087/TuitBot/pull/264))
+
 ## [0.1.45](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.44...tuitbot-cli-v0.1.45) - 2026-03-21
 
 ### Other
