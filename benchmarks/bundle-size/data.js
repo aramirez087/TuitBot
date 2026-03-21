@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774125667697,
+  "lastUpdate": 1774125680163,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2478,6 +2478,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/d1893ecdb736fd6b29fbe615ff1da34512f9fdc8"
         },
         "date": 1774125666830,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 902531,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 316490,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1258272,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "29d0c055101d7a455c5983118e774a2eaaaa7a64",
+          "message": "devops: document release-plz isolation from plugins/ in release-plz.toml (#276)\n\nrelease-plz operates on the Cargo workspace (Cargo.toml workspace.members),\nwhich lists only crates/tuitbot-{core,cli,mcp,server}. The new plugins/ packages\n(obsidian-tuitbot, openclaw-tuitbot) are pure TypeScript/npm with no Cargo.toml\n— release-plz never reads package.json and cannot be confused by them.\n\nVerification evidence (2026-03-21):\n- find plugins/ -name Cargo.toml → no results\n- PR #274 (latest release-plz release) touched only Cargo.toml bumps + CHANGELOG.md\n- No plugin entries in any release-plz PR\n\nNo code change needed — this commit documents the confirmed safe state to prevent\nfuture contributors from adding unnecessary exclude rules or worrying about drift.\n\nResolves task ed54feb3 (D2: release-plz multi-workspace fix).\n\nCo-authored-by: CI-Wrench <ci-wrench@tuitbot.local>",
+          "timestamp": "2026-03-21T14:40:35-06:00",
+          "tree_id": "f92e4c840b1b8146fbcdb503a755890741c54990",
+          "url": "https://github.com/aramirez087/TuitBot/commit/29d0c055101d7a455c5983118e774a2eaaaa7a64"
+        },
+        "date": 1774125679460,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
