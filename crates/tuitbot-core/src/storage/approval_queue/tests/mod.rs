@@ -2,4 +2,5 @@
 
 mod crud;
 mod edge_cases;
+mod isolation;
 mod workflow;
