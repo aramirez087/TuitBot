@@ -841,6 +841,22 @@ export interface VaultNoteDetail {
 	chunks: VaultChunkSummary[];
 }
 
+// --- Ghostwriter selection (from Obsidian plugin) ---
+
+export interface VaultSelectionResponse {
+	session_id: string;
+	vault_name: string;
+	file_path: string;
+	selected_text: string | null;
+	heading_context: string | null;
+	note_title: string | null;
+	frontmatter_tags: string[] | null;
+	resolved_node_id: number | null;
+	resolved_chunk_id: number | null;
+	created_at: string;
+	expires_at: string;
+}
+
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.
 export interface McpToolParam {
 	name: string;

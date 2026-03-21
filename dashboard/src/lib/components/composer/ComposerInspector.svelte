@@ -24,9 +24,11 @@
 		hasExistingContent,
 		threadFlowRef,
 		voicePanelRef = $bindable<VoiceContextPanel | undefined>(undefined),
+		selectionSessionId = null,
 		onclose,
 		onundo,
 		onsubmiterror,
+		onSelectionConsumed,
 	}: {
 		open?: boolean;
 		isMobile?: boolean;
@@ -44,11 +46,13 @@
 		targetDate: Date;
 		timezone?: string;
 		hasExistingContent: boolean;
+		selectionSessionId?: string | null;
 		threadFlowRef?: ThreadFlowLane;
 		voicePanelRef?: VoiceContextPanel;
 		onclose?: () => void;
 		onundo?: () => void;
 		onsubmiterror?: (msg: string) => void;
+		onSelectionConsumed?: () => void;
 	} = $props();
 
 	// ── Undo timer (AI operations) ─────────────────────────
@@ -194,6 +198,7 @@
 		notesPanelMode,
 		showUndo,
 		mode,
+		selectionSessionId,
 	});
 
 	function handleScheduleSelect(date: string, time: string) {
@@ -230,6 +235,7 @@
 					ongeneratefromvault={handleGenerateFromVault}
 					onclosenotes={() => { notesPanelMode = null; }}
 					onundo={() => { onundo?.(); }}
+					{onSelectionConsumed}
 				/>
 			</div>
 		</div>
@@ -248,6 +254,7 @@
 		ongeneratefromvault={handleGenerateFromVault}
 		onclosenotes={() => { notesPanelMode = null; }}
 		onundo={() => { onundo?.(); }}
+		{onSelectionConsumed}
 	/>
 {/if}
 

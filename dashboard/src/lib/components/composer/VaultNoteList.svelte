@@ -11,6 +11,7 @@
 		selectedChunks: Map<number, { nodeId: number; heading: string }>;
 		atLimit: boolean;
 		searchQuery: string;
+		resolvedChunkId?: number | null;
 		onToggleNote: (nodeId: number) => void;
 		onToggleChunk: (chunkId: number, nodeId: number, heading: string) => void;
 	}
@@ -24,6 +25,7 @@
 		selectedChunks,
 		atLimit,
 		searchQuery,
+		resolvedChunkId = null,
 		onToggleNote,
 		onToggleChunk,
 	}: Props = $props();
@@ -84,10 +86,12 @@
 							{#each expandedNote.chunks as chunk (chunk.chunk_id)}
 								{@const isSelected = selectedChunks.has(chunk.chunk_id)}
 								{@const isDisabled = atLimit && !isSelected}
+								{@const isResolved = resolvedChunkId === chunk.chunk_id}
 								<label
 									class="vault-chunk-row"
 									class:selected={isSelected}
 									class:disabled={isDisabled}
+									class:resolved={isResolved}
 								>
 									<input
 										type="checkbox"
@@ -241,6 +245,11 @@
 	.vault-chunk-row.disabled {
 		opacity: 0.45;
 		cursor: not-allowed;
+	}
+
+	.vault-chunk-row.resolved {
+		border-left: 2px solid var(--color-accent);
+		padding-left: 4px;
 	}
 
 	.vault-chunk-cb {

@@ -52,6 +52,19 @@ vi.mock('$lib/api', () => ({
 			}),
 			sources: vi.fn().mockResolvedValue({
 				sources: [{ id: 'source-1', name: 'Knowledge Base' }]
+			}),
+			getSelection: vi.fn().mockResolvedValue({
+				session_id: 'test-session-123',
+				vault_name: 'marketing',
+				file_path: 'content/ideas.md',
+				selected_text: 'Selected block of text from Obsidian',
+				heading_context: 'Ideas > Marketing',
+				note_title: 'Content Ideas',
+				frontmatter_tags: ['marketing', 'ideas'],
+				resolved_node_id: 42,
+				resolved_chunk_id: 99,
+				created_at: '2024-01-01T00:00:00Z',
+				expires_at: '2024-01-01T00:30:00Z'
 			})
 		},
 		assist: {
@@ -336,11 +349,11 @@ describe('FromVaultPanel', () => {
 		expect(container).toBeTruthy();
 	});
 
-	it('shows Extract Highlights button instead of Generate', () => {
+	it('shows Extract key points button instead of Generate', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		const buttons = container.querySelectorAll('button');
 		const extractBtn = Array.from(buttons).find(
-			(b) => b.textContent?.includes('Extract Highlights')
+			(b) => b.textContent?.includes('Extract key points')
 		);
 		expect(extractBtn).toBeTruthy();
 	});
@@ -357,7 +370,7 @@ describe('FromVaultPanel', () => {
 	it('extract highlights button is disabled when no chunks selected', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		const extractBtn = Array.from(container.querySelectorAll('button')).find(
-			(b) => b.textContent?.includes('Extract Highlights')
+			(b) => b.textContent?.includes('Extract key points')
 		) as HTMLButtonElement | undefined;
 		expect(extractBtn?.disabled).toBe(true);
 	});
@@ -398,12 +411,148 @@ describe('FromVaultPanel', () => {
 	});
 
 	it('shows Extracting state text on button during extraction', async () => {
-		// We verify the initial disabled state renders "Extract Highlights"
+		// We verify the initial disabled state renders "Extract key points"
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		const extractBtn = Array.from(container.querySelectorAll('button')).find(
-			(b) => b.textContent?.includes('Extract Highlights') || b.textContent?.includes('Extracting')
+			(b) => b.textContent?.includes('Extract key points') || b.textContent?.includes('Extracting')
 		);
 		expect(extractBtn).toBeTruthy();
-		expect(extractBtn?.textContent?.trim()).toBe('Extract Highlights');
+		expect(extractBtn?.textContent?.trim()).toBe('Extract key points');
+	});
+
+	// --- Selection hydration tests ---
+
+	it('enters selection mode when selectionSessionId is provided', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		// Wait for hydration to complete
+		await vi.waitFor(() => {
+			const selectionReview = container.querySelector('.vault-selection-review');
+			expect(selectionReview).toBeTruthy();
+		});
+	});
+
+	it('displays note title from hydrated selection', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		await vi.waitFor(() => {
+			const meta = container.querySelector('.selection-source-path');
+			expect(meta?.textContent).toContain('Content Ideas');
+		});
+	});
+
+	it('displays heading context from hydrated selection', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		await vi.waitFor(() => {
+			const heading = container.querySelector('.selection-heading');
+			expect(heading?.textContent).toContain('Ideas > Marketing');
+		});
+	});
+
+	it('displays selected text preview from hydrated selection', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		await vi.waitFor(() => {
+			const preview = container.querySelector('.selection-text-preview');
+			expect(preview?.textContent).toContain('Selected block of text from Obsidian');
+		});
+	});
+
+	it('displays frontmatter tags from hydrated selection', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		await vi.waitFor(() => {
+			const tags = container.querySelectorAll('.selection-tag');
+			expect(tags.length).toBe(2);
+			expect(tags[0]?.textContent).toContain('marketing');
+			expect(tags[1]?.textContent).toContain('ideas');
+		});
+	});
+
+	it('shows "Generate from selection" CTA in selection mode', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		await vi.waitFor(() => {
+			const btn = Array.from(container.querySelectorAll('button')).find(
+				(b) => b.textContent?.includes('Generate from selection')
+			);
+			expect(btn).toBeTruthy();
+		});
+	});
+
+	it('shows expired state when selection fetch fails', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'expired-session' }
+		});
+		await vi.waitFor(() => {
+			const expiredText = container.textContent;
+			expect(expiredText).toContain('Selection expired');
+		});
+	});
+
+	it('shows browse vault button when selection is expired', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'expired-session' }
+		});
+		await vi.waitFor(() => {
+			const btn = container.querySelector('.vault-expired-dismiss');
+			expect(btn?.textContent).toContain('Browse vault');
+		});
+	});
+
+	it('calls onSelectionConsumed after hydration', async () => {
+		const onSelectionConsumed = vi.fn();
+		render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123', onSelectionConsumed }
+		});
+		await vi.waitFor(() => {
+			expect(onSelectionConsumed).toHaveBeenCalled();
+		});
+	});
+
+	it('does not render search input in selection mode', async () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const searchInput = container.querySelector('input[type="text"]');
+		expect(searchInput).toBeFalsy();
+	});
+
+	it('shows cloud mode privacy note when selected_text is null', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			session_id: 'cloud-session',
+			vault_name: 'marketing',
+			file_path: 'content/ideas.md',
+			selected_text: null,
+			heading_context: 'Ideas > Marketing',
+			note_title: 'Content Ideas',
+			frontmatter_tags: null,
+			resolved_node_id: 42,
+			resolved_chunk_id: 99,
+			created_at: '2024-01-01T00:00:00Z',
+			expires_at: '2024-01-01T00:30:00Z'
+		});
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, selectionSessionId: 'cloud-session' }
+		});
+		await vi.waitFor(() => {
+			const note = container.querySelector('.selection-text-cloud-note');
+			expect(note?.textContent).toContain('cloud mode');
+		});
 	});
 });

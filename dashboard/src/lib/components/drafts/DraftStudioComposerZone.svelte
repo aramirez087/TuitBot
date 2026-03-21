@@ -15,12 +15,14 @@
 		hydrationDraftId: number | null;
 		loadingDraft: boolean;
 		publishEnabled: boolean;
+		selectionSessionId?: string | null;
 		onToggleDrawer: () => void;
 		onSyncStatus: (status: SyncStatus) => void;
 		onDraftAction: (actionId: string) => void;
 		onDraftSubmit: (data: ComposeRequest) => void;
 		onFetchDraft: (id: number) => void;
 		onCreate: () => void;
+		onSelectionConsumed?: () => void;
 	}
 
 	const {
@@ -29,12 +31,14 @@
 		hydrationDraftId,
 		loadingDraft,
 		publishEnabled,
+		selectionSessionId = null,
 		onToggleDrawer,
 		onSyncStatus,
 		onDraftAction,
 		onDraftSubmit,
 		onFetchDraft,
 		onCreate,
+		onSelectionConsumed,
 	}: Props = $props();
 
 	const paletteActions: PaletteAction[] = [
@@ -122,11 +126,13 @@
 					embedded={true}
 					schedule={$scheduleStore}
 					canPublish={publishEnabled}
+					{selectionSessionId}
 					onsubmit={onDraftSubmit}
 					onsyncstatus={onSyncStatus}
 					extraPaletteActions={paletteActions}
 					ondraftaction={onDraftAction}
 					headerLeft={headerLeftControls}
+					onSelectionConsumed={onSelectionConsumed}
 				/>
 			{/key}
 		{:else}

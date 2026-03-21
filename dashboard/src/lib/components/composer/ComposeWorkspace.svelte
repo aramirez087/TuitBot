@@ -28,6 +28,7 @@
 		prefillDate = null,
 		embedded = false,
 		canPublish = true,
+		selectionSessionId = null,
 		// DraftStudio integration props (optional, handled externally)
 		draftId: _draftId = undefined,
 		initialContent: _initialContent = undefined,
@@ -35,6 +36,7 @@
 		extraPaletteActions: _extraPaletteActions = undefined,
 		ondraftaction: _ondraftaction = undefined,
 		headerLeft: _headerLeft = undefined,
+		onSelectionConsumed,
 	}: {
 		schedule: ScheduleConfig | null;
 		onsubmit: (data: ComposeRequest) => void | Promise<void>;
@@ -43,12 +45,14 @@
 		prefillDate?: Date | null;
 		embedded?: boolean;
 		canPublish?: boolean;
+		selectionSessionId?: string | null;
 		draftId?: unknown;
 		initialContent?: unknown;
 		onsyncstatus?: unknown;
 		extraPaletteActions?: unknown;
 		ondraftaction?: unknown;
 		headerLeft?: unknown;
+		onSelectionConsumed?: () => void;
 	} = $props();
 
 	// ── State ──────────────────────────────────────────────
@@ -131,6 +135,13 @@
 	$effect(() => {
 		if (!modeInitialized) { modeInitialized = true; return; }
 		statusAnnouncement = mode === 'tweet' ? 'Switched to tweet mode' : 'Switched to thread mode';
+	});
+
+	$effect(() => {
+		if (selectionSessionId) {
+			notesPanelMode = 'vault';
+			if (!inspectorOpen) inspectorOpen = true;
+		}
 	});
 
 	// ── Lifecycle ──────────────────────────────────────────
@@ -270,6 +281,7 @@
 				bind:assisting bind:voiceCue bind:notesPanelMode bind:showUndo bind:undoMessage
 				bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
 				bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
+				{selectionSessionId} {onSelectionConsumed}
 				onundo={handleUndo}
 				onsubmiterror={(msg) => { submitError = msg; }}
 			/>
@@ -283,6 +295,7 @@
 			bind:assisting bind:voiceCue bind:notesPanelMode bind:showUndo bind:undoMessage
 			bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
 			bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
+			{selectionSessionId} {onSelectionConsumed}
 			onclose={() => { inspectorOpen = false; }}
 			onundo={handleUndo}
 			onsubmiterror={(msg) => { submitError = msg; }}

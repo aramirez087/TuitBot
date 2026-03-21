@@ -9,6 +9,7 @@
 	import type { SyncStatus } from '$lib/utils/composerAutosave';
 	import type { ComposeRequest } from '$lib/api';
 	import { matchEvent } from '$lib/utils/shortcuts';
+	import { events as wsEvents } from '$lib/stores/websocket';
 	import { parseServerDraft } from '$lib/utils/draftStudioParse';
 	import type { HydrationPayload } from '$lib/utils/draftStudioParse';
 	import DraftStudioDrawer from './DraftStudioDrawer.svelte';
@@ -23,6 +24,8 @@
 	let prefillSchedule = $state<string | null>(null);
 	let drawerOpen = $state(false);
 	let approvalMode = $state(true);
+	let selectionSessionId = $state<string | null>(null);
+	let lastConsumedSelectionId = $state<string | null>(null);
 
 	const publishEnabled = $derived($canPost && !approvalMode);
 
@@ -71,6 +74,15 @@
 			history.replaceState(null, '', url.toString());
 		}
 
+		const selectionParam = $page.url.searchParams.get('selection');
+		if (selectionParam) {
+			selectionSessionId = selectionParam;
+			lastConsumedSelectionId = selectionParam;
+			const url = new URL(window.location.href);
+			url.searchParams.delete('selection');
+			history.replaceState(null, '', url.toString());
+		}
+
 		const handler = () => {
 			studio.reset();
 			hydration = null;
@@ -108,6 +120,17 @@
 			studio.loadRevisions();
 			studio.loadActivity();
 		}
+	});
+
+	$effect(() => {
+		const eventList = $wsEvents;
+		if (eventList.length === 0) return;
+		const latest = eventList[0];
+		if (latest.type !== 'SelectionReceived') return;
+		const sid = latest.session_id as string | undefined;
+		if (!sid || sid === lastConsumedSelectionId) return;
+		selectionSessionId = sid;
+		lastConsumedSelectionId = sid;
 	});
 
 	async function fetchDraft(id: number) {
@@ -278,12 +301,14 @@
 		{hydrationDraftId}
 		{loadingDraft}
 		{publishEnabled}
+		{selectionSessionId}
 		onToggleDrawer={() => (drawerOpen = !drawerOpen)}
 		onSyncStatus={handleSyncStatus}
 		onDraftAction={handleDraftAction}
 		onDraftSubmit={handleDraftSubmit}
 		onFetchDraft={fetchDraft}
 		onCreate={handleCreate}
+		onSelectionConsumed={() => { selectionSessionId = null; }}
 	/>
 
 	{#if detailsPanelOpen && studio.getSelectedId() !== null}

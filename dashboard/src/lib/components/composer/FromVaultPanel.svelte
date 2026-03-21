@@ -6,21 +6,26 @@
 	import VaultNoteList from './VaultNoteList.svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import VaultHighlights from './VaultHighlights.svelte';
+	import VaultSelectionReview from './VaultSelectionReview.svelte';
 
 	let {
 		mode = 'tweet',
 		hasExistingContent = false,
+		selectionSessionId = null,
 		ongenerate,
 		onclose,
 		onundo,
 		showUndo = false,
+		onSelectionConsumed,
 	}: {
 		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
+		selectionSessionId?: string | null;
 		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[]) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;
+		onSelectionConsumed?: () => void;
 	} = $props();
 
 	let outputFormat: 'tweet' | 'thread' = $state('tweet');
@@ -44,6 +49,7 @@
 	let highlightsStep = $state<Array<{ text: string; enabled: boolean }> | null>(null);
 	let extracting = $state(false);
 	let cachedNodeIds = $state<number[]>([]);
+	let selectionActive = $state(false);
 
 	const selectionCount = $derived(selectedChunks.size);
 	const atLimit = $derived(selectionCount >= MAX_SELECTIONS);
@@ -137,6 +143,10 @@
 	}
 
 	onMount(async () => {
+		if (selectionSessionId) {
+			selectionActive = true;
+			return;
+		}
 		searchRef?.focus();
 		try {
 			const sourcesResult = await api.vault.sources();
@@ -159,7 +169,19 @@
 		</button>
 	</div>
 
-	{#if noSources}
+	{#if selectionActive && selectionSessionId}
+		<VaultSelectionReview
+			sessionId={selectionSessionId}
+			{outputFormat}
+			{hasExistingContent}
+			{showUndo}
+			{onundo}
+			{ongenerate}
+			{onSelectionConsumed}
+			onexpired={() => { selectionActive = false; }}
+			onformatchange={(f) => { outputFormat = f; }}
+		/>
+	{:else if noSources}
 		<div class="vault-empty-state">
 			<FileText size={20} />
 			<p>No vault sources configured.</p>

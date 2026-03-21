@@ -17,6 +17,7 @@
 		notesPanelMode,
 		showUndo,
 		mode,
+		selectionSessionId = null,
 		onscheduleselect,
 		onunschedule,
 		oncuechange,
@@ -27,6 +28,7 @@
 		ongeneratefromvault,
 		onclosenotes,
 		onundo,
+		onSelectionConsumed,
 		voicePanelRef = $bindable()
 	}: {
 		schedule: ScheduleConfig | null;
@@ -40,6 +42,7 @@
 		notesPanelMode: 'notes' | 'vault' | null;
 		showUndo: boolean;
 		mode: 'tweet' | 'thread';
+		selectionSessionId?: string | null;
 		onscheduleselect: (date: string, time: string) => void;
 		onunschedule: () => void;
 		oncuechange: (cue: string) => void;
@@ -50,6 +53,7 @@
 		ongeneratefromvault: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[]) => Promise<void>;
 		onclosenotes: () => void;
 		onundo: () => void;
+		onSelectionConsumed?: () => void;
 		voicePanelRef?: VoiceContextPanel;
 	} = $props();
 </script>
@@ -100,7 +104,7 @@
 			class:active={notesPanelMode === 'vault'}
 			onclick={onopenvault}
 		>
-			From vault
+			From vault{#if selectionSessionId}<span class="selection-dot" title="Selection pending"></span>{/if}
 		</button>
 	</div>
 </div>
@@ -122,10 +126,12 @@
 		<FromVaultPanel
 			{mode}
 			{hasExistingContent}
+			{selectionSessionId}
 			ongenerate={ongeneratefromvault}
 			onclose={onclosenotes}
 			onundo={onundo}
 			{showUndo}
+			{onSelectionConsumed}
 		/>
 	</div>
 {/if}
@@ -218,9 +224,28 @@
 		border-color: var(--color-accent);
 	}
 
+	.selection-dot {
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		margin-left: 4px;
+		vertical-align: middle;
+		animation: pulse-dot 1.5s ease-in-out infinite;
+	}
+
+	@keyframes pulse-dot {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.4; }
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		.ai-action-btn {
 			transition: none;
+		}
+		.selection-dot {
+			animation: none;
 		}
 	}
 

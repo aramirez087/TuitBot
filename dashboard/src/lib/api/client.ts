@@ -50,6 +50,7 @@ import type {
 	VaultSourceStatus,
 	VaultNoteItem,
 	VaultNoteDetail,
+	VaultSelectionResponse,
 	ProvenanceRef,
 	DraftSummary,
 	AutosaveResponse,
@@ -805,6 +806,8 @@ export const api = {
 			request<{ citations: VaultCitation[] }>('/api/vault/resolve-refs', {
 				method: 'POST',
 				body: JSON.stringify({ node_ids: nodeIds })
-			})
+			}),
+		getSelection: (sessionId: string) =>
+			request<VaultSelectionResponse>(`/api/vault/selection/${encodeURIComponent(sessionId)}`)
 	}
 };
