@@ -73,7 +73,7 @@ fn validate_minimum_invalid_llm_provider() {
 
 #[test]
 fn validate_minimum_valid_llm_providers() {
-    for provider in &["openai", "anthropic", "ollama"] {
+    for provider in &["openai", "anthropic", "ollama", "groq"] {
         let mut config = Config::default();
         config.business.product_name = "Test".to_string();
         config.business.product_keywords = vec!["test".to_string()];

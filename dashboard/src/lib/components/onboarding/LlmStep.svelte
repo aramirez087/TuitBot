@@ -11,6 +11,7 @@
 	const providers = [
 		{ value: 'openai', label: 'OpenAI', defaultModel: 'gpt-4o-mini' },
 		{ value: 'anthropic', label: 'Anthropic', defaultModel: 'claude-sonnet-4-6' },
+		{ value: 'groq', label: 'Groq', defaultModel: 'llama-3.3-70b-versatile' },
 		{ value: 'ollama', label: 'Ollama (local)', defaultModel: 'llama3.2' },
 	];
 
@@ -76,7 +77,7 @@
 					id="llm-key"
 					type="password"
 					class="field-input"
-					placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
+					placeholder={provider === 'openai' ? 'sk-...' : provider === 'groq' ? 'gsk_...' : 'sk-ant-...'}
 					bind:value={apiKey}
 				/>
 			</div>

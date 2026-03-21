@@ -30,6 +30,7 @@ pub fn lookup(provider: &str, model: &str) -> ModelPricing {
         "anthropic" => lookup_anthropic(model),
         "gemini" | "google" => lookup_gemini(model),
         "deepseek" => lookup_deepseek(model),
+        "groq" => lookup_groq(model),
         // Ollama and unknowns are free (local inference).
         _ => ModelPricing {
             input_per_million: 0.0,
@@ -144,6 +145,36 @@ fn lookup_deepseek(model: &str) -> ModelPricing {
         ModelPricing {
             input_per_million: 0.27,
             output_per_million: 1.10,
+        }
+    }
+}
+
+fn lookup_groq(model: &str) -> ModelPricing {
+    if model.contains("llama-3.3-70b") {
+        ModelPricing {
+            input_per_million: 0.59,
+            output_per_million: 0.79,
+        }
+    } else if model.contains("llama-3.1-8b") || model.contains("llama-3-8b") {
+        ModelPricing {
+            input_per_million: 0.05,
+            output_per_million: 0.08,
+        }
+    } else if model.contains("mixtral") {
+        ModelPricing {
+            input_per_million: 0.24,
+            output_per_million: 0.24,
+        }
+    } else if model.contains("gemma2-9b") {
+        ModelPricing {
+            input_per_million: 0.20,
+            output_per_million: 0.20,
+        }
+    } else {
+        // Unknown Groq model — use llama-3.3-70b pricing.
+        ModelPricing {
+            input_per_million: 0.59,
+            output_per_million: 0.79,
         }
     }
 }

@@ -9,13 +9,15 @@
 	const modelSuggestions: Record<string, string> = {
 		openai: 'gpt-4o-mini',
 		anthropic: 'claude-sonnet-4-5-20250514',
-		ollama: 'llama3.1'
+		ollama: 'llama3.1',
+		groq: 'llama-3.3-70b-versatile'
 	};
 
 	const baseUrlPlaceholders: Record<string, string> = {
 		openai: 'https://api.openai.com/v1',
 		anthropic: 'https://api.anthropic.com/v1',
-		ollama: 'http://localhost:11434/v1'
+		ollama: 'http://localhost:11434/v1',
+		groq: 'https://api.groq.com/openai/v1'
 	};
 </script>
 
@@ -40,6 +42,7 @@
 				<option value="">Select provider...</option>
 				<option value="openai">OpenAI</option>
 				<option value="anthropic">Anthropic</option>
+				<option value="groq">Groq</option>
 				<option value="ollama">Ollama</option>
 			</select>
 		</div>
@@ -62,7 +65,7 @@
 			{/if}
 		</div>
 
-		{#if $draft.llm.provider === 'openai' || $draft.llm.provider === 'anthropic'}
+		{#if $draft.llm.provider === 'openai' || $draft.llm.provider === 'anthropic' || $draft.llm.provider === 'groq'}
 			<div class="field full-width">
 				<label class="field-label" for="llm_api_key">API Key</label>
 				<div class="password-wrapper">
@@ -76,7 +79,7 @@
 								'llm.api_key',
 								e.currentTarget.value || null
 							)}
-						placeholder="sk-..."
+						placeholder={$draft.llm.provider === 'groq' ? 'gsk_...' : 'sk-...'}
 					/>
 					<button
 						type="button"

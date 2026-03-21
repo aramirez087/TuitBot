@@ -306,7 +306,7 @@ fn default_max_target_replies_per_day() -> u32 {
 /// LLM provider configuration.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct LlmConfig {
-    /// LLM provider name: "openai", "anthropic", or "ollama".
+    /// LLM provider name: "openai", "anthropic", "ollama", or "groq".
     #[serde(default)]
     pub provider: String,
 

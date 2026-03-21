@@ -94,6 +94,36 @@ pub fn create_provider(config: &LlmConfig) -> Result<Box<dyn LlmProvider>, LlmEr
                 Ok(Box::new(AnthropicProvider::new(api_key, model)))
             }
         }
+        "groq" => {
+            let api_key = config
+                .api_key
+                .as_deref()
+                .filter(|k| !k.is_empty())
+                .ok_or(LlmError::NotConfigured)?
+                .to_string();
+
+            let base_url = config
+                .base_url
+                .as_deref()
+                .filter(|u| !u.is_empty())
+                .unwrap_or("https://api.groq.com/openai/v1")
+                .to_string();
+
+            let model = if config.model.is_empty() {
+                "llama-3.3-70b-versatile".to_string()
+            } else {
+                config.model.clone()
+            };
+
+            tracing::info!(provider = "groq", model = %model, base_url = %base_url, "Creating LLM provider");
+
+            Ok(Box::new(OpenAiCompatProvider::new(
+                base_url,
+                api_key,
+                model,
+                "groq".to_string(),
+            )))
+        }
         "" => Err(LlmError::NotConfigured),
         _other => Err(LlmError::NotConfigured),
     }
@@ -302,6 +332,44 @@ mod tests {
         };
         let provider = create_provider(&config).expect("create");
         assert_eq!(provider.name(), "openai");
+    }
+
+    #[test]
+    fn create_groq_provider() {
+        let config = LlmConfig {
+            provider: "groq".to_string(),
+            api_key: Some("gsk_test".to_string()),
+            model: "llama-3.3-70b-versatile".to_string(),
+            base_url: None,
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "groq");
+    }
+
+    #[test]
+    fn create_groq_requires_api_key() {
+        let config = LlmConfig {
+            provider: "groq".to_string(),
+            api_key: None,
+            model: String::new(),
+            base_url: None,
+        };
+        assert!(matches!(
+            create_provider(&config),
+            Err(LlmError::NotConfigured)
+        ));
+    }
+
+    #[test]
+    fn create_groq_default_model_when_empty() {
+        let config = LlmConfig {
+            provider: "groq".to_string(),
+            api_key: Some("gsk_test".to_string()),
+            model: String::new(),
+            base_url: None,
+        };
+        let provider = create_provider(&config).expect("create");
+        assert_eq!(provider.name(), "groq");
     }
 
     #[test]
