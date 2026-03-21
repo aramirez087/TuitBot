@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774060548391,
+  "lastUpdate": 1774064605718,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1389,6 +1389,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 938.7,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a1c753383c6d713ac3531ae50f13cbbcaf35f21",
+          "message": "feat: Twitter-faithful preview + AI key highlights (#264)\n\n* feat: Twitter-faithful preview with device toggle and AI key highlights\n\nAdd two features improving the composer experience:\n\n1. Preview now renders with Twitter-faithful styling (40px avatar, 15px\n   font, display name + @handle + timestamp, action bar icons) and a\n   desktop/mobile toggle that switches container width between 600px\n   and 375px — matching how Twitter actually renders on different devices.\n\n2. Vault-to-content flow now includes an intermediate \"Extract Highlights\"\n   step: the AI summarizes selected vault notes into 3-5 bullet points,\n   the user curates which highlights to keep, then generates content from\n   the curated selection instead of raw notes.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* test: improve coverage for highlights flow and preview components\n\nAdd tests for ComposerInspector handleGenerateFromVault with highlights\n(tweet/thread modes, voiceCue inclusion, error reporting), FromVaultPanel\nExtract Highlights button state, and VaultHighlights count display with\npartially enabled highlights.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-20T21:41:06-06:00",
+          "tree_id": "e1e61f4a95c084f56d8bbdb5556b7e7c2dc06d79",
+          "url": "https://github.com/aramirez087/TuitBot/commit/1a1c753383c6d713ac3531ae50f13cbbcaf35f21"
+        },
+        "date": 1774064604887,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.26,
             "unit": "ps"
           }
         ]
