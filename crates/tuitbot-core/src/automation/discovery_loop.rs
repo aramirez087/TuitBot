@@ -961,6 +961,148 @@ mod tests {
         assert!(results.is_empty());
     }
 
+    // ── S7-Q1 Baseline: AC4+AC6 ─────────────────────────────────────────────
+    // Finder locates relevant accounts by topic; full loop iteration with mock X client
+    #[tokio::test]
+    async fn baseline_finder_locates_accounts_by_topic_full_iteration() {
+        let tweets = vec![test_tweet("d1", "alice"), test_tweet("d2", "bob")];
+        let (discovery, poster, _storage) = build_loop(tweets, 85.0, true, false);
+
+        let (results, summary) = discovery.run_once(None).await.expect("baseline");
+
+        // Both keywords ("rust", "cli") searched — finder located accounts in each topic
+        assert!(
+            summary.tweets_found >= 2,
+            "baseline: finder must locate accounts across keywords"
+        );
+        assert!(
+            summary.replied >= 2,
+            "baseline: full loop iteration must post replies"
+        );
+        assert!(!results.is_empty(), "baseline: results must not be empty");
+        assert!(
+            poster.sent_count() >= 2,
+            "baseline: mock X client received replies"
+        );
+    }
+
+    // ── S7-Q1 Baseline: AC5 ─────────────────────────────────────────────────
+    // Ranker scores and sorts candidates correctly (above threshold replied, below skipped)
+    #[tokio::test]
+    async fn baseline_ranker_scores_filters_above_and_below_threshold() {
+        // Scorer: tweet "d1" → 90 (above), tweet "d2" → 20 (below)
+        struct ThresholdTestScorer;
+        impl TweetScorer for ThresholdTestScorer {
+            fn score(&self, tweet: &LoopTweet) -> ScoreResult {
+                if tweet.id == "d1" {
+                    ScoreResult {
+                        total: 90.0,
+                        meets_threshold: true,
+                        matched_keywords: vec!["rust".into()],
+                    }
+                } else {
+                    ScoreResult {
+                        total: 20.0,
+                        meets_threshold: false,
+                        matched_keywords: vec![],
+                    }
+                }
+            }
+        }
+
+        let poster = Arc::new(MockPoster::new());
+        let storage = Arc::new(MockStorage::new());
+        let discovery = DiscoveryLoop::new(
+            Arc::new(MockSearcher {
+                results: vec![test_tweet("d1", "alice"), test_tweet("d2", "bob")],
+            }),
+            Arc::new(ThresholdTestScorer),
+            Arc::new(MockGenerator {
+                reply: "Ranked reply!".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            storage,
+            poster.clone(),
+            vec!["rust".to_string()],
+            70.0,
+            false,
+        );
+
+        let (results, summary) = discovery.search_and_process("rust", None).await.unwrap();
+
+        assert_eq!(
+            summary.tweets_found, 2,
+            "baseline: should process both candidates"
+        );
+        assert_eq!(
+            summary.replied, 1,
+            "baseline: only above-threshold candidate replied"
+        );
+        assert_eq!(
+            summary.skipped, 1,
+            "baseline: below-threshold candidate skipped"
+        );
+        assert_eq!(
+            poster.sent_count(),
+            1,
+            "baseline: ranker selected exactly 1 winner"
+        );
+
+        // Verify the correct (higher-scoring) tweet was selected
+        let replied_id = results.iter().find_map(|r| {
+            if let DiscoveryResult::Replied { tweet_id, .. } = r {
+                Some(tweet_id.as_str())
+            } else {
+                None
+            }
+        });
+        assert_eq!(
+            replied_id,
+            Some("d1"),
+            "baseline: ranker must select highest-scored tweet"
+        );
+    }
+
+    // ── S7-Q1 Baseline: AC7 (discovery side) ────────────────────────────────
+    // Graceful handling of 429 rate-limit response on search
+    #[tokio::test]
+    async fn baseline_discovery_handles_rate_limit_429_on_search() {
+        let poster = Arc::new(MockPoster::new());
+        let storage = Arc::new(MockStorage::new());
+        // FailingSearcher returns RateLimited{retry_after: Some(60)}
+        let discovery = DiscoveryLoop::new(
+            Arc::new(FailingSearcher),
+            Arc::new(MockScorer {
+                score: 85.0,
+                meets_threshold: true,
+            }),
+            Arc::new(MockGenerator {
+                reply: "test".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            storage,
+            poster.clone(),
+            vec!["rust".to_string()],
+            70.0,
+            false,
+        );
+
+        let result = discovery.search_and_process("rust", None).await;
+        assert!(
+            result.is_err(),
+            "baseline: 429 on search must propagate as error"
+        );
+        assert!(
+            matches!(result.unwrap_err(), LoopError::RateLimited { .. }),
+            "baseline: error must be RateLimited variant"
+        );
+        assert_eq!(
+            poster.sent_count(),
+            0,
+            "baseline: no posts when search rate-limited"
+        );
+    }
+
     // ── FailingGenerator ─────────────────────────────────────────────
 
     struct FailingGenerator;
@@ -1040,3 +1182,5 @@ mod tests {
         assert!(matches!(results[0], DiscoveryResult::Failed { .. }));
     }
 }
+
+// ============================================================================
