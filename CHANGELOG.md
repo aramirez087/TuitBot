@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.47](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.46...tuitbot-cli-v0.1.47) - 2026-03-21
+
+### Other
+
+- *(C2)* split automation/discovery_loop.rs into discovery_loop/ submodule ([#267](https://github.com/aramirez087/TuitBot/pull/267))
+- *(C1)* split automation/target_loop.rs into target_loop/ submodule ([#268](https://github.com/aramirez087/TuitBot/pull/268))
+
 ## [0.1.46](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.45...tuitbot-cli-v0.1.46) - 2026-03-21
 
 ### Added
