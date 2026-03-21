@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774046495567,
+  "lastUpdate": 1774055742169,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1245,6 +1245,35 @@ window.BENCHMARK_DATA = {
             "name": "trivial_operation",
             "value": 1.0553,
             "unit": "ns"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bfb324578dbb29f20bde9b5aad9d52d5ea89d994",
+          "message": "Fix/silent recover empty draft (#258)\n\n* fix(composer): auto-recover empty drafts without prompting\n\nWhen the recovered draft has no text content (empty tweet text and no\nnon-empty thread blocks), silently restore it instead of showing the\n\"Unsaved draft found. Recover it?\" banner. Only prompt when there's\nactual text worth deciding about.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix(composer): always silently recover drafts on startup\n\nThe editor is always empty on startup, so there's nothing to lose by\nrecovering. Remove the recovery banner prompt entirely and just restore\nthe saved draft automatically.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* Updated checksum.\n\n---------\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-20T19:10:16-06:00",
+          "tree_id": "a9d847893ff31a4a6459bf0ebf0b4a261f377119",
+          "url": "https://github.com/aramirez087/TuitBot/commit/bfb324578dbb29f20bde9b5aad9d52d5ea89d994"
+        },
+        "date": 1774055741534,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 936.76,
+            "unit": "ps"
           }
         ]
       }
