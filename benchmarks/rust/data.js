@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774085943970,
+  "lastUpdate": 1774104299174,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1534,6 +1534,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 936.77,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0483529eec645edc43a1e744e6b853187ba90bac",
+          "message": "refactor(C1): split automation/target_loop.rs into target_loop/ submodule (#268)\n\ntarget_loop.rs (1054L) → target_loop/{mod(464L), tests/{mod(303L), core(296L)}}\n\nAll files ≤500L. Made truncate pub(crate) for test access.\n\n- mod.rs: TargetLoop struct, config, run_iteration, process_account, process_target_tweet\n- tests/mod.rs: mock implementations + first 10 tests (core behavior)\n- tests/core.rs: remaining 11 tests (edge cases, error handling)\n\n21 original tests preserved, all passing. RUSTFLAGS='-D warnings' clean.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-21T08:39:27-06:00",
+          "tree_id": "3aa2f540c6b40d5d8cf2157a18aeaad2eaf6907e",
+          "url": "https://github.com/aramirez087/TuitBot/commit/0483529eec645edc43a1e744e6b853187ba90bac"
+        },
+        "date": 1774104298488,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 940.18,
             "unit": "ps"
           }
         ]
