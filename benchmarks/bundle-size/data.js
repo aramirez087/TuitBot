@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774058988982,
+  "lastUpdate": 1774059111888,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -1869,6 +1869,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1216010,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9ee7078a37a42909e2351f2271acb627a86a523",
+          "message": "Added groq. (#261)",
+          "timestamp": "2026-03-20T20:11:02-06:00",
+          "tree_id": "2694f26102b0992b0fc5c1bb53d6291240bfd9c8",
+          "url": "https://github.com/aramirez087/TuitBot/commit/f9ee7078a37a42909e2351f2271acb627a86a523"
+        },
+        "date": 1774059110710,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 877145,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 299893,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1216288,
             "unit": "bytes"
           }
         ]
