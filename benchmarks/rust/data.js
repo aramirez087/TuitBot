@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774120591358,
+  "lastUpdate": 1774125761761,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1737,6 +1737,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 932.87,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d1893ecdb736fd6b29fbe615ff1da34512f9fdc8",
+          "message": "ci: add path-filtered plugin CI for obsidian-tuitbot and openclaw-tuitbot (#275)\n\nBoth plugins in plugins/ have TypeScript source and build/test npm scripts.\nThis workflow triggers only when files under plugins/** change, keeping\nunrelated PRs fast.\n\nEach plugin job:\n- Uses npm ci to get linux-native esbuild (darwin binaries were committed)\n- Runs npm run build (esbuild bundle / tsc respectively)\n- Runs npm test (node:test + tsx runner)\n\nFollows dorny/paths-filter@v4 + actions/setup-node@v6 already used in ci.yml.\nResolves task a5bdcb1b (D1: Ghost Writer plugin CI integration).\n\nCo-authored-by: CI-Wrench <ci-wrench@tuitbot.local>",
+          "timestamp": "2026-03-21T14:40:17-06:00",
+          "tree_id": "51b6564a664534eb6be299e28d186b1b0ee10aad",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d1893ecdb736fd6b29fbe615ff1da34512f9fdc8"
+        },
+        "date": 1774125760738,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.55,
             "unit": "ps"
           }
         ]
