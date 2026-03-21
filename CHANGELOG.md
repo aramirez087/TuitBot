@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.49](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.48...tuitbot-cli-v0.1.49) - 2026-03-21
+
+### Fixed
+
+- make hooks parser tolerant of LLM formatting variations ([#277](https://github.com/aramirez087/TuitBot/pull/277))
+
 ## [0.1.48](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.47...tuitbot-cli-v0.1.48) - 2026-03-21
 
 ### Added
