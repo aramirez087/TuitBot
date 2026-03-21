@@ -1,0 +1,23 @@
+{
+  "name": "@tuitbot/obsidian-plugin",
+  "version": "0.1.0",
+  "description": "Send Obsidian selections to TuitBot for content generation",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --outfile=main.js --external:obsidian --external:electron --format=cjs --platform=node --target=es2022",
+    "dev": "esbuild src/main.ts --bundle --outfile=main.js --external:obsidian --external:electron --format=cjs --platform=node --target=es2022 --watch",
+    "test": "node --import tsx --test src/__tests__/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "obsidian": "^1.7.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}
