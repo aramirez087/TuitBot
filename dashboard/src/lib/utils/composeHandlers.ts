@@ -3,7 +3,7 @@
  * Extracted from ComposeWorkspace to keep the orchestrator focused on reactive state.
  */
 
-import type { ComposeRequest, ThreadBlock } from '$lib/api';
+import type { ComposeRequest, ThreadBlock, ProvenanceRef } from '$lib/api';
 import type { AttachedMedia } from '$lib/components/composer/TweetEditor.svelte';
 import { buildScheduledFor } from './timezone';
 
@@ -18,6 +18,10 @@ export interface BuildComposeRequestOpts {
 	timezone?: string;
 	/** Explicit "YYYY-MM-DD" date for scheduling (from SchedulePicker). Takes priority over targetDate. */
 	scheduledDate?: string | null;
+	/** Provenance refs linking this content to vault source material. */
+	provenance?: ProvenanceRef[];
+	/** Hook style tag (e.g. "contrarian_take") for source enrichment. */
+	hookStyle?: string;
 }
 
 /** Build a ComposeRequest from current editor state. */
@@ -54,6 +58,9 @@ export function buildComposeRequest(opts: BuildComposeRequestOpts): ComposeReque
 	}
 
 	if (attachedMedia.length > 0) data.media_paths = attachedMedia.map((m) => m.path);
+
+	if (opts.provenance && opts.provenance.length > 0) data.provenance = opts.provenance;
+	if (opts.hookStyle) data.hook_style = opts.hookStyle;
 
 	return data;
 }

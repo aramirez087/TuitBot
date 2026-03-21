@@ -12,7 +12,7 @@ use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tuitbot_core::storage::scheduled_content;
+use tuitbot_core::storage::{provenance, scheduled_content};
 
 use crate::account::{require_mutate, AccountContext};
 use crate::error::ApiError;
@@ -342,6 +342,17 @@ pub async fn duplicate_studio_draft(
         .await
         .map_err(ApiError::Storage)?
         .ok_or_else(|| ApiError::NotFound(format!("Draft {id} not found")))?;
+
+    // Copy provenance links from original draft to the duplicate.
+    let _ = provenance::copy_links_for(
+        &state.db,
+        &ctx.account_id,
+        "scheduled_content",
+        id,
+        "scheduled_content",
+        new_id,
+    )
+    .await;
 
     // Log created activity on the new draft
     let _ = scheduled_content::insert_activity_for(

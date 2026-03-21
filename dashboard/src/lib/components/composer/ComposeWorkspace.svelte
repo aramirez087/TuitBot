@@ -198,7 +198,9 @@
 		if (!canSubmit || submitting) return;
 		submitting = true; submitError = null;
 		try {
-			const data = buildComposeRequest({ mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia, timezone: accountTimezone, scheduledDate });
+			const provenance = inspectorRef?.getVaultProvenance?.() ?? [];
+		const hookStyle = inspectorRef?.getVaultHookStyle?.() ?? undefined;
+		const data = buildComposeRequest({ mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia, timezone: accountTimezone, scheduledDate, provenance, hookStyle });
 			canvasRef?.clearAutoSave();
 			clearSessionFlag();
 			await onsubmit(data);

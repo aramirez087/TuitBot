@@ -258,6 +258,7 @@ export interface ComposeRequest {
 	media_paths?: string[];
 	blocks?: ThreadBlock[];
 	provenance?: ProvenanceRef[];
+	hook_style?: string;
 }
 
 // Thread content parsing utilities moved to $lib/utils/parseThreadContent.ts
@@ -798,6 +799,20 @@ export interface ProvenanceRef {
 	source_path?: string;
 	heading_path?: string;
 	snippet?: string;
+}
+
+export interface ProvenanceLink {
+	id: number;
+	account_id: string;
+	entity_type: string;
+	entity_id: number;
+	node_id: number | null;
+	chunk_id: number | null;
+	seed_id: number | null;
+	source_path: string | null;
+	heading_path: string | null;
+	snippet: string | null;
+	created_at: string;
 }
 
 export interface VaultSourceStatus {

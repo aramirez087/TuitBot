@@ -23,7 +23,7 @@
 		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
 		selectionSessionId?: string | null;
-		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[]) => Promise<void>;
+		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;
@@ -147,7 +147,7 @@
 		error = null;
 		confirmReplace = false;
 		try {
-			await ongenerate(cachedNodeIds, format, [hook.text]);
+			await ongenerate(cachedNodeIds, format, [hook.text], hook.style);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {

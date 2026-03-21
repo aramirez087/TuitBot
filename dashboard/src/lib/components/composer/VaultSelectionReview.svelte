@@ -22,7 +22,7 @@
 		hasExistingContent?: boolean;
 		showUndo?: boolean;
 		onundo?: () => void;
-		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[]) => Promise<void>;
+		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
 		onSelectionConsumed?: () => void;
 		onexpired?: () => void;
 		onformatchange?: (format: 'tweet' | 'thread') => void;
@@ -76,7 +76,7 @@
 		confirmReplace = false;
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
-			await ongenerate(nodeIds, format, [hook.text]);
+			await ongenerate(nodeIds, format, [hook.text], hook.style);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {

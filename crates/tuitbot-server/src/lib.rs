@@ -150,6 +150,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/drafts/{id}/activity",
             get(routes::content::list_draft_activity),
         )
+        .route(
+            "/drafts/{id}/provenance",
+            get(routes::content::get_draft_provenance),
+        )
         .route("/drafts/{id}/tags", get(routes::content::list_draft_tags))
         .route(
             "/drafts/{id}/tags/{tag_id}",
@@ -171,6 +175,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/content/drafts/{id}/publish",
             post(routes::content::publish_draft),
+        )
+        .route(
+            "/content/drafts/{id}/provenance",
+            get(routes::content::get_draft_provenance),
         )
         // Ingest
         .route("/ingest", post(routes::ingest::ingest))

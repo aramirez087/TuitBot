@@ -2,6 +2,7 @@
 	import { Clock, FileText, Sparkles, Radio } from 'lucide-svelte';
 	import type { DraftSummary } from '$lib/api/types';
 	import { formatInAccountTz } from '$lib/utils/timezone';
+	import { getStyleLabel } from '$lib/utils/hookStyles';
 
 	let {
 		draftSummary,
@@ -11,12 +12,19 @@
 		timezone?: string;
 	} = $props();
 
+	const hookStyleMatch = $derived(
+		draftSummary.source?.match(/^assist:hook:(\w+)$/)
+	);
+	const hookStyleKey = $derived(hookStyleMatch ? hookStyleMatch[1] : null);
+
 	const sourceLabel = $derived(
-		draftSummary.source === 'assist'
+		hookStyleKey
 			? 'AI Assist'
-			: draftSummary.source === 'discovery'
-				? 'Discovery'
-				: 'Manual'
+			: draftSummary.source === 'assist'
+				? 'AI Assist'
+				: draftSummary.source === 'discovery'
+					? 'Discovery'
+					: 'Manual'
 	);
 
 	const statusLabel = $derived(
@@ -71,7 +79,12 @@
 			<Sparkles size={12} />
 			Source
 		</span>
-		<span class="meta-value">{sourceLabel}</span>
+		<span class="meta-value">
+			{sourceLabel}
+			{#if hookStyleKey}
+				<span class="hook-badge">{getStyleLabel(hookStyleKey)}</span>
+			{/if}
+		</span>
 	</div>
 	<div class="meta-row">
 		<span class="meta-label">
@@ -136,6 +149,17 @@
 		font-size: 12px;
 		color: var(--color-text);
 		text-align: right;
+	}
+
+	.hook-badge {
+		font-size: 9px;
+		font-weight: 600;
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+		padding: 1px 5px;
+		border-radius: 3px;
+		margin-left: 4px;
+		white-space: nowrap;
 	}
 
 	.meta-value.type-badge {

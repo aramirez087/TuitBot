@@ -52,6 +52,7 @@ import type {
 	VaultNoteDetail,
 	VaultSelectionResponse,
 	ProvenanceRef,
+	ProvenanceLink,
 	DraftSummary,
 	AutosaveResponse,
 	ContentRevision,
@@ -637,7 +638,8 @@ export const api = {
 		assignTag: (id: number, tagId: number) =>
 			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'POST' }),
 		unassignTag: (id: number, tagId: number) =>
-			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'DELETE' })
+			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'DELETE' }),
+		provenance: (id: number) => request<ProvenanceLink[]>(`/api/drafts/${id}/provenance`)
 	},
 
 	tags: {
