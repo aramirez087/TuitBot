@@ -35,11 +35,11 @@ impl Config {
         // Validate LLM provider value if present (but don't require it)
         if !self.llm.provider.is_empty() {
             match self.llm.provider.as_str() {
-                "openai" | "anthropic" | "ollama" => {}
+                "openai" | "anthropic" | "ollama" | "groq" => {}
                 _ => {
                     errors.push(ConfigError::InvalidValue {
                         field: "llm.provider".to_string(),
-                        message: "must be openai, anthropic, or ollama".to_string(),
+                        message: "must be openai, anthropic, ollama, or groq".to_string(),
                     });
                 }
             }
@@ -127,16 +127,16 @@ impl Config {
         // Validate LLM provider
         if !self.llm.provider.is_empty() {
             match self.llm.provider.as_str() {
-                "openai" | "anthropic" | "ollama" => {}
+                "openai" | "anthropic" | "ollama" | "groq" => {}
                 _ => {
                     errors.push(ConfigError::InvalidValue {
                         field: "llm.provider".to_string(),
-                        message: "must be openai, anthropic, or ollama".to_string(),
+                        message: "must be openai, anthropic, ollama, or groq".to_string(),
                     });
                 }
             }
 
-            if matches!(self.llm.provider.as_str(), "openai" | "anthropic") {
+            if matches!(self.llm.provider.as_str(), "openai" | "anthropic" | "groq") {
                 match &self.llm.api_key {
                     Some(key) if !key.is_empty() => {}
                     _ => {
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn validate_minimum_valid_llm_providers_pass() {
-        for provider in &["openai", "anthropic", "ollama"] {
+        for provider in &["openai", "anthropic", "ollama", "groq"] {
             let mut c = minimal_valid_config();
             c.llm.provider = provider.to_string();
             assert!(

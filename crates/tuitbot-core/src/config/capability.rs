@@ -83,8 +83,10 @@ impl CapabilityTier {
                 let mut missing = Vec::new();
                 if config.llm.provider.is_empty() {
                     missing.push("LLM provider".to_string());
-                } else if matches!(config.llm.provider.as_str(), "openai" | "anthropic")
-                    && config.llm.api_key.as_ref().map_or(true, |k| k.is_empty())
+                } else if matches!(
+                    config.llm.provider.as_str(),
+                    "openai" | "anthropic" | "groq"
+                ) && config.llm.api_key.as_ref().map_or(true, |k| k.is_empty())
                 {
                     missing.push("LLM API key".to_string());
                 }
