@@ -1,6 +1,8 @@
 //! Discovery loop tests.
 
-use super::*;
+use super::super::*;
+use super::truncate;
+use crate::automation::loop_helpers::LoopError;
 use crate::automation::ScoreResult;
 use std::sync::Mutex;
 
@@ -10,20 +12,36 @@ struct MockSearcher {
     results: Vec<LoopTweet>,
 }
 
+#[async_trait::async_trait]
 impl TweetSearcher for MockSearcher {
-    async fn search(&self, _keyword: &str) -> Result<Vec<LoopTweet>, String> {
+    async fn search_tweets(&self, _query: &str) -> Result<Vec<LoopTweet>, LoopError> {
         Ok(self.results.clone())
     }
 }
 
-#[derive(Clone)]
+struct FailingSearcher;
+
+#[async_trait::async_trait]
+impl TweetSearcher for FailingSearcher {
+    async fn search_tweets(&self, _query: &str) -> Result<Vec<LoopTweet>, LoopError> {
+        Err(LoopError::RateLimited {
+            retry_after: Some(60),
+        })
+    }
+}
+
 struct MockScorer {
-    scores: Vec<f32>,
+    score: f32,
+    meets_threshold: bool,
 }
 
 impl TweetScorer for MockScorer {
-    fn score(&self, _tweet: &LoopTweet, _threshold: f32) -> Option<f32> {
-        self.scores.first().copied()
+    fn score(&self, _tweet: &LoopTweet) -> ScoreResult {
+        ScoreResult {
+            total: self.score,
+            meets_threshold: self.meets_threshold,
+            matched_keywords: vec!["test".to_string()],
+        }
     }
 }
 
@@ -31,43 +49,109 @@ struct MockGenerator {
     reply: String,
 }
 
+#[async_trait::async_trait]
 impl ReplyGenerator for MockGenerator {
-    async fn generate(&self, _tweet: &LoopTweet) -> Result<String, String> {
+    async fn generate_reply(
+        &self,
+        _tweet_text: &str,
+        _author: &str,
+        _mention_product: bool,
+    ) -> Result<String, LoopError> {
         Ok(self.reply.clone())
     }
 }
 
-struct MockSafety;
+struct MockSafety {
+    can_reply: bool,
+    replied_ids: Mutex<Vec<String>>,
+}
 
-impl SafetyChecker for MockSafety {
-    async fn check(&self, _reply: &str) -> Result<bool, String> {
-        Ok(true)
-    }
-
-    fn can_generate_reply(&self, _tweet: &LoopTweet) -> bool {
-        true
+impl MockSafety {
+    fn new(can_reply: bool) -> Self {
+        Self {
+            can_reply,
+            replied_ids: Mutex::new(Vec::new()),
+        }
     }
 }
 
-struct MockStorage;
+#[async_trait::async_trait]
+impl SafetyChecker for MockSafety {
+    async fn can_reply(&self) -> bool {
+        self.can_reply
+    }
+    async fn has_replied_to(&self, tweet_id: &str) -> bool {
+        self.replied_ids
+            .lock()
+            .expect("lock")
+            .contains(&tweet_id.to_string())
+    }
+    async fn record_reply(&self, tweet_id: &str, _content: &str) -> Result<(), LoopError> {
+        self.replied_ids
+            .lock()
+            .expect("lock")
+            .push(tweet_id.to_string());
+        Ok(())
+    }
+}
+
+struct MockStorage {
+    existing_ids: Mutex<Vec<String>>,
+    discovered: Mutex<Vec<String>>,
+    actions: Mutex<Vec<(String, String, String)>>,
+}
+
+impl MockStorage {
+    fn new() -> Self {
+        Self {
+            existing_ids: Mutex::new(Vec::new()),
+            discovered: Mutex::new(Vec::new()),
+            actions: Mutex::new(Vec::new()),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 impl LoopStorage for MockStorage {
-    async fn get_discovered_id(&self, _id: &str) -> Result<bool, String> {
-        Ok(false)
+    async fn get_cursor(&self, _key: &str) -> Result<Option<String>, LoopError> {
+        Ok(None)
     }
-
-    async fn insert_discovered_id(&self, _id: &str) -> Result<(), String> {
+    async fn set_cursor(&self, _key: &str, _value: &str) -> Result<(), LoopError> {
         Ok(())
     }
-
-    async fn record_loop_run(&self, _result: &DiscoveryResult) -> Result<(), String> {
+    async fn tweet_exists(&self, tweet_id: &str) -> Result<bool, LoopError> {
+        Ok(self
+            .existing_ids
+            .lock()
+            .expect("lock")
+            .contains(&tweet_id.to_string()))
+    }
+    async fn store_discovered_tweet(
+        &self,
+        tweet: &LoopTweet,
+        _score: f32,
+        _keyword: &str,
+    ) -> Result<(), LoopError> {
+        self.discovered.lock().expect("lock").push(tweet.id.clone());
+        Ok(())
+    }
+    async fn log_action(
+        &self,
+        action_type: &str,
+        status: &str,
+        message: &str,
+    ) -> Result<(), LoopError> {
+        self.actions.lock().expect("lock").push((
+            action_type.to_string(),
+            status.to_string(),
+            message.to_string(),
+        ));
         Ok(())
     }
 }
 
 struct MockPoster {
-    sent: Mutex<Vec<String>>,
+    sent: Mutex<Vec<(String, String)>>,
 }
 
 impl MockPoster {
@@ -76,74 +160,64 @@ impl MockPoster {
             sent: Mutex::new(Vec::new()),
         }
     }
-
     fn sent_count(&self) -> usize {
-        self.sent.lock().unwrap().len()
+        self.sent.lock().expect("lock").len()
     }
 }
 
 #[async_trait::async_trait]
 impl PostSender for MockPoster {
-    async fn send(&self, reply: &str, _tweet_id: &str, _author: &str) -> Result<String, String> {
-        self.sent.lock().unwrap().push(reply.to_string());
-        Ok("posted".to_string())
+    async fn send_reply(&self, tweet_id: &str, content: &str) -> Result<(), LoopError> {
+        self.sent
+            .lock()
+            .expect("lock")
+            .push((tweet_id.to_string(), content.to_string()));
+        Ok(())
     }
+}
+
+fn test_tweet(id: &str, author: &str) -> LoopTweet {
+    LoopTweet {
+        id: id.to_string(),
+        text: format!("Test tweet about rust from @{author}"),
+        author_id: format!("uid_{author}"),
+        author_username: author.to_string(),
+        author_followers: 5000,
+        created_at: "2026-01-01T00:00:00Z".to_string(),
+        likes: 20,
+        retweets: 5,
+        replies: 3,
+    }
+}
+
+fn build_loop(
+    tweets: Vec<LoopTweet>,
+    score: f32,
+    meets_threshold: bool,
+    dry_run: bool,
+) -> (DiscoveryLoop, Arc<MockPoster>, Arc<MockStorage>) {
+    let poster = Arc::new(MockPoster::new());
+    let storage = Arc::new(MockStorage::new());
+    let discovery = DiscoveryLoop::new(
+        Arc::new(MockSearcher { results: tweets }),
+        Arc::new(MockScorer {
+            score,
+            meets_threshold,
+        }),
+        Arc::new(MockGenerator {
+            reply: "Great insight!".to_string(),
+        }),
+        Arc::new(MockSafety::new(true)),
+        storage.clone(),
+        poster.clone(),
+        vec!["rust".to_string(), "cli".to_string()],
+        70.0,
+        dry_run,
+    );
+    (discovery, poster, storage)
 }
 
 // --- Tests ---
 
-#[tokio::test]
-async fn discovery_summary_default() {
-    let discovery = DiscoveryLoop {
-        searcher: Arc::new(MockSearcher {
-            results: vec![LoopTweet {
-                id: "1".to_string(),
-                text: "rust".to_string(),
-                author: "user1".to_string(),
-                author_followers: 100,
-                created_at: "2026-01-01T00:00:00Z".to_string(),
-                likes: 10,
-                retweets: 5,
-                replies: 2,
-                has_media: false,
-                is_quote_tweet: false,
-            }],
-        }),
-        scorer: Arc::new(MockScorer { scores: vec![90.0] }),
-        generator: Arc::new(MockGenerator {
-            reply: "great!".to_string(),
-        }),
-        safety: Arc::new(MockSafety),
-        storage: Arc::new(MockStorage),
-        poster: Arc::new(MockPoster::new()),
-        keywords: vec!["rust".to_string(), "cli".to_string()],
-        threshold: 50.0,
-        dry_run: false,
-    };
-
-    let (_, summary) = discovery.run_once(None).await.unwrap();
-    assert_eq!(summary.tweets_found, 1);
-}
-
-#[test]
-fn discovery_result_debug() {
-    let result = DiscoveryResult::Replied {
-        tweet_id: "123".to_string(),
-        author: "user".to_string(),
-        score: 95.0,
-        reply_text: "test reply".to_string(),
-    };
-    let debug_str = format!("{:?}", result);
-    assert!(debug_str.contains("123"));
-}
-
-#[test]
-fn truncate_exact_length() {
-    let text = "hello world";
-    assert_eq!(truncate_tweet_text(text, text.len()), text);
-}
-
-#[test]
-fn truncate_empty_string() {
-    assert_eq!(truncate_tweet_text("", 100), "");
-}
+mod core_tests;
+mod integration;

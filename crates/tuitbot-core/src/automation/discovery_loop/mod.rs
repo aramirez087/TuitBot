@@ -233,7 +233,7 @@ impl DiscoveryLoop {
     }
 
     /// Search for a single keyword and process all results.
-    async fn search_and_process(
+    pub(crate) async fn search_and_process(
         &self,
         keyword: &str,
         limit: Option<usize>,
@@ -279,7 +279,7 @@ impl DiscoveryLoop {
     }
 
     /// Process a single discovered tweet: dedup, score, generate reply, post.
-    async fn process_tweet(&self, tweet: &LoopTweet, keyword: &str) -> DiscoveryResult {
+    pub(crate) async fn process_tweet(&self, tweet: &LoopTweet, keyword: &str) -> DiscoveryResult {
         // Check if already discovered (dedup)
         match self.storage.tweet_exists(&tweet.id).await {
             Ok(true) => {
@@ -425,7 +425,7 @@ impl DiscoveryLoop {
 }
 
 /// Truncate a string for display.
-fn truncate(s: &str, max_len: usize) -> String {
+pub(crate) fn truncate(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
