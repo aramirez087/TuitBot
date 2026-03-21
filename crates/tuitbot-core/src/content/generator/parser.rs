@@ -58,6 +58,10 @@ pub fn parse_thread(text: &str) -> Vec<String> {
 ///
 /// Returns `(style, hook_text)` pairs. Falls back to `"general"` if STYLE line
 /// is missing for a block.
+///
+/// Tolerant of common LLM formatting variations: case-insensitive prefixes,
+/// markdown bold (`**STYLE:**`), numbered prefixes (`1. STYLE:`), and
+/// leading/trailing quotes.
 pub fn parse_hooks_response(text: &str) -> Vec<(String, String)> {
     let mut results = Vec::new();
     let mut current_hook = String::new();
@@ -66,7 +70,7 @@ pub fn parse_hooks_response(text: &str) -> Vec<(String, String)> {
     for line in text.lines() {
         let trimmed = line.trim();
 
-        if trimmed == "---" {
+        if trimmed == "---" || trimmed == "- - -" {
             if !current_hook.is_empty() {
                 let style = if current_style.is_empty() {
                     "general".to_string()
@@ -80,10 +84,13 @@ pub fn parse_hooks_response(text: &str) -> Vec<(String, String)> {
             continue;
         }
 
-        if let Some(s) = trimmed.strip_prefix("STYLE:") {
+        // Strip markdown bold, numbering prefixes, and leading bullets
+        let cleaned = strip_line_noise(trimmed);
+
+        if let Some(s) = strip_prefix_ci(&cleaned, "style:") {
             current_style = s.trim().to_string();
-        } else if let Some(h) = trimmed.strip_prefix("HOOK:") {
-            current_hook = h.trim().to_string();
+        } else if let Some(h) = strip_prefix_ci(&cleaned, "hook:") {
+            current_hook = strip_quotes(h.trim());
         }
     }
 
@@ -98,4 +105,45 @@ pub fn parse_hooks_response(text: &str) -> Vec<(String, String)> {
     }
 
     results
+}
+
+/// Case-insensitive prefix strip. Returns the remainder after the prefix.
+fn strip_prefix_ci<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+    let lower = text.to_ascii_lowercase();
+    if lower.starts_with(prefix) {
+        Some(&text[prefix.len()..])
+    } else {
+        None
+    }
+}
+
+/// Remove markdown bold markers, numbered prefixes, and bullet chars.
+fn strip_line_noise(line: &str) -> String {
+    let mut s = line.replace("**", "");
+    // Strip leading number+punctuation like "1. ", "1) ", "1: "
+    if let Some(first) = s.chars().next() {
+        if first.is_ascii_digit() {
+            if let Some(pos) = s.find(|c: char| !c.is_ascii_digit()) {
+                let after = &s[pos..];
+                if after.starts_with(". ") || after.starts_with(") ") || after.starts_with(": ") {
+                    s = after[2..].to_string();
+                }
+            }
+        }
+    }
+    // Strip leading bullet
+    if s.starts_with("- ") || s.starts_with("• ") {
+        s = s[2..].to_string();
+    }
+    s
+}
+
+/// Remove surrounding quotes (single or double) from hook text.
+fn strip_quotes(text: &str) -> String {
+    let t = text.trim();
+    if (t.starts_with('"') && t.ends_with('"')) || (t.starts_with('\'') && t.ends_with('\'')) {
+        t[1..t.len() - 1].to_string()
+    } else {
+        t.to_string()
+    }
 }
