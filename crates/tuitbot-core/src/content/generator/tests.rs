@@ -900,4 +900,238 @@ mod tests {
         let result = gen.extract_highlights("some context").await;
         assert!(result.is_err());
     }
+
+    // --- parse_hooks_response tests ---
+
+    #[test]
+    fn parse_hooks_response_empty() {
+        let results = super::super::parser::parse_hooks_response("");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn parse_hooks_response_single() {
+        let text = "STYLE: question\nHOOK: What if testing was actually fun?";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "question");
+        assert_eq!(results[0].1, "What if testing was actually fun?");
+    }
+
+    #[test]
+    fn parse_hooks_response_multiple() {
+        let text = "\
+STYLE: question
+HOOK: What if testing was actually fun?
+---
+STYLE: contrarian_take
+HOOK: Most devs test too much. Here's why.
+---
+STYLE: tip
+HOOK: One command that saves me 2 hours a week.";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].0, "question");
+        assert_eq!(results[1].0, "contrarian_take");
+        assert_eq!(results[2].0, "tip");
+    }
+
+    #[test]
+    fn parse_hooks_response_missing_style_defaults_to_general() {
+        let text = "HOOK: A standalone hook without style tag";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "general");
+        assert_eq!(results[0].1, "A standalone hook without style tag");
+    }
+
+    #[test]
+    fn parse_hooks_response_trailing_separator() {
+        let text = "STYLE: tip\nHOOK: First hook\n---\nSTYLE: list\nHOOK: Second hook\n---";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn parse_hooks_response_empty_hook_skipped() {
+        let text = "STYLE: tip\n---\nSTYLE: question\nHOOK: Real hook here";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "question");
+    }
+
+    // --- generate_hooks tests ---
+
+    #[tokio::test]
+    async fn generate_hooks_returns_hooks() {
+        let response = "\
+STYLE: question
+HOOK: What if your tests could write themselves?
+---
+STYLE: contrarian_take
+HOOK: Most devs test too much. Here's why that hurts your product.
+---
+STYLE: tip
+HOOK: One cargo command saves me 2 hours a week: cargo nextest.
+---
+STYLE: list
+HOOK: 3 testing mistakes costing you time: 1) mocking too much 2) no integration tests 3) ignoring flaky tests
+---
+STYLE: storytelling
+HOOK: Last week I shipped a bug to production. The fix? A 3-line test I should have written first.";
+
+        let provider = MockProvider::single(response);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen
+            .generate_hooks("testing best practices", None)
+            .await
+            .expect("hooks");
+        assert!(
+            (3..=5).contains(&output.hooks.len()),
+            "expected 3-5 hooks, got {}",
+            output.hooks.len()
+        );
+        for hook in &output.hooks {
+            assert!(!hook.style.is_empty());
+            assert!(!hook.text.is_empty());
+            assert!(hook.char_count <= MAX_TWEET_CHARS);
+            assert!(hook.confidence == "high" || hook.confidence == "medium");
+        }
+        assert_eq!(output.provider, "mock");
+    }
+
+    #[tokio::test]
+    async fn generate_hooks_with_rag_context() {
+        let response = "STYLE: question\nHOOK: Short hook here";
+        let (provider, captured) = PromptCapturingProvider::new(response);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let rag_block = "Winning patterns:\n1. [tip] (tweet): \"Great advice\"";
+        gen.generate_hooks("testing", Some(rag_block))
+            .await
+            .expect("hooks");
+
+        let system = captured.lock().await;
+        let system = system.as_ref().expect("system prompt captured");
+        assert!(
+            system.contains("Winning patterns"),
+            "RAG context should appear in system prompt"
+        );
+    }
+
+    #[tokio::test]
+    async fn generate_hooks_filters_oversized() {
+        let long_hook = "x".repeat(300);
+        let response =
+            format!("STYLE: question\nHOOK: {long_hook}\n---\nSTYLE: tip\nHOOK: Short and sweet.");
+        let provider = MockProvider::single(&response);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen.generate_hooks("topic", None).await.expect("hooks");
+        assert_eq!(output.hooks.len(), 1, "oversized hook should be filtered");
+        assert_eq!(output.hooks[0].text, "Short and sweet.");
+    }
+
+    #[tokio::test]
+    async fn generate_hooks_retries_when_too_few() {
+        let bad = "STYLE: tip\nHOOK: Only one";
+        let good = "\
+STYLE: question\nHOOK: Hook one?\n---\n\
+STYLE: contrarian_take\nHOOK: Hook two.\n---\n\
+STYLE: tip\nHOOK: Hook three.";
+        let provider = MockProvider::new(vec![bad.into(), good.into()]);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let output = gen.generate_hooks("topic", None).await.expect("hooks");
+        assert!(
+            output.hooks.len() >= 3,
+            "expected >= 3 after retry, got {}",
+            output.hooks.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn generate_hooks_fails_on_empty() {
+        let provider = MockProvider::new(vec!["".into(), "".into()]);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let result = gen.generate_hooks("topic", None).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn generate_hooks_prompt_includes_five_styles() {
+        let response = "STYLE: question\nHOOK: Test hook";
+        let (provider, captured) = PromptCapturingProvider::new(response);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        // Will likely fail (only 1 hook) but we just need to inspect the prompt
+        let _ = gen.generate_hooks("testing", None).await;
+
+        let system = captured.lock().await;
+        let system = system.as_ref().expect("system prompt captured");
+        assert!(
+            system.contains("question"),
+            "prompt should include 'question' style"
+        );
+        assert!(
+            system.contains("contrarian_take"),
+            "prompt should include 'contrarian_take' style"
+        );
+        assert!(
+            system.contains("Generate exactly 5 hook tweets"),
+            "prompt should ask for 5 hooks"
+        );
+    }
+
+    #[test]
+    fn hook_option_serialization() {
+        let hook = super::super::HookOption {
+            style: "question".to_string(),
+            text: "Is testing overrated?".to_string(),
+            char_count: 20,
+            confidence: "high".to_string(),
+        };
+        let json = serde_json::to_string(&hook).expect("serialize");
+        assert!(json.contains("\"style\":\"question\""));
+        assert!(json.contains("\"confidence\":\"high\""));
+
+        let hook2: super::super::HookOption = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(hook2.style, "question");
+        assert_eq!(hook2.text, "Is testing overrated?");
+    }
+
+    #[test]
+    fn hook_option_confidence_heuristic() {
+        let short_hooks = super::super::ContentGenerator::build_hook_options(&[(
+            "tip".to_string(),
+            "Short hook".to_string(),
+        )]);
+        assert_eq!(short_hooks[0].confidence, "high");
+
+        let long_text = "x".repeat(250);
+        let long_hooks =
+            super::super::ContentGenerator::build_hook_options(&[("tip".to_string(), long_text)]);
+        assert_eq!(long_hooks[0].confidence, "medium");
+    }
+
+    #[test]
+    fn hook_generation_output_debug_and_clone() {
+        let output = super::super::HookGenerationOutput {
+            hooks: vec![super::super::HookOption {
+                style: "question".to_string(),
+                text: "Test?".to_string(),
+                char_count: 5,
+                confidence: "high".to_string(),
+            }],
+            usage: TokenUsage::default(),
+            model: "gpt-4".to_string(),
+            provider: "openai".to_string(),
+        };
+        let clone = output.clone();
+        assert_eq!(clone.hooks.len(), 1);
+        let debug = format!("{output:?}");
+        assert!(debug.contains("question"));
+    }
 }

@@ -57,7 +57,8 @@ import type {
 	ContentRevision,
 	ContentActivity,
 	ContentTag,
-	AnalyzeProfileResponse
+	AnalyzeProfileResponse,
+	AssistHooksResponse
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -486,6 +487,18 @@ export const api = {
 					body: JSON.stringify({ selected_node_ids: selectedNodeIds })
 				}
 			),
+		hooks: (
+			topic: string,
+			opts?: { selectedNodeIds?: number[]; sessionId?: string }
+		) =>
+			request<AssistHooksResponse>('/api/assist/hooks', {
+				method: 'POST',
+				body: JSON.stringify({
+					topic,
+					...(opts?.selectedNodeIds && { selected_node_ids: opts.selectedNodeIds }),
+					...(opts?.sessionId && { session_id: opts.sessionId })
+				})
+			}),
 		mode: () => request<{ mode: string; approval_mode: boolean }>('/api/assist/mode')
 	},
 

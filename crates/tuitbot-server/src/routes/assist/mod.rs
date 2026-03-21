@@ -3,6 +3,8 @@
 //! These are stateless: they generate content and return it without posting.
 //! The user decides what to do with the results.
 
+pub mod hooks;
+
 use std::sync::Arc;
 
 use axum::extract::State;

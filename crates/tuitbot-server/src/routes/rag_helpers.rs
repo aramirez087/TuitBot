@@ -1,6 +1,7 @@
 //! Shared RAG context resolution for assist and discovery routes.
 
 use tuitbot_core::context::winning_dna;
+use tuitbot_core::storage::vault_selections;
 
 use crate::state::AppState;
 
@@ -50,4 +51,51 @@ pub(crate) async fn resolve_composer_rag_context(
     } else {
         Some(draft_context)
     }
+}
+
+/// Resolve RAG context from a Ghostwriter selection session_id.
+///
+/// Fetches the selection, then delegates to `resolve_composer_rag_context`
+/// using the resolved node ID when available. Also returns any raw
+/// `selected_text` for direct injection as additional context.
+///
+/// Returns `None` (fail-open) if the selection is expired, not found,
+/// or context resolution fails.
+pub(crate) async fn resolve_selection_rag_context(
+    state: &AppState,
+    account_id: &str,
+    session_id: &str,
+) -> Option<SelectionRagContext> {
+    let selection =
+        match vault_selections::get_selection_by_session(&state.db, account_id, session_id).await {
+            Ok(Some(sel)) => sel,
+            Ok(None) => {
+                tracing::debug!(session_id, "selection not found or expired");
+                return None;
+            }
+            Err(e) => {
+                tracing::warn!(session_id, "failed to fetch selection: {e}");
+                return None;
+            }
+        };
+
+    let node_ids = selection.resolved_node_id.map(|id| vec![id]);
+    let draft_context = resolve_composer_rag_context(state, account_id, node_ids.as_deref()).await;
+
+    Some(SelectionRagContext {
+        draft_context,
+        selected_text: if selection.selected_text.is_empty() {
+            None
+        } else {
+            Some(selection.selected_text)
+        },
+    })
+}
+
+/// RAG context resolved from a Ghostwriter selection.
+pub(crate) struct SelectionRagContext {
+    /// Standard RAG context from node resolution (may be None if node wasn't indexed).
+    pub draft_context: Option<winning_dna::DraftContext>,
+    /// Raw selected text from Obsidian (for direct injection when no indexed node).
+    pub selected_text: Option<String>,
 }

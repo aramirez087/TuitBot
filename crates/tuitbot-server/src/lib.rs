@@ -223,6 +223,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/assist/highlights",
             post(routes::assist::assist_highlights),
         )
+        .route("/assist/hooks", post(routes::assist::hooks::assist_hooks))
         .route("/assist/topics", get(routes::assist::assist_topics))
         .route(
             "/assist/optimal-times",

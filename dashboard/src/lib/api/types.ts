@@ -857,6 +857,21 @@ export interface VaultSelectionResponse {
 	expires_at: string;
 }
 
+// --- Hook generation types (Ghostwriter) ---
+
+export interface HookOption {
+	style: string;
+	text: string;
+	char_count: number;
+	confidence: string;
+}
+
+export interface AssistHooksResponse {
+	hooks: HookOption[];
+	topic: string;
+	vault_citations?: VaultCitation[];
+}
+
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.
 export interface McpToolParam {
 	name: string;
