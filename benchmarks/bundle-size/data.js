@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774104025547,
+  "lastUpdate": 1774105689782,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2283,6 +2283,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/0422db621780dee28d244c9725ca06641f001b6c"
         },
         "date": 1774104024915,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 885715,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 304225,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1229190,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a5895fa9ef6006ade7d46c77f2bb6bc26eab58c5",
+          "message": "fix(ci): skip cargo install when binary already cached (#272)\n\nThe cache action restores binaries to ~/.cargo/bin/ but cargo install\nfails with 'binary already exists' when the cached binary is present.\nUse 'command -v' to skip install if the tool is already on PATH.\n\nFixes: Security audit, License compliance, and SBOM generation CI jobs\nfailing on PR #271 (release-plz).\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-21T09:07:25-06:00",
+          "tree_id": "e5578b6360cdd157ca159810af08eb697f0da0de",
+          "url": "https://github.com/aramirez087/TuitBot/commit/a5895fa9ef6006ade7d46c77f2bb6bc26eab58c5"
+        },
+        "date": 1774105689006,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
