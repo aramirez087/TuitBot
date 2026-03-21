@@ -241,6 +241,35 @@ describe('ComposerInspector', () => {
 		expect(onsubmiterror).toHaveBeenCalledWith('API down');
 	});
 
+	it('handleGenerateFromVault with hookStyle sets tweet text directly without API call', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		await (component as any).handleGenerateFromVault(
+			[1],
+			'tweet',
+			['What if your tests could write themselves?'],
+			'question'
+		);
+		// Should NOT call improve or tweet API — hook is ready-to-use
+		expect(mockImprove).not.toHaveBeenCalled();
+		expect(mockTweet).not.toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromVault with hookStyle and thread format sets blocks directly', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread' }
+		});
+		await (component as any).handleGenerateFromVault(
+			[1],
+			'thread',
+			['Hook opener for a thread'],
+			'storytelling'
+		);
+		// Should NOT call thread API — hook is ready-to-use
+		expect(mockThread).not.toHaveBeenCalled();
+	});
+
 	it('getVaultProvenance returns empty array initially', () => {
 		const { component } = render(ComposerInspector, {
 			props: { ...defaultProps, open: true }

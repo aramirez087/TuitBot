@@ -161,7 +161,16 @@
 		vaultProvenance = selectedNodeIds.map((id) => ({ node_id: id }));
 		vaultHookStyle = hookStyle ?? null;
 		try {
-			if (highlights && highlights.length > 0) {
+			if (hookStyle && highlights && highlights.length > 0) {
+				// Hook selected — the hook text is ready-to-use content, not raw highlights.
+				if (outputFormat === 'thread') {
+					threadBlocks = highlights.map((text, i) => ({
+						id: crypto.randomUUID(), text, media_paths: [], order: i
+					}));
+				} else {
+					tweetText = highlights[0];
+				}
+			} else if (highlights && highlights.length > 0) {
 				const highlightContext = highlights.join('\n');
 				if (outputFormat === 'thread') {
 					const topic = topicWithCue(voiceCue, 'the key highlights provided');

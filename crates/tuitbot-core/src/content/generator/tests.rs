@@ -960,6 +960,45 @@ HOOK: One command that saves me 2 hours a week.";
         assert_eq!(results[0].0, "question");
     }
 
+    #[test]
+    fn parse_hooks_response_case_insensitive() {
+        let text =
+            "Style: question\nHook: Does case matter?\n---\nstyle: tip\nhook: Apparently not.";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, "question");
+        assert_eq!(results[0].1, "Does case matter?");
+        assert_eq!(results[1].0, "tip");
+        assert_eq!(results[1].1, "Apparently not.");
+    }
+
+    #[test]
+    fn parse_hooks_response_markdown_bold() {
+        let text = "**STYLE:** question\n**HOOK:** Bold formatting works?";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "question");
+        assert_eq!(results[0].1, "Bold formatting works?");
+    }
+
+    #[test]
+    fn parse_hooks_response_numbered_prefixes() {
+        let text =
+            "1. STYLE: question\n1. HOOK: First hook\n---\n2. STYLE: tip\n2. HOOK: Second hook";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, "question");
+        assert_eq!(results[1].0, "tip");
+    }
+
+    #[test]
+    fn parse_hooks_response_quoted_hooks() {
+        let text = "STYLE: question\nHOOK: \"What if testing was fun?\"";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1, "What if testing was fun?");
+    }
+
     // --- generate_hooks tests ---
 
     #[tokio::test]
