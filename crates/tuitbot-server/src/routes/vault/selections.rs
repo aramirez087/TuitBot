@@ -227,6 +227,7 @@ pub struct GetSelectionResponse {
     pub resolved_node_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolved_chunk_id: Option<i64>,
+    pub privacy_envelope: String,
 }
 
 pub async fn get_selection(
@@ -283,6 +284,7 @@ pub async fn get_selection(
             frontmatter_tags,
             resolved_node_id: selection.resolved_node_id,
             resolved_chunk_id: selection.resolved_chunk_id,
+            privacy_envelope: state.deployment_mode.privacy_envelope().to_string(),
         }),
     )
         .into_response()
@@ -360,6 +362,7 @@ mod tests {
             frontmatter_tags: None,
             resolved_node_id: None,
             resolved_chunk_id: None,
+            privacy_envelope: "local_first".to_string(),
         };
         let json = serde_json::to_value(&resp).expect("serialize");
         assert!(json.get("selected_text").is_none());
@@ -368,5 +371,27 @@ mod tests {
         assert!(json.get("frontmatter_tags").is_none());
         assert!(json.get("resolved_node_id").is_none());
         assert!(json.get("resolved_chunk_id").is_none());
+        assert_eq!(json["privacy_envelope"], "local_first");
+    }
+
+    #[test]
+    fn get_selection_response_includes_privacy_envelope() {
+        let resp = GetSelectionResponse {
+            session_id: "s".to_string(),
+            vault_name: "v".to_string(),
+            file_path: "f.md".to_string(),
+            selected_text: Some("text".to_string()),
+            heading_context: None,
+            selection_start_line: 0,
+            selection_end_line: 0,
+            note_title: None,
+            frontmatter_tags: None,
+            resolved_node_id: None,
+            resolved_chunk_id: None,
+            privacy_envelope: "user_controlled".to_string(),
+        };
+        let json = serde_json::to_value(&resp).expect("serialize");
+        assert_eq!(json["privacy_envelope"], "user_controlled");
+        assert_eq!(json["selected_text"], "text");
     }
 }

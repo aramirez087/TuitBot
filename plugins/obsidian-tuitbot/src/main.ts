@@ -138,6 +138,15 @@ export default class TuitBotPlugin extends Plugin {
 
   // -- Transport ------------------------------------------------------------
 
+  private isLocalTransport(): boolean {
+    try {
+      const url = new URL(this.settings.serverUrl);
+      return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    } catch {
+      return false;
+    }
+  }
+
   async sendToTuitBot(
     payload: GhostwriterPayload,
   ): Promise<SendSelectionResponse> {
@@ -246,6 +255,12 @@ export default class TuitBotPlugin extends Plugin {
   }
 
   private async send(payload: GhostwriterPayload): Promise<void> {
+    if (!this.isLocalTransport()) {
+      new Notice(
+        "TuitBot: Sending selection to remote server \u2014 text will cross the network.",
+        3000,
+      );
+    }
     try {
       const result = await this.sendToTuitBot(payload);
       new Notice(

@@ -173,6 +173,11 @@ impl AppState {
         Ok(gen)
     }
 
+    /// Returns `true` if the current deployment mode is local-first (Desktop).
+    pub fn is_local_first(&self) -> bool {
+        self.deployment_mode.is_local_first()
+    }
+
     /// Cancel the running Watchtower (if any), reload config from disk,
     /// and spawn a new Watchtower loop with the updated sources.
     ///
@@ -215,6 +220,18 @@ impl AppState {
             tracing::info!("Watchtower restart: no enabled sources, not spawning");
             *self.content_sources.write().await = new_sources;
             return;
+        }
+
+        // Surface privacy envelope for operators: local_fs in non-Desktop mode
+        // means data is user-controlled but not same-machine local-first.
+        if !deployment_mode.is_local_first()
+            && has_enabled.iter().any(|s| s.source_type == "local_fs")
+        {
+            tracing::info!(
+                mode = %deployment_mode,
+                "local_fs source in {} mode — data is user-controlled but not local-first",
+                deployment_mode
+            );
         }
 
         // 4. Spawn new WatchtowerLoop.

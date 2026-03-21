@@ -1216,6 +1216,8 @@ mod tests {
             inline_ingest: false,
             file_picker_native: true,
             preferred_source_default: "local_fs".into(),
+            privacy_envelope: "local_first".into(),
+            ghostwriter_local_only: true,
         };
         let json = serde_json::to_string(&caps).unwrap();
         let back: DeploymentCapabilities = serde_json::from_str(&json).unwrap();
@@ -1311,6 +1313,13 @@ pub struct DeploymentCapabilities {
     /// Preferred default source type for onboarding in this deployment mode.
     /// `"local_fs"` for Desktop, `"google_drive"` for SelfHost and Cloud.
     pub preferred_source_default: String,
+    /// Privacy envelope label: `"local_first"`, `"user_controlled"`, or `"provider_controlled"`.
+    #[serde(default)]
+    pub privacy_envelope: String,
+    /// Whether the Ghostwriter vault-to-compose pipeline runs entirely on the local machine.
+    /// True only for Desktop mode (embedded server on 127.0.0.1).
+    #[serde(default)]
+    pub ghostwriter_local_only: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -1360,6 +1369,8 @@ impl DeploymentMode {
                 inline_ingest: true,
                 file_picker_native: true,
                 preferred_source_default: "local_fs".to_string(),
+                privacy_envelope: "local_first".to_string(),
+                ghostwriter_local_only: true,
             },
             DeploymentMode::SelfHost => DeploymentCapabilities {
                 local_folder: true,
@@ -1368,6 +1379,8 @@ impl DeploymentMode {
                 inline_ingest: true,
                 file_picker_native: false,
                 preferred_source_default: "google_drive".to_string(),
+                privacy_envelope: "user_controlled".to_string(),
+                ghostwriter_local_only: false,
             },
             DeploymentMode::Cloud => DeploymentCapabilities {
                 local_folder: false,
@@ -1376,6 +1389,8 @@ impl DeploymentMode {
                 inline_ingest: true,
                 file_picker_native: false,
                 preferred_source_default: "google_drive".to_string(),
+                privacy_envelope: "provider_controlled".to_string(),
+                ghostwriter_local_only: false,
             },
         }
     }
@@ -1388,6 +1403,29 @@ impl DeploymentMode {
             "google_drive" => caps.google_drive,
             "manual" => caps.inline_ingest,
             _ => false,
+        }
+    }
+
+    /// Returns `true` only for Desktop mode where data never leaves the machine.
+    ///
+    /// Self-host has local filesystem access but data crosses a network boundary
+    /// (browser → server), so it cannot claim local-first. Cloud is obviously
+    /// not local-first.
+    pub fn is_local_first(&self) -> bool {
+        matches!(self, DeploymentMode::Desktop)
+    }
+
+    /// Returns the privacy envelope label for this deployment mode.
+    ///
+    /// - `"local_first"` — Desktop: data never leaves the machine.
+    /// - `"user_controlled"` — Self-host: user controls the server, but data
+    ///   may cross a network boundary.
+    /// - `"provider_controlled"` — Cloud: data processed on provider infrastructure.
+    pub fn privacy_envelope(&self) -> &'static str {
+        match self {
+            DeploymentMode::Desktop => "local_first",
+            DeploymentMode::SelfHost => "user_controlled",
+            DeploymentMode::Cloud => "provider_controlled",
         }
     }
 }

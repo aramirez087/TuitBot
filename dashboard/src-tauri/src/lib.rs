@@ -32,6 +32,15 @@ fn get_api_token() -> Result<String, String> {
     read_api_token()
 }
 
+/// Tauri command: returns the privacy envelope for the current deployment mode.
+///
+/// Desktop always returns `"local_first"`. This gives the frontend a fast
+/// sync fallback before the API runtime status endpoint is available.
+#[tauri::command]
+fn get_privacy_envelope() -> String {
+    "local_first".to_string()
+}
+
 /// Tauri command: open an external URL via the OS.
 ///
 /// Only `obsidian://` and `file://` schemes are allowed, preventing
@@ -274,7 +283,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_api_token, open_oauth_window, open_external_url])
+        .invoke_handler(tauri::generate_handler![get_api_token, get_privacy_envelope, open_oauth_window, open_external_url])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

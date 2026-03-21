@@ -51,6 +51,7 @@ import type {
 	VaultNoteItem,
 	VaultNoteDetail,
 	VaultSelectionResponse,
+	VaultSourcesResponse,
 	ProvenanceRef,
 	ProvenanceLink,
 	DraftSummary,
@@ -800,7 +801,7 @@ export const api = {
 	},
 
 	vault: {
-		sources: () => request<{ sources: VaultSourceStatus[] }>('/api/vault/sources'),
+		sources: () => request<VaultSourcesResponse>('/api/vault/sources'),
 		searchNotes: (params: { q?: string; source_id?: number; limit?: number } = {}) => {
 			const query = new URLSearchParams();
 			if (params.q) query.set('q', params.q);

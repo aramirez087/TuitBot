@@ -39,7 +39,9 @@ const runtime = {
 			google_drive: false,
 			inline_ingest: true,
 			file_picker_native: true,
-			preferred_source_default: 'local'
+			preferred_source_default: 'local',
+			privacy_envelope: 'local_first',
+			ghostwriter_local_only: true
 		},
 		provider_backend: 'local',
 		can_post: false,
@@ -136,7 +138,9 @@ export function resetMockApi(): void {
 			google_drive: false,
 			inline_ingest: true,
 			file_picker_native: true,
-			preferred_source_default: 'local'
+			preferred_source_default: 'local',
+			privacy_envelope: 'local_first',
+			ghostwriter_local_only: true
 		},
 		provider_backend: 'local',
 		can_post: false,

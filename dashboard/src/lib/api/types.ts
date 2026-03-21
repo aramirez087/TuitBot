@@ -55,6 +55,8 @@ export interface DeploymentCapabilities {
 	inline_ingest: boolean;
 	file_picker_native: boolean;
 	preferred_source_default: string;
+	privacy_envelope: string;
+	ghostwriter_local_only: boolean;
 }
 
 export interface RuntimeStatus {
@@ -826,6 +828,12 @@ export interface VaultSourceStatus {
 	path?: string;
 }
 
+export interface VaultSourcesResponse {
+	sources: VaultSourceStatus[];
+	deployment_mode: string;
+	privacy_envelope: string;
+}
+
 export interface VaultNoteItem {
 	node_id: number;
 	source_id: number;
@@ -870,6 +878,7 @@ export interface VaultSelectionResponse {
 	resolved_chunk_id: number | null;
 	created_at: string;
 	expires_at: string;
+	privacy_envelope?: string;
 }
 
 // --- Hook generation types (Ghostwriter) ---

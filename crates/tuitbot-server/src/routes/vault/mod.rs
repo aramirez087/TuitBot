@@ -52,6 +52,8 @@ fn truncate_snippet(text: &str, max_len: usize) -> String {
 #[derive(Serialize)]
 pub struct VaultSourcesResponse {
     pub sources: Vec<VaultSourceStatusItem>,
+    pub deployment_mode: String,
+    pub privacy_envelope: String,
 }
 
 #[derive(Serialize)]
@@ -74,12 +76,18 @@ pub async fn vault_sources(
 ) -> Result<Json<VaultSourcesResponse>, ApiError> {
     let sources = watchtower::get_all_source_contexts_for(&state.db, &ctx.account_id).await?;
 
+    let is_cloud = matches!(
+        state.deployment_mode,
+        tuitbot_core::config::DeploymentMode::Cloud
+    );
+
     let mut items = Vec::with_capacity(sources.len());
     for src in sources {
         let count = watchtower::count_nodes_for_source(&state.db, &ctx.account_id, src.id)
             .await
             .unwrap_or(0);
-        let path = if src.source_type == "local_fs" {
+        // Only expose local path for non-Cloud modes (defense in depth).
+        let path = if src.source_type == "local_fs" && !is_cloud {
             serde_json::from_str::<serde_json::Value>(&src.config_json)
                 .ok()
                 .and_then(|v| v.get("path").and_then(|p| p.as_str().map(String::from)))
@@ -97,7 +105,11 @@ pub async fn vault_sources(
         });
     }
 
-    Ok(Json(VaultSourcesResponse { sources: items }))
+    Ok(Json(VaultSourcesResponse {
+        sources: items,
+        deployment_mode: state.deployment_mode.to_string(),
+        privacy_envelope: state.deployment_mode.privacy_envelope().to_string(),
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -565,5 +577,88 @@ mod tests {
         )
         .unwrap();
         assert_eq!(body["citations"].as_array().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn vault_sources_includes_privacy_envelope() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/sources")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(resp.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        // Default deployment_mode is Desktop
+        assert_eq!(body["deployment_mode"], "desktop");
+        assert_eq!(body["privacy_envelope"], "local_first");
+    }
+
+    async fn test_state_with_mode(mode: tuitbot_core::config::DeploymentMode) -> Arc<AppState> {
+        let db = tuitbot_core::storage::init_test_db()
+            .await
+            .expect("init test db");
+        let (event_tx, _) = broadcast::channel::<AccountWsEvent>(16);
+        Arc::new(AppState {
+            db,
+            config_path: PathBuf::from("/tmp/test-config.toml"),
+            data_dir: PathBuf::from("/tmp"),
+            event_tx,
+            api_token: "test-token".to_string(),
+            passphrase_hash: RwLock::new(None),
+            passphrase_hash_mtime: RwLock::new(None),
+            bind_host: "127.0.0.1".to_string(),
+            bind_port: 3001,
+            login_attempts: Mutex::new(HashMap::new()),
+            runtimes: Mutex::new(HashMap::new()),
+            content_generators: Mutex::new(HashMap::new()),
+            circuit_breaker: None,
+            scraper_health: None,
+            watchtower_cancel: RwLock::new(None),
+            content_sources: RwLock::new(Default::default()),
+            connector_config: Default::default(),
+            deployment_mode: mode,
+            pending_oauth: Mutex::new(HashMap::new()),
+            token_managers: Mutex::new(HashMap::new()),
+            x_client_id: String::new(),
+        })
+    }
+
+    #[tokio::test]
+    async fn vault_sources_cloud_mode_privacy_envelope() {
+        let state = test_state_with_mode(tuitbot_core::config::DeploymentMode::Cloud).await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/sources")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(resp.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(body["deployment_mode"], "cloud");
+        assert_eq!(body["privacy_envelope"], "provider_controlled");
     }
 }

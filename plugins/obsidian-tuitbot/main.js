@@ -148,6 +148,14 @@ var TuitBotPlugin = class extends import_obsidian.Plugin {
     };
   }
   // -- Transport ------------------------------------------------------------
+  isLocalTransport() {
+    try {
+      const url = new URL(this.settings.serverUrl);
+      return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    } catch {
+      return false;
+    }
+  }
   async sendToTuitBot(payload) {
     const token = await this.readApiToken();
     const url = `${this.settings.serverUrl}/api/vault/send-selection`;
@@ -232,6 +240,12 @@ var TuitBotPlugin = class extends import_obsidian.Plugin {
     await this.send(payload);
   }
   async send(payload) {
+    if (!this.isLocalTransport()) {
+      new import_obsidian.Notice(
+        "TuitBot: Sending selection to remote server \u2014 text will cross the network.",
+        3e3
+      );
+    }
     try {
       const result = await this.sendToTuitBot(payload);
       new import_obsidian.Notice(

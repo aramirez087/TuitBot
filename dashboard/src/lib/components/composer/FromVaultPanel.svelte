@@ -3,6 +3,7 @@
 	import { api } from '$lib/api';
 	import type { VaultNoteItem, VaultNoteDetail } from '$lib/api/types';
 	import { X, Search, FileText } from 'lucide-svelte';
+	import { deploymentMode } from '$lib/stores/runtime';
 	import VaultNoteList from './VaultNoteList.svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import VaultHighlights from './VaultHighlights.svelte';
@@ -208,6 +209,15 @@
 <div class="vault-panel">
 	<div class="vault-header">
 		<span class="vault-label">From Vault</span>
+		<span class="vault-privacy-badge">
+			{#if $deploymentMode === 'desktop'}
+				Local-first
+			{:else if $deploymentMode === 'self_host'}
+				Self-hosted
+			{:else}
+				Cloud
+			{/if}
+		</span>
 		<button class="vault-close" onclick={onclose} aria-label="Close vault panel">
 			<X size={12} />
 		</button>
@@ -328,6 +338,17 @@
 		color: var(--color-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
+	}
+
+	.vault-privacy-badge {
+		font-size: 10px;
+		font-weight: 500;
+		color: var(--color-text-subtle);
+		padding: 2px 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		margin-left: auto;
+		margin-right: 4px;
 	}
 
 	.vault-close {

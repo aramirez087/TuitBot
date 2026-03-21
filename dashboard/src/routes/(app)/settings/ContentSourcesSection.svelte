@@ -177,6 +177,15 @@
 
 {#if $draft}
 <SettingsSection id="sources" title="Knowledge Vault" description="Your vault feeds notes into generation as context and tracks what performs" icon={SectionIcon} scope="account" scopeKey="content_sources">
+	<!-- Privacy envelope notice -->
+	{#if isDesktop && sourceType === 'local_fs'}
+		<div class="notice notice-success">Your notes are processed locally — content never leaves this machine.</div>
+	{:else if isSelfHost}
+		<div class="notice notice-info">Self-hosted — notes stay on your server. Content is processed within your infrastructure.</div>
+	{:else if isCloud}
+		<div class="notice notice-info">Cloud mode — notes are processed server-side. Only generated content is returned to your browser.</div>
+	{/if}
+
 	<!-- Vault Health Summary -->
 	{#if !healthLoading && primarySource}
 		<div class="health-summary">
@@ -336,6 +345,7 @@
 	.field-warning { font-size: 12px; color: var(--color-warning, #f59e0b); }
 	.notice { padding: 10px 14px; border-radius: 6px; font-size: 12px; line-height: 1.5; }
 	.notice-info { background: color-mix(in srgb, var(--color-accent) 8%, transparent); border: 1px solid color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-text-subtle); }
+	.notice-success { background: color-mix(in srgb, var(--color-success, #22c55e) 8%, transparent); border: 1px solid color-mix(in srgb, var(--color-success, #22c55e) 20%, transparent); color: var(--color-text-subtle); }
 	.notice-warning { background: color-mix(in srgb, var(--color-warning, #f59e0b) 8%, transparent); border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 20%, transparent); color: var(--color-text-subtle); }
 	.notice-danger { background: color-mix(in srgb, var(--color-danger) 8%, transparent); border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent); color: var(--color-danger); }
 	.advanced-toggle { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--color-surface-hover); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text-muted); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }

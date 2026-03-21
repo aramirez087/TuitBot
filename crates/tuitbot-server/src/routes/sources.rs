@@ -22,6 +22,7 @@ use crate::state::AppState;
 #[derive(Serialize)]
 pub struct SourceStatusResponse {
     pub sources: Vec<SourceStatusItem>,
+    pub deployment_mode: String,
 }
 
 #[derive(Serialize)]
@@ -70,7 +71,10 @@ pub async fn source_status(
         })
         .collect();
 
-    Ok(Json(SourceStatusResponse { sources }))
+    Ok(Json(SourceStatusResponse {
+        sources,
+        deployment_mode: state.deployment_mode.to_string(),
+    }))
 }
 
 /// `POST /api/sources/{id}/reindex` — trigger a full rescan of one source.
@@ -157,9 +161,11 @@ mod tests {
                 updated_at: "2026-03-15T10:00:00Z".into(),
                 config_json: "{}".into(),
             }],
+            deployment_mode: "desktop".into(),
         };
         let json = serde_json::to_string(&resp).expect("serialize");
         assert!(json.contains("local_fs"));
+        assert!(json.contains("desktop"));
         assert!(!json.contains("error_message"));
         assert!(!json.contains("sync_cursor"));
     }

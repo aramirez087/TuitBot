@@ -220,6 +220,8 @@ fn deployment_capabilities_serde_json_roundtrip() {
         inline_ingest: true,
         file_picker_native: false,
         preferred_source_default: "google_drive".to_string(),
+        privacy_envelope: "user_controlled".to_string(),
+        ghostwriter_local_only: false,
     };
     let json = serde_json::to_value(&caps).expect("serialize");
     assert_eq!(json["local_folder"], true);
@@ -468,4 +470,92 @@ loop_back_enabled = true
         !toml_out.contains("connection_id"),
         "connection_id should not appear when None"
     );
+}
+
+// --- Privacy envelope tests ---
+
+#[test]
+fn is_local_first_desktop() {
+    assert!(DeploymentMode::Desktop.is_local_first());
+}
+
+#[test]
+fn is_local_first_self_host() {
+    assert!(!DeploymentMode::SelfHost.is_local_first());
+}
+
+#[test]
+fn is_local_first_cloud() {
+    assert!(!DeploymentMode::Cloud.is_local_first());
+}
+
+#[test]
+fn privacy_envelope_desktop() {
+    assert_eq!(DeploymentMode::Desktop.privacy_envelope(), "local_first");
+}
+
+#[test]
+fn privacy_envelope_self_host() {
+    assert_eq!(
+        DeploymentMode::SelfHost.privacy_envelope(),
+        "user_controlled"
+    );
+}
+
+#[test]
+fn privacy_envelope_cloud() {
+    assert_eq!(
+        DeploymentMode::Cloud.privacy_envelope(),
+        "provider_controlled"
+    );
+}
+
+#[test]
+fn capabilities_privacy_fields_desktop() {
+    let caps = DeploymentMode::Desktop.capabilities();
+    assert_eq!(caps.privacy_envelope, "local_first");
+    assert!(caps.ghostwriter_local_only);
+}
+
+#[test]
+fn capabilities_privacy_fields_self_host() {
+    let caps = DeploymentMode::SelfHost.capabilities();
+    assert_eq!(caps.privacy_envelope, "user_controlled");
+    assert!(!caps.ghostwriter_local_only);
+}
+
+#[test]
+fn capabilities_privacy_fields_cloud() {
+    let caps = DeploymentMode::Cloud.capabilities();
+    assert_eq!(caps.privacy_envelope, "provider_controlled");
+    assert!(!caps.ghostwriter_local_only);
+}
+
+#[test]
+fn capabilities_serde_backward_compat() {
+    // Old JSON without privacy_envelope and ghostwriter_local_only should deserialize
+    // with serde defaults (empty string and false).
+    let json = r#"{
+        "local_folder": true,
+        "manual_local_path": true,
+        "google_drive": true,
+        "inline_ingest": true,
+        "file_picker_native": false,
+        "preferred_source_default": "local_fs"
+    }"#;
+    let caps: DeploymentCapabilities = serde_json::from_str(json).expect("deserialize");
+    assert!(caps.local_folder);
+    assert_eq!(caps.privacy_envelope, "");
+    assert!(!caps.ghostwriter_local_only);
+}
+
+#[test]
+fn capabilities_privacy_fields_json_roundtrip() {
+    let caps = DeploymentMode::Desktop.capabilities();
+    let json = serde_json::to_value(&caps).expect("serialize");
+    assert_eq!(json["privacy_envelope"], "local_first");
+    assert_eq!(json["ghostwriter_local_only"], true);
+    let roundtripped: DeploymentCapabilities = serde_json::from_value(json).expect("deserialize");
+    assert_eq!(roundtripped.privacy_envelope, "local_first");
+    assert!(roundtripped.ghostwriter_local_only);
 }
