@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.45](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.44...tuitbot-cli-v0.1.45) - 2026-03-21
+
+### Other
+
+- Added groq. ([#261](https://github.com/aramirez087/TuitBot/pull/261))
+
 ## [0.1.44](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.43...tuitbot-cli-v0.1.44) - 2026-03-20
 
 ### Other
