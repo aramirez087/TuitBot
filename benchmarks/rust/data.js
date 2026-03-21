@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774104299174,
+  "lastUpdate": 1774104320090,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1563,6 +1563,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 940.18,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0422db621780dee28d244c9725ca06641f001b6c",
+          "message": "refactor(C5): split routes/approval.rs (1015L) into approval/{mod,handlers,export,tests} (#269)\n\n- mod.rs (78L): shared types + list/stats (read-only endpoints)\n- handlers.rs (459L): edit/approve/reject/approve_all + approve_single_item helper\n- export.rs (119L): CSV/JSON export + get_edit_history\n- tests.rs (323L): 44 tests (serialization, escape_csv, status guards)\n- Tests: 44/44 passing\n- All CI gates: fmt ✓ clippy ✓ test ✓\n- Zero functional changes, full public API preserved\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-21T08:39:42-06:00",
+          "tree_id": "2447358211ad0e37f44756dcad9ca01e3ce2b373",
+          "url": "https://github.com/aramirez087/TuitBot/commit/0422db621780dee28d244c9725ca06641f001b6c"
+        },
+        "date": 1774104319052,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 937.51,
             "unit": "ps"
           }
         ]
