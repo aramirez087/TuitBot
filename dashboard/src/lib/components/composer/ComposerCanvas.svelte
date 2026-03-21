@@ -107,7 +107,8 @@
 	export function checkRecovery() {
 		const data = readAutoSave();
 		if (!data) return;
-		if (wasNavigationExit()) {
+		const hasText = !!(data.tweetText?.trim() || data.blocks?.some((b: ThreadBlock) => b.text.trim()));
+		if (wasNavigationExit() || !hasText) {
 			restoreDraft(data);
 			initialized = true;
 		} else {
