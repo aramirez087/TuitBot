@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774129628407,
+  "lastUpdate": 1774131258724,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1824,6 +1824,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 941.25,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f8f0c4498bbb97267cf45b05e2c45521c1f79e1b",
+          "message": "chore: release (#278)",
+          "timestamp": "2026-03-21T16:11:57-06:00",
+          "tree_id": "fed07679e5f84749b108517c50c270a423d2d0e9",
+          "url": "https://github.com/aramirez087/TuitBot/commit/f8f0c4498bbb97267cf45b05e2c45521c1f79e1b"
+        },
+        "date": 1774131257689,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.89,
             "unit": "ps"
           }
         ]
