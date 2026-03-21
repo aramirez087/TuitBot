@@ -150,6 +150,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/drafts/{id}/activity",
             get(routes::content::list_draft_activity),
         )
+        .route(
+            "/drafts/{id}/provenance",
+            get(routes::content::get_draft_provenance),
+        )
         .route("/drafts/{id}/tags", get(routes::content::list_draft_tags))
         .route(
             "/drafts/{id}/tags/{tag_id}",
@@ -171,6 +175,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/content/drafts/{id}/publish",
             post(routes::content::publish_draft),
+        )
+        .route(
+            "/content/drafts/{id}/provenance",
+            get(routes::content::get_draft_provenance),
         )
         // Ingest
         .route("/ingest", post(routes::ingest::ingest))
@@ -223,6 +231,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/assist/highlights",
             post(routes::assist::assist_highlights),
         )
+        .route("/assist/hooks", post(routes::assist::hooks::assist_hooks))
         .route("/assist/topics", get(routes::assist::assist_topics))
         .route(
             "/assist/optimal-times",
@@ -235,6 +244,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/vault/notes/{id}", get(routes::vault::note_detail))
         .route("/vault/search", get(routes::vault::search_fragments))
         .route("/vault/resolve-refs", post(routes::vault::resolve_refs))
+        .route(
+            "/vault/send-selection",
+            post(routes::vault::selections::send_selection),
+        )
+        .route(
+            "/vault/selection/{session_id}",
+            get(routes::vault::selections::get_selection),
+        )
         // Discovery feed
         .route("/discovery/feed", get(routes::discovery::feed))
         .route("/discovery/keywords", get(routes::discovery::keywords))

@@ -75,18 +75,18 @@ describe('VaultHighlights', () => {
 		expect(count?.textContent).toContain('3 of 3');
 	});
 
-	it('shows Generate tweet button in tweet mode', () => {
+	it('shows Find hooks button in tweet mode', () => {
 		const { container } = render(VaultHighlights, { props: defaultProps });
 		const btn = container.querySelector('.highlights-generate-btn');
-		expect(btn?.textContent).toContain('Generate tweet');
+		expect(btn?.textContent).toContain('Find hooks');
 	});
 
-	it('shows Generate thread button in thread mode', () => {
+	it('shows Find hooks button in thread mode', () => {
 		const { container } = render(VaultHighlights, {
 			props: { ...defaultProps, outputFormat: 'thread' as const }
 		});
 		const btn = container.querySelector('.highlights-generate-btn');
-		expect(btn?.textContent).toContain('Generate thread');
+		expect(btn?.textContent).toContain('Find hooks');
 	});
 
 	it('disables generate button when generating', () => {
@@ -215,5 +215,93 @@ describe('VaultHighlights', () => {
 		const list = container.querySelector('[role="group"]');
 		expect(list).toBeTruthy();
 		expect(list?.getAttribute('aria-label')).toBe('Select highlights to include');
+	});
+});
+
+// --- Selection state and ingress tests ---
+describe('Selection state helpers', () => {
+	it('ProvenanceRef can be constructed from selection metadata', () => {
+		// Verify the type shape matches what the selection endpoint returns
+		const selectionResponse = {
+			session_id: 'abc-123',
+			vault_name: 'marketing',
+			file_path: 'content/ideas.md',
+			selected_text: 'Some text from Obsidian',
+			heading_context: 'Ideas > Marketing',
+			note_title: 'Content Ideas',
+			frontmatter_tags: ['marketing'],
+			resolved_node_id: 42,
+			resolved_chunk_id: 99,
+			created_at: '2024-01-01T00:00:00Z',
+			expires_at: '2024-01-01T00:30:00Z'
+		};
+
+		// Construct ProvenanceRef from selection (mirrors runtime logic)
+		const provenance = {
+			node_id: selectionResponse.resolved_node_id ?? undefined,
+			chunk_id: selectionResponse.resolved_chunk_id ?? undefined,
+			source_path: selectionResponse.file_path,
+			heading_path: selectionResponse.heading_context ?? undefined,
+			snippet: selectionResponse.selected_text ?? undefined
+		};
+
+		expect(provenance.node_id).toBe(42);
+		expect(provenance.chunk_id).toBe(99);
+		expect(provenance.source_path).toBe('content/ideas.md');
+		expect(provenance.heading_path).toBe('Ideas > Marketing');
+		expect(provenance.snippet).toBe('Some text from Obsidian');
+	});
+
+	it('ProvenanceRef handles null resolved IDs gracefully', () => {
+		const selectionResponse = {
+			resolved_node_id: null,
+			resolved_chunk_id: null,
+			file_path: 'content/ideas.md',
+			heading_context: null,
+			selected_text: null
+		};
+
+		const provenance = {
+			node_id: selectionResponse.resolved_node_id ?? undefined,
+			chunk_id: selectionResponse.resolved_chunk_id ?? undefined,
+			source_path: selectionResponse.file_path,
+			heading_path: selectionResponse.heading_context ?? undefined,
+			snippet: selectionResponse.selected_text ?? undefined
+		};
+
+		expect(provenance.node_id).toBeUndefined();
+		expect(provenance.chunk_id).toBeUndefined();
+		expect(provenance.source_path).toBe('content/ideas.md');
+	});
+});
+
+// --- Citation deep-link tests ---
+describe('Citation heading deep-links', () => {
+	it('buildObsidianUri includes heading fragment', async () => {
+		const { buildObsidianUri } = await import('$lib/utils/obsidianUri');
+		const uri = buildObsidianUri('/Users/alice/vaults/marketing', 'ideas.md', 'Overview > Strategy');
+		expect(uri).toContain('obsidian://open');
+		expect(uri).toContain('vault=marketing');
+		expect(uri).toContain('file=ideas');
+		expect(uri).toContain('#Strategy');
+	});
+
+	it('buildObsidianUri works without heading', async () => {
+		const { buildObsidianUri } = await import('$lib/utils/obsidianUri');
+		const uri = buildObsidianUri('/Users/alice/vaults/marketing', 'ideas.md');
+		expect(uri).toContain('obsidian://open');
+		expect(uri).not.toContain('#');
+	});
+
+	it('buildObsidianUri handles single-level heading', async () => {
+		const { buildObsidianUri } = await import('$lib/utils/obsidianUri');
+		const uri = buildObsidianUri('/Users/alice/vaults/notes', 'todo.md', 'Tasks');
+		expect(uri).toContain('#Tasks');
+	});
+
+	it('buildObsidianUri returns null for empty vault path', async () => {
+		const { buildObsidianUri } = await import('$lib/utils/obsidianUri');
+		const uri = buildObsidianUri('', 'ideas.md', 'Heading');
+		expect(uri).toBeNull();
 	});
 });

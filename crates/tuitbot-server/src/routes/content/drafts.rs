@@ -30,6 +30,9 @@ pub struct CreateDraftRequest {
     /// Optional provenance refs linking this draft to vault source material.
     #[serde(default)]
     pub provenance: Option<Vec<ProvenanceRef>>,
+    /// Optional hook style tag (e.g. "contrarian_take") for source enrichment.
+    #[serde(default)]
+    pub hook_style: Option<String>,
 }
 
 fn default_source() -> String {
@@ -72,13 +75,19 @@ pub async fn create_draft(
         body.content.clone()
     };
 
+    // Enrich source with hook style when present (e.g. "assist:hook:contrarian_take").
+    let effective_source = match body.hook_style.as_deref() {
+        Some(style) if !style.is_empty() => format!("assist:hook:{style}"),
+        _ => body.source.clone(),
+    };
+
     let id = if let Some(ref refs) = body.provenance {
         scheduled_content::insert_draft_with_provenance_for(
             &state.db,
             &ctx.account_id,
             &body.content_type,
             &content,
-            &body.source,
+            &effective_source,
             refs,
         )
         .await
@@ -89,7 +98,7 @@ pub async fn create_draft(
             &ctx.account_id,
             &body.content_type,
             &content,
-            &body.source,
+            &effective_source,
         )
         .await
         .map_err(ApiError::Storage)?
@@ -286,4 +295,23 @@ pub async fn publish_draft(
     Ok(Json(
         json!({ "id": id, "approval_queue_id": queue_id, "status": "queued_for_posting" }),
     ))
+}
+
+/// `GET /api/drafts/:id/provenance` — retrieve provenance links for a draft.
+pub async fn get_draft_provenance(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Path(id): Path<i64>,
+) -> Result<Json<Vec<provenance::ProvenanceLink>>, ApiError> {
+    // Verify the draft exists and belongs to this account.
+    let _item = scheduled_content::get_by_id_for(&state.db, &ctx.account_id, id)
+        .await
+        .map_err(ApiError::Storage)?
+        .ok_or_else(|| ApiError::NotFound(format!("Draft {id} not found")))?;
+
+    let links = provenance::get_links_for(&state.db, &ctx.account_id, "scheduled_content", id)
+        .await
+        .map_err(ApiError::Storage)?;
+
+    Ok(Json(links))
 }

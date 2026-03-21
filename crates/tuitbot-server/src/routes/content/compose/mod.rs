@@ -53,6 +53,9 @@ pub struct ComposeTweetRequest {
     /// Optional provenance refs linking this content to vault source material.
     #[serde(default)]
     pub provenance: Option<Vec<ProvenanceRef>>,
+    /// Optional hook style tag (e.g. "contrarian_take") for source enrichment.
+    #[serde(default)]
+    pub hook_style: Option<String>,
 }
 
 /// `POST /api/content/tweets` — compose and queue a manual tweet.
@@ -124,6 +127,12 @@ pub struct ComposeThreadRequest {
     pub tweets: Vec<String>,
     /// Optional ISO 8601 timestamp to schedule the thread.
     pub scheduled_for: Option<String>,
+    /// Optional provenance refs linking this content to vault source material.
+    #[serde(default)]
+    pub provenance: Option<Vec<ProvenanceRef>>,
+    /// Optional hook style tag (e.g. "contrarian_take") for source enrichment.
+    #[serde(default)]
+    pub hook_style: Option<String>,
 }
 
 /// `POST /api/content/threads` — compose and queue a manual thread.
@@ -144,7 +153,9 @@ pub async fn compose_thread(
     let combined = body.tweets.join("\n---\n");
 
     if approval_mode {
-        let id = approval_queue::enqueue_with_context_for(
+        let prov_input = build_provenance_input(body.provenance.as_deref());
+
+        let id = approval_queue::enqueue_with_provenance_for(
             &state.db,
             &ctx.account_id,
             "thread",
@@ -157,6 +168,7 @@ pub async fn compose_thread(
             "[]",
             None,
             None,
+            prov_input.as_ref(),
             body.scheduled_for.as_deref(),
         )
         .await?;
@@ -203,6 +215,9 @@ pub struct ComposeRequest {
     /// Optional provenance refs linking this content to vault source material.
     #[serde(default)]
     pub provenance: Option<Vec<ProvenanceRef>>,
+    /// Optional hook style tag (e.g. "contrarian_take") for source enrichment.
+    #[serde(default)]
+    pub hook_style: Option<String>,
 }
 
 /// `POST /api/content/compose` — compose manual content (tweet or thread).

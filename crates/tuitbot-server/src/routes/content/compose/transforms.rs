@@ -6,7 +6,7 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
-use tuitbot_core::storage::{action_log, approval_queue, scheduled_content};
+use tuitbot_core::storage::{action_log, approval_queue, provenance, scheduled_content};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::AccountContext;
@@ -157,6 +157,20 @@ pub(super) async fn compose_thread_blocks_flow(
         )
         .await?;
 
+        // Attach provenance links to the scheduled thread.
+        if let Some(refs) = body.provenance.as_deref() {
+            if !refs.is_empty() {
+                let _ = provenance::insert_links_for(
+                    &state.db,
+                    &ctx.account_id,
+                    "scheduled_content",
+                    id,
+                    refs,
+                )
+                .await;
+            }
+        }
+
         let _ = state.event_tx.send(AccountWsEvent {
             account_id: ctx.account_id.clone(),
             event: WsEvent::ContentScheduled {
@@ -184,6 +198,20 @@ pub(super) async fn compose_thread_blocks_flow(
                 Some(&scheduled_for),
             )
             .await?;
+
+            // Attach provenance links to the fallback-scheduled thread.
+            if let Some(refs) = body.provenance.as_deref() {
+                if !refs.is_empty() {
+                    let _ = provenance::insert_links_for(
+                        &state.db,
+                        &ctx.account_id,
+                        "scheduled_content",
+                        id,
+                        refs,
+                    )
+                    .await;
+                }
+            }
 
             let _ = state.event_tx.send(AccountWsEvent {
                 account_id: ctx.account_id.clone(),
@@ -276,6 +304,20 @@ async fn persist_content(
         )
         .await?;
 
+        // Attach provenance links to the scheduled content if present.
+        if let Some(refs) = body.provenance.as_deref() {
+            if !refs.is_empty() {
+                let _ = provenance::insert_links_for(
+                    &state.db,
+                    &ctx.account_id,
+                    "scheduled_content",
+                    id,
+                    refs,
+                )
+                .await;
+            }
+        }
+
         let _ = state.event_tx.send(AccountWsEvent {
             account_id: ctx.account_id.clone(),
             event: WsEvent::ContentScheduled {
@@ -303,6 +345,20 @@ async fn persist_content(
                 Some(&scheduled_for),
             )
             .await?;
+
+            // Attach provenance links to the fallback-scheduled content.
+            if let Some(refs) = body.provenance.as_deref() {
+                if !refs.is_empty() {
+                    let _ = provenance::insert_links_for(
+                        &state.db,
+                        &ctx.account_id,
+                        "scheduled_content",
+                        id,
+                        refs,
+                    )
+                    .await;
+                }
+            }
 
             let _ = state.event_tx.send(AccountWsEvent {
                 account_id: ctx.account_id.clone(),

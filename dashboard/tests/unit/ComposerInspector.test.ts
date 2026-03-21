@@ -240,4 +240,41 @@ describe('ComposerInspector', () => {
 		await (component as any).handleGenerateFromVault([1], 'tweet');
 		expect(onsubmiterror).toHaveBeenCalledWith('API down');
 	});
+
+	it('getVaultProvenance returns empty array initially', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		const result = (component as any).getVaultProvenance();
+		expect(Array.isArray(result)).toBe(true);
+		expect(result).toHaveLength(0);
+	});
+
+	it('getVaultHookStyle returns null initially', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		const result = (component as any).getVaultHookStyle();
+		expect(result).toBeNull();
+	});
+
+	it('after handleGenerateFromVault with hookStyle, getVaultHookStyle returns it', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		await (component as any).handleGenerateFromVault([1], 'tweet', ['A highlight'], 'bold-claim');
+		const result = (component as any).getVaultHookStyle();
+		expect(result).toBe('bold-claim');
+	});
+
+	it('after handleGenerateFromVault, getVaultProvenance returns refs for used node IDs', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		await (component as any).handleGenerateFromVault([10, 20], 'tweet', ['Key point']);
+		const provenance = (component as any).getVaultProvenance();
+		expect(provenance).toHaveLength(2);
+		expect(provenance[0]).toMatchObject({ node_id: 10 });
+		expect(provenance[1]).toMatchObject({ node_id: 20 });
+	});
 });

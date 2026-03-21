@@ -86,11 +86,7 @@
 			onclick={handleGenerate}
 			disabled={enabledCount === 0 || generating}
 		>
-			{generating
-				? 'Generating...'
-				: outputFormat === 'thread'
-					? 'Generate thread'
-					: 'Generate tweet'}
+			{generating ? 'Generating...' : 'Find hooks'}
 		</button>
 	</div>
 </div>

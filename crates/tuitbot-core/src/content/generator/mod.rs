@@ -14,7 +14,7 @@ use crate::content::length::{truncate_at_sentence, validate_tweet_length, MAX_TW
 use crate::error::LlmError;
 use crate::llm::{GenerationParams, LlmProvider, TokenUsage};
 
-use parser::parse_thread;
+use parser::{parse_hooks_response, parse_thread};
 
 /// Output from a single-text generation (reply or tweet).
 #[derive(Debug, Clone)]
@@ -26,6 +26,32 @@ pub struct GenerationOutput {
     /// The model that produced the final response.
     pub model: String,
     /// The provider name (e.g., "openai", "anthropic", "ollama").
+    pub provider: String,
+}
+
+/// A single hook option returned by the hook generation pipeline.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HookOption {
+    /// The tweet format style (e.g., "question", "contrarian_take").
+    pub style: String,
+    /// The hook text (max 280 chars).
+    pub text: String,
+    /// Character count of the hook text.
+    pub char_count: usize,
+    /// Confidence heuristic: "high" if under 240 chars, "medium" otherwise.
+    pub confidence: String,
+}
+
+/// Output from hook generation.
+#[derive(Debug, Clone)]
+pub struct HookGenerationOutput {
+    /// The generated hook options (3–5).
+    pub hooks: Vec<HookOption>,
+    /// Accumulated token usage across all attempts.
+    pub usage: TokenUsage,
+    /// The model that produced the response.
+    pub model: String,
+    /// The provider name.
     pub provider: String,
 }
 
@@ -344,6 +370,144 @@ impl ContentGenerator {
         };
 
         self.generate_single(&system, &user_message, &params).await
+    }
+
+    // -----------------------------------------------------------------
+    // Hook generation (5 differentiated options)
+    // -----------------------------------------------------------------
+
+    /// Generate 5 differentiated hook options for the given topic.
+    pub async fn generate_hooks(
+        &self,
+        topic: &str,
+        rag_context: Option<&str>,
+    ) -> Result<HookGenerationOutput, LlmError> {
+        tracing::debug!(
+            topic = %topic,
+            has_rag_context = rag_context.is_some(),
+            "Generating hooks",
+        );
+
+        let styles = Self::select_hook_styles();
+        let style_list = styles
+            .iter()
+            .enumerate()
+            .map(|(i, f)| format!("{}. {}", i + 1, f))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let voice_section = self.format_voice_section();
+        let persona_section = self.format_persona_context();
+        let rag_section = Self::format_rag_section(rag_context);
+        let audience_section = self.format_audience_section();
+
+        let system = format!(
+            "You are {}'s social media voice. {}.\
+             {audience_section}\
+             {voice_section}\
+             {persona_section}\
+             {rag_section}\n\n\
+             Task: Generate exactly 5 hook tweets for the topic below, \
+             one per style listed. Each hook must be a standalone tweet \
+             (max 280 characters) that grabs attention.\n\n\
+             Required styles (one hook per style):\n{style_list}\n\n\
+             Output format (strictly follow this, no extra text):\n\
+             STYLE: <style_name>\n\
+             HOOK: <hook text>\n\
+             ---\n\
+             (repeat for all 5)",
+            self.business.product_name, self.business.product_description,
+        );
+
+        let user_message = format!("Generate hooks about: {topic}");
+        let params = GenerationParams {
+            max_tokens: 800,
+            temperature: 0.9,
+            ..Default::default()
+        };
+
+        let mut usage = TokenUsage::default();
+        let provider_name = self.provider.name().to_string();
+
+        let resp = self
+            .provider
+            .complete(&system, &user_message, &params)
+            .await?;
+        usage.accumulate(&resp.usage);
+        let model = resp.model.clone();
+
+        let mut hooks = Self::build_hook_options(&parse_hooks_response(&resp.text));
+
+        // Retry once if fewer than 3 hooks
+        if hooks.len() < 3 {
+            tracing::debug!(count = hooks.len(), "Too few hooks, retrying");
+            let retry_msg = format!(
+                "{user_message}\n\nIMPORTANT: Output exactly 5 hooks, \
+                 each with STYLE: and HOOK: lines, separated by ---."
+            );
+            let resp = self.provider.complete(&system, &retry_msg, &params).await?;
+            usage.accumulate(&resp.usage);
+            hooks = Self::build_hook_options(&parse_hooks_response(&resp.text));
+        }
+
+        if hooks.is_empty() {
+            return Err(LlmError::GenerationFailed(
+                "No valid hooks could be generated".to_string(),
+            ));
+        }
+
+        // Truncate to 5 if the LLM returned more
+        hooks.truncate(5);
+
+        Ok(HookGenerationOutput {
+            hooks,
+            usage,
+            model,
+            provider: provider_name,
+        })
+    }
+
+    /// Select 5 TweetFormat styles for hook generation.
+    /// Always includes Question and ContrarianTake, plus 3 from the rest.
+    fn select_hook_styles() -> Vec<TweetFormat> {
+        use rand::seq::SliceRandom;
+
+        let mut styles = vec![TweetFormat::Question, TweetFormat::ContrarianTake];
+        let remaining = [
+            TweetFormat::List,
+            TweetFormat::MostPeopleThinkX,
+            TweetFormat::Storytelling,
+            TweetFormat::BeforeAfter,
+            TweetFormat::Tip,
+        ];
+        let mut rng = rand::rng();
+        let mut pool = remaining.to_vec();
+        pool.shuffle(&mut rng);
+        styles.extend(pool.into_iter().take(3));
+        styles
+    }
+
+    /// Convert parsed (style, text) pairs into HookOption structs,
+    /// filtering out any that exceed MAX_TWEET_CHARS.
+    fn build_hook_options(parsed: &[(String, String)]) -> Vec<HookOption> {
+        parsed
+            .iter()
+            .filter(|(_, text)| !text.is_empty() && text.len() <= MAX_TWEET_CHARS)
+            .map(|(style, text)| {
+                let char_count = text.len();
+                let confidence = if char_count <= 240 {
+                    "high".to_string()
+                } else {
+                    "medium".to_string()
+                };
+                HookOption {
+                    style: style.clone(),
+                    text: text.clone(),
+                    char_count,
+                    confidence,
+                }
+            })
+            .collect()
     }
 
     // -----------------------------------------------------------------

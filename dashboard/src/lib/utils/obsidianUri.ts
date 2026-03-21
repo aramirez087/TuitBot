@@ -14,13 +14,19 @@
  * (e.g. `/Users/alice/notes/marketing` → `marketing`).  Returns `null`
  * when the vault name cannot be determined.
  */
-export function buildObsidianUri(vaultPath: string, relativePath: string): string | null {
+export function buildObsidianUri(vaultPath: string, relativePath: string, heading?: string): string | null {
 	const vaultName = vaultPath.split('/').filter(Boolean).pop();
 	if (!vaultName) return null;
 	const encodedVault = encodeURIComponent(vaultName);
 	// Obsidian expects the file path without the .md extension
 	const encodedFile = encodeURIComponent(relativePath.replace(/\.md$/, ''));
-	return `obsidian://open?vault=${encodedVault}&file=${encodedFile}`;
+	let uri = `obsidian://open?vault=${encodedVault}&file=${encodedFile}`;
+	if (heading) {
+		// Extract the deepest heading segment for the anchor
+		const leaf = heading.split(' > ').pop()?.trim();
+		if (leaf) uri += `#${encodeURIComponent(leaf)}`;
+	}
+	return uri;
 }
 
 /**

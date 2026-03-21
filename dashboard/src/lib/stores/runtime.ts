@@ -16,7 +16,9 @@ const DESKTOP_DEFAULTS: RuntimeCapabilities = {
 		google_drive: true,
 		inline_ingest: true,
 		file_picker_native: false,
-		preferred_source_default: 'local_fs'
+		preferred_source_default: 'local_fs',
+		privacy_envelope: 'local_first',
+		ghostwriter_local_only: true
 	},
 	can_post: false,
 	capability_tier: 'unconfigured'
@@ -29,6 +31,8 @@ export const deploymentMode = derived(capabilitiesData, ($d) => $d?.deployment_m
 export const capabilitiesLoaded = derived(capabilitiesData, ($d) => $d !== null);
 export const canPost = derived(capabilitiesData, ($d) => $d?.can_post ?? false);
 export const capabilityTier = derived(capabilitiesData, ($d): CapabilityTier => $d?.capability_tier ?? 'unconfigured');
+export const privacyEnvelope = derived(capabilitiesData, ($d) => $d?.capabilities?.privacy_envelope ?? 'local_first');
+export const isLocalFirst = derived(capabilitiesData, ($d) => $d?.capabilities?.ghostwriter_local_only ?? true);
 
 let fetching = false;
 let fetched = false;

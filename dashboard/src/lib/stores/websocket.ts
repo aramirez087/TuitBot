@@ -3,7 +3,7 @@ import { getAccountId } from '$lib/api/http';
 
 /** Events pushed by the tuitbot-server WebSocket. */
 export interface WsEvent {
-    type: 'ActionPerformed' | 'ApprovalQueued' | 'ApprovalUpdated' | 'FollowerUpdate' | 'RuntimeStatus' | 'ContentScheduled' | 'Error';
+    type: 'ActionPerformed' | 'ApprovalQueued' | 'ApprovalUpdated' | 'FollowerUpdate' | 'RuntimeStatus' | 'ContentScheduled' | 'SelectionReceived' | 'Error';
     account_id?: string;
     [key: string]: unknown;
 }

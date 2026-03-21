@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api, type ScheduleConfig, type ThreadBlock } from '$lib/api';
+	import { api, type ScheduleConfig, type ThreadBlock, type ProvenanceRef } from '$lib/api';
 	import { topicWithCue } from '$lib/utils/composeHandlers';
 	import InspectorContent from './InspectorContent.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
@@ -24,9 +24,11 @@
 		hasExistingContent,
 		threadFlowRef,
 		voicePanelRef = $bindable<VoiceContextPanel | undefined>(undefined),
+		selectionSessionId = null,
 		onclose,
 		onundo,
 		onsubmiterror,
+		onSelectionConsumed,
 	}: {
 		open?: boolean;
 		isMobile?: boolean;
@@ -44,12 +46,30 @@
 		targetDate: Date;
 		timezone?: string;
 		hasExistingContent: boolean;
+		selectionSessionId?: string | null;
 		threadFlowRef?: ThreadFlowLane;
 		voicePanelRef?: VoiceContextPanel;
 		onclose?: () => void;
 		onundo?: () => void;
 		onsubmiterror?: (msg: string) => void;
+		onSelectionConsumed?: () => void;
 	} = $props();
+
+	// ── Vault provenance tracking ────────────────────────────
+	/** Provenance refs captured from the most recent vault generation. */
+	let vaultProvenance: ProvenanceRef[] = $state([]);
+	/** Hook style from the most recent hook selection. */
+	let vaultHookStyle: string | null = $state(null);
+
+	/** Get the current vault provenance refs (read by parent). */
+	export function getVaultProvenance(): ProvenanceRef[] {
+		return vaultProvenance;
+	}
+
+	/** Get the current hook style (read by parent). */
+	export function getVaultHookStyle(): string | null {
+		return vaultHookStyle;
+	}
 
 	// ── Undo timer (AI operations) ─────────────────────────
 	let undoTimer: ReturnType<typeof setTimeout> | null = null;
@@ -135,8 +155,11 @@
 		startUndoTimer();
 	}
 
-	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[]) {
+	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[], hookStyle?: string) {
 		if (selectedNodeIds.length === 0) return;
+		// Capture provenance from the vault node IDs used for generation.
+		vaultProvenance = selectedNodeIds.map((id) => ({ node_id: id }));
+		vaultHookStyle = hookStyle ?? null;
 		try {
 			if (highlights && highlights.length > 0) {
 				const highlightContext = highlights.join('\n');
@@ -194,6 +217,7 @@
 		notesPanelMode,
 		showUndo,
 		mode,
+		selectionSessionId,
 	});
 
 	function handleScheduleSelect(date: string, time: string) {
@@ -230,6 +254,7 @@
 					ongeneratefromvault={handleGenerateFromVault}
 					onclosenotes={() => { notesPanelMode = null; }}
 					onundo={() => { onundo?.(); }}
+					{onSelectionConsumed}
 				/>
 			</div>
 		</div>
@@ -248,6 +273,7 @@
 		ongeneratefromvault={handleGenerateFromVault}
 		onclosenotes={() => { notesPanelMode = null; }}
 		onundo={() => { onundo?.(); }}
+		{onSelectionConsumed}
 	/>
 {/if}
 

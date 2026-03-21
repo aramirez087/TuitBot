@@ -1,0 +1,9 @@
+{
+  "id": "tuitbot",
+  "name": "TuitBot Ghostwriter",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Send selections and blocks from your vault to TuitBot for content generation with full provenance tracking.",
+  "author": "TuitBot",
+  "isDesktopOnly": true
+}

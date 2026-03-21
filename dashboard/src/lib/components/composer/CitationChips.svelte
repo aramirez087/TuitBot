@@ -43,7 +43,7 @@
 
 	function obsidianUriFor(cit: VaultCitation): string | null {
 		if (!isDesktop || !vaultPath) return null;
-		return buildObsidianUri(vaultPath, cit.source_path);
+		return buildObsidianUri(vaultPath, cit.source_path, cit.heading_path);
 	}
 
 	async function handleOpenInObsidian(e: Event, cit: VaultCitation) {
@@ -66,6 +66,7 @@
 						onkeydown={(e) => handleKeydown(e, cit.chunk_id)}
 						aria-expanded={expandedId === cit.chunk_id}
 						aria-label="Citation: {chipLabel(cit)}"
+						title={cit.heading_path}
 					>
 						<FileText size={11} />
 						<span class="chip-text">{chipLabel(cit)}</span>

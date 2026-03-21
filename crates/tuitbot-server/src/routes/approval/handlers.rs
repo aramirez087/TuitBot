@@ -7,7 +7,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tuitbot_core::config::Config;
-use tuitbot_core::storage::{action_log, approval_queue, scheduled_content};
+use tuitbot_core::storage::{action_log, approval_queue, provenance, scheduled_content};
 
 use crate::account::{require_approve, AccountContext};
 use crate::error::ApiError;
@@ -163,6 +163,17 @@ pub async fn approve_item(
             Some(sched),
         )
         .await?;
+
+        // Copy provenance links from approval_queue to scheduled_content.
+        let _ = provenance::copy_links_for(
+            &state.db,
+            &ctx.account_id,
+            "approval_queue",
+            id,
+            "scheduled_content",
+            sc_id,
+        )
+        .await;
 
         let metadata = json!({
             "approval_id": id,
@@ -431,7 +442,7 @@ pub(super) async fn approve_single_item(
         )
         .await?;
 
-        scheduled_content::insert_for(
+        let sc_id = scheduled_content::insert_for(
             &state.db,
             account_id,
             &item.action_type,
@@ -439,6 +450,17 @@ pub(super) async fn approve_single_item(
             Some(sched),
         )
         .await?;
+
+        // Copy provenance links from approval_queue to scheduled_content.
+        let _ = provenance::copy_links_for(
+            &state.db,
+            account_id,
+            "approval_queue",
+            item.id,
+            "scheduled_content",
+            sc_id,
+        )
+        .await;
     } else {
         approval_queue::update_status_with_review_for(
             &state.db, account_id, item.id, "approved", review,

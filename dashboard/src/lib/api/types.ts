@@ -55,6 +55,8 @@ export interface DeploymentCapabilities {
 	inline_ingest: boolean;
 	file_picker_native: boolean;
 	preferred_source_default: string;
+	privacy_envelope: string;
+	ghostwriter_local_only: boolean;
 }
 
 export interface RuntimeStatus {
@@ -258,6 +260,7 @@ export interface ComposeRequest {
 	media_paths?: string[];
 	blocks?: ThreadBlock[];
 	provenance?: ProvenanceRef[];
+	hook_style?: string;
 }
 
 // Thread content parsing utilities moved to $lib/utils/parseThreadContent.ts
@@ -800,6 +803,20 @@ export interface ProvenanceRef {
 	snippet?: string;
 }
 
+export interface ProvenanceLink {
+	id: number;
+	account_id: string;
+	entity_type: string;
+	entity_id: number;
+	node_id: number | null;
+	chunk_id: number | null;
+	seed_id: number | null;
+	source_path: string | null;
+	heading_path: string | null;
+	snippet: string | null;
+	created_at: string;
+}
+
 export interface VaultSourceStatus {
 	id: number;
 	source_type: string;
@@ -809,6 +826,12 @@ export interface VaultSourceStatus {
 	updated_at: string;
 	/** Local vault path for `local_fs` sources — used for Obsidian URI deep links. */
 	path?: string;
+}
+
+export interface VaultSourcesResponse {
+	sources: VaultSourceStatus[];
+	deployment_mode: string;
+	privacy_envelope: string;
 }
 
 export interface VaultNoteItem {
@@ -839,6 +862,38 @@ export interface VaultNoteDetail {
 	ingested_at: string;
 	updated_at: string;
 	chunks: VaultChunkSummary[];
+}
+
+// --- Ghostwriter selection (from Obsidian plugin) ---
+
+export interface VaultSelectionResponse {
+	session_id: string;
+	vault_name: string;
+	file_path: string;
+	selected_text: string | null;
+	heading_context: string | null;
+	note_title: string | null;
+	frontmatter_tags: string[] | null;
+	resolved_node_id: number | null;
+	resolved_chunk_id: number | null;
+	created_at: string;
+	expires_at: string;
+	privacy_envelope?: string;
+}
+
+// --- Hook generation types (Ghostwriter) ---
+
+export interface HookOption {
+	style: string;
+	text: string;
+	char_count: number;
+	confidence: string;
+}
+
+export interface AssistHooksResponse {
+	hooks: HookOption[];
+	topic: string;
+	vault_citations?: VaultCitation[];
 }
 
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.

@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { schedule as scheduleStore } from '$lib/stores/calendar';
 	import * as studio from '$lib/stores/draftStudio.svelte';
+	import type { ProvenanceLink, VaultCitation } from '$lib/api/types';
 	import DraftDetailsPanel from './DraftDetailsPanel.svelte';
 	import DraftHistoryPanel from './DraftHistoryPanel.svelte';
+	import CitationChips from '$lib/components/composer/CitationChips.svelte';
 
 	interface Props {
 		activePanel: 'details' | 'history';
 		prefillSchedule: string | null;
+		provenance?: ProvenanceLink[];
 		onActivePanel: (panel: 'details' | 'history') => void;
 		onUpdateMeta: (data: { title?: string; notes?: string }) => void;
 		onAssignTag: (tagId: number) => void;
@@ -23,6 +26,7 @@
 	const {
 		activePanel,
 		prefillSchedule,
+		provenance = [],
 		onActivePanel,
 		onUpdateMeta,
 		onAssignTag,
@@ -35,6 +39,21 @@
 		onRestoreFromRevision,
 		onClose,
 	}: Props = $props();
+
+	/** Convert ProvenanceLink rows to the VaultCitation shape that CitationChips expects. */
+	const provenanceCitations = $derived<VaultCitation[]>(
+		provenance
+			.filter((l) => l.source_path)
+			.map((l) => ({
+				chunk_id: l.chunk_id ?? l.id,
+				node_id: l.node_id ?? 0,
+				heading_path: l.heading_path ?? '',
+				source_path: l.source_path ?? '',
+				source_title: null,
+				snippet: l.snippet ?? '',
+				retrieval_boost: 0
+			}))
+	);
 
 	function switchToHistory() {
 		onActivePanel('history');
@@ -62,6 +81,12 @@
 			History
 		</button>
 	</div>
+
+	{#if provenanceCitations.length > 0}
+		<div class="sources-section">
+			<CitationChips citations={provenanceCitations} />
+		</div>
+	{/if}
 
 	{#if activePanel === 'details'}
 		<DraftDetailsPanel
@@ -132,5 +157,11 @@
 	.panel-tab.active {
 		color: var(--color-accent);
 		border-bottom-color: var(--color-accent);
+	}
+
+	.sources-section {
+		padding: 8px 12px;
+		border-bottom: 1px solid var(--color-border-subtle);
+		flex-shrink: 0;
 	}
 </style>

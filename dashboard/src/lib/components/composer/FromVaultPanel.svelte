@@ -3,24 +3,32 @@
 	import { api } from '$lib/api';
 	import type { VaultNoteItem, VaultNoteDetail } from '$lib/api/types';
 	import { X, Search, FileText } from 'lucide-svelte';
+	import { deploymentMode } from '$lib/stores/runtime';
 	import VaultNoteList from './VaultNoteList.svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import VaultHighlights from './VaultHighlights.svelte';
+	import HookPicker from './HookPicker.svelte';
+	import VaultSelectionReview from './VaultSelectionReview.svelte';
+	import type { HookOption } from '$lib/api/types';
 
 	let {
 		mode = 'tweet',
 		hasExistingContent = false,
+		selectionSessionId = null,
 		ongenerate,
 		onclose,
 		onundo,
 		showUndo = false,
+		onSelectionConsumed,
 	}: {
 		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
-		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[]) => Promise<void>;
+		selectionSessionId?: string | null;
+		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;
+		onSelectionConsumed?: () => void;
 	} = $props();
 
 	let outputFormat: 'tweet' | 'thread' = $state('tweet');
@@ -44,6 +52,10 @@
 	let highlightsStep = $state<Array<{ text: string; enabled: boolean }> | null>(null);
 	let extracting = $state(false);
 	let cachedNodeIds = $state<number[]>([]);
+	let selectionActive = $state(false);
+	let hookOptions = $state<HookOption[] | null>(null);
+	let hookLoading = $state(false);
+	let hookError = $state<string | null>(null);
 
 	const selectionCount = $derived(selectedChunks.size);
 	const atLimit = $derived(selectionCount >= MAX_SELECTIONS);
@@ -110,8 +122,24 @@
 		}
 	}
 
-	async function handleGenerateFromHighlights(enabledHighlights: string[]) {
-		if (enabledHighlights.length === 0 || generating) return;
+	async function handleGenerateHooksFromHighlights(enabledHighlights: string[]) {
+		if (enabledHighlights.length === 0 || hookLoading) return;
+		hookLoading = true;
+		hookError = null;
+		error = null;
+		try {
+			const topic = enabledHighlights.join('\n');
+			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	async function handleHookSelected(hook: HookOption, format: 'tweet' | 'thread') {
+		if (generating) return;
 		if (hasExistingContent && !confirmReplace) {
 			confirmReplace = true;
 			return;
@@ -120,7 +148,7 @@
 		error = null;
 		confirmReplace = false;
 		try {
-			await ongenerate(cachedNodeIds, outputFormat, enabledHighlights);
+			await ongenerate(cachedNodeIds, format, [hook.text], hook.style);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
@@ -128,8 +156,31 @@
 		}
 	}
 
+	async function handleRegenerateHooks() {
+		if (!highlightsStep) return;
+		hookLoading = true;
+		hookError = null;
+		try {
+			const enabledHighlights = highlightsStep.filter((h) => h.enabled).map((h) => h.text);
+			const topic = enabledHighlights.join('\n');
+			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	function handleBackToHighlights() {
+		hookOptions = null;
+		hookError = null;
+	}
+
 	function handleBackToChunks() {
 		highlightsStep = null;
+		hookOptions = null;
+		hookError = null;
 	}
 
 	function cancelReplace() {
@@ -137,6 +188,10 @@
 	}
 
 	onMount(async () => {
+		if (selectionSessionId) {
+			selectionActive = true;
+			return;
+		}
 		searchRef?.focus();
 		try {
 			const sourcesResult = await api.vault.sources();
@@ -154,12 +209,33 @@
 <div class="vault-panel">
 	<div class="vault-header">
 		<span class="vault-label">From Vault</span>
+		<span class="vault-privacy-badge">
+			{#if $deploymentMode === 'desktop'}
+				Local-first
+			{:else if $deploymentMode === 'self_host'}
+				Self-hosted
+			{:else}
+				Cloud
+			{/if}
+		</span>
 		<button class="vault-close" onclick={onclose} aria-label="Close vault panel">
 			<X size={12} />
 		</button>
 	</div>
 
-	{#if noSources}
+	{#if selectionActive && selectionSessionId}
+		<VaultSelectionReview
+			sessionId={selectionSessionId}
+			{outputFormat}
+			{hasExistingContent}
+			{showUndo}
+			{onundo}
+			{ongenerate}
+			{onSelectionConsumed}
+			onexpired={() => { selectionActive = false; }}
+			onformatchange={(f) => { outputFormat = f; }}
+		/>
+	{:else if noSources}
 		<div class="vault-empty-state">
 			<FileText size={20} />
 			<p>No vault sources configured.</p>
@@ -167,6 +243,21 @@
 				Add content sources in Settings to use vault search.
 			</p>
 		</div>
+	{:else if hookOptions || hookLoading}
+		{#if error}
+			<div class="vault-error" role="alert">{error}</div>
+		{/if}
+
+		<HookPicker
+			hooks={hookOptions ?? []}
+			{outputFormat}
+			loading={hookLoading}
+			error={hookError}
+			onselect={handleHookSelected}
+			onregenerate={handleRegenerateHooks}
+			onback={handleBackToHighlights}
+			onformatchange={(f) => { outputFormat = f; }}
+		/>
 	{:else if highlightsStep}
 		{#if error}
 			<div class="vault-error" role="alert">{error}</div>
@@ -175,8 +266,8 @@
 		<VaultHighlights
 			highlights={highlightsStep}
 			{outputFormat}
-			{generating}
-			ongenerate={handleGenerateFromHighlights}
+			generating={hookLoading}
+			ongenerate={handleGenerateHooksFromHighlights}
 			onback={handleBackToChunks}
 			onformatchange={(f) => { outputFormat = f; }}
 		/>
@@ -247,6 +338,17 @@
 		color: var(--color-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
+	}
+
+	.vault-privacy-badge {
+		font-size: 10px;
+		font-weight: 500;
+		color: var(--color-text-subtle);
+		padding: 2px 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		margin-left: auto;
+		margin-right: 4px;
 	}
 
 	.vault-close {

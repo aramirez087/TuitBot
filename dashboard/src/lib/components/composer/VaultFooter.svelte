@@ -7,6 +7,7 @@
 		generating: boolean;
 		confirmReplace: boolean;
 		showUndo: boolean;
+		selectionMode?: boolean;
 		onundo?: () => void;
 		onGenerate: () => void;
 		onCancelReplace: () => void;
@@ -21,11 +22,19 @@
 		generating,
 		confirmReplace,
 		showUndo,
+		selectionMode = false,
 		onundo,
 		onGenerate,
 		onCancelReplace,
 		onformatchange,
 	}: Props = $props();
+
+	function buttonLabel(): string {
+		if (generating) return 'Generating...';
+		if (extracting) return 'Extracting...';
+		if (selectionMode) return 'Generate hooks';
+		return 'Extract key points';
+	}
 </script>
 
 <div class="vault-footer">
@@ -65,9 +74,7 @@
 			onclick={onGenerate}
 			disabled={selectionCount === 0 || extracting || generating}
 		>
-			{extracting
-				? 'Extracting...'
-				: 'Extract Highlights'}
+			{buttonLabel()}
 		</button>
 	{/if}
 

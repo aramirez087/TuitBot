@@ -333,6 +333,32 @@ pub async fn count_nodes_for_source(
     Ok(row.0)
 }
 
+/// Find a content node by `relative_path` for a given account (across all sources).
+///
+/// Returns the most recently updated match if multiple sources contain the same path.
+pub async fn find_node_by_path_for(
+    pool: &DbPool,
+    account_id: &str,
+    relative_path: &str,
+) -> Result<Option<ContentNode>, StorageError> {
+    let row: Option<ContentNodeRow> = sqlx::query_as(
+        "SELECT id, account_id, source_id, relative_path, content_hash, \
+                    title, body_text, front_matter_json, tags, status, \
+                    ingested_at, updated_at \
+             FROM content_nodes \
+             WHERE account_id = ? AND relative_path = ? \
+             ORDER BY updated_at DESC \
+             LIMIT 1",
+    )
+    .bind(account_id)
+    .bind(relative_path)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(ContentNode::from_row))
+}
+
 /// Mark a content node as 'chunked' for a specific account.
 pub async fn mark_node_chunked(
     pool: &DbPool,

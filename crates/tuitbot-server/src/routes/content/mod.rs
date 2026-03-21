@@ -27,7 +27,8 @@ pub use draft_tags::{
     assign_draft_tag, create_account_tag, list_account_tags, list_draft_tags, unassign_draft_tag,
 };
 pub use drafts::{
-    create_draft, delete_draft, edit_draft, list_drafts, publish_draft, schedule_draft,
+    create_draft, delete_draft, edit_draft, get_draft_provenance, list_drafts, publish_draft,
+    schedule_draft,
 };
 pub use list::{list_threads, list_tweets};
 pub use scheduled::{cancel_scheduled, edit_scheduled};

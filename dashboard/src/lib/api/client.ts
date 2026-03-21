@@ -50,13 +50,17 @@ import type {
 	VaultSourceStatus,
 	VaultNoteItem,
 	VaultNoteDetail,
+	VaultSelectionResponse,
+	VaultSourcesResponse,
 	ProvenanceRef,
+	ProvenanceLink,
 	DraftSummary,
 	AutosaveResponse,
 	ContentRevision,
 	ContentActivity,
 	ContentTag,
-	AnalyzeProfileResponse
+	AnalyzeProfileResponse,
+	AssistHooksResponse
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -485,6 +489,18 @@ export const api = {
 					body: JSON.stringify({ selected_node_ids: selectedNodeIds })
 				}
 			),
+		hooks: (
+			topic: string,
+			opts?: { selectedNodeIds?: number[]; sessionId?: string }
+		) =>
+			request<AssistHooksResponse>('/api/assist/hooks', {
+				method: 'POST',
+				body: JSON.stringify({
+					topic,
+					...(opts?.selectedNodeIds && { selected_node_ids: opts.selectedNodeIds }),
+					...(opts?.sessionId && { session_id: opts.sessionId })
+				})
+			}),
 		mode: () => request<{ mode: string; approval_mode: boolean }>('/api/assist/mode')
 	},
 
@@ -623,7 +639,8 @@ export const api = {
 		assignTag: (id: number, tagId: number) =>
 			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'POST' }),
 		unassignTag: (id: number, tagId: number) =>
-			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'DELETE' })
+			request<{ status: string }>(`/api/drafts/${id}/tags/${tagId}`, { method: 'DELETE' }),
+		provenance: (id: number) => request<ProvenanceLink[]>(`/api/drafts/${id}/provenance`)
 	},
 
 	tags: {
@@ -784,7 +801,7 @@ export const api = {
 	},
 
 	vault: {
-		sources: () => request<{ sources: VaultSourceStatus[] }>('/api/vault/sources'),
+		sources: () => request<VaultSourcesResponse>('/api/vault/sources'),
 		searchNotes: (params: { q?: string; source_id?: number; limit?: number } = {}) => {
 			const query = new URLSearchParams();
 			if (params.q) query.set('q', params.q);
@@ -805,6 +822,8 @@ export const api = {
 			request<{ citations: VaultCitation[] }>('/api/vault/resolve-refs', {
 				method: 'POST',
 				body: JSON.stringify({ node_ids: nodeIds })
-			})
+			}),
+		getSelection: (sessionId: string) =>
+			request<VaultSelectionResponse>(`/api/vault/selection/${encodeURIComponent(sessionId)}`)
 	}
 };

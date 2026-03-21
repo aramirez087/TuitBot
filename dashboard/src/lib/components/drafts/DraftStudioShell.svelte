@@ -6,9 +6,11 @@
 	import { loadSchedule } from '$lib/stores/calendar';
 	import * as studio from '$lib/stores/draftStudio.svelte';
 	import { api } from '$lib/api';
+	import type { ProvenanceLink } from '$lib/api/types';
 	import type { SyncStatus } from '$lib/utils/composerAutosave';
 	import type { ComposeRequest } from '$lib/api';
 	import { matchEvent } from '$lib/utils/shortcuts';
+	import { events as wsEvents } from '$lib/stores/websocket';
 	import { parseServerDraft } from '$lib/utils/draftStudioParse';
 	import type { HydrationPayload } from '$lib/utils/draftStudioParse';
 	import DraftStudioDrawer from './DraftStudioDrawer.svelte';
@@ -23,6 +25,9 @@
 	let prefillSchedule = $state<string | null>(null);
 	let drawerOpen = $state(false);
 	let approvalMode = $state(true);
+	let selectionSessionId = $state<string | null>(null);
+	let lastConsumedSelectionId = $state<string | null>(null);
+	let draftProvenance = $state<ProvenanceLink[]>([]);
 
 	const publishEnabled = $derived($canPost && !approvalMode);
 
@@ -71,6 +76,15 @@
 			history.replaceState(null, '', url.toString());
 		}
 
+		const selectionParam = $page.url.searchParams.get('selection');
+		if (selectionParam) {
+			selectionSessionId = selectionParam;
+			lastConsumedSelectionId = selectionParam;
+			const url = new URL(window.location.href);
+			url.searchParams.delete('selection');
+			history.replaceState(null, '', url.toString());
+		}
+
 		const handler = () => {
 			studio.reset();
 			hydration = null;
@@ -87,6 +101,7 @@
 		if (id === null) {
 			hydration = null;
 			hydrationDraftId = null;
+			draftProvenance = [];
 			studio.setFullDraft(null);
 			return;
 		}
@@ -110,6 +125,17 @@
 		}
 	});
 
+	$effect(() => {
+		const eventList = $wsEvents;
+		if (eventList.length === 0) return;
+		const latest = eventList[0];
+		if (latest.type !== 'SelectionReceived') return;
+		const sid = latest.session_id as string | undefined;
+		if (!sid || sid === lastConsumedSelectionId) return;
+		selectionSessionId = sid;
+		lastConsumedSelectionId = sid;
+	});
+
 	async function fetchDraft(id: number) {
 		try {
 			const draft = await api.draftStudio.get(id);
@@ -118,11 +144,19 @@
 			console.info('[draft-studio]', { event: 'draft_selected', id, source: 'fetch' });
 			hydration = parseServerDraft(draft);
 			hydrationDraftId = id;
+
+			// Fetch provenance links (non-blocking — display is optional).
+			api.draftStudio.provenance(id).then((links) => {
+				if (studio.getSelectedId() === id) draftProvenance = links;
+			}).catch(() => {
+				if (studio.getSelectedId() === id) draftProvenance = [];
+			});
 		} catch {
 			if (studio.getSelectedId() !== id) return;
 			studio.setFullDraft(null);
 			hydration = null;
 			hydrationDraftId = null;
+			draftProvenance = [];
 		} finally {
 			if (studio.getSelectedId() === id) loadingDraft = false;
 		}
@@ -278,18 +312,21 @@
 		{hydrationDraftId}
 		{loadingDraft}
 		{publishEnabled}
+		{selectionSessionId}
 		onToggleDrawer={() => (drawerOpen = !drawerOpen)}
 		onSyncStatus={handleSyncStatus}
 		onDraftAction={handleDraftAction}
 		onDraftSubmit={handleDraftSubmit}
 		onFetchDraft={fetchDraft}
 		onCreate={handleCreate}
+		onSelectionConsumed={() => { selectionSessionId = null; }}
 	/>
 
 	{#if detailsPanelOpen && studio.getSelectedId() !== null}
 		<DraftStudioDetailsPane
 			{activePanel}
 			{prefillSchedule}
+			provenance={draftProvenance}
 			onActivePanel={(p) => (activePanel = p)}
 			onUpdateMeta={handleMetaUpdate}
 			onAssignTag={(id) => studio.assignTag(id)}
