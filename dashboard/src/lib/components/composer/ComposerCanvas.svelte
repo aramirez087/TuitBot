@@ -2,9 +2,8 @@
 	import { Send } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import type { ThreadBlock } from '$lib/api';
-	import { saveAutoSave, clearAutoSave as clearAutoSaveStorage, readAutoSave, restoreMedia, wasNavigationExit, markSessionActive, AUTOSAVE_DEBOUNCE_MS } from '$lib/utils/composerAutosave';
+	import { saveAutoSave, clearAutoSave as clearAutoSaveStorage, readAutoSave, restoreMedia, AUTOSAVE_DEBOUNCE_MS } from '$lib/utils/composerAutosave';
 	import type { RecoveryData } from '$lib/stores/composerAutosave';
-	import RecoveryBanner from './RecoveryBanner.svelte';
 	import TweetEditor from './TweetEditor.svelte';
 	import ThreadFlowLane from './ThreadFlowLane.svelte';
 	import AddTweetDivider from './AddTweetDivider.svelte';
@@ -107,25 +106,7 @@
 	export function checkRecovery() {
 		const data = readAutoSave();
 		if (!data) return;
-		if (wasNavigationExit()) {
-			restoreDraft(data);
-			initialized = true;
-		} else {
-			recoveryData = data;
-			showRecovery = true;
-		}
-	}
-
-	function recoverDraft() {
-		if (!recoveryData) return;
-		restoreDraft(recoveryData);
-		showRecovery = false;
-		initialized = true;
-	}
-
-	function dismissRecovery() {
-		showRecovery = false;
-		clearAutoSave();
+		restoreDraft(data);
 		initialized = true;
 	}
 
@@ -189,10 +170,6 @@
 
 <div class="canvas" class:with-inspector={inspectorOpen && inspector}>
 	<div class="canvas-main">
-		{#if showRecovery}
-			<RecoveryBanner onrecover={recoverDraft} ondismiss={dismissRecovery} />
-		{/if}
-
 		{#if mode === 'tweet'}
 			<TweetEditor
 				bind:this={tweetEditorRef}
