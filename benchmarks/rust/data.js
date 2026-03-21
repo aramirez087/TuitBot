@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774055742169,
+  "lastUpdate": 1774059081502,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1273,6 +1273,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 936.76,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c425c6cf66fe3fd69a6a2a945602a42c5dab85e",
+          "message": "ci: optimize caching and remove duplicate benchmark workflow\n\n- Add npm cache via setup-node (keyed on package-lock.json)\n- Remove redundant npm i --prefer-offline after npm ci\n- Cache cargo-audit, cargo-license, cargo-sbom binaries with --locked\n- Remove duplicate benchmark.yml (benchmarks.yml is canonical)\n- Document cache key strategy in workflow comments",
+          "timestamp": "2026-03-20T20:09:05-06:00",
+          "tree_id": "06bae1cb0b88c87b03b5ecf4d595f81cb41bc2c2",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8c425c6cf66fe3fd69a6a2a945602a42c5dab85e"
+        },
+        "date": 1774059080658,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 935.05,
             "unit": "ps"
           }
         ]
