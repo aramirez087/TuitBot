@@ -347,6 +347,66 @@ impl ContentGenerator {
     }
 
     // -----------------------------------------------------------------
+    // Key highlights extraction
+    // -----------------------------------------------------------------
+
+    /// Extract 3-5 concise, tweetable key highlights from provided context.
+    ///
+    /// Used as an intermediate curation step before generating content
+    /// from vault notes, letting the user review and select which
+    /// insights to include.
+    pub async fn extract_highlights(&self, rag_context: &str) -> Result<Vec<String>, LlmError> {
+        tracing::debug!(context_len = rag_context.len(), "Extracting key highlights",);
+
+        let system = format!(
+            "You are {}'s content strategist. {}.\n\n\
+             Task: Read the context below and extract 3 to 5 concise, \
+             tweetable key insights as bullet points.\n\n\
+             Rules:\n\
+             - Each bullet should be a single clear insight or idea.\n\
+             - Keep each bullet under 200 characters.\n\
+             - Output only the bullet list, one per line.\n\
+             - Use a dash (-) prefix for each bullet.\n\
+             - No numbering, no sub-bullets, no headers.",
+            self.business.product_name, self.business.product_description,
+        );
+
+        let user_message = format!("Context:\n{rag_context}");
+        let params = GenerationParams {
+            max_tokens: 500,
+            temperature: 0.5,
+            ..Default::default()
+        };
+
+        let resp = self
+            .provider
+            .complete(&system, &user_message, &params)
+            .await?;
+
+        let highlights: Vec<String> = resp
+            .text
+            .lines()
+            .map(|line| {
+                line.trim()
+                    .trim_start_matches(['-', '*', '•'])
+                    .trim_start_matches(|c: char| c.is_ascii_digit())
+                    .trim_start_matches('.')
+                    .trim()
+                    .to_string()
+            })
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if highlights.is_empty() {
+            return Err(LlmError::GenerationFailed(
+                "No highlights could be extracted from the provided context".to_string(),
+            ));
+        }
+
+        Ok(highlights)
+    }
+
+    // -----------------------------------------------------------------
     // Thread generation
     // -----------------------------------------------------------------
 

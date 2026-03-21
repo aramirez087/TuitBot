@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { X } from "lucide-svelte";
+	import { X, Smartphone, Monitor } from "lucide-svelte";
 	import { focusTrap } from "$lib/actions/focusTrap";
 	import TweetPreview from "../TweetPreview.svelte";
 
@@ -32,6 +32,7 @@
 		blocks.filter((b) => b.text.trim().length > 0),
 	);
 
+	let deviceMode: 'mobile' | 'desktop' = $state('desktop');
 	let closeBtn: HTMLButtonElement | undefined = $state();
 	let triggerElement: Element | null = null;
 
@@ -71,9 +72,31 @@
 				handleBackdropClick(e as any);
 		}}
 	></div>
-	<div class="preview-container">
+	<div class="preview-container" class:preview-mobile={deviceMode === 'mobile'}>
 		<header class="preview-header">
 			<h2 class="preview-title">Preview</h2>
+			<div class="device-toggle" role="radiogroup" aria-label="Preview device">
+				<button
+					class="device-btn"
+					class:active={deviceMode === 'desktop'}
+					aria-checked={deviceMode === 'desktop'}
+					role="radio"
+					onclick={() => { deviceMode = 'desktop'; }}
+					aria-label="Desktop preview"
+				>
+					<Monitor size={16} />
+				</button>
+				<button
+					class="device-btn"
+					class:active={deviceMode === 'mobile'}
+					aria-checked={deviceMode === 'mobile'}
+					role="radio"
+					onclick={() => { deviceMode = 'mobile'; }}
+					aria-label="Mobile preview"
+				>
+					<Smartphone size={16} />
+				</button>
+			</div>
 			<button
 				bind:this={closeBtn}
 				class="preview-close"
@@ -94,6 +117,7 @@
 						total={1}
 						{handle}
 						{avatarUrl}
+						{deviceMode}
 					/>
 				{:else}
 					<div class="preview-empty">
@@ -109,6 +133,7 @@
 						total={visibleBlocks.length}
 						{handle}
 						{avatarUrl}
+						{deviceMode}
 					/>
 				{/each}
 			{:else}
@@ -155,6 +180,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 8px;
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--color-border-subtle);
 		flex-shrink: 0;
@@ -217,8 +243,49 @@
 		}
 	}
 
+	.device-toggle {
+		display: flex;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 6px;
+		overflow: hidden;
+	}
+
+	.device-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 28px;
+		border: none;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.device-btn:first-child {
+		border-right: 1px solid var(--color-border-subtle);
+	}
+
+	.device-btn.active {
+		background: var(--color-surface-active);
+		color: var(--color-text);
+	}
+
+	.device-btn:hover:not(.active) {
+		background: var(--color-surface-hover);
+	}
+
+	.preview-container.preview-mobile {
+		max-width: 375px;
+	}
+
 	@media (prefers-reduced-motion: reduce) {
 		.preview-close {
+			transition: none;
+		}
+
+		.device-btn {
 			transition: none;
 		}
 	}

@@ -5,6 +5,7 @@
 	import { X, Search, FileText } from 'lucide-svelte';
 	import VaultNoteList from './VaultNoteList.svelte';
 	import VaultFooter from './VaultFooter.svelte';
+	import VaultHighlights from './VaultHighlights.svelte';
 
 	let {
 		mode = 'tweet',
@@ -16,7 +17,7 @@
 	}: {
 		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
-		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread') => Promise<void>;
+		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[]) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;
@@ -40,6 +41,9 @@
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let searchRef: HTMLInputElement | undefined = $state();
 	let noSources = $state(false);
+	let highlightsStep = $state<Array<{ text: string; enabled: boolean }> | null>(null);
+	let extracting = $state(false);
+	let cachedNodeIds = $state<number[]>([]);
 
 	const selectionCount = $derived(selectedChunks.size);
 	const atLimit = $derived(selectionCount >= MAX_SELECTIONS);
@@ -90,8 +94,24 @@
 		selectedChunks = next;
 	}
 
-	async function handleGenerate() {
-		if (selectionCount === 0 || generating) return;
+	async function handleExtractHighlights() {
+		if (selectionCount === 0 || extracting) return;
+		extracting = true;
+		error = null;
+		try {
+			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
+			cachedNodeIds = nodeIds;
+			const result = await api.assist.highlights(nodeIds);
+			highlightsStep = result.highlights.map((text) => ({ text, enabled: true }));
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to extract highlights';
+		} finally {
+			extracting = false;
+		}
+	}
+
+	async function handleGenerateFromHighlights(enabledHighlights: string[]) {
+		if (enabledHighlights.length === 0 || generating) return;
 		if (hasExistingContent && !confirmReplace) {
 			confirmReplace = true;
 			return;
@@ -100,13 +120,16 @@
 		error = null;
 		confirmReplace = false;
 		try {
-			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
-			await ongenerate(nodeIds, outputFormat);
+			await ongenerate(cachedNodeIds, outputFormat, enabledHighlights);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
 			generating = false;
 		}
+	}
+
+	function handleBackToChunks() {
+		highlightsStep = null;
 	}
 
 	function cancelReplace() {
@@ -144,6 +167,19 @@
 				Add content sources in Settings to use vault search.
 			</p>
 		</div>
+	{:else if highlightsStep}
+		{#if error}
+			<div class="vault-error" role="alert">{error}</div>
+		{/if}
+
+		<VaultHighlights
+			highlights={highlightsStep}
+			{outputFormat}
+			{generating}
+			ongenerate={handleGenerateFromHighlights}
+			onback={handleBackToChunks}
+			onformatchange={(f) => { outputFormat = f; }}
+		/>
 	{:else}
 		<div class="vault-search-wrap">
 			<Search size={13} class="vault-search-icon" />
@@ -179,11 +215,12 @@
 			{selectionCount}
 			maxSelections={MAX_SELECTIONS}
 			{outputFormat}
+			extracting={extracting}
 			{generating}
 			{confirmReplace}
 			{showUndo}
 			{onundo}
-			onGenerate={handleGenerate}
+			onGenerate={handleExtractHighlights}
 			onCancelReplace={cancelReplace}
 			onformatchange={(f) => { outputFormat = f; }}
 		/>

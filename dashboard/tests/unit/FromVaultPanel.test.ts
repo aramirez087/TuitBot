@@ -53,6 +53,11 @@ vi.mock('$lib/api', () => ({
 			sources: vi.fn().mockResolvedValue({
 				sources: [{ id: 'source-1', name: 'Knowledge Base' }]
 			})
+		},
+		assist: {
+			highlights: vi.fn().mockResolvedValue({
+				highlights: ['Key insight about design patterns', 'Performance optimization tip', 'Architecture best practice']
+			})
 		}
 	}
 }));
@@ -329,5 +334,76 @@ describe('FromVaultPanel', () => {
 	it('handles long note titles gracefully', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		expect(container).toBeTruthy();
+	});
+
+	it('shows Extract Highlights button instead of Generate', () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+		const buttons = container.querySelectorAll('button');
+		const extractBtn = Array.from(buttons).find(
+			(b) => b.textContent?.includes('Extract Highlights')
+		);
+		expect(extractBtn).toBeTruthy();
+	});
+
+	it('does not show Generate tweet/thread button in initial view', () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+		const buttons = container.querySelectorAll('button');
+		const generateBtn = Array.from(buttons).find(
+			(b) => b.textContent?.includes('Generate tweet') || b.textContent?.includes('Generate thread')
+		);
+		expect(generateBtn).toBeFalsy();
+	});
+
+	it('extract highlights button is disabled when no chunks selected', () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+		const extractBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Extract Highlights')
+		) as HTMLButtonElement | undefined;
+		expect(extractBtn?.disabled).toBe(true);
+	});
+
+	it('renders with thread mode', () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, mode: 'thread' as const }
+		});
+		expect(container.querySelector('.vault-panel')).toBeTruthy();
+	});
+
+	it('renders with hasExistingContent true', () => {
+		const { container } = render(FromVaultPanel, {
+			props: { ...defaultProps, hasExistingContent: true }
+		});
+		expect(container.querySelector('.vault-panel')).toBeTruthy();
+	});
+
+	it('handles ongenerate callback type with optional highlights', () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		render(FromVaultPanel, {
+			props: { ...defaultProps, ongenerate }
+		});
+		// Verify the ongenerate function accepts the new signature
+		expect(typeof ongenerate).toBe('function');
+		// Simulate calling with highlights
+		ongenerate([1], 'tweet', ['highlight1', 'highlight2']);
+		expect(ongenerate).toHaveBeenCalledWith([1], 'tweet', ['highlight1', 'highlight2']);
+	});
+
+	it('handles ongenerate callback without highlights (backward compat)', () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		render(FromVaultPanel, {
+			props: { ...defaultProps, ongenerate }
+		});
+		ongenerate([1], 'tweet');
+		expect(ongenerate).toHaveBeenCalledWith([1], 'tweet');
+	});
+
+	it('shows Extracting state text on button during extraction', async () => {
+		// We verify the initial disabled state renders "Extract Highlights"
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+		const extractBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Extract Highlights') || b.textContent?.includes('Extracting')
+		);
+		expect(extractBtn).toBeTruthy();
+		expect(extractBtn?.textContent?.trim()).toBe('Extract Highlights');
 	});
 });

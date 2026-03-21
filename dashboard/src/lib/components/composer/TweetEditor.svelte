@@ -34,6 +34,44 @@
 
 	let uploading = $state(false);
 	let fileInput: HTMLInputElement | undefined = $state();
+	let textareaEl: HTMLTextAreaElement | undefined = $state();
+
+	// Local state preserves the browser's native undo/redo stack.
+	// The controlled `value={text}` pattern kills undo because every keystroke
+	// round-trips through the parent and programmatically re-sets textarea.value.
+	let localText = $state('');
+	let lastPropText = $state('');
+
+	// Sync from parent when its text prop changes externally (toolbar insert, template load)
+	$effect(() => {
+		if (text !== lastPropText) {
+			lastPropText = text;
+			localText = text;
+		}
+	});
+
+	// Notify parent of local edits
+	function handleInput() {
+		lastPropText = localText;
+		onchange(localText);
+		autoResize();
+	}
+
+	// Auto-resize textarea to fit content, scroll when past max
+	function autoResize() {
+		if (!textareaEl) return;
+		textareaEl.style.height = 'auto';
+		const scrollH = textareaEl.scrollHeight;
+		textareaEl.style.height = scrollH + 'px';
+		textareaEl.style.overflowY = scrollH > 320 ? 'auto' : 'hidden';
+	}
+
+	$effect(() => {
+		// resize on mount and whenever localText changes externally
+		localText;
+		// tick: let Svelte flush the bind:value first
+		requestAnimationFrame(autoResize);
+	});
 
 	const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
 	const MAX_IMAGES = 4;
@@ -42,7 +80,7 @@
 	const MAX_VIDEO_SIZE = 512 * 1024 * 1024;
 	const TWEET_MAX = 280;
 
-	const tweetChars = $derived(tweetWeightedLen(text));
+	const tweetChars = $derived(tweetWeightedLen(localText));
 	const tweetOverLimit = $derived(tweetChars > TWEET_MAX);
 
 	const hasGifOrVideo = $derived(
@@ -156,15 +194,16 @@
 		<div class="compose-spine-spacer"></div>
 		<div class="compose-main">
 			<textarea
+				bind:this={textareaEl}
+				bind:value={localText}
 				class="compose-input"
 				class:over-limit={tweetOverLimit}
 				placeholder="What's on your mind?"
-				value={text}
-				oninput={(e) => onchange(e.currentTarget.value)}
+				oninput={handleInput}
 				ondrop={handleDrop}
 				ondragover={handleDragOver}
 				onpaste={handlePaste}
-				rows={4}
+				rows={3}
 				aria-label="Tweet content"
 			></textarea>
 			<div class="char-ring-row">
@@ -278,7 +317,10 @@
 		caret-color: var(--color-accent);
 		text-rendering: optimizeLegibility;
 		-webkit-font-smoothing: antialiased;
-		resize: vertical;
+		resize: none;
+		overflow: hidden;
+		min-height: 72px;
+		max-height: 320px;
 		box-sizing: border-box;
 	}
 

@@ -858,4 +858,46 @@ mod tests {
         assert!(system.contains("https://testapp.com"));
         assert!(system.contains("TestApp"));
     }
+
+    // --- extract_highlights tests ---
+
+    #[tokio::test]
+    async fn extract_highlights_parses_dash_bullets() {
+        let provider = MockProvider::single("- Insight one\n- Insight two\n- Insight three");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["Insight one", "Insight two", "Insight three"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_parses_asterisk_bullets() {
+        let provider = MockProvider::single("* First point\n* Second point");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["First point", "Second point"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_parses_numbered_bullets() {
+        let provider = MockProvider::single("1. First\n2. Second\n3. Third");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["First", "Second", "Third"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_filters_empty_lines() {
+        let provider = MockProvider::single("- One\n\n- Two\n\n");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["One", "Two"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_errors_on_empty_response() {
+        let provider = MockProvider::single("");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await;
+        assert!(result.is_err());
+    }
 }

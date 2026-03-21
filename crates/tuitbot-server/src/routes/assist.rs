@@ -225,6 +225,54 @@ pub async fn assist_improve(
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/assist/highlights
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct AssistHighlightsRequest {
+    pub selected_node_ids: Vec<i64>,
+}
+
+#[derive(Serialize)]
+pub struct AssistHighlightsResponse {
+    pub highlights: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub vault_citations: Vec<VaultCitation>,
+}
+
+pub async fn assist_highlights(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Json(body): Json<AssistHighlightsRequest>,
+) -> Result<Json<AssistHighlightsResponse>, ApiError> {
+    if body.selected_node_ids.is_empty() {
+        return Err(ApiError::BadRequest(
+            "selected_node_ids must not be empty".to_string(),
+        ));
+    }
+
+    let gen = get_generator(&state, &ctx.account_id).await?;
+    let rag_context =
+        resolve_composer_rag_context(&state, &ctx.account_id, Some(&body.selected_node_ids)).await;
+
+    let Some(ctx_data) = rag_context else {
+        return Err(ApiError::BadRequest(
+            "No vault context could be resolved for the given node IDs".to_string(),
+        ));
+    };
+
+    let highlights = gen
+        .extract_highlights(&ctx_data.prompt_block)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    Ok(Json(AssistHighlightsResponse {
+        highlights,
+        vault_citations: ctx_data.vault_citations,
+    }))
+}
+
+// ---------------------------------------------------------------------------
 // GET /api/assist/topics
 // ---------------------------------------------------------------------------
 
@@ -439,6 +487,13 @@ mod tests {
         let json = r#"{"tweet_text": "hi", "tweet_author": "u", "selected_node_ids": [10, 20]}"#;
         let req: AssistReplyRequest = serde_json::from_str(json).expect("deserialize");
         assert_eq!(req.selected_node_ids.unwrap(), vec![10, 20]);
+    }
+
+    #[test]
+    fn highlights_request_requires_node_ids() {
+        let json = r#"{"selected_node_ids": [1, 2]}"#;
+        let req: AssistHighlightsRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.selected_node_ids, vec![1, 2]);
     }
 
     #[test]

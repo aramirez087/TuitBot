@@ -3,6 +3,7 @@
 		selectionCount: number;
 		maxSelections: number;
 		outputFormat: 'tweet' | 'thread';
+		extracting?: boolean;
 		generating: boolean;
 		confirmReplace: boolean;
 		showUndo: boolean;
@@ -16,6 +17,7 @@
 		selectionCount,
 		maxSelections,
 		outputFormat,
+		extracting = false,
 		generating,
 		confirmReplace,
 		showUndo,
@@ -61,13 +63,11 @@
 		<button
 			class="vault-generate-btn"
 			onclick={onGenerate}
-			disabled={selectionCount === 0 || generating}
+			disabled={selectionCount === 0 || extracting || generating}
 		>
-			{generating
-				? 'Generating...'
-				: outputFormat === 'thread'
-					? 'Generate thread'
-					: 'Generate tweet'}
+			{extracting
+				? 'Extracting...'
+				: 'Extract Highlights'}
 		</button>
 	{/if}
 

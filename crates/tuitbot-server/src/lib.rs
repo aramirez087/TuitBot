@@ -219,6 +219,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/assist/reply", post(routes::assist::assist_reply))
         .route("/assist/thread", post(routes::assist::assist_thread))
         .route("/assist/improve", post(routes::assist::assist_improve))
+        .route(
+            "/assist/highlights",
+            post(routes::assist::assist_highlights),
+        )
         .route("/assist/topics", get(routes::assist::assist_topics))
         .route(
             "/assist/optimal-times",
