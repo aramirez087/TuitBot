@@ -6,7 +6,9 @@
 	import VaultNoteList from './VaultNoteList.svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import VaultHighlights from './VaultHighlights.svelte';
+	import HookPicker from './HookPicker.svelte';
 	import VaultSelectionReview from './VaultSelectionReview.svelte';
+	import type { HookOption } from '$lib/api/types';
 
 	let {
 		mode = 'tweet',
@@ -50,6 +52,9 @@
 	let extracting = $state(false);
 	let cachedNodeIds = $state<number[]>([]);
 	let selectionActive = $state(false);
+	let hookOptions = $state<HookOption[] | null>(null);
+	let hookLoading = $state(false);
+	let hookError = $state<string | null>(null);
 
 	const selectionCount = $derived(selectedChunks.size);
 	const atLimit = $derived(selectionCount >= MAX_SELECTIONS);
@@ -116,8 +121,24 @@
 		}
 	}
 
-	async function handleGenerateFromHighlights(enabledHighlights: string[]) {
-		if (enabledHighlights.length === 0 || generating) return;
+	async function handleGenerateHooksFromHighlights(enabledHighlights: string[]) {
+		if (enabledHighlights.length === 0 || hookLoading) return;
+		hookLoading = true;
+		hookError = null;
+		error = null;
+		try {
+			const topic = enabledHighlights.join('\n');
+			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	async function handleHookSelected(hook: HookOption, format: 'tweet' | 'thread') {
+		if (generating) return;
 		if (hasExistingContent && !confirmReplace) {
 			confirmReplace = true;
 			return;
@@ -126,7 +147,7 @@
 		error = null;
 		confirmReplace = false;
 		try {
-			await ongenerate(cachedNodeIds, outputFormat, enabledHighlights);
+			await ongenerate(cachedNodeIds, format, [hook.text]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
@@ -134,8 +155,31 @@
 		}
 	}
 
+	async function handleRegenerateHooks() {
+		if (!highlightsStep) return;
+		hookLoading = true;
+		hookError = null;
+		try {
+			const enabledHighlights = highlightsStep.filter((h) => h.enabled).map((h) => h.text);
+			const topic = enabledHighlights.join('\n');
+			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	function handleBackToHighlights() {
+		hookOptions = null;
+		hookError = null;
+	}
+
 	function handleBackToChunks() {
 		highlightsStep = null;
+		hookOptions = null;
+		hookError = null;
 	}
 
 	function cancelReplace() {
@@ -189,6 +233,21 @@
 				Add content sources in Settings to use vault search.
 			</p>
 		</div>
+	{:else if hookOptions || hookLoading}
+		{#if error}
+			<div class="vault-error" role="alert">{error}</div>
+		{/if}
+
+		<HookPicker
+			hooks={hookOptions ?? []}
+			{outputFormat}
+			loading={hookLoading}
+			error={hookError}
+			onselect={handleHookSelected}
+			onregenerate={handleRegenerateHooks}
+			onback={handleBackToHighlights}
+			onformatchange={(f) => { outputFormat = f; }}
+		/>
 	{:else if highlightsStep}
 		{#if error}
 			<div class="vault-error" role="alert">{error}</div>
@@ -197,8 +256,8 @@
 		<VaultHighlights
 			highlights={highlightsStep}
 			{outputFormat}
-			{generating}
-			ongenerate={handleGenerateFromHighlights}
+			generating={hookLoading}
+			ongenerate={handleGenerateHooksFromHighlights}
 			onback={handleBackToChunks}
 			onformatchange={(f) => { outputFormat = f; }}
 		/>

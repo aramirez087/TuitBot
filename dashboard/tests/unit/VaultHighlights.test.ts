@@ -75,18 +75,18 @@ describe('VaultHighlights', () => {
 		expect(count?.textContent).toContain('3 of 3');
 	});
 
-	it('shows Generate tweet button in tweet mode', () => {
+	it('shows Find hooks button in tweet mode', () => {
 		const { container } = render(VaultHighlights, { props: defaultProps });
 		const btn = container.querySelector('.highlights-generate-btn');
-		expect(btn?.textContent).toContain('Generate tweet');
+		expect(btn?.textContent).toContain('Find hooks');
 	});
 
-	it('shows Generate thread button in thread mode', () => {
+	it('shows Find hooks button in thread mode', () => {
 		const { container } = render(VaultHighlights, {
 			props: { ...defaultProps, outputFormat: 'thread' as const }
 		});
 		const btn = container.querySelector('.highlights-generate-btn');
-		expect(btn?.textContent).toContain('Generate thread');
+		expect(btn?.textContent).toContain('Find hooks');
 	});
 
 	it('disables generate button when generating', () => {

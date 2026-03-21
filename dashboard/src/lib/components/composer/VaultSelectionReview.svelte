@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { VaultSelectionResponse } from '$lib/api/types';
+	import type { VaultSelectionResponse, HookOption } from '$lib/api/types';
 	import { Zap, FileText } from 'lucide-svelte';
 	import VaultFooter from './VaultFooter.svelte';
+	import HookPicker from './HookPicker.svelte';
 
 	let {
 		sessionId,
@@ -33,6 +34,9 @@
 	let generating = $state(false);
 	let confirmReplace = $state(false);
 	let error = $state<string | null>(null);
+	let hookOptions = $state<HookOption[] | null>(null);
+	let hookLoading = $state(false);
+	let hookError = $state<string | null>(null);
 
 	onMount(async () => {
 		try {
@@ -46,6 +50,22 @@
 	});
 
 	async function handleGenerate() {
+		if (!selection || hookLoading) return;
+		hookLoading = true;
+		hookError = null;
+		error = null;
+		try {
+			const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
+			const result = await api.assist.hooks(topic, { sessionId: sessionId });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	async function handleHookSelected(hook: HookOption, format: 'tweet' | 'thread') {
 		if (!selection || generating) return;
 		if (hasExistingContent && !confirmReplace) {
 			confirmReplace = true;
@@ -56,13 +76,32 @@
 		confirmReplace = false;
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
-			const input = selection.selected_text ? [selection.selected_text] : undefined;
-			await ongenerate(nodeIds, outputFormat, input);
+			await ongenerate(nodeIds, format, [hook.text]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
 			generating = false;
 		}
+	}
+
+	async function handleRegenerateHooks() {
+		if (!selection) return;
+		hookLoading = true;
+		hookError = null;
+		try {
+			const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
+			const result = await api.assist.hooks(topic, { sessionId: sessionId });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	function handleBackFromHooks() {
+		hookOptions = null;
+		hookError = null;
 	}
 </script>
 
@@ -80,6 +119,20 @@
 		</p>
 		<button class="vault-expired-dismiss" onclick={() => onexpired?.()}>Browse vault</button>
 	</div>
+{:else if selection && (hookOptions || hookLoading)}
+	{#if error}
+		<div class="vault-error" role="alert">{error}</div>
+	{/if}
+	<HookPicker
+		hooks={hookOptions ?? []}
+		{outputFormat}
+		loading={hookLoading}
+		error={hookError}
+		onselect={handleHookSelected}
+		onregenerate={handleRegenerateHooks}
+		onback={handleBackFromHooks}
+		onformatchange={(f) => { outputFormat = f; onformatchange?.(f); }}
+	/>
 {:else if selection}
 	<div class="vault-selection-review">
 		<div class="selection-source-meta">
@@ -109,7 +162,7 @@
 		selectionCount={1}
 		maxSelections={1}
 		{outputFormat}
-		{generating}
+		generating={hookLoading}
 		{confirmReplace}
 		{showUndo}
 		{onundo}

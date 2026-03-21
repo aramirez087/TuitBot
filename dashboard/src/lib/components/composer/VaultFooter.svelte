@@ -32,7 +32,7 @@
 	function buttonLabel(): string {
 		if (generating) return 'Generating...';
 		if (extracting) return 'Extracting...';
-		if (selectionMode) return 'Generate from selection';
+		if (selectionMode) return 'Generate hooks';
 		return 'Extract key points';
 	}
 </script>

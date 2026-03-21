@@ -70,6 +70,17 @@ vi.mock('$lib/api', () => ({
 		assist: {
 			highlights: vi.fn().mockResolvedValue({
 				highlights: ['Key insight about design patterns', 'Performance optimization tip', 'Architecture best practice']
+			}),
+			hooks: vi.fn().mockResolvedValue({
+				hooks: [
+					{ style: 'question', text: 'What if design patterns could save you?', char_count: 40, confidence: 'high' },
+					{ style: 'contrarian_take', text: 'Most devs use patterns wrong.', char_count: 30, confidence: 'high' },
+					{ style: 'tip', text: 'One pattern trick for cleaner code.', char_count: 35, confidence: 'high' },
+					{ style: 'storytelling', text: 'I refactored 10k lines with one pattern.', char_count: 41, confidence: 'medium' },
+					{ style: 'list', text: '5 patterns every dev should know:', char_count: 33, confidence: 'high' },
+				],
+				topic: 'design patterns',
+				vault_citations: []
 			})
 		}
 	}
@@ -358,13 +369,13 @@ describe('FromVaultPanel', () => {
 		expect(extractBtn).toBeTruthy();
 	});
 
-	it('does not show Generate tweet/thread button in initial view', () => {
+	it('does not show Find hooks or Use this hook button in initial view', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		const buttons = container.querySelectorAll('button');
-		const generateBtn = Array.from(buttons).find(
-			(b) => b.textContent?.includes('Generate tweet') || b.textContent?.includes('Generate thread')
+		const hookBtn = Array.from(buttons).find(
+			(b) => b.textContent?.includes('Find hooks') || b.textContent?.includes('Use this hook')
 		);
-		expect(generateBtn).toBeFalsy();
+		expect(hookBtn).toBeFalsy();
 	});
 
 	it('extract highlights button is disabled when no chunks selected', () => {
@@ -475,13 +486,13 @@ describe('FromVaultPanel', () => {
 		});
 	});
 
-	it('shows "Generate from selection" CTA in selection mode', async () => {
+	it('shows "Generate hooks" CTA in selection mode', async () => {
 		const { container } = render(FromVaultPanel, {
 			props: { ...defaultProps, selectionSessionId: 'test-session-123' }
 		});
 		await vi.waitFor(() => {
 			const btn = Array.from(container.querySelectorAll('button')).find(
-				(b) => b.textContent?.includes('Generate from selection')
+				(b) => b.textContent?.includes('Generate hooks')
 			);
 			expect(btn).toBeTruthy();
 		});
