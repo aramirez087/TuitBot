@@ -69,9 +69,17 @@ export interface RuntimeStatus {
 
 // --- Health & Analytics types ---
 
+/** Runtime health status returned by `GET /api/health`. */
 export interface HealthResponse {
 	status: string;
 	version: string;
+	/** Scraper-specific health details (optional, populated by Sprint 4 scraper reliability). */
+	scraper?: {
+		status: 'healthy' | 'degraded' | 'down';
+		last_success_at?: string;
+		consecutive_failures?: number;
+		circuit_state?: 'closed' | 'open' | 'half-open';
+	};
 }
 
 export interface FollowerSummary {
@@ -100,6 +108,7 @@ export interface ContentScore {
 	avg_performance: number;
 }
 
+/** Aggregated analytics summary returned by `GET /api/analytics/summary`. */
 export interface AnalyticsSummary {
 	followers: FollowerSummary;
 	actions_today: ActionsSummary;
@@ -156,6 +165,7 @@ export interface RateLimitUsage {
 
 // --- Approval types ---
 
+/** An item in the approval queue. `action_type` distinguishes content type (e.g. `failed_post_recovery`). */
 export interface ApprovalItem {
 	id: number;
 	action_type: string;
@@ -250,36 +260,9 @@ export interface ComposeRequest {
 	provenance?: ProvenanceRef[];
 }
 
-/**
- * Parse stored thread content, detecting new blocks format vs legacy string array.
- * Returns `ThreadBlock[]` for blocks format, `string[]` for legacy format.
- */
-export function parseThreadContent(content: string): ThreadBlock[] | string[] {
-	try {
-		const parsed = JSON.parse(content);
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.blocks) {
-			return (parsed as ThreadBlocksPayload).blocks;
-		}
-		if (Array.isArray(parsed)) {
-			return parsed as string[];
-		}
-	} catch {
-		// Not JSON — return as single-item array
-	}
-	return [content];
-}
-
-/**
- * Check whether stored content uses the versioned blocks payload format.
- */
-export function isBlocksPayload(content: string): boolean {
-	try {
-		const parsed = JSON.parse(content);
-		return parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'blocks' in parsed;
-	} catch {
-		return false;
-	}
-}
+// Thread content parsing utilities moved to $lib/utils/parseThreadContent.ts
+// Re-exported here for backward compatibility.
+export { parseThreadContent, isBlocksPayload } from '$lib/utils/parseThreadContent';
 
 export interface ScheduledContentItem {
 	id: number;
@@ -297,6 +280,7 @@ export interface ScheduledContentItem {
 
 // --- Draft Studio types ---
 
+/** Lightweight draft summary returned from draft list endpoints. Full content is in `ScheduledContentItem`. */
 export interface DraftSummary {
 	id: number;
 	title: string | null;

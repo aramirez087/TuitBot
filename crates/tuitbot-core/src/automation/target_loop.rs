@@ -1018,6 +1018,108 @@ mod tests {
         assert_eq!(poster.sent_count(), 0);
     }
 
+    // ── S7-Q1 Baseline: AC1+AC3 ─────────────────────────────────────────────
+    // Scanner identifies valid targets from timeline; full loop iteration with mock
+    #[tokio::test]
+    async fn baseline_scanner_finds_targets_and_full_loop_posts() {
+        let tweets = vec![test_tweet("b1", "alice"), test_tweet("b2", "alice")];
+        let storage = Arc::new(MockTargetStorage::new());
+        let (target_loop, poster) = build_loop(tweets, default_config(), storage);
+
+        let results = target_loop.run_iteration().await.expect("baseline");
+
+        let replied: Vec<_> = results
+            .iter()
+            .filter(|r| matches!(r, TargetResult::Replied { .. }))
+            .collect();
+        // Scanner found tweets → processor replied → poster sent (full loop)
+        assert!(
+            !replied.is_empty(),
+            "baseline: scanner must identify targets"
+        );
+        assert!(poster.sent_count() >= 1, "baseline: full loop must post");
+    }
+
+    // ── S7-Q1 Baseline: AC2 ─────────────────────────────────────────────────
+    // Processor filters by safety guardrail: 1 reply/author/day
+    #[tokio::test]
+    async fn baseline_processor_enforces_one_reply_per_account_safety_guardrail() {
+        // Three tweets from same account — safety guardrail: only first gets replied to
+        let tweets = vec![
+            test_tweet("c1", "alice"),
+            test_tweet("c2", "alice"),
+            test_tweet("c3", "alice"),
+        ];
+        let storage = Arc::new(MockTargetStorage::new());
+        let (target_loop, poster) = build_loop(tweets, default_config(), storage);
+
+        let results = target_loop.run_iteration().await.expect("baseline");
+
+        let replied_count = results
+            .iter()
+            .filter(|r| matches!(r, TargetResult::Replied { .. }))
+            .count();
+        // Safety guardrail: at most 1 reply per account per iteration
+        assert_eq!(
+            replied_count, 1,
+            "baseline: processor must limit 1 reply/account/iteration"
+        );
+        assert_eq!(
+            poster.sent_count(),
+            1,
+            "baseline: exactly 1 post per account"
+        );
+    }
+
+    // ── S7-Q1 Baseline: AC7 (target side) ───────────────────────────────────
+    // Graceful handling of 429 rate-limit on tweet fetch
+    #[tokio::test]
+    async fn baseline_target_handles_rate_limit_429_on_fetch_gracefully() {
+        struct RateLimitedFetcher;
+        #[async_trait::async_trait]
+        impl TargetTweetFetcher for RateLimitedFetcher {
+            async fn fetch_user_tweets(&self, _user_id: &str) -> Result<Vec<LoopTweet>, LoopError> {
+                Err(LoopError::RateLimited {
+                    retry_after: Some(60),
+                })
+            }
+        }
+
+        let storage = Arc::new(MockTargetStorage::new());
+        let poster = Arc::new(MockPoster::new());
+        let user_mgr = Arc::new(MockUserManager {
+            users: vec![(
+                "alice".to_string(),
+                "uid_alice".to_string(),
+                "alice".to_string(),
+            )],
+        });
+
+        let target_loop = TargetLoop::new(
+            Arc::new(RateLimitedFetcher),
+            user_mgr,
+            Arc::new(MockGenerator {
+                reply: "Great!".to_string(),
+            }),
+            Arc::new(MockSafety::new(true)),
+            storage,
+            poster.clone(),
+            default_config(),
+        );
+
+        // 429 on fetch is a non-AuthExpired error → iteration continues, account silently skipped
+        let result = target_loop.run_iteration().await;
+        assert!(
+            result.is_ok(),
+            "baseline: 429 fetch should not crash the loop"
+        );
+        assert_eq!(
+            poster.sent_count(),
+            0,
+            "baseline: no replies when fetch rate-limited"
+        );
+    }
+
     #[tokio::test]
     async fn non_auth_error_continues_iteration() {
         let user_mgr = Arc::new(MockPartialFailUserManager {
@@ -1052,3 +1154,5 @@ mod tests {
         assert_eq!(poster.sent_count(), 1);
     }
 }
+
+// ============================================================================
