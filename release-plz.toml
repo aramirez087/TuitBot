@@ -11,6 +11,14 @@ pr_labels = ["release"]
 git_tag_name = "v{{ version }}"
 git_release_name = "v{{ version }}"
 git_release_enable = false
+# release-plz operates solely on the Cargo workspace defined in Cargo.toml.
+# The plugins/ directory (obsidian-tuitbot, openclaw-tuitbot) contains pure TypeScript/npm
+# packages with no Cargo.toml — they are invisible to release-plz by design.
+# Cargo.toml workspace.members lists only crates/tuitbot-{core,cli,mcp,server}.
+# dashboard/src-tauri is explicitly excluded there too.
+# No exclusion rules are needed here: release-plz never scans npm package.json files.
+# Verified 2026-03-21: PR #274 (release-plz chore: release) touched only
+#   Cargo.toml version bumps and CHANGELOG.md — no plugin entries.
 
 [[package]]
 name = "tuitbot-core"
