@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774075304563,
+  "lastUpdate": 1774075305819,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2088,6 +2088,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/60ac8f62cf928888c2e4f2f6975c299a9b2f8bd3"
         },
         "date": 1774075304055,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 885719,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 304225,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1229195,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bd1a9ac8a652d25212100ffff12098760d9d6dac",
+          "message": "C4: Split rate_limits.rs (1546L → rate_limits/{mod,tracker,queries,tests}) (#265)\n\n* refactor(approval_queue): split tests.rs into tests/{crud,workflow,edge_cases} (≤500L per file)\n\n- crud.rs: basic enqueue, get, update, status ops (406L)\n- workflow.rs: QA fields, overrides, batch ops, edit history (378L)\n- edge_cases.rs: all account isolation `_for` variant tests (535L)\n- Consolidates 1569L monolithic tests into organized modules\n- Tests: 53/53 passing\n- All CI gates: fmt ✓ clippy ✓ test ✓\n- Zero functional changes, full public API preserved\n\n* refactor(approval_queue): split edge_cases.rs into edge_cases + isolation (≤500L each)\n\nedge_cases.rs was 600L — 100 lines over the hard cap.\n\nSplit by concern:\n- edge_cases.rs (321L): enqueue/get/stats/review _for variants\n- isolation.rs (283L): QA/override/batch/post/expire _for variants\n\nAll files now ≤500L. 53/53 tests still passing.\n\n* refactor(rate_limits): split rate_limits.rs into rate_limits/{mod,tracker,queries,tests} (≤500L per file)\n\n- mod.rs (123L): RateLimit struct + init functions (init_rate_limits, init_mcp_rate_limit)\n- tracker.rs (189L): check/increment operations (check_rate_limit, check_and_increment_rate_limit)\n- queries.rs (204L): get/daily_usage + policy rate limits (DailyUsage, PolicyRateLimit ops)\n- tests.rs (348L): all 12 tests consolidated\n- Total: 1546L monolithic → 864L organized modules\n- Tests: 12/12 passing\n- All CI gates: fmt ✓ clippy ✓ test ✓\n- Zero functional changes, full public API preserved\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-21T00:40:56-06:00",
+          "tree_id": "0f9eee07fc897442a7d2b07cb970e3d679024c21",
+          "url": "https://github.com/aramirez087/TuitBot/commit/bd1a9ac8a652d25212100ffff12098760d9d6dac"
+        },
+        "date": 1774075304565,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
