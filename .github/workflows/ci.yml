@@ -225,7 +225,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install cargo-audit (skipped if cached)
-        run: cargo install cargo-audit --locked
+        run: command -v cargo-audit || cargo install cargo-audit --locked
 
       - name: Run cargo audit (fail on unsound)
         continue-on-error: true  # Report but don't block CI (unmaintained/yanked are informational)
@@ -279,7 +279,7 @@ jobs:
           key: ${{ runner.os }}-cargo-license-bin-v1
 
       - name: Install cargo-license (skipped if cached)
-        run: cargo install cargo-license --locked
+        run: command -v cargo-license || cargo install cargo-license --locked
 
       - name: Check Rust licenses
         run: |
@@ -325,7 +325,7 @@ jobs:
             ${{ runner.os }}-cargo-sbom-
 
       - name: Install cargo-sbom (skipped if cached)
-        run: cargo install cargo-sbom --locked
+        run: command -v cargo-sbom || cargo install cargo-sbom --locked
 
       - name: Generate Rust SBOM (CycloneDX)
         run: |
