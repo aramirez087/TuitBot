@@ -10,13 +10,19 @@ import { render, screen, fireEvent } from '@testing-library/svelte';
 import ComposerInspector from '$lib/components/composer/ComposerInspector.svelte';
 import type { ScheduleConfig } from '$lib/api';
 
-// Mock API
+// Mock API — use vi.hoisted so refs are available inside the hoisted vi.mock factory
+const { mockImprove, mockTweet, mockThread } = vi.hoisted(() => ({
+	mockImprove: vi.fn().mockResolvedValue({ content: 'Improved text' }),
+	mockTweet: vi.fn().mockResolvedValue({ content: 'Generated tweet', vault_citations: [] }),
+	mockThread: vi.fn().mockResolvedValue({ tweets: ['T1', 'T2'], topic: 'test' })
+}));
+
 vi.mock('$lib/api', () => ({
 	api: {
 		assist: {
-			improve: vi.fn().mockResolvedValue({ draft: 'Improved text' }),
-			tweet: vi.fn().mockResolvedValue({ draft: 'Generated tweet', citations: [] }),
-			thread: vi.fn().mockResolvedValue({ tweets: ['T1', 'T2'], topic: 'test' })
+			improve: mockImprove,
+			tweet: mockTweet,
+			thread: mockThread
 		},
 		content: {
 			schedule: vi.fn().mockResolvedValue({ timezone: 'UTC', preferred_times: [] })
@@ -156,5 +162,82 @@ describe('ComposerInspector', () => {
 		}
 		// Callback is wired — no crash expected
 		expect(typeof onclose).toBe('function');
+	});
+
+	it('handleGenerateFromVault with highlights calls improve API for tweet mode', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		await (component as any).handleGenerateFromVault(
+			[1, 2],
+			'tweet',
+			['Highlight one', 'Highlight two']
+		);
+		expect(mockImprove).toHaveBeenCalledWith(
+			'Highlight one\nHighlight two',
+			'Expand these key highlights into a polished tweet'
+		);
+	});
+
+	it('handleGenerateFromVault with highlights calls thread API for thread mode', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread' }
+		});
+		await (component as any).handleGenerateFromVault(
+			[1, 2],
+			'thread',
+			['Highlight one', 'Highlight two']
+		);
+		expect(mockThread).toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromVault without highlights calls tweet API directly', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		await (component as any).handleGenerateFromVault([1, 2], 'tweet');
+		expect(mockTweet).toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromVault without highlights calls thread API directly', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread' }
+		});
+		await (component as any).handleGenerateFromVault([1, 2], 'thread');
+		expect(mockThread).toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromVault does nothing with empty node IDs', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		await (component as any).handleGenerateFromVault([], 'tweet');
+		expect(mockTweet).not.toHaveBeenCalled();
+		expect(mockImprove).not.toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromVault with voiceCue includes cue in context', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, voiceCue: 'be witty' }
+		});
+		await (component as any).handleGenerateFromVault(
+			[1],
+			'tweet',
+			['A key insight']
+		);
+		expect(mockImprove).toHaveBeenCalledWith(
+			'A key insight',
+			'be witty. Expand these key highlights into a polished tweet'
+		);
+	});
+
+	it('handleGenerateFromVault reports errors via onsubmiterror', async () => {
+		mockTweet.mockRejectedValueOnce(new Error('API down'));
+		const onsubmiterror = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, onsubmiterror }
+		});
+		await (component as any).handleGenerateFromVault([1], 'tweet');
+		expect(onsubmiterror).toHaveBeenCalledWith('API down');
 	});
 });

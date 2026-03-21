@@ -162,4 +162,58 @@ describe('VaultHighlights', () => {
 		const backBtn = container.querySelector('.highlights-back');
 		expect(backBtn?.getAttribute('aria-label')).toBe('Back to notes');
 	});
+
+	it('shows correct count for partially enabled highlights', () => {
+		const highlights = [
+			{ text: 'First', enabled: true },
+			{ text: 'Second', enabled: false },
+			{ text: 'Third', enabled: true }
+		];
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, highlights }
+		});
+		const count = container.querySelector('.highlights-count');
+		expect(count?.textContent).toContain('2 of 3');
+	});
+
+	it('shows zero count when all highlights disabled', () => {
+		const highlights = [
+			{ text: 'First', enabled: false },
+			{ text: 'Second', enabled: false }
+		];
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, highlights }
+		});
+		const count = container.querySelector('.highlights-count');
+		expect(count?.textContent).toContain('0 of 2');
+	});
+
+	it('applies disabled class to unchecked highlight items', () => {
+		const highlights = [
+			{ text: 'First', enabled: false },
+			{ text: 'Second', enabled: true }
+		];
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, highlights }
+		});
+		const items = container.querySelectorAll('.highlight-item');
+		expect(items[0].classList.contains('disabled')).toBe(true);
+		expect(items[1].classList.contains('disabled')).toBe(false);
+	});
+
+	it('marks active format option correctly', () => {
+		const { container } = render(VaultHighlights, {
+			props: { ...defaultProps, outputFormat: 'tweet' as const }
+		});
+		const opts = container.querySelectorAll('.highlights-format-opt');
+		expect(opts[0].classList.contains('active')).toBe(true);
+		expect(opts[1].classList.contains('active')).toBe(false);
+	});
+
+	it('highlights list has proper role group', () => {
+		const { container } = render(VaultHighlights, { props: defaultProps });
+		const list = container.querySelector('[role="group"]');
+		expect(list).toBeTruthy();
+		expect(list?.getAttribute('aria-label')).toBe('Select highlights to include');
+	});
 });
