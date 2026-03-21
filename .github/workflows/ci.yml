@@ -123,9 +123,13 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
+          # Cache node_modules keyed on package-lock.json for deterministic hits
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
 
       - name: Install dependencies
-        run: cd dashboard && npm ci && npm i --prefer-offline
+        # npm ci alone is sufficient; the redundant npm i --prefer-offline was removed
+        run: cd dashboard && npm ci
 
       - name: Type check
         run: cd dashboard && npm run check
@@ -206,20 +210,22 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Cache cargo registry and build
+      - name: Cache cargo registry, build, and cargo-audit binary
         uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.cargo/bin/cargo-audit
             target
+          # Bust binary cache only when Cargo.lock changes (new deps may affect advisories)
           key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-audit-
             ${{ runner.os }}-cargo-
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
+      - name: Install cargo-audit (skipped if cached)
+        run: cargo install cargo-audit --locked
 
       - name: Run cargo audit (fail on unsound)
         continue-on-error: true  # Report but don't block CI (unmaintained/yanked are informational)
@@ -265,8 +271,15 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Install cargo-license
-        run: cargo install cargo-license
+      - name: Cache cargo-license binary
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/cargo-license
+          # Stable key — cargo-license binary rarely changes; bump v suffix to force refresh
+          key: ${{ runner.os }}-cargo-license-bin-v1
+
+      - name: Install cargo-license (skipped if cached)
+        run: cargo install cargo-license --locked
 
       - name: Check Rust licenses
         run: |
@@ -299,18 +312,20 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: Cache cargo registry
+      - name: Cache cargo registry and cargo-sbom binary
         uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.cargo/bin/cargo-sbom
+          # Bust binary cache on Cargo.lock changes in case cargo-sbom itself is a dep
           key: ${{ runner.os }}-cargo-sbom-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-sbom-
 
-      - name: Install cargo-sbom
-        run: cargo install cargo-sbom
+      - name: Install cargo-sbom (skipped if cached)
+        run: cargo install cargo-sbom --locked
 
       - name: Generate Rust SBOM (CycloneDX)
         run: |
