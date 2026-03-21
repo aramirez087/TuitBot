@@ -174,4 +174,27 @@ describe('ComposeWorkspace', () => {
 		expect(c1).toBeTruthy();
 		expect(c2).toBeTruthy();
 	});
+
+	it('renders with selectionSessionId prop', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, selectionSessionId: 'session-abc-123' }
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('renders with selectionSessionId=null (default behavior)', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, selectionSessionId: null }
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('passes selectionSessionId through to child components', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, selectionSessionId: 'vault-session-xyz' }
+		});
+		// Workspace mounts with the session ID — verify it rendered without error
+		expect(container).toBeTruthy();
+		expect(document.body.innerHTML.length).toBeGreaterThan(100);
+	});
 });

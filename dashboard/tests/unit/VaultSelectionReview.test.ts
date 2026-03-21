@@ -1,0 +1,721 @@
+/**
+ * VaultSelectionReview.test.ts — Unit tests for VaultSelectionReview.svelte
+ *
+ * Tests: loading state, selection display, expired state, hook generation,
+ * HookPicker rendering, replace confirmation, back navigation, error states,
+ * onSelectionConsumed callback, and edge cases (null note_title, null selected_text).
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, fireEvent } from '@testing-library/svelte';
+import VaultSelectionReview from '$lib/components/composer/VaultSelectionReview.svelte';
+
+// Mock API
+vi.mock('$lib/api', () => ({
+	api: {
+		vault: { getSelection: vi.fn() },
+		assist: { hooks: vi.fn() }
+	}
+}));
+
+const sampleSelection = {
+	session_id: 'test-session-abc',
+	vault_name: 'my-vault',
+	file_path: 'notes/article.md',
+	selected_text: 'The key insight here is that async patterns differ by context.',
+	heading_context: 'Patterns > Async',
+	note_title: 'Design Patterns',
+	frontmatter_tags: ['patterns', 'async'],
+	resolved_node_id: 7,
+	resolved_chunk_id: 22,
+	created_at: '2024-01-01T00:00:00Z',
+	expires_at: '2024-01-01T00:30:00Z'
+};
+
+const sampleHooks = [
+	{ style: 'question', text: 'What if async patterns could simplify everything?', char_count: 50, confidence: 'high' as const },
+	{ style: 'contrarian_take', text: 'Most devs use async wrong.', char_count: 28, confidence: 'high' as const },
+	{ style: 'tip', text: 'One async trick for cleaner code.', char_count: 33, confidence: 'high' as const },
+	{ style: 'storytelling', text: 'I rewrote async code and it changed everything.', char_count: 47, confidence: 'medium' as const },
+	{ style: 'list', text: '5 async patterns every dev needs:', char_count: 34, confidence: 'high' as const },
+];
+
+const defaultProps = {
+	sessionId: 'test-session-abc',
+	outputFormat: 'tweet' as const,
+	hasExistingContent: false,
+	showUndo: false,
+	onundo: vi.fn(),
+	ongenerate: vi.fn().mockResolvedValue(undefined),
+	onSelectionConsumed: vi.fn(),
+	onexpired: vi.fn(),
+	onformatchange: vi.fn(),
+};
+
+beforeEach(() => {
+	vi.clearAllMocks();
+});
+
+describe('VaultSelectionReview', () => {
+	// --- Loading state ---
+
+	it('renders loading shimmer initially before fetch resolves', async () => {
+		// getSelection never resolves in this tick — component stays in loading state
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		const shimmer = container.querySelector('.vault-loading-shimmer');
+		expect(shimmer).toBeTruthy();
+	});
+
+	it('renders "Loading selection..." text while loading', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		expect(container.textContent).toContain('Loading selection...');
+	});
+
+	// --- Successful selection display ---
+
+	it('shows selection review container after successful fetch', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+	});
+
+	it('displays note_title in selection source path', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const path = container.querySelector('.selection-source-path');
+			expect(path?.textContent).toContain('Design Patterns');
+		});
+	});
+
+	it('displays heading_context when present', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const heading = container.querySelector('.selection-heading');
+			expect(heading?.textContent).toContain('Patterns > Async');
+		});
+	});
+
+	it('displays selected_text in text preview', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const preview = container.querySelector('.selection-text-preview');
+			expect(preview?.textContent).toContain('The key insight here is that async patterns differ by context.');
+		});
+	});
+
+	it('renders frontmatter tags', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const tags = container.querySelectorAll('.selection-tag');
+			expect(tags.length).toBe(2);
+			expect(tags[0]?.textContent).toContain('patterns');
+			expect(tags[1]?.textContent).toContain('async');
+		});
+	});
+
+	it('does not render tags section when frontmatter_tags is null', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			frontmatter_tags: null
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const tags = container.querySelectorAll('.selection-tag');
+		expect(tags.length).toBe(0);
+	});
+
+	it('does not render tags section when frontmatter_tags is empty array', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			frontmatter_tags: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const tags = container.querySelectorAll('.selection-tag');
+		expect(tags.length).toBe(0);
+	});
+
+	// --- Fallback: file_path when note_title is null ---
+
+	it('shows file_path when note_title is null', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			note_title: null
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const path = container.querySelector('.selection-source-path');
+			expect(path?.textContent).toContain('notes/article.md');
+		});
+	});
+
+	// --- Cloud mode: selected_text null ---
+
+	it('shows cloud mode privacy note when selected_text is null', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			selected_text: null
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const cloudNote = container.querySelector('.selection-text-cloud-note');
+			expect(cloudNote?.textContent).toContain('cloud mode');
+		});
+	});
+
+	it('does not show selection-text-preview when selected_text is null', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			selected_text: null
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.selection-text-cloud-note')).toBeTruthy();
+		});
+		expect(container.querySelector('.selection-text-preview')).toBeFalsy();
+	});
+
+	// --- Expired state ---
+
+	it('shows expired state when getSelection rejects', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.textContent).toContain('Selection expired');
+		});
+	});
+
+	it('shows hint text in expired state', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Gone'));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const hint = container.querySelector('.vault-empty-hint');
+			expect(hint).toBeTruthy();
+		});
+	});
+
+	it('shows Browse vault button in expired state', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Gone'));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const btn = container.querySelector('.vault-expired-dismiss');
+			expect(btn?.textContent).toContain('Browse vault');
+		});
+	});
+
+	it('Browse vault button calls onexpired', async () => {
+		const onexpired = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Gone'));
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, onexpired }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-expired-dismiss')).toBeTruthy();
+		});
+		const btn = container.querySelector('.vault-expired-dismiss') as HTMLButtonElement;
+		await fireEvent.click(btn);
+		expect(onexpired).toHaveBeenCalled();
+	});
+
+	// --- onSelectionConsumed callback ---
+
+	it('calls onSelectionConsumed after successful load', async () => {
+		const onSelectionConsumed = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		render(VaultSelectionReview, {
+			props: { ...defaultProps, onSelectionConsumed }
+		});
+		await vi.waitFor(() => {
+			expect(onSelectionConsumed).toHaveBeenCalled();
+		});
+	});
+
+	it('calls onSelectionConsumed even when getSelection fails', async () => {
+		const onSelectionConsumed = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Expired'));
+		render(VaultSelectionReview, {
+			props: { ...defaultProps, onSelectionConsumed }
+		});
+		await vi.waitFor(() => {
+			expect(onSelectionConsumed).toHaveBeenCalled();
+		});
+	});
+
+	// --- Generate hooks (handleGenerate) ---
+
+	it('VaultFooter shows Generate hooks button after load', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const btn = Array.from(container.querySelectorAll('button')).find(
+				(b) => b.textContent?.includes('Generate hooks')
+			);
+			expect(btn).toBeTruthy();
+		});
+	});
+
+	it('clicking Generate hooks calls api.assist.hooks', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const btn = Array.from(container.querySelectorAll('button')).find(
+				(b) => b.textContent?.includes('Generate hooks')
+			);
+			expect(btn).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(api.assist.hooks).toHaveBeenCalledWith(
+				expect.any(String),
+				{ sessionId: 'test-session-abc' }
+			);
+		});
+	});
+
+	it('api.assist.hooks is called with selected_text as topic when present', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(api.assist.hooks).toHaveBeenCalledWith(
+				'The key insight here is that async patterns differ by context.',
+				expect.any(Object)
+			);
+		});
+	});
+
+	// --- HookPicker rendered after hooks load ---
+
+	it('renders HookPicker after hooks load', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+	});
+
+	it('HookPicker replaces selection review view after hooks load', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		expect(container.querySelector('.vault-selection-review')).toBeFalsy();
+	});
+
+	// --- Hook error state ---
+
+	it('returns to selection view after api.assist.hooks rejects (hookOptions stays null)', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Hook generation failed'));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		// After hooks fail, hookOptions stays null and hookLoading goes false →
+		// component falls back to selection view (not HookPicker branch)
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+			expect(container.querySelector('.hook-picker')).toBeFalsy();
+		});
+	});
+
+	// --- handleHookSelected → calls ongenerate ---
+
+	it('handleHookSelected calls ongenerate with nodeIds, format, hookText, hookStyle', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		// Select first hook card
+		const cards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(cards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalledWith(
+				[7],
+				'tweet',
+				['What if async patterns could simplify everything?'],
+				'question'
+			);
+		});
+	});
+
+	it('handleHookSelected passes empty nodeIds when resolved_node_id is null', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			resolved_node_id: null
+		});
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const cards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(cards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalledWith(
+				[],
+				expect.any(String),
+				expect.any(Array),
+				expect.any(String)
+			);
+		});
+	});
+
+	// --- handleHookSelected with hasExistingContent → replace confirmation ---
+
+	it('does not call ongenerate on first confirm when hasExistingContent=true (waits for replace)', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, hasExistingContent: true, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		// First confirm: sets confirmReplace=true and returns — ongenerate NOT called
+		const cards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(cards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		// Small tick to let any async settle
+		await new Promise((r) => setTimeout(r, 10));
+		expect(ongenerate).not.toHaveBeenCalled();
+	});
+
+	it('calls ongenerate on second confirm (confirmReplace bypass) when hasExistingContent=true', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, hasExistingContent: true, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const cards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(cards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		// First click: sets confirmReplace=true
+		await fireEvent.click(confirmBtn);
+		await new Promise((r) => setTimeout(r, 10));
+		expect(ongenerate).not.toHaveBeenCalled();
+		// Second click: confirmReplace=true already, so ongenerate is called
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalled();
+		});
+	});
+
+	// --- Back from hooks (handleBackFromHooks) ---
+
+	it('back button in HookPicker clears hookOptions and returns to selection view', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const backBtn = container.querySelector('.hook-back') as HTMLButtonElement;
+		await fireEvent.click(backBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		expect(container.querySelector('.hook-picker')).toBeFalsy();
+	});
+
+	// --- Regenerate hooks ---
+
+	it('regenerate hooks button calls api.assist.hooks again', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const callCountAfterFirst = (api.assist.hooks as ReturnType<typeof vi.fn>).mock.calls.length;
+		const regenBtn = container.querySelector('.hook-regen-btn') as HTMLButtonElement;
+		await fireEvent.click(regenBtn);
+		await vi.waitFor(() => {
+			expect((api.assist.hooks as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(callCountAfterFirst);
+		});
+	});
+
+	// --- Error during generation (ongenerate rejects) ---
+
+	it('sets error state when ongenerate rejects', async () => {
+		const ongenerate = vi.fn().mockRejectedValue(new Error('Server error'));
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const cards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(cards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			const errorEl = container.querySelector('.vault-error');
+			expect(errorEl?.textContent).toContain('Server error');
+		});
+	});
+
+	// --- Format change propagation ---
+
+	it('calls onformatchange when format toggle is changed in VaultFooter', async () => {
+		const onformatchange = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, onformatchange }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		const threadBtn = container.querySelectorAll('.vault-format-opt')[1] as HTMLButtonElement;
+		await fireEvent.click(threadBtn);
+		expect(onformatchange).toHaveBeenCalledWith('thread');
+	});
+
+	// --- Undo visibility ---
+
+	it('shows undo button when showUndo=true', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const onundo = vi.fn();
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, showUndo: true, onundo }
+		});
+		await vi.waitFor(() => {
+			const undoBtn = container.querySelector('.vault-undo-btn');
+			expect(undoBtn).toBeTruthy();
+		});
+	});
+
+	it('calls onundo when undo button clicked', async () => {
+		const onundo = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, showUndo: true, onundo }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-undo-btn')).toBeTruthy();
+		});
+		const undoBtn = container.querySelector('.vault-undo-btn') as HTMLButtonElement;
+		await fireEvent.click(undoBtn);
+		expect(onundo).toHaveBeenCalled();
+	});
+
+	it('does not show undo button when showUndo=false', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		expect(container.querySelector('.vault-undo-btn')).toBeFalsy();
+	});
+
+	// --- VaultFooter selectionMode label ---
+
+	it('VaultFooter generate button reads "Generate hooks" (selectionMode=true)', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			const btn = container.querySelector('.vault-generate-btn');
+			expect(btn?.textContent?.trim()).toBe('Generate hooks');
+		});
+	});
+
+	// --- Loading state clears after fetch ---
+
+	it('loading shimmer disappears after fetch completes', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-loading-shimmer')).toBeFalsy();
+		});
+	});
+
+	// --- heading_context absent ---
+
+	it('does not render heading div when heading_context is null', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			heading_context: null
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		expect(container.querySelector('.selection-heading')).toBeFalsy();
+	});
+});
