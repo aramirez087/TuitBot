@@ -1,0 +1,94 @@
+name: Plugin CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**'
+  pull_request:
+    paths:
+      - 'plugins/**'
+
+concurrency:
+  group: plugins-ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Detect which plugin directories actually changed ──
+  detect-changes:
+    name: Detect plugin changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      obsidian: ${{ steps.filter.outputs.obsidian }}
+      openclaw: ${{ steps.filter.outputs.openclaw }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            obsidian:
+              - 'plugins/obsidian-tuitbot/**'
+            openclaw:
+              - 'plugins/openclaw-tuitbot/**'
+
+  # ── obsidian-tuitbot: TypeScript compile + tests ──
+  obsidian-plugin:
+    name: obsidian-tuitbot (build + test)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.obsidian == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/obsidian-tuitbot
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plugins/obsidian-tuitbot/package-lock.json
+
+      - name: Install dependencies
+        # node_modules contains darwin-arm64 esbuild binaries committed from dev machines.
+        # npm ci re-installs platform-correct binaries (linux) for CI, ensuring the build step
+        # uses the right native binary rather than the darwin one that was checked in.
+        run: npm ci
+
+      - name: Build (esbuild TypeScript bundle)
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+  # ── openclaw-tuitbot: TypeScript compile + tests ──
+  openclaw-plugin:
+    name: openclaw-tuitbot (build + test)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.openclaw == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/openclaw-tuitbot
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plugins/openclaw-tuitbot/package-lock.json
+
+      - name: Install dependencies
+        # Same rationale as obsidian-plugin: npm ci installs linux-compatible binaries for CI.
+        run: npm ci
+
+      - name: Build (tsc)
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
