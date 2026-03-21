@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774104320090,
+  "lastUpdate": 1774104321728,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1592,6 +1592,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 937.51,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "15dd55c5015c68234263ea1c4edb16993e9ee6b9",
+          "message": "refactor(C2): split automation/discovery_loop.rs into discovery_loop/ submodule (#267)\n\n* WIP: C2 discovery_loop modularization structure created\n\nSplit crates/tuitbot-core/src/automation/discovery_loop.rs (1042L) into:\n- discovery_loop/mod.rs (437L) - all impl DiscoveryLoop methods\n- discovery_loop/tests/{mod,core,edge_cases} - test split (311L + 304L)\n\nTests need mock struct definitions shared between modules. Next step:\neither move mocks to mod.rs or use a shared test_support submodule.\n\n* WIP: C2 discovery_loop modularization — structure in place, tests need work\n\nSplit discovery_loop.rs (1042L) into:\n- discovery_loop/mod.rs (437L) — main loop struct + run_once/run_continuous logic\n- discovery_loop/tests/mod.rs (151L) — core tests with mocks\n\nStatus: main code ✓, tests need import/trait resolution fixes.\n\nTODO:\n- Trait bound issues (MockSearcher, MockScorer, etc need proper async_trait)\n- Test helper visibility (truncate_tweet_text, LoopTweet clone, etc)\n- Mock struct visibility from tests/mod.rs to main module\n\n* refactor(C2): split automation/discovery_loop.rs into discovery_loop/ submodule\n\ndiscovery_loop.rs (1042L) → discovery_loop/{mod(437L), tests/{mod(224L), core_tests(195L), integration(200L)}}\n\nAll files ≤500L. Made search_and_process, process_tweet, truncate pub(crate) for test access.\n\n- tests/mod.rs: shared mock implementations + submodule declarations\n- tests/core_tests.rs: search_and_process and process_tweet function tests\n- tests/integration.rs: run_once, error handling, edge case tests\n\n21 original tests restored and passing. RUSTFLAGS='-D warnings' cargo fmt --all clean.\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-21T08:39:35-06:00",
+          "tree_id": "7edba1ece25b04c7d417edd6cc94a98150369e2c",
+          "url": "https://github.com/aramirez087/TuitBot/commit/15dd55c5015c68234263ea1c4edb16993e9ee6b9"
+        },
+        "date": 1774104320668,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 576.59,
             "unit": "ps"
           }
         ]
