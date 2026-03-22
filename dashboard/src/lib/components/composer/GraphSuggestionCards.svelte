@@ -43,7 +43,7 @@
 	// Fire empty_graph when relevant empty state renders
 	let hasFiredEmpty = false;
 	$effect(() => {
-		const isEmpty = graphState === 'no_related_notes' || (graphState === 'available' && neighbors.length === 0) || graphState === 'node_not_indexed';
+		const isEmpty = graphState === 'no_related_notes' || graphState === 'unresolved_links' || (graphState === 'available' && neighbors.length === 0) || graphState === 'node_not_indexed';
 		if (isEmpty && !hasFiredEmpty && !loading) {
 			hasFiredEmpty = true;
 			trackEmptyGraph(graphState, sessionId);
@@ -93,7 +93,7 @@
 			<p class="graph-empty-message">This note hasn't been indexed yet. Generating from your selected text.</p>
 		</div>
 	</div>
-{:else if graphState === 'no_related_notes' || (graphState === 'available' && neighbors.length === 0)}
+{:else if graphState === 'no_related_notes' || graphState === 'unresolved_links' || (graphState === 'available' && neighbors.length === 0)}
 	<div class="graph-suggestions" role="status">
 		<div class="graph-empty-state">
 			<p class="graph-empty-message">This note doesn't link to other indexed notes. You can still generate from this selection alone.</p>

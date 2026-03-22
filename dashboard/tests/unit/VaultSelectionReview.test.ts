@@ -1028,6 +1028,55 @@ describe('VaultSelectionReview', () => {
 		);
 	});
 
+	it('shows dismissed recovery section after dismissing a card', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Dismiss first neighbor
+		const dismissBtns = container.querySelectorAll('.graph-card-dismiss');
+		await fireEvent.click(dismissBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(1);
+		});
+		// "Show skipped" toggle should appear
+		const toggle = container.querySelector('.dismissed-toggle');
+		expect(toggle).toBeTruthy();
+		expect(toggle?.textContent).toContain('Show skipped');
+		expect(toggle?.textContent).toContain('1');
+	});
+
+	it('restoring a dismissed card adds it back to suggestions', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Dismiss first neighbor
+		const dismissBtns = container.querySelectorAll('.graph-card-dismiss');
+		await fireEvent.click(dismissBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(1);
+		});
+		// Expand dismissed list
+		const toggle = container.querySelector('.dismissed-toggle') as HTMLButtonElement;
+		await fireEvent.click(toggle);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.dismissed-list')).toBeTruthy();
+		});
+		// Restore the dismissed card
+		const restoreBtn = container.querySelector('.dismissed-restore') as HTMLButtonElement;
+		await fireEvent.click(restoreBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Dismissed section should disappear
+		expect(container.querySelector('.dismissed-toggle')).toBeFalsy();
+	});
+
 	it('ongenerate includes neighbor provenance edge_type and edge_label', async () => {
 		const ongenerate = vi.fn().mockResolvedValue(undefined);
 		const { api } = await import('$lib/api');

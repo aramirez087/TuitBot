@@ -870,7 +870,7 @@ export interface VaultNoteDetail {
 
 // --- Graph neighbor types (backlink synthesizer) ---
 
-export type GraphState = 'available' | 'no_related_notes' | 'node_not_indexed' | 'fallback_active';
+export type GraphState = 'available' | 'no_related_notes' | 'unresolved_links' | 'node_not_indexed' | 'fallback_active';
 
 export interface NeighborItem {
 	node_id: number;

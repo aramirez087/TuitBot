@@ -626,4 +626,44 @@ mod tests {
             "\"fallback_active\""
         );
     }
+
+    #[test]
+    fn graph_state_all_variants_serialize() {
+        assert_eq!(
+            serde_json::to_string(&GraphState::Available).unwrap(),
+            "\"available\""
+        );
+        assert_eq!(
+            serde_json::to_string(&GraphState::UnresolvedLinks).unwrap(),
+            "\"unresolved_links\""
+        );
+        assert_eq!(
+            serde_json::to_string(&GraphState::NodeNotIndexed).unwrap(),
+            "\"node_not_indexed\""
+        );
+    }
+
+    #[test]
+    fn score_tag_only_neighbor() {
+        // 0 direct, 0 backlinks, 2 shared_tags, no chunk boost = 2.0
+        let score = compute_neighbor_score(0, 0, 2, 0.0);
+        assert!((score - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn classify_reason_zero_direct_zero_backlink_with_tags() {
+        assert_eq!(
+            classify_suggestion_reason(0, 0, 5),
+            SuggestionReason::SharedTag
+        );
+    }
+
+    #[test]
+    fn classify_reason_zero_everything_defaults_linked() {
+        // Edge case: no links, no backlinks, no tags → defaults to LinkedNote
+        assert_eq!(
+            classify_suggestion_reason(0, 0, 0),
+            SuggestionReason::LinkedNote
+        );
+    }
 }

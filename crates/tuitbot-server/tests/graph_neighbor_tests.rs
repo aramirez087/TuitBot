@@ -450,3 +450,170 @@ async fn neighbors_score_ordering() {
     let score_1 = neighbors[1]["score"].as_f64().unwrap();
     assert!(score_0 > score_1);
 }
+
+#[tokio::test]
+async fn neighbors_tag_only_returns_shared_tag_reason() {
+    let (state, _dir) = build_test_state().await;
+
+    let source_id =
+        watchtower::insert_source_context_for(&state.db, DEFAULT_ACCOUNT_ID, "local_fs", "{}")
+            .await
+            .unwrap();
+
+    // Create two nodes with no direct links.
+    for (path, title) in [
+        ("notes/alpha.md", "Alpha Note"),
+        ("notes/beta.md", "Beta Note"),
+    ] {
+        watchtower::upsert_content_node_for(
+            &state.db,
+            DEFAULT_ACCOUNT_ID,
+            source_id,
+            path,
+            &format!("hash-{path}"),
+            Some(title),
+            "body content",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    let nodes = watchtower::get_nodes_for_source_for(&state.db, DEFAULT_ACCOUNT_ID, source_id, 10)
+        .await
+        .unwrap();
+    let alpha_id = nodes
+        .iter()
+        .find(|n| n.relative_path == "notes/alpha.md")
+        .unwrap()
+        .id;
+    let beta_id = nodes
+        .iter()
+        .find(|n| n.relative_path == "notes/beta.md")
+        .unwrap()
+        .id;
+
+    // Insert shared_tag edges (simulating what graph_ingest creates).
+    watchtower::insert_edge(
+        &state.db,
+        DEFAULT_ACCOUNT_ID,
+        &NewEdge {
+            source_node_id: alpha_id,
+            target_node_id: beta_id,
+            edge_type: "shared_tag".to_string(),
+            edge_label: Some("rust".to_string()),
+            source_chunk_id: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let router = build_router(state);
+    let (status, body) = get_json(router, &format!("/vault/notes/{alpha_id}/neighbors")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["graph_state"], "available");
+
+    let neighbors = body["neighbors"].as_array().unwrap();
+    assert_eq!(neighbors.len(), 1);
+    assert_eq!(neighbors[0]["reason"], "shared_tag");
+    assert!(neighbors[0]["reason_label"]
+        .as_str()
+        .unwrap()
+        .contains("rust"));
+}
+
+#[tokio::test]
+async fn neighbors_response_fields_complete() {
+    let (state, _dir) = build_test_state().await;
+    let (main_id, _) = seed_graph_data(&state.db).await;
+    let router = build_router(state);
+
+    let (status, body) = get_json(router, &format!("/vault/notes/{main_id}/neighbors")).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Verify top-level contract fields.
+    assert!(body.get("node_id").is_some());
+    assert!(body.get("neighbors").is_some());
+    assert!(body.get("total_edges").is_some());
+    assert!(body.get("graph_state").is_some());
+
+    // Verify neighbor item contract fields.
+    let neighbor = &body["neighbors"][0];
+    assert!(neighbor.get("node_id").is_some());
+    assert!(neighbor.get("node_title").is_some());
+    assert!(neighbor.get("reason").is_some());
+    assert!(neighbor.get("reason_label").is_some());
+    assert!(neighbor.get("intent").is_some());
+    assert!(neighbor.get("matched_tags").is_some());
+    assert!(neighbor.get("score").is_some());
+    assert!(neighbor.get("best_chunk_id").is_some());
+    assert!(neighbor.get("relative_path").is_some());
+}
+
+#[tokio::test]
+async fn neighbors_intent_field_from_edge_label() {
+    let (state, _dir) = build_test_state().await;
+
+    let source_id =
+        watchtower::insert_source_context_for(&state.db, DEFAULT_ACCOUNT_ID, "local_fs", "{}")
+            .await
+            .unwrap();
+
+    for (path, title) in [
+        ("notes/source.md", "Source Note"),
+        ("notes/tip.md", "Tip Note"),
+    ] {
+        watchtower::upsert_content_node_for(
+            &state.db,
+            DEFAULT_ACCOUNT_ID,
+            source_id,
+            path,
+            &format!("hash-{path}"),
+            Some(title),
+            "body",
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    let nodes = watchtower::get_nodes_for_source_for(&state.db, DEFAULT_ACCOUNT_ID, source_id, 10)
+        .await
+        .unwrap();
+    let source_id_node = nodes
+        .iter()
+        .find(|n| n.relative_path == "notes/source.md")
+        .unwrap()
+        .id;
+    let tip_id = nodes
+        .iter()
+        .find(|n| n.relative_path == "notes/tip.md")
+        .unwrap()
+        .id;
+
+    // Edge with "tip" in the label → should classify as pro_tip.
+    watchtower::insert_edge(
+        &state.db,
+        DEFAULT_ACCOUNT_ID,
+        &NewEdge {
+            source_node_id: source_id_node,
+            target_node_id: tip_id,
+            edge_type: "wikilink".to_string(),
+            edge_label: Some("quick tip for setup".to_string()),
+            source_chunk_id: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let router = build_router(state);
+    let (status, body) =
+        get_json(router, &format!("/vault/notes/{source_id_node}/neighbors")).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let neighbors = body["neighbors"].as_array().unwrap();
+    assert_eq!(neighbors.len(), 1);
+    assert_eq!(neighbors[0]["intent"], "pro_tip");
+}

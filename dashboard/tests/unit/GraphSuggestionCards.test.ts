@@ -187,6 +187,15 @@ describe('GraphSuggestionCards', () => {
 		expect(container.textContent?.trim()).toBe('');
 	});
 
+	// --- Unresolved links state ---
+
+	it('shows empty message for unresolved_links', () => {
+		const { container } = render(GraphSuggestionCards, {
+			props: { ...defaultProps, graphState: 'unresolved_links' as GraphState, neighbors: [] },
+		});
+		expect(container.textContent).toContain("doesn't link to other indexed notes");
+	});
+
 	// --- Available but empty neighbors ---
 
 	it('handles empty neighbors array with available state gracefully', () => {
