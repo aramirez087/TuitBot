@@ -3,6 +3,7 @@
 //! Produces replies, tweets, and threads that meet X's format requirements
 //! (280 characters per tweet, 5-8 tweets per thread) with retry logic.
 
+pub(crate) mod angles;
 pub(crate) mod parser;
 
 #[cfg(test)]
@@ -519,6 +520,27 @@ impl ContentGenerator {
                 }
             })
             .collect()
+    }
+
+    // -----------------------------------------------------------------
+    // Mined angle generation (Hook Miner)
+    // -----------------------------------------------------------------
+
+    /// Generate evidence-backed content angles from neighbor notes.
+    pub async fn generate_mined_angles(
+        &self,
+        topic: &str,
+        neighbors: &[crate::content::evidence::NeighborContent],
+        selection_context: Option<&str>,
+    ) -> Result<crate::content::angles::AngleMiningOutput, LlmError> {
+        angles::generate_mined_angles(
+            &*self.provider,
+            &self.business,
+            topic,
+            neighbors,
+            selection_context,
+        )
+        .await
     }
 
     // -----------------------------------------------------------------
