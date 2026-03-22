@@ -241,7 +241,7 @@ describe('VaultSelectionReview', () => {
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
 		const { container } = render(VaultSelectionReview, { props: defaultProps });
 		await vi.waitFor(() => {
-			expect(container.textContent).toContain('Selection expired');
+			expect(container.textContent).toContain('This selection has expired');
 		});
 	});
 
@@ -778,7 +778,7 @@ describe('VaultSelectionReview', () => {
 		});
 		const { container } = render(VaultSelectionReview, { props: defaultProps });
 		await vi.waitFor(() => {
-			expect(container.textContent).toContain('No linked notes found');
+			expect(container.textContent).toContain("doesn't link to other indexed notes");
 		});
 	});
 
@@ -791,7 +791,7 @@ describe('VaultSelectionReview', () => {
 		});
 		const { container } = render(VaultSelectionReview, { props: defaultProps });
 		await vi.waitFor(() => {
-			expect(container.textContent).toContain("isn't indexed yet");
+			expect(container.textContent).toContain("hasn't been indexed yet");
 		});
 	});
 
@@ -883,7 +883,7 @@ describe('VaultSelectionReview', () => {
 		await fireEvent.click(actionBtns[0]);
 		// Shows accepted summary
 		await vi.waitFor(() => {
-			expect(container.textContent).toContain('1 related note will be included');
+			expect(container.textContent).toContain('1 note included in context');
 		});
 		// Generate hooks
 		const generateBtn = Array.from(container.querySelectorAll('button')).find(
@@ -959,7 +959,7 @@ describe('VaultSelectionReview', () => {
 		const actionBtns = container.querySelectorAll('.graph-action-btn');
 		await fireEvent.click(actionBtns[0]);
 		await vi.waitFor(() => {
-			expect(container.textContent).toContain('1 related note will be included');
+			expect(container.textContent).toContain('1 note included in context');
 		});
 		expect(container.querySelector('.slot-target-panel')).toBeFalsy();
 	});

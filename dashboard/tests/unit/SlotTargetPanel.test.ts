@@ -78,7 +78,7 @@ describe('SlotTargetPanel', () => {
 				insertState: createInsertState(),
 			},
 		});
-		expect(getByText('Refine specific slots')).toBeTruthy();
+		expect(getByText('Refine specific parts')).toBeTruthy();
 		expect(getByText('Async Patterns')).toBeTruthy();
 	});
 
@@ -91,7 +91,7 @@ describe('SlotTargetPanel', () => {
 				insertState: createInsertState(),
 			},
 		});
-		const applyBtns = getAllByText('Apply');
+		const applyBtns = getAllByText('Refine');
 		expect(applyBtns.length).toBe(2);
 	});
 
@@ -123,7 +123,7 @@ describe('SlotTargetPanel', () => {
 				oninsert,
 			},
 		});
-		await fireEvent.click(getByText('Apply'));
+		await fireEvent.click(getByText('Refine'));
 		expect(oninsert).toHaveBeenCalledWith(sampleNeighbor, 0, 'Opening hook');
 	});
 
@@ -138,7 +138,7 @@ describe('SlotTargetPanel', () => {
 				insertState: state,
 			},
 		});
-		expect(getByText('Applied suggestions')).toBeTruthy();
+		expect(getByText('Applied refinements')).toBeTruthy();
 		expect(getByText('Async Patterns')).toBeTruthy();
 	});
 
@@ -168,7 +168,7 @@ describe('SlotTargetPanel', () => {
 				insertState: createInsertState(),
 			},
 		});
-		expect(getByText(/Accept related notes/)).toBeTruthy();
+		expect(getByText(/Include related notes/)).toBeTruthy();
 	});
 
 	it('tweet mode: single slot, no dropdown needed', () => {
@@ -179,7 +179,7 @@ describe('SlotTargetPanel', () => {
 				insertState: createInsertState(),
 			},
 		});
-		expect(getByText('Apply')).toBeTruthy();
+		expect(getByText('Refine')).toBeTruthy();
 		// Only 1 slot, no select needed
 		const selects = queryAllByRole('combobox');
 		expect(selects.length).toBe(0);
@@ -194,6 +194,6 @@ describe('SlotTargetPanel', () => {
 				insertState: createInsertState(),
 			},
 		});
-		expect(getByLabelText('Apply Async Patterns to slot')).toBeTruthy();
+		expect(getByLabelText('Refine slot with Async Patterns')).toBeTruthy();
 	});
 });

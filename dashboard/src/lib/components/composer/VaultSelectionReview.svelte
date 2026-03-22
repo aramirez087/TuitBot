@@ -2,12 +2,19 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import type { VaultSelectionResponse, HookOption, NeighborItem, GraphState, ThreadBlock, DraftInsertState } from '$lib/api/types';
-	import { Zap, FileText } from 'lucide-svelte';
+	import { Zap, FileText, ChevronDown, ChevronUp, Undo2 } from 'lucide-svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import HookPicker from './HookPicker.svelte';
 	import GraphSuggestionCards from './GraphSuggestionCards.svelte';
 	import SlotTargetPanel from './SlotTargetPanel.svelte';
 	import { createInsertState } from '$lib/stores/draftInsertStore';
+	import {
+		trackSuggestionAccepted,
+		trackSuggestionDismissed,
+		trackSuggestionRestored,
+		trackSynthesisToggled,
+		trackHooksGenerated,
+	} from '$lib/analytics/backlinkFunnel';
 
 	let {
 		sessionId,
@@ -58,11 +65,16 @@
 	let dismissedNodeIds = $state<Set<number>>(new Set());
 	let synthesisEnabled = $state(true);
 
+	let showDismissed = $state(false);
+
 	const graphNeighbors = $derived(selection?.graph_neighbors ?? []);
 	const graphState = $derived<GraphState>(selection?.graph_state ?? 'fallback_active');
 	const graphLoading = $derived(loading);
 	const visibleNeighbors = $derived(
 		graphNeighbors.filter((n) => !dismissedNodeIds.has(n.node_id))
+	);
+	const dismissedNeighbors = $derived(
+		graphNeighbors.filter((n) => dismissedNodeIds.has(n.node_id))
 	);
 
 	onMount(async () => {
@@ -80,22 +92,32 @@
 		const next = new Map(acceptedNeighbors);
 		next.set(neighbor.node_id, { neighbor, role });
 		acceptedNeighbors = next;
+		trackSuggestionAccepted(neighbor.node_id, neighbor.reason, neighbor.intent, neighbor.score, sessionId);
 	}
 
 	function handleDismissNeighbor(nodeId: number) {
+		const neighbor = graphNeighbors.find((n) => n.node_id === nodeId);
 		const nextDismissed = new Set(dismissedNodeIds);
 		nextDismissed.add(nodeId);
 		dismissedNodeIds = nextDismissed;
-		// Also remove from accepted if it was accepted
 		if (acceptedNeighbors.has(nodeId)) {
 			const next = new Map(acceptedNeighbors);
 			next.delete(nodeId);
 			acceptedNeighbors = next;
 		}
+		trackSuggestionDismissed(nodeId, neighbor?.reason ?? 'unknown', sessionId);
+	}
+
+	function handleRestoreNeighbor(nodeId: number) {
+		const nextDismissed = new Set(dismissedNodeIds);
+		nextDismissed.delete(nodeId);
+		dismissedNodeIds = nextDismissed;
+		trackSuggestionRestored(nodeId, sessionId);
 	}
 
 	function toggleSynthesis() {
 		synthesisEnabled = !synthesisEnabled;
+		trackSynthesisToggled(synthesisEnabled, sessionId);
 	}
 
 	async function handleGenerate() {
@@ -107,6 +129,7 @@
 			const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
 			const result = await api.assist.hooks(topic, { sessionId: sessionId });
 			hookOptions = result.hooks;
+			trackHooksGenerated(acceptedNeighbors.size, graphNeighbors.length, result.hooks.length, sessionId);
 		} catch (e) {
 			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
 		} finally {
@@ -174,9 +197,9 @@
 {:else if expired}
 	<div class="vault-empty-state">
 		<FileText size={20} />
-		<p>Selection expired.</p>
+		<p>This selection has expired.</p>
 		<p class="vault-empty-hint">
-			Select blocks manually or send a new selection from Obsidian.
+			Please send a new selection from Obsidian.
 		</p>
 		<button class="vault-expired-dismiss" onclick={() => onexpired?.()}>Browse vault</button>
 	</div>
@@ -226,7 +249,7 @@
 				aria-pressed={synthesisEnabled}
 				aria-label="Toggle related notes"
 			>
-				Related notes {synthesisEnabled ? 'ON' : 'OFF'}
+				{#if synthesisEnabled}&#10003;{/if} Use related notes
 			</button>
 		</div>
 	{/if}
@@ -236,6 +259,7 @@
 			neighbors={visibleNeighbors}
 			{graphState}
 			loading={graphLoading}
+			{sessionId}
 			onaccept={handleAcceptNeighbor}
 			ondismiss={handleDismissNeighbor}
 		/>
@@ -243,7 +267,41 @@
 
 	{#if acceptedNeighbors.size > 0 && synthesisEnabled}
 		<div class="accepted-summary">
-			{acceptedNeighbors.size} related {acceptedNeighbors.size === 1 ? 'note' : 'notes'} will be included
+			{acceptedNeighbors.size} {acceptedNeighbors.size === 1 ? 'note' : 'notes'} included in context
+		</div>
+	{/if}
+
+	{#if dismissedNeighbors.length > 0 && synthesisEnabled}
+		<div class="dismissed-section">
+			<button
+				class="dismissed-toggle"
+				onclick={() => { showDismissed = !showDismissed; }}
+				aria-expanded={showDismissed}
+			>
+				{#if showDismissed}
+					<ChevronUp size={10} />
+				{:else}
+					<ChevronDown size={10} />
+				{/if}
+				Show skipped ({dismissedNeighbors.length})
+			</button>
+			{#if showDismissed}
+				<div class="dismissed-list">
+					{#each dismissedNeighbors as neighbor (neighbor.node_id)}
+						<div class="dismissed-item">
+							<span class="dismissed-title">{neighbor.node_title}</span>
+							<button
+								class="dismissed-restore"
+								onclick={() => handleRestoreNeighbor(neighbor.node_id)}
+								aria-label="Restore {neighbor.node_title}"
+								title="Undo skip"
+							>
+								<Undo2 size={10} />
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -424,6 +482,71 @@
 		font-weight: 500;
 		margin-top: 4px;
 		padding: 0 2px;
+	}
+
+	.dismissed-section {
+		margin-top: 4px;
+	}
+
+	.dismissed-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		border: none;
+		background: transparent;
+		color: var(--color-text-subtle);
+		font-size: 10px;
+		font-weight: 500;
+		cursor: pointer;
+		padding: 2px 0;
+	}
+
+	.dismissed-toggle:hover {
+		color: var(--color-text-muted);
+	}
+
+	.dismissed-list {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-top: 4px;
+	}
+
+	.dismissed-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 3px 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-text-subtle) 5%, transparent);
+	}
+
+	.dismissed-title {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
+	}
+
+	.dismissed-restore {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		border: none;
+		border-radius: 3px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.dismissed-restore:hover {
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 	}
 
 	.vault-error {

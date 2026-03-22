@@ -79,7 +79,7 @@
 <div class="slot-target-panel">
 	{#if appliedInserts.length > 0}
 		<div class="applied-section">
-			<div class="section-label">Applied suggestions</div>
+			<div class="section-label">Applied refinements</div>
 			{#each appliedInserts as insert (insert.id)}
 				<div class="applied-item">
 					<div class="applied-info">
@@ -102,7 +102,7 @@
 
 	{#if unappliedNeighbors.length > 0}
 		<div class="unapplied-section">
-			<div class="section-label">Refine specific slots</div>
+			<div class="section-label">Refine specific parts</div>
 			{#each unappliedNeighbors as { neighbor, role }}
 				<div class="neighbor-row">
 					<div class="neighbor-info">
@@ -128,9 +128,9 @@
 						<button
 							class="apply-btn"
 							onclick={() => handleApply(neighbor)}
-							aria-label="Apply {neighbor.node_title} to slot"
+							aria-label="Refine slot with {neighbor.node_title}"
 						>
-							Apply
+							Refine
 						</button>
 					</div>
 				</div>
@@ -138,7 +138,7 @@
 		</div>
 	{:else if appliedInserts.length === 0}
 		<div class="empty-state">
-			Accept related notes above to refine specific parts of your draft.
+			Include related notes above, then apply them to specific parts of your draft.
 		</div>
 	{/if}
 </div>

@@ -1,32 +1,56 @@
 <script lang="ts">
 	import type { NeighborItem, GraphState } from '$lib/api/types';
 	import { X, Lightbulb, BookOpen, ArrowLeftRight, Link } from 'lucide-svelte';
+	import { fly } from 'svelte/transition';
+	import { trackSuggestionsShown, trackEmptyGraph } from '$lib/analytics/backlinkFunnel';
 
 	let {
 		neighbors,
 		graphState,
 		loading = false,
+		sessionId = '',
 		onaccept,
 		ondismiss,
 	}: {
 		neighbors: NeighborItem[];
 		graphState: GraphState;
 		loading?: boolean;
+		sessionId?: string;
 		onaccept: (neighbor: NeighborItem, role: string) => void;
 		ondismiss: (nodeId: number) => void;
 	} = $props();
 
-	const intentActions: Record<string, { label: string; roles: string[] }> = {
-		pro_tip: { label: 'Use as pro-tip', roles: ['pro_tip'] },
-		evidence: { label: 'Use as example', roles: ['evidence'] },
-		counterpoint: { label: 'Use as counterpoint', roles: ['counterpoint'] },
-		related: { label: 'Use as context', roles: ['related'] },
+	const intentBadges: Record<string, string> = {
+		pro_tip: 'pro tip',
+		evidence: 'evidence',
+		counterpoint: 'counterpoint',
+		related: 'context',
 	};
 
-	function actionsForIntent(intent: string): { label: string; role: string }[] {
-		const base = intentActions[intent] ?? intentActions['related'];
-		return [{ label: base.label, role: base.roles[0] }];
+	function intentRoleFor(intent: string): string {
+		return intent in intentBadges ? intent : 'related';
 	}
+
+	// Fire suggestions_shown once per session when neighbors appear
+	let hasFiredShown = false;
+	$effect(() => {
+		if (neighbors.length > 0 && !hasFiredShown && !loading) {
+			hasFiredShown = true;
+			trackSuggestionsShown(neighbors.length, sessionId, graphState);
+		}
+	});
+
+	// Fire empty_graph when relevant empty state renders
+	let hasFiredEmpty = false;
+	$effect(() => {
+		const isEmpty = graphState === 'no_related_notes' || (graphState === 'available' && neighbors.length === 0) || graphState === 'node_not_indexed';
+		if (isEmpty && !hasFiredEmpty && !loading) {
+			hasFiredEmpty = true;
+			trackEmptyGraph(graphState, sessionId);
+		}
+	});
+
+	const reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 	function truncateSnippet(text: string, max: number = 120): string {
 		if (text.length <= max) return text;
@@ -66,32 +90,40 @@
 {:else if graphState === 'node_not_indexed'}
 	<div class="graph-suggestions" role="status">
 		<div class="graph-empty-state">
-			<p class="graph-empty-message">This note isn't indexed yet. Related notes will appear after your next vault sync.</p>
+			<p class="graph-empty-message">This note hasn't been indexed yet. Generating from your selected text.</p>
 		</div>
 	</div>
 {:else if graphState === 'no_related_notes' || (graphState === 'available' && neighbors.length === 0)}
 	<div class="graph-suggestions" role="status">
 		<div class="graph-empty-state">
-			<p class="graph-empty-message">No linked notes found &mdash; using this note only.</p>
+			<p class="graph-empty-message">This note doesn't link to other indexed notes. You can still generate from this selection alone.</p>
 		</div>
 	</div>
 {:else if graphState === 'available' && neighbors.length > 0}
 	<div class="graph-suggestions" role="list" aria-label="Related note suggestions">
 		<div class="graph-suggestions-header">
-			<span class="graph-suggestions-label">Related notes</span>
+			<span class="graph-suggestions-label">Related notes from your vault</span>
 			<span class="graph-suggestions-count">{neighbors.length}</span>
 		</div>
 		{#each neighbors as neighbor (neighbor.node_id)}
 			{@const ReasonIcon = getReasonIcon(neighbor.reason)}
-			<div class="graph-card" role="listitem" aria-label="Suggestion: {neighbor.node_title}">
+			<div
+				class="graph-card"
+				role="listitem"
+				aria-label="Suggestion: {neighbor.node_title}"
+				in:fly={{ y: 8, duration: reducedMotion ? 0 : 150 }}
+				out:fly={{ y: -8, duration: reducedMotion ? 0 : 120 }}
+			>
 				<div class="graph-card-header">
 					<span class="graph-card-title">{neighbor.node_title}</span>
 					<button
 						class="graph-card-dismiss"
 						onclick={() => ondismiss(neighbor.node_id)}
-						aria-label="Dismiss {neighbor.node_title}"
+						aria-label="Skip {neighbor.node_title}"
+						title="Skip this note"
 					>
 						<X size={12} />
+						<span class="dismiss-label">Skip</span>
 					</button>
 				</div>
 				<div class="graph-card-snippet">{truncateSnippet(neighbor.snippet)}</div>
@@ -100,17 +132,17 @@
 						<ReasonIcon size={10} />
 						{neighbor.reason_label}
 					</span>
+					<span class="graph-intent-badge">{intentBadges[neighbor.intent] ?? 'context'}</span>
 					<span class="graph-score-dot" style="opacity: {scoreOpacity(neighbor.score)}" title="Relevance: {neighbor.score.toFixed(1)}"></span>
 				</div>
 				<div class="graph-card-actions">
-					{#each actionsForIntent(neighbor.intent) as action}
-						<button
-							class="graph-action-btn"
-							onclick={() => onaccept(neighbor, action.role)}
-						>
-							{action.label}
-						</button>
-					{/each}
+					<button
+						class="graph-action-btn"
+						onclick={() => onaccept(neighbor, intentRoleFor(neighbor.intent))}
+						title="Include insights from this note in your draft"
+					>
+						Include
+					</button>
 				</div>
 			</div>
 		{/each}
@@ -231,16 +263,22 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 18px;
+		gap: 2px;
 		height: 18px;
 		border: none;
 		border-radius: 3px;
 		background: transparent;
 		color: var(--color-text-subtle);
 		cursor: pointer;
-		padding: 0;
+		padding: 0 4px;
 		flex-shrink: 0;
 		transition: all 0.1s ease;
+		font-size: 10px;
+		font-weight: 500;
+	}
+
+	.dismiss-label {
+		font-size: 10px;
 	}
 
 	.graph-card-dismiss:hover {
@@ -269,6 +307,16 @@
 		border-radius: 3px;
 		background: color-mix(in srgb, var(--color-text-subtle) 8%, transparent);
 		color: var(--color-text-subtle);
+	}
+
+	.graph-intent-badge {
+		font-size: 9px;
+		padding: 0 4px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		color: var(--color-accent);
+		font-weight: 500;
+		text-transform: lowercase;
 	}
 
 	.graph-score-dot {

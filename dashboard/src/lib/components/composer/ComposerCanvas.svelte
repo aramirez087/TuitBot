@@ -2,6 +2,7 @@
 	import { Send, Undo2 } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import type { ThreadBlock } from '$lib/api';
+	import type { DraftInsertState } from '$lib/api/types';
 	import { saveAutoSave, clearAutoSave as clearAutoSaveStorage, readAutoSave, restoreMedia, AUTOSAVE_DEBOUNCE_MS } from '$lib/utils/composerAutosave';
 	import type { RecoveryData } from '$lib/stores/composerAutosave';
 	import TweetEditor from './TweetEditor.svelte';
@@ -39,6 +40,9 @@
 		onsubmiterror,
 		onswitchtothread,
 		onundo,
+		// Insert state for ThreadFlowLane
+		insertState,
+		onundoinsert,
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
@@ -64,6 +68,8 @@
 		onsubmiterror?: (msg: string) => void;
 		onswitchtothread?: () => void;
 		onundo?: () => void;
+		insertState?: DraftInsertState;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
 	const avatarUrl = $derived($currentAccount?.x_avatar_url ?? null);
@@ -192,8 +198,10 @@
 				{avatarUrl}
 				{displayName}
 				{handle}
+				{insertState}
 				onchange={(b) => { threadBlocks = b; }}
 				onvalidchange={(v) => { threadValid = v; }}
+				{onundoinsert}
 			/>
 		{/if}
 

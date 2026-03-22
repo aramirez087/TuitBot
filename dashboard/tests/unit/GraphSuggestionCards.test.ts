@@ -123,9 +123,9 @@ describe('GraphSuggestionCards', () => {
 		expect(count?.textContent).toBe('2');
 	});
 
-	it('shows "Related notes" header', () => {
+	it('shows "Related notes from your vault" header', () => {
 		const { container } = render(GraphSuggestionCards, { props: defaultProps });
-		expect(container.textContent).toContain('Related notes');
+		expect(container.textContent).toContain('Related notes from your vault');
 	});
 
 	// --- Accept interaction ---
@@ -140,10 +140,11 @@ describe('GraphSuggestionCards', () => {
 		expect(onaccept).toHaveBeenCalledWith(sampleNeighbors[0], 'pro_tip');
 	});
 
-	it('maps evidence intent to "Use as example" action button', () => {
+	it('maps all intents to unified "Include" action button', () => {
 		const { container } = render(GraphSuggestionCards, { props: defaultProps });
 		const actionBtns = container.querySelectorAll('.graph-action-btn');
-		expect(actionBtns[1]?.textContent).toBe('Use as example');
+		expect(actionBtns[0]?.textContent?.trim()).toBe('Include');
+		expect(actionBtns[1]?.textContent?.trim()).toBe('Include');
 	});
 
 	// --- Dismiss interaction ---
@@ -164,7 +165,7 @@ describe('GraphSuggestionCards', () => {
 		const { container } = render(GraphSuggestionCards, {
 			props: { ...defaultProps, graphState: 'no_related_notes' as GraphState, neighbors: [] },
 		});
-		expect(container.textContent).toContain('No linked notes found');
+		expect(container.textContent).toContain("doesn't link to other indexed notes");
 	});
 
 	// --- Not indexed state ---
@@ -173,7 +174,7 @@ describe('GraphSuggestionCards', () => {
 		const { container } = render(GraphSuggestionCards, {
 			props: { ...defaultProps, graphState: 'node_not_indexed' as GraphState, neighbors: [] },
 		});
-		expect(container.textContent).toContain("isn't indexed yet");
+		expect(container.textContent).toContain("hasn't been indexed yet");
 	});
 
 	// --- Fallback state ---
@@ -192,7 +193,7 @@ describe('GraphSuggestionCards', () => {
 		const { container } = render(GraphSuggestionCards, {
 			props: { ...defaultProps, graphState: 'available' as GraphState, neighbors: [] },
 		});
-		expect(container.textContent).toContain('No linked notes found');
+		expect(container.textContent).toContain("doesn't link to other indexed notes");
 		expect(container.querySelectorAll('.graph-card').length).toBe(0);
 	});
 
@@ -213,7 +214,7 @@ describe('GraphSuggestionCards', () => {
 	it('dismiss buttons have aria-label', () => {
 		const { container } = render(GraphSuggestionCards, { props: defaultProps });
 		const dismissBtns = container.querySelectorAll('.graph-card-dismiss');
-		expect(dismissBtns[0]?.getAttribute('aria-label')).toBe('Dismiss Async Patterns');
+		expect(dismissBtns[0]?.getAttribute('aria-label')).toBe('Skip Async Patterns');
 	});
 
 	it('reason badges have aria-label', () => {

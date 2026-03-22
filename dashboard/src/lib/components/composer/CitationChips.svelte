@@ -10,6 +10,7 @@
 		Undo2,
 	} from "lucide-svelte";
 	import { buildObsidianUri, openExternalUrl } from "$lib/utils/obsidianUri";
+	import { trackCitationClicked } from "$lib/analytics/backlinkFunnel";
 
 	let {
 		citations,
@@ -30,7 +31,12 @@
 	let expandedId = $state<number | null>(null);
 
 	function toggleExpand(chunkId: number) {
-		expandedId = expandedId === chunkId ? null : chunkId;
+		const wasExpanded = expandedId === chunkId;
+		expandedId = wasExpanded ? null : chunkId;
+		if (!wasExpanded) {
+			const cit = citations.find((c) => c.chunk_id === chunkId);
+			if (cit) trackCitationClicked(chipLabel(cit), false, isDesktop);
+		}
 	}
 
 	function handleKeydown(e: KeyboardEvent, chunkId: number) {
@@ -54,6 +60,7 @@
 
 	async function handleOpenInObsidian(e: Event, cit: VaultCitation) {
 		e.stopPropagation();
+		trackCitationClicked(chipLabel(cit), false, isDesktop);
 		const uri = obsidianUriFor(cit);
 		if (uri) await openExternalUrl(uri);
 	}

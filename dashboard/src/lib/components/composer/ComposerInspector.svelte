@@ -3,6 +3,7 @@
 	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
 	import { topicWithCue } from '$lib/utils/composeHandlers';
 	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel } from '$lib/stores/draftInsertStore';
+	import { trackSlotTargeted, trackInsertUndone } from '$lib/analytics/backlinkFunnel';
 	import InspectorContent from './InspectorContent.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import type ThreadFlowLane from './ThreadFlowLane.svelte';
@@ -31,6 +32,7 @@
 		onundo,
 		onsubmiterror,
 		onSelectionConsumed,
+		oninsertstatechange,
 	}: {
 		open?: boolean;
 		isMobile?: boolean;
@@ -55,6 +57,7 @@
 		onundo?: () => void;
 		onsubmiterror?: (msg: string) => void;
 		onSelectionConsumed?: () => void;
+		oninsertstatechange?: (state: DraftInsertState) => void;
 	} = $props();
 
 	// ── Vault provenance tracking ────────────────────────────
@@ -76,7 +79,12 @@
 	// ── Draft insert state ────────────────────────────────
 	let draftInsertState = $state<DraftInsertState>(createInsertState());
 
-	/** Get the current insert state (read by parent for prop drilling). */
+	// Notify parent whenever insert state changes
+	$effect(() => {
+		oninsertstatechange?.(draftInsertState);
+	});
+
+	/** Get the current insert state (read by parent). */
 	export function getDraftInsertState(): DraftInsertState {
 		return draftInsertState;
 	}
@@ -127,6 +135,7 @@
 
 			undoMessage = `Applied "${neighbor.node_title}" to ${slotLabel}.`;
 			startUndoTimer();
+			trackSlotTargeted(slotLabel, neighbor.node_id, selectionSessionId ?? '');
 		} catch (e) {
 			onsubmiterror?.(e instanceof Error ? e.message : 'Slot refinement failed');
 		} finally {
@@ -152,6 +161,7 @@
 
 		undoMessage = `Reverted ${undone.slotLabel}.`;
 		startUndoTimer();
+		trackInsertUndone(undone.id, undone.slotLabel, selectionSessionId ?? '');
 		return true;
 	}
 
@@ -172,6 +182,7 @@
 
 		undoMessage = `Reverted ${undone.slotLabel}.`;
 		startUndoTimer();
+		trackInsertUndone(undone.id, undone.slotLabel, selectionSessionId ?? '');
 		return true;
 	}
 

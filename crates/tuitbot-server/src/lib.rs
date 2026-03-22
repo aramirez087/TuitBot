@@ -401,6 +401,8 @@ pub fn build_router(state: Arc<AppState>) -> Router {
                 .patch(routes::accounts::update_account)
                 .delete(routes::accounts::delete_account),
         )
+        // Telemetry
+        .route("/telemetry/events", post(routes::telemetry::ingest_events))
         // WebSocket
         .route("/ws", get(ws::ws_handler))
         // Auth middleware — applied to all routes; exempt paths handled internally.

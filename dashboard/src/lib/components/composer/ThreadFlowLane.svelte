@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { type ThreadBlock } from '$lib/api';
+	import type { DraftInsertState } from '$lib/api/types';
 	import { tweetWeightedLen, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
 	import * as threadOps from '$lib/utils/threadOps';
 	import { fly, fade } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
 	import { registerTransferHandler } from '$lib/stores/mediaDrag';
+	import { getInsertsForBlock } from '$lib/stores/draftInsertStore';
 	import ThreadFlowCard from './ThreadFlowCard.svelte';
 	import {
 		handleCardKeydown,
@@ -17,17 +19,21 @@
 		avatarUrl = null,
 		displayName = null,
 		handle = null,
+		insertState,
 		onchange,
 		onvalidchange,
 		onfocusindexchange,
+		onundoinsert,
 	}: {
 		blocks?: ThreadBlock[];
 		avatarUrl?: string | null;
 		displayName?: string | null;
 		handle?: string | null;
+		insertState?: DraftInsertState;
 		onchange: (blocks: ThreadBlock[]) => void;
 		onvalidchange: (valid: boolean) => void;
 		onfocusindexchange?: (index: number) => void;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
 	const fallbackBlocks = threadOps.createDefaultBlocks();
@@ -279,6 +285,7 @@
 				assisting={assistingBlockId === block.id}
 				dragging={draggingBlockId === block.id}
 				dropTarget={dropTargetBlockId === block.id}
+				inserts={insertState ? getInsertsForBlock(insertState, block.id) : []}
 				ontext={(text) => updateBlockText(block.id, text)}
 				onfocus={() => { focusedBlockId = block.id; }}
 				onblur={() => { if (focusedBlockId === block.id) focusedBlockId = null; }}
@@ -298,6 +305,7 @@
 				ondragenter={(e) => handleCardDragEnter(e, block.id)}
 				ondragleave={(e) => handleCardDragLeave(e, block.id)}
 				ondrop={(e) => handleCardDrop(e, block.id)}
+				{onundoinsert}
 			/>
 		</div>
 	{/each}

@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { api, type ScheduleConfig, type ComposeRequest, type ThreadBlock } from '$lib/api';
+	import type { DraftInsertState } from '$lib/api/types';
 	import { tweetWeightedLen } from '$lib/utils/tweetLength';
 	import { buildComposeRequest } from '$lib/utils/composeHandlers';
 	import { buildScheduledFor } from '$lib/utils/timezone';
 	import { clearSessionFlag, markSessionActive } from '$lib/utils/composerAutosave';
 	import type { RecoveryData } from '$lib/stores/composerAutosave';
+	import { trackDraftCompleted } from '$lib/analytics/backlinkFunnel';
 	import ThreadFlowLane from './ThreadFlowLane.svelte';
 	import ComposerShell from './ComposerShell.svelte';
 	import ComposerHeaderBar from './ComposerHeaderBar.svelte';
@@ -79,7 +81,7 @@
 	let showRecovery = $state(false);
 	let recoveryData = $state<RecoveryData | null>(null);
 	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[]; media?: AttachedMedia[]; selectedTime?: string | null; scheduledDate?: string | null } | null>(null);
-
+	let currentInsertState = $state<DraftInsertState | undefined>(undefined);
 
 	// Component refs
 	let threadFlowRef = $state<ThreadFlowLane | undefined>();
@@ -144,6 +146,8 @@
 		}
 	});
 
+	// currentInsertState is synced via oninsertstatechange callback from ComposerInspector
+
 	// ── Lifecycle ──────────────────────────────────────────
 	onMount(async () => {
 		selectedTime = prefillTime ?? null;
@@ -200,7 +204,12 @@
 		try {
 			const provenance = inspectorRef?.getVaultProvenance?.() ?? [];
 		const hookStyle = inspectorRef?.getVaultHookStyle?.() ?? undefined;
+		const insertState = inspectorRef?.getDraftInsertState?.();
+		const insertCount = insertState?.history?.length ?? 0;
 		const data = buildComposeRequest({ mode, tweetText, threadBlocks, selectedTime, targetDate, attachedMedia, timezone: accountTimezone, scheduledDate, provenance, hookStyle });
+			if (insertCount > 0 || provenance.length > 0) {
+				trackDraftCompleted(insertCount, provenance.length, mode, selectionSessionId ?? '');
+			}
 			canvasRef?.clearAutoSave();
 			clearSessionFlag();
 			await onsubmit(data);
@@ -280,6 +289,8 @@
 		bind:threadFlowRef bind:tweetEditorRef
 		onsubmiterror={(msg) => { submitError = msg; }}
 		onundo={handleUndo}
+		insertState={currentInsertState}
+		onundoinsert={(id) => inspectorRef?.handleUndoInsertById(id)}
 	>
 		{#snippet inspector()}
 			<ComposerInspector
@@ -290,6 +301,7 @@
 				bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
 				bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
 				{selectionSessionId} {onSelectionConsumed}
+				oninsertstatechange={(s) => { currentInsertState = s; }}
 				onundo={handleUndo}
 				onsubmiterror={(msg) => { submitError = msg; }}
 			/>
@@ -304,6 +316,7 @@
 			bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
 			bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
 			{selectionSessionId} {onSelectionConsumed}
+			oninsertstatechange={(s) => { currentInsertState = s; }}
 			onclose={() => { inspectorOpen = false; }}
 			onundo={handleUndo}
 			onsubmiterror={(msg) => { submitError = msg; }}

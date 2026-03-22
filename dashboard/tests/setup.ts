@@ -67,6 +67,44 @@ vi.mock('$app/environment', () => ({
 	version: 'test'
 }));
 
+// jsdom lacks the Web Animations API. Svelte transitions (fly, fade, etc.)
+// call element.animate() which doesn't exist in jsdom. Provide a stub that
+// immediately resolves so out-transitions complete and elements are removed.
+if (typeof Element.prototype.animate !== 'function') {
+	Element.prototype.animate = function () {
+		const anim = {
+			cancel: () => {},
+			finish: () => {},
+			finished: Promise.resolve(),
+			onfinish: null as (() => void) | null,
+			playState: 'finished',
+			currentTime: null,
+			effect: null,
+			id: '',
+			pending: false,
+			ready: Promise.resolve(),
+			startTime: null,
+			timeline: null,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => true,
+			persist: () => {},
+			play: () => {},
+			pause: () => {},
+			reverse: () => {},
+			updatePlaybackRate: () => {},
+			commitStyles: () => {},
+			oncancel: null,
+			onremove: null,
+			playbackRate: 1,
+			replaceState: 'active',
+		};
+		// Trigger onfinish synchronously so Svelte removes out-transitioned elements
+		queueMicrotask(() => { anim.onfinish?.(); });
+		return anim as unknown as Animation;
+	};
+}
+
 // Suppress console errors in tests unless explicitly needed
 const originalConsoleError = console.error;
 beforeEach(() => {
