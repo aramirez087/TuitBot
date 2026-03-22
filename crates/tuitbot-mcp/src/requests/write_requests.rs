@@ -158,20 +158,6 @@ pub struct GetXUsageRequest {
     pub days: Option<u32>,
 }
 
-// --- Telemetry (mutations/audits) ---
-
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct GetMcpToolMetricsRequest {
-    /// Hours to look back (default: 24)
-    pub since_hours: Option<u32>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct GetMcpErrorBreakdownRequest {
-    /// Hours to look back (default: 24)
-    pub since_hours: Option<u32>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,21 +323,5 @@ mod tests {
         let json = r#"{"days": 14}"#;
         let req: GetXUsageRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.days, Some(14));
-    }
-
-    // --- Telemetry ---
-
-    #[test]
-    fn get_mcp_tool_metrics_request_deser() {
-        let json = r#"{"since_hours": 48}"#;
-        let req: GetMcpToolMetricsRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.since_hours, Some(48));
-    }
-
-    #[test]
-    fn get_mcp_error_breakdown_request_deser() {
-        let json = r#"{"since_hours": 72}"#;
-        let req: GetMcpErrorBreakdownRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.since_hours, Some(72));
     }
 }

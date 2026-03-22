@@ -118,6 +118,118 @@ pub struct TopicPerformanceSnapshotRequest {
     pub lookback_days: Option<u32>,
 }
 
+// --- Direct X API (lookups) ---
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TweetIdRequest {
+    /// The tweet ID to look up.
+    pub tweet_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UsernameRequest {
+    /// The X username (without @) to look up.
+    pub username: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct SearchTweetsRequest {
+    /// Search query string.
+    pub query: String,
+    /// Maximum number of results (10-100, default: 10).
+    pub max_results: Option<u32>,
+    /// Only return tweets newer than this tweet ID.
+    pub since_id: Option<String>,
+    /// Pagination token for fetching the next page of results.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetUserMentionsRequest {
+    /// Only return mentions newer than this tweet ID.
+    pub since_id: Option<String>,
+    /// Pagination token for fetching the next page of results.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetUserTweetsRequest {
+    /// The user ID whose tweets to fetch.
+    pub user_id: String,
+    /// Maximum number of results (5-100, default: 10).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page of results.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetFollowersRequest {
+    /// The user ID whose followers to fetch.
+    pub user_id: String,
+    /// Maximum number of results (1-1000, default: 100).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetFollowingRequest {
+    /// The user ID whose following list to fetch.
+    pub user_id: String,
+    /// Maximum number of results (1-1000, default: 100).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetUserByIdRequest {
+    /// The user ID to look up.
+    pub user_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetLikedTweetsRequest {
+    /// The user ID whose liked tweets to fetch.
+    pub user_id: String,
+    /// Maximum number of results (1-100, default: 10).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetBookmarksRequest {
+    /// Maximum number of results (1-100, default: 10).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetUsersByIdsRequest {
+    /// List of user IDs to look up (1-100).
+    pub user_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetTweetLikingUsersRequest {
+    /// The tweet ID to get liking users for.
+    pub tweet_id: String,
+    /// Maximum number of results (1-100, default: 100).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetHomeTimelineRequest {
+    /// Maximum number of results (1-100, default: 20).
+    pub max_results: Option<u32>,
+    /// Pagination token for fetching the next page.
+    pub pagination_token: Option<String>,
+}
+
 // --- Telemetry ---
 
 #[derive(Debug, Deserialize, JsonSchema)]
