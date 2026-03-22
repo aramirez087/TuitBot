@@ -221,7 +221,11 @@ pub async fn telemetry_summary(
 ) -> Result<Json<Value>, ApiError> {
     let since = since_timestamp(params.hours);
     let summary = mcp_telemetry::get_summary(&state.db, &since).await?;
-    Ok(Json(serde_json::to_value(summary).unwrap()))
+    // `serde_json::to_value` can only fail if T contains a non-string map key or
+    // an f64 NaN/infinity; the telemetry summary struct contains neither.
+    let value = serde_json::to_value(summary)
+        .map_err(|e| ApiError::Internal(format!("serialization error: {e}")))?;
+    Ok(Json(value))
 }
 
 /// `GET /api/mcp/telemetry/metrics` — per-tool metrics over a time window.

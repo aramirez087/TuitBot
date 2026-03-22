@@ -149,7 +149,8 @@ fn json_merge_patch(base: &mut Value, patch: &Value) {
         if !base.is_object() {
             *base = Value::Object(serde_json::Map::new());
         }
-        let base_obj = base.as_object_mut().unwrap();
+        // Safety: we just checked `!base.is_object()` above and set it if not.
+        let base_obj = base.as_object_mut().expect("base is always an object here");
         for (key, patch_val) in patch_obj {
             if patch_val.is_null() {
                 base_obj.remove(key);
@@ -188,7 +189,8 @@ pub fn merge_overrides(current_overrides: &str, patch: &Value) -> Result<String,
         if !current.is_object() {
             current = Value::Object(serde_json::Map::new());
         }
-        let current_obj = current.as_object_mut().unwrap();
+        // Safety: we just checked `!current.is_object()` above and set it if not.
+        let current_obj = current.as_object_mut().expect("current is always an object here");
         for (key, val) in patch_obj {
             if val.is_null() {
                 current_obj.remove(key);

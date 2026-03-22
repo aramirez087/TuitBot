@@ -154,6 +154,21 @@ impl LocalModeXClient {
         Ok(())
     }
 
+    /// Return the cookie transport, or an error if unavailable.
+    ///
+    /// Must only be called after `check_mutation()` succeeds (which already
+    /// guards against `cookie_transport.is_none()`).  Using this helper
+    /// avoids `.unwrap()` scatter across every mutation method.
+    fn transport(&self) -> Result<&CookieTransport, XApiError> {
+        self.cookie_transport.as_ref().ok_or_else(|| {
+            XApiError::ScraperTransportUnavailable {
+                message: "no browser session imported. \
+                          Import cookies via Settings → X API → Import Browser Session."
+                    .to_string(),
+            }
+        })
+    }
+
     /// Return a transport-unavailable error for read methods.
     fn read_stub(method: &str) -> XApiError {
         XApiError::ScraperTransportUnavailable {
@@ -218,20 +233,12 @@ impl XApiClient for LocalModeXClient {
 
     async fn bookmark_tweet(&self, _user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("bookmark_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .create_bookmark(tweet_id)
-            .await
+        self.transport()?.create_bookmark(tweet_id).await
     }
 
     async fn unbookmark_tweet(&self, _user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("unbookmark_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .delete_bookmark(tweet_id)
-            .await
+        self.transport()?.delete_bookmark(tweet_id).await
     }
 
     // --- Read methods (delegated to cookie transport when available) ---
@@ -358,7 +365,7 @@ impl XApiClient for LocalModeXClient {
 
     async fn post_tweet(&self, text: &str) -> Result<PostedTweet, XApiError> {
         self.check_mutation("post_tweet")?;
-        let transport = self.cookie_transport.as_ref().unwrap();
+        let transport = self.transport()?;
         let text = text.to_string();
         self.with_retry_and_health(|| {
             let t = text.clone();
@@ -373,7 +380,7 @@ impl XApiClient for LocalModeXClient {
         in_reply_to_id: &str,
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("reply_to_tweet")?;
-        let transport = self.cookie_transport.as_ref().unwrap();
+        let transport = self.transport()?;
         let text = text.to_string();
         let reply_id = in_reply_to_id.to_string();
         self.with_retry_and_health(|| {
@@ -391,7 +398,7 @@ impl XApiClient for LocalModeXClient {
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("post_tweet_with_media")?;
         // Media upload not yet supported via cookie transport — post text only.
-        let transport = self.cookie_transport.as_ref().unwrap();
+        let transport = self.transport()?;
         let text = text.to_string();
         self.with_retry_and_health(|| {
             let t = text.clone();
@@ -408,7 +415,7 @@ impl XApiClient for LocalModeXClient {
     ) -> Result<PostedTweet, XApiError> {
         self.check_mutation("reply_to_tweet_with_media")?;
         // Media upload not yet supported via cookie transport — post text only.
-        let transport = self.cookie_transport.as_ref().unwrap();
+        let transport = self.transport()?;
         let text = text.to_string();
         let reply_id = in_reply_to_id.to_string();
         self.with_retry_and_health(|| {
@@ -432,65 +439,37 @@ impl XApiClient for LocalModeXClient {
 
     async fn like_tweet(&self, _user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("like_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .favorite_tweet(tweet_id)
-            .await
+        self.transport()?.favorite_tweet(tweet_id).await
     }
 
     async fn unlike_tweet(&self, _user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("unlike_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .unfavorite_tweet(tweet_id)
-            .await
+        self.transport()?.unfavorite_tweet(tweet_id).await
     }
 
     async fn follow_user(&self, _user_id: &str, target_user_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("follow_user")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .follow_user(target_user_id)
-            .await
+        self.transport()?.follow_user(target_user_id).await
     }
 
     async fn unfollow_user(&self, _user_id: &str, target_user_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("unfollow_user")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .unfollow_user(target_user_id)
-            .await
+        self.transport()?.unfollow_user(target_user_id).await
     }
 
     async fn retweet(&self, _user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("retweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .create_retweet(tweet_id)
-            .await
+        self.transport()?.create_retweet(tweet_id).await
     }
 
     async fn unretweet(&self, _user_id: &str, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("unretweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .delete_retweet(tweet_id)
-            .await
+        self.transport()?.delete_retweet(tweet_id).await
     }
 
     async fn delete_tweet(&self, tweet_id: &str) -> Result<bool, XApiError> {
         self.check_mutation("delete_tweet")?;
-        self.cookie_transport
-            .as_ref()
-            .unwrap()
-            .delete_tweet(tweet_id)
-            .await
+        self.transport()?.delete_tweet(tweet_id).await
     }
 
     // --- Media (always unavailable in scraper mode) ---
