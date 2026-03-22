@@ -10,7 +10,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use tuitbot_core::config::DeploymentMode;
-use tuitbot_core::context::retrieval;
+use tuitbot_core::context::{graph_expansion, retrieval};
 use tuitbot_core::storage::vault_selections;
 
 use crate::account::AccountContext;
@@ -228,6 +228,10 @@ pub struct GetSelectionResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolved_chunk_id: Option<i64>,
     pub privacy_envelope: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graph_neighbors: Option<Vec<super::NeighborItem>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub graph_state: Option<String>,
 }
 
 pub async fn get_selection(
@@ -257,8 +261,10 @@ pub async fn get_selection(
             }
         };
 
+    let is_cloud = state.deployment_mode == DeploymentMode::Cloud;
+
     // Cloud mode: omit selected_text (privacy invariant)
-    let selected_text = if state.deployment_mode == DeploymentMode::Cloud {
+    let selected_text = if is_cloud {
         None
     } else {
         Some(selection.selected_text)
@@ -269,6 +275,28 @@ pub async fn get_selection(
         .frontmatter_tags
         .as_deref()
         .and_then(|s| serde_json::from_str(s).ok());
+
+    // Auto-expand graph neighbors when a resolved node exists.
+    let (graph_neighbors, graph_state) = if let Some(node_id) = selection.resolved_node_id {
+        let result = crate::routes::rag_helpers::resolve_graph_suggestions(
+            &state,
+            &ctx.account_id,
+            node_id,
+            graph_expansion::DEFAULT_MAX_NEIGHBORS,
+        )
+        .await;
+        let state_str = serde_json::to_value(&result.graph_state)
+            .ok()
+            .and_then(|v| v.as_str().map(String::from));
+        let items: Vec<super::NeighborItem> = result
+            .neighbors
+            .into_iter()
+            .map(|n| super::NeighborItem::from_graph_neighbor(n, is_cloud))
+            .collect();
+        (Some(items), state_str)
+    } else {
+        (None, None)
+    };
 
     (
         StatusCode::OK,
@@ -285,6 +313,8 @@ pub async fn get_selection(
             resolved_node_id: selection.resolved_node_id,
             resolved_chunk_id: selection.resolved_chunk_id,
             privacy_envelope: state.deployment_mode.privacy_envelope().to_string(),
+            graph_neighbors,
+            graph_state,
         }),
     )
         .into_response()
@@ -363,6 +393,8 @@ mod tests {
             resolved_node_id: None,
             resolved_chunk_id: None,
             privacy_envelope: "local_first".to_string(),
+            graph_neighbors: None,
+            graph_state: None,
         };
         let json = serde_json::to_value(&resp).expect("serialize");
         assert!(json.get("selected_text").is_none());
@@ -371,6 +403,8 @@ mod tests {
         assert!(json.get("frontmatter_tags").is_none());
         assert!(json.get("resolved_node_id").is_none());
         assert!(json.get("resolved_chunk_id").is_none());
+        assert!(json.get("graph_neighbors").is_none());
+        assert!(json.get("graph_state").is_none());
         assert_eq!(json["privacy_envelope"], "local_first");
     }
 
@@ -389,6 +423,8 @@ mod tests {
             resolved_node_id: None,
             resolved_chunk_id: None,
             privacy_envelope: "user_controlled".to_string(),
+            graph_neighbors: None,
+            graph_state: None,
         };
         let json = serde_json::to_value(&resp).expect("serialize");
         assert_eq!(json["privacy_envelope"], "user_controlled");

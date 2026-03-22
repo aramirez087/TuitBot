@@ -7,6 +7,8 @@
 //! identical state transitions.
 
 pub mod chunker;
+pub mod graph_ingest;
+pub mod link_extractor;
 pub mod loopback;
 
 #[cfg(test)]

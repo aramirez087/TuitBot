@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { ThreadBlock } from '$lib/api';
+	import type { DraftInsert } from '$lib/api/types';
 	import { tweetWeightedLen, wordCount, MAX_TWEET_CHARS } from '$lib/utils/tweetLength';
+	import { Link, Undo2 } from 'lucide-svelte';
 	import MediaSlot from '../MediaSlot.svelte';
 	import ThreadFlowCardFooter from './ThreadFlowCardFooter.svelte';
 
@@ -16,6 +18,7 @@
 		assisting = false,
 		dragging = false,
 		dropTarget = false,
+		inserts = [],
 		ontext,
 		onfocus,
 		onblur,
@@ -32,6 +35,7 @@
 		ondragenter,
 		ondragleave,
 		ondrop,
+		onundoinsert,
 	}: {
 		block: ThreadBlock;
 		index: number;
@@ -43,6 +47,7 @@
 		assisting?: boolean;
 		dragging?: boolean;
 		dropTarget?: boolean;
+		inserts?: DraftInsert[];
 		ontext: (text: string) => void;
 		onfocus: () => void;
 		onblur: () => void;
@@ -59,6 +64,7 @@
 		ondragenter: (e: DragEvent) => void;
 		ondragleave: (e: DragEvent) => void;
 		ondrop: (e: DragEvent) => void;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
 	const charCount = $derived(tweetWeightedLen(block.text));
@@ -146,6 +152,27 @@
 				blockId={block.id}
 			/>
 		</div>
+
+		{#if inserts.length > 0}
+			<div class="insert-badges">
+				{#each inserts as ins (ins.id)}
+					<div class="insert-badge">
+						<Link size={9} />
+						<span class="insert-badge-title">{ins.sourceTitle}</span>
+						{#if onundoinsert}
+							<button
+								class="insert-badge-undo"
+								onclick={() => onundoinsert?.(ins.id)}
+								aria-label="Undo insert from {ins.sourceTitle}"
+								title="Undo"
+							>
+								<Undo2 size={9} />
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/if}
 
 		<ThreadFlowCardFooter
 			{index}
@@ -315,6 +342,53 @@
 		color: var(--color-text-subtle);
 		opacity: 0.35;
 		font-style: italic;
+	}
+
+	/* ── Insert badges ────────────────────── */
+	.insert-badges {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 3px;
+		margin: 4px 0;
+	}
+
+	.insert-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 1px 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+		font-size: 10px;
+		color: var(--color-accent);
+	}
+
+	.insert-badge-title {
+		max-width: 100px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-weight: 500;
+	}
+
+	.insert-badge-undo {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
+		border: none;
+		border-radius: 2px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
+		padding: 0;
+	}
+
+	.insert-badge-undo:hover {
+		color: var(--color-danger);
+		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 	}
 
 	@media (max-width: 640px) {

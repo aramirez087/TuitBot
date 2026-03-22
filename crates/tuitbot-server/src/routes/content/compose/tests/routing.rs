@@ -251,6 +251,8 @@ fn build_provenance_input_all_none_fields() {
         source_path: None,
         heading_path: None,
         snippet: None,
+        edge_type: None,
+        edge_label: None,
     }];
     let result = build_provenance_input(Some(&refs)).unwrap();
     assert!(result.source_node_id.is_none());

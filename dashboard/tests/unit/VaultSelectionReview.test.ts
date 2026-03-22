@@ -18,6 +18,35 @@ vi.mock('$lib/api', () => ({
 	}
 }));
 
+const sampleNeighbors = [
+	{
+		node_id: 55,
+		node_title: 'Async Patterns',
+		reason: 'linked_note',
+		reason_label: 'linked note',
+		intent: 'pro_tip',
+		matched_tags: [],
+		score: 3.5,
+		snippet: 'Async patterns in Rust use tokio.',
+		best_chunk_id: 120,
+		heading_path: '# Async',
+		relative_path: 'notes/async-patterns.md',
+	},
+	{
+		node_id: 78,
+		node_title: 'Tokio Runtime',
+		reason: 'shared_tag',
+		reason_label: 'shared tag: #async',
+		intent: 'evidence',
+		matched_tags: ['async'],
+		score: 1.8,
+		snippet: 'Tokio provides a multi-threaded runtime.',
+		best_chunk_id: 145,
+		heading_path: '# Runtime',
+		relative_path: 'notes/tokio-runtime.md',
+	},
+];
+
 const sampleSelection = {
 	session_id: 'test-session-abc',
 	vault_name: 'my-vault',
@@ -30,6 +59,12 @@ const sampleSelection = {
 	resolved_chunk_id: 22,
 	created_at: '2024-01-01T00:00:00Z',
 	expires_at: '2024-01-01T00:30:00Z'
+};
+
+const sampleSelectionWithGraph = {
+	...sampleSelection,
+	graph_neighbors: sampleNeighbors,
+	graph_state: 'available' as const,
 };
 
 const sampleHooks = [
@@ -206,7 +241,7 @@ describe('VaultSelectionReview', () => {
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Not found'));
 		const { container } = render(VaultSelectionReview, { props: defaultProps });
 		await vi.waitFor(() => {
-			expect(container.textContent).toContain('Selection expired');
+			expect(container.textContent).toContain('This selection has expired');
 		});
 	});
 
@@ -430,7 +465,8 @@ describe('VaultSelectionReview', () => {
 				[7],
 				'tweet',
 				['What if async patterns could simplify everything?'],
-				'question'
+				'question',
+				undefined
 			);
 		});
 	});
@@ -467,7 +503,8 @@ describe('VaultSelectionReview', () => {
 				[],
 				expect.any(String),
 				expect.any(Array),
-				expect.any(String)
+				expect.any(String),
+				undefined
 			);
 		});
 	});
@@ -717,5 +754,365 @@ describe('VaultSelectionReview', () => {
 			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
 		});
 		expect(container.querySelector('.selection-heading')).toBeFalsy();
+	});
+
+	// --- Graph suggestion cards integration ---
+
+	it('shows GraphSuggestionCards when selection has graph_neighbors', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.graph-suggestions')).toBeTruthy();
+		});
+		const cards = container.querySelectorAll('.graph-card');
+		expect(cards.length).toBe(2);
+	});
+
+	it('shows empty state when graph_state is no_related_notes', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			graph_neighbors: [],
+			graph_state: 'no_related_notes',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.textContent).toContain("doesn't link to other indexed notes");
+		});
+	});
+
+	it('shows not-indexed message when graph_state is node_not_indexed', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			graph_neighbors: [],
+			graph_state: 'node_not_indexed',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.textContent).toContain("hasn't been indexed yet");
+		});
+	});
+
+	it('does not show graph section when graph_state is fallback_active', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+			...sampleSelection,
+			graph_neighbors: [],
+			graph_state: 'fallback_active',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		expect(container.querySelector('.graph-suggestions')).toBeFalsy();
+		// Toggle should also not appear for fallback
+		expect(container.querySelector('.synthesis-toggle')).toBeFalsy();
+	});
+
+	it('does not show graph section when selection has no graph fields', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelection);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		// fallback_active is the default when graph_state is undefined
+		expect(container.querySelector('.graph-suggestions')).toBeFalsy();
+	});
+
+	it('synthesis toggle hides graph cards when toggled off', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.graph-suggestions')).toBeTruthy();
+		});
+		// Toggle off
+		const toggle = container.querySelector('.synthesis-toggle') as HTMLButtonElement;
+		expect(toggle).toBeTruthy();
+		await fireEvent.click(toggle);
+		expect(container.querySelector('.graph-suggestions')).toBeFalsy();
+	});
+
+	it('synthesis toggle shows graph cards when toggled back on', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.graph-suggestions')).toBeTruthy();
+		});
+		const toggle = container.querySelector('.synthesis-toggle') as HTMLButtonElement;
+		// Toggle off then on
+		await fireEvent.click(toggle);
+		expect(container.querySelector('.graph-suggestions')).toBeFalsy();
+		await fireEvent.click(toggle);
+		expect(container.querySelector('.graph-suggestions')).toBeTruthy();
+	});
+
+	it('dismiss neighbor removes it from visible list', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const dismissBtns = container.querySelectorAll('.graph-card-dismiss');
+		await fireEvent.click(dismissBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(1);
+		});
+	});
+
+	it('accepted neighbors are included in ongenerate call', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		// Shows accepted summary
+		await vi.waitFor(() => {
+			expect(container.textContent).toContain('1 note included in context');
+		});
+		// Generate hooks
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		// Select first hook
+		const hookCards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(hookCards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalled();
+			const call = ongenerate.mock.calls[0];
+			// nodeIds should include both selection node (7) and accepted neighbor (55)
+			expect(call[0]).toContain(7);
+			expect(call[0]).toContain(55);
+		});
+	});
+
+	it('synthesis toggle has correct aria-pressed attribute', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelector('.synthesis-toggle')).toBeTruthy();
+		});
+		const toggle = container.querySelector('.synthesis-toggle') as HTMLButtonElement;
+		expect(toggle.getAttribute('aria-pressed')).toBe('true');
+		await fireEvent.click(toggle);
+		expect(toggle.getAttribute('aria-pressed')).toBe('false');
+	});
+
+	// --- Slot targeting integration (Session 5) ---
+
+	it('shows SlotTargetPanel when hasExistingContent and accepted neighbors exist', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: {
+				...defaultProps,
+				hasExistingContent: true,
+				threadBlocks: [
+					{ id: 'b1', text: 'Opening', media_paths: [], order: 0 },
+					{ id: 'b2', text: 'Closing', media_paths: [], order: 1 },
+				],
+				mode: 'thread',
+			}
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.slot-target-panel')).toBeTruthy();
+		});
+	});
+
+	it('does not show SlotTargetPanel when no existing content', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, hasExistingContent: false }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.textContent).toContain('1 note included in context');
+		});
+		expect(container.querySelector('.slot-target-panel')).toBeFalsy();
+	});
+
+	it('slot insert callback is fired with correct neighbor and slot index', async () => {
+		const oninsert = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: {
+				...defaultProps,
+				hasExistingContent: true,
+				threadBlocks: [
+					{ id: 'b1', text: 'Opening text', media_paths: [], order: 0 },
+					{ id: 'b2', text: 'Closing text', media_paths: [], order: 1 },
+				],
+				mode: 'thread',
+				oninsert,
+			}
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.slot-target-panel')).toBeTruthy();
+		});
+		// Click "Apply" in the SlotTargetPanel
+		const applyBtn = container.querySelector('.apply-btn') as HTMLButtonElement;
+		await fireEvent.click(applyBtn);
+		expect(oninsert).toHaveBeenCalledWith(
+			expect.objectContaining({ node_id: 55, node_title: 'Async Patterns' }),
+			0,
+			'Opening hook'
+		);
+	});
+
+	it('tweet mode: insert targets single slot', async () => {
+		const oninsert = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: {
+				...defaultProps,
+				hasExistingContent: true,
+				mode: 'tweet',
+				oninsert,
+			}
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.slot-target-panel')).toBeTruthy();
+		});
+		const applyBtn = container.querySelector('.apply-btn') as HTMLButtonElement;
+		await fireEvent.click(applyBtn);
+		expect(oninsert).toHaveBeenCalledWith(
+			expect.objectContaining({ node_id: 55 }),
+			0,
+			'Tweet'
+		);
+	});
+
+	it('shows dismissed recovery section after dismissing a card', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Dismiss first neighbor
+		const dismissBtns = container.querySelectorAll('.graph-card-dismiss');
+		await fireEvent.click(dismissBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(1);
+		});
+		// "Show skipped" toggle should appear
+		const toggle = container.querySelector('.dismissed-toggle');
+		expect(toggle).toBeTruthy();
+		expect(toggle?.textContent).toContain('Show skipped');
+		expect(toggle?.textContent).toContain('1');
+	});
+
+	it('restoring a dismissed card adds it back to suggestions', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Dismiss first neighbor
+		const dismissBtns = container.querySelectorAll('.graph-card-dismiss');
+		await fireEvent.click(dismissBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(1);
+		});
+		// Expand dismissed list
+		const toggle = container.querySelector('.dismissed-toggle') as HTMLButtonElement;
+		await fireEvent.click(toggle);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.dismissed-list')).toBeTruthy();
+		});
+		// Restore the dismissed card
+		const restoreBtn = container.querySelector('.dismissed-restore') as HTMLButtonElement;
+		await fireEvent.click(restoreBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Dismissed section should disappear
+		expect(container.querySelector('.dismissed-toggle')).toBeFalsy();
+	});
+
+	it('ongenerate includes neighbor provenance edge_type and edge_label', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		// Generate and confirm
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const hookCards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(hookCards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalled();
+			const call = ongenerate.mock.calls[0];
+			const neighborProv = call[4];
+			expect(neighborProv).toBeDefined();
+			expect(neighborProv[0]).toEqual(
+				expect.objectContaining({ node_id: 55, edge_type: 'linked_note', edge_label: 'linked note' })
+			);
+		});
 	});
 });

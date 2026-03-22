@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { Send } from 'lucide-svelte';
+	import { Send, Undo2 } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
 	import type { ThreadBlock } from '$lib/api';
+	import type { DraftInsertState } from '$lib/api/types';
 	import { saveAutoSave, clearAutoSave as clearAutoSaveStorage, readAutoSave, restoreMedia, AUTOSAVE_DEBOUNCE_MS } from '$lib/utils/composerAutosave';
 	import type { RecoveryData } from '$lib/stores/composerAutosave';
 	import TweetEditor from './TweetEditor.svelte';
@@ -38,6 +39,10 @@
 		// Callbacks
 		onsubmiterror,
 		onswitchtothread,
+		onundo,
+		// Insert state for ThreadFlowLane
+		insertState,
+		onundoinsert,
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
@@ -62,6 +67,9 @@
 		tweetEditorRef?: TweetEditor;
 		onsubmiterror?: (msg: string) => void;
 		onswitchtothread?: () => void;
+		onundo?: () => void;
+		insertState?: DraftInsertState;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
 	const avatarUrl = $derived($currentAccount?.x_avatar_url ?? null);
@@ -190,8 +198,10 @@
 				{avatarUrl}
 				{displayName}
 				{handle}
+				{insertState}
 				onchange={(b) => { threadBlocks = b; }}
 				onvalidchange={(v) => { threadValid = v; }}
+				{onundoinsert}
 			/>
 		{/if}
 
@@ -200,6 +210,12 @@
 		{#if showUndo}
 			<div class="undo-banner">
 				<span>{undoMessage}</span>
+				{#if onundo}
+					<button class="undo-banner-btn" onclick={onundo} aria-label="Undo">
+						<Undo2 size={12} />
+						Undo
+					</button>
+				{/if}
 			</div>
 		{/if}
 
@@ -263,10 +279,22 @@
 	}
 
 	.undo-banner {
-		display: flex; align-items: center; margin-top: 8px;
-		padding: 8px 12px; border-radius: 6px;
+		display: flex; align-items: center; justify-content: space-between;
+		margin-top: 8px; padding: 8px 12px; border-radius: 6px;
 		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 		font-size: 12px; color: var(--color-accent);
+	}
+
+	.undo-banner-btn {
+		display: inline-flex; align-items: center; gap: 4px;
+		padding: 3px 10px; border: 1px solid var(--color-accent);
+		border-radius: 4px; background: transparent;
+		color: var(--color-accent); font-size: 11px; font-weight: 600;
+		cursor: pointer; transition: background 0.1s ease;
+	}
+
+	.undo-banner-btn:hover {
+		background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 	}
 
 	.submit-anchor {

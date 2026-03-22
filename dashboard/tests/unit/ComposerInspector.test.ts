@@ -310,4 +310,210 @@ describe('ComposerInspector', () => {
 		expect(provenance[0]).toMatchObject({ node_id: 10 });
 		expect(provenance[1]).toMatchObject({ node_id: 20 });
 	});
+
+	// ── handleSlotInsert coverage ──────────────────────────
+	it('handleSlotInsert in tweet mode calls improve API and pushes insert', async () => {
+		const oninsertstatechange = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'Hello world', oninsertstatechange }
+		});
+		const neighbor = {
+			node_id: 42, node_title: 'Test Note', reason: 'related', reason_label: 'Related',
+			intent: 'expand', matched_tags: [], score: 0.9, snippet: 'a snippet',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Opening hook');
+		expect(mockImprove).toHaveBeenCalled();
+	});
+
+	it('handleSlotInsert does nothing when blockId is missing (invalid slotIndex in thread mode)', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread', threadBlocks: [] }
+		});
+		const neighbor = {
+			node_id: 1, node_title: 'N', reason: 'r', reason_label: 'R',
+			intent: 'i', matched_tags: [], score: 0.5, snippet: 's',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 5, 'Tweet 6');
+		expect(mockImprove).not.toHaveBeenCalled();
+	});
+
+	it('handleSlotInsert does nothing when previousText is empty', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: '   ' }
+		});
+		const neighbor = {
+			node_id: 1, node_title: 'N', reason: 'r', reason_label: 'R',
+			intent: 'i', matched_tags: [], score: 0.5, snippet: 's',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Opening hook');
+		expect(mockImprove).not.toHaveBeenCalled();
+	});
+
+	it('handleSlotInsert in thread mode updates the correct block', async () => {
+		const blocks = [
+			{ id: 'b1', text: 'Block one', media_paths: [], order: 0 },
+			{ id: 'b2', text: 'Block two', media_paths: [], order: 1 },
+		];
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread', threadBlocks: blocks }
+		});
+		const neighbor = {
+			node_id: 10, node_title: 'Note A', reason: 'similar', reason_label: 'Similar',
+			intent: 'refine', matched_tags: [], score: 0.8, snippet: 'snippet',
+			best_chunk_id: 2, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 1, 'Tweet 2');
+		expect(mockImprove).toHaveBeenCalledWith('Block two', expect.any(String));
+	});
+
+	it('handleSlotInsert reports error via onsubmiterror when API fails', async () => {
+		mockImprove.mockRejectedValueOnce(new Error('Network error'));
+		const onsubmiterror = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'content', onsubmiterror }
+		});
+		const neighbor = {
+			node_id: 1, node_title: 'N', reason: 'r', reason_label: 'R',
+			intent: 'i', matched_tags: [], score: 0.5, snippet: 's',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Opening hook');
+		expect(onsubmiterror).toHaveBeenCalledWith('Network error');
+	});
+
+	// ── handleUndoInsert / handleUndoInsertById coverage ──
+	it('handleUndoInsert returns false when no inserts exist', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		const result = (component as any).handleUndoInsert();
+		expect(result).toBe(false);
+	});
+
+	it('hasPendingInsertUndo returns false initially', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		expect((component as any).hasPendingInsertUndo()).toBe(false);
+	});
+
+	it('handleUndoInsertById returns false when no matching insert', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		const result = (component as any).handleUndoInsertById('nonexistent-id');
+		expect(result).toBe(false);
+	});
+
+	// ── handleAiAssist coverage ──────────────────────────
+	it('handleAiAssist in tweet mode with existing text calls improve', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'Some content' }
+		});
+		await (component as any).handleAiAssist();
+		expect(mockImprove).toHaveBeenCalled();
+	});
+
+	it('handleAiAssist in tweet mode with empty text calls tweet API', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: '' }
+		});
+		await (component as any).handleAiAssist();
+		expect(mockTweet).toHaveBeenCalled();
+	});
+
+	it('handleAiAssist in thread mode calls thread API', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread' }
+		});
+		await (component as any).handleAiAssist();
+		expect(mockThread).toHaveBeenCalled();
+	});
+
+	it('handleAiAssist reports errors via onsubmiterror', async () => {
+		mockImprove.mockRejectedValueOnce(new Error('AI down'));
+		const onsubmiterror = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'text', onsubmiterror }
+		});
+		await (component as any).handleAiAssist();
+		expect(onsubmiterror).toHaveBeenCalledWith('AI down');
+	});
+
+	// ── handleGenerateFromNotes coverage ─────────────────
+	it('handleGenerateFromNotes in thread mode calls thread API', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread' }
+		});
+		await (component as any).handleGenerateFromNotes('Some rough notes');
+		expect(mockThread).toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromNotes in tweet mode calls improve API', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		await (component as any).handleGenerateFromNotes('Raw notes here');
+		expect(mockImprove).toHaveBeenCalled();
+	});
+
+	it('handleGenerateFromNotes with voiceCue includes cue in context', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', voiceCue: 'be casual' }
+		});
+		await (component as any).handleGenerateFromNotes('Some notes');
+		expect(mockImprove).toHaveBeenCalled();
+		const callArgs = mockImprove.mock.calls[0];
+		expect(callArgs[1]).toContain('be casual');
+	});
+
+	// ── handleGenerateFromVault neighbor provenance ──────
+	it('handleGenerateFromVault includes neighbor provenance when provided', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet' }
+		});
+		const neighborProv = [{ node_id: 5, edge_type: 'tag_overlap', edge_label: 'Tags' }];
+		await (component as any).handleGenerateFromVault([5, 10], 'tweet', undefined, undefined, neighborProv);
+		const provenance = (component as any).getVaultProvenance();
+		expect(provenance).toHaveLength(2);
+		expect(provenance[0]).toMatchObject({ node_id: 5, edge_type: 'tag_overlap', edge_label: 'Tags' });
+		expect(provenance[1]).toMatchObject({ node_id: 10 });
+	});
+
+	// ── getDraftInsertState coverage ─────────────────────
+	it('getDraftInsertState returns empty state initially', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		const state = (component as any).getDraftInsertState();
+		expect(state.history).toHaveLength(0);
+	});
+
+	// ── backdrop/keyboard coverage ──────────────────────
+	it('Escape keydown on mobile backdrop calls onclose', async () => {
+		const onclose = vi.fn();
+		const { container } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, isMobile: true, onclose }
+		});
+		const backdrop = container.querySelector('.inspector-backdrop');
+		if (backdrop) {
+			await fireEvent.keyDown(backdrop, { key: 'Escape' });
+			expect(onclose).toHaveBeenCalled();
+		}
+	});
+
+	it('clicking mobile backdrop itself calls onclose', async () => {
+		const onclose = vi.fn();
+		const { container } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, isMobile: true, onclose }
+		});
+		const backdrop = container.querySelector('.inspector-backdrop');
+		if (backdrop) {
+			await fireEvent.click(backdrop);
+			expect(onclose).toHaveBeenCalled();
+		}
+	});
 });

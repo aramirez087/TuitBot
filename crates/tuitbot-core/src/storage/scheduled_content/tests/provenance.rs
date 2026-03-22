@@ -282,6 +282,8 @@ fn sample_provenance_refs() -> Vec<ProvenanceRef> {
             source_path: Some("notes/rust-async.md".to_string()),
             heading_path: Some("# Async > ## Tokio".to_string()),
             snippet: Some("Tokio runtime patterns...".to_string()),
+            edge_type: None,
+            edge_label: None,
         },
         ProvenanceRef {
             node_id: None,
@@ -290,6 +292,8 @@ fn sample_provenance_refs() -> Vec<ProvenanceRef> {
             source_path: Some("notes/testing.md".to_string()),
             heading_path: None,
             snippet: Some("Property-based testing...".to_string()),
+            edge_type: None,
+            edge_label: None,
         },
     ]
 }

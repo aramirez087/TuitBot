@@ -320,4 +320,113 @@ describe('ThreadFlowCard', () => {
 		// Component should apply over-limit styling
 		expect(container).toBeTruthy();
 	});
+
+	// ── Insert badges coverage ──────────────────────────
+	it('renders insert badges when inserts are provided', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'block-1', slotLabel: 'Opening hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Test Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, inserts }
+		});
+		const badges = container.querySelector('.insert-badges');
+		expect(badges).toBeTruthy();
+		expect(badges?.textContent).toContain('Test Note');
+	});
+
+	it('does not render insert badges when inserts is empty', () => {
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, inserts: [] }
+		});
+		const badges = container.querySelector('.insert-badges');
+		expect(badges).toBeNull();
+	});
+
+	it('renders undo button on insert badge when onundoinsert is provided', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'block-1', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, inserts, onundoinsert: vi.fn() }
+		});
+		const undoBtn = container.querySelector('.insert-badge-undo');
+		expect(undoBtn).toBeTruthy();
+	});
+
+	it('calls onundoinsert with correct ID when undo badge is clicked', async () => {
+		const onundoinsert = vi.fn();
+		const inserts = [
+			{ id: 'ins-42', blockId: 'block-1', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, inserts, onundoinsert }
+		});
+		const undoBtn = container.querySelector('.insert-badge-undo') as HTMLButtonElement;
+		await fireEvent.click(undoBtn);
+		expect(onundoinsert).toHaveBeenCalledWith('ins-42');
+	});
+
+	it('hides undo button on insert badge when onundoinsert is not provided', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'block-1', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, inserts }
+		});
+		const undoBtn = container.querySelector('.insert-badge-undo');
+		expect(undoBtn).toBeNull();
+	});
+
+	it('renders multiple insert badges', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'block-1', slotLabel: 'Hook', previousText: '', insertedText: 'a', sourceNodeId: 1, sourceTitle: 'Note A', provenance: { node_id: 1 }, timestamp: Date.now() },
+			{ id: 'ins-2', blockId: 'block-1', slotLabel: 'Body', previousText: '', insertedText: 'b', sourceNodeId: 2, sourceTitle: 'Note B', provenance: { node_id: 2 }, timestamp: Date.now() },
+		];
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, inserts }
+		});
+		const badges = container.querySelectorAll('.insert-badge');
+		expect(badges.length).toBe(2);
+	});
+
+	// ── Drag event handlers ─────────────────────────────
+	it('fires ondragover when card is dragged over', async () => {
+		const ondragover = vi.fn();
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, ondragover }
+		});
+		const card = container.querySelector('.flow-card') as HTMLElement;
+		await fireEvent.dragOver(card);
+		expect(ondragover).toHaveBeenCalled();
+	});
+
+	it('fires ondrop when dropped on card', async () => {
+		const ondrop = vi.fn();
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, ondrop }
+		});
+		const card = container.querySelector('.flow-card') as HTMLElement;
+		await fireEvent.drop(card);
+		expect(ondrop).toHaveBeenCalled();
+	});
+
+	it('fires ondragenter when entering card', async () => {
+		const ondragenter = vi.fn();
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, ondragenter }
+		});
+		const card = container.querySelector('.flow-card') as HTMLElement;
+		await fireEvent.dragEnter(card);
+		expect(ondragenter).toHaveBeenCalled();
+	});
+
+	it('fires ondragleave when leaving card', async () => {
+		const ondragleave = vi.fn();
+		const { container } = render(ThreadFlowCard, {
+			props: { ...defaultProps, ondragleave }
+		});
+		const card = container.querySelector('.flow-card') as HTMLElement;
+		await fireEvent.dragLeave(card);
+		expect(ondragleave).toHaveBeenCalled();
+	});
 });

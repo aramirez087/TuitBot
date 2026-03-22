@@ -24,5 +24,6 @@ pub mod settings;
 pub mod sources;
 pub mod strategy;
 pub mod targets;
+pub mod telemetry;
 pub mod vault;
 pub mod x_auth;

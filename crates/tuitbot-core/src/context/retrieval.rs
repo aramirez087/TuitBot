@@ -40,6 +40,12 @@ pub struct VaultCitation {
     pub snippet: String,
     /// Retrieval boost score.
     pub retrieval_boost: f64,
+    /// Graph edge type (e.g., "wikilink", "backlink", "shared_tag"). None for non-graph citations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edge_type: Option<String>,
+    /// Graph edge label for provenance tracking. None for non-graph citations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub edge_label: Option<String>,
 }
 
 /// Intermediate result pairing chunk text with citation metadata.
@@ -178,6 +184,8 @@ pub fn citations_to_provenance_refs(citations: &[VaultCitation]) -> Vec<Provenan
             source_path: Some(c.source_path.clone()),
             heading_path: Some(c.heading_path.clone()),
             snippet: Some(c.snippet.clone()),
+            edge_type: c.edge_type.clone(),
+            edge_label: c.edge_label.clone(),
         })
         .collect()
 }
@@ -243,6 +251,8 @@ fn fragment_from_chunk_with_context(cwc: ChunkWithNodeContext) -> FragmentContex
             source_title: cwc.source_title,
             snippet,
             retrieval_boost: cwc.chunk.retrieval_boost,
+            edge_type: None,
+            edge_label: None,
         },
     }
 }
@@ -274,6 +284,8 @@ mod tests {
                 source_title: None,
                 snippet: text.chars().take(50).collect(),
                 retrieval_boost: 1.0,
+                edge_type: None,
+                edge_label: None,
             },
         }
     }
@@ -287,6 +299,8 @@ mod tests {
             source_title: Some("Installation Guide".to_string()),
             snippet: "Install with cargo install".to_string(),
             retrieval_boost: 1.0,
+            edge_type: None,
+            edge_label: None,
         }
     }
 
@@ -378,6 +392,8 @@ mod tests {
             source_title: Some("Guide".to_string()),
             snippet: "snippet text".to_string(),
             retrieval_boost: 1.5,
+            edge_type: None,
+            edge_label: None,
         };
         let refs = citations_to_provenance_refs(&[citation]);
         assert_eq!(refs.len(), 1);
@@ -408,6 +424,8 @@ mod tests {
             source_title: None,
             snippet: "intro text".to_string(),
             retrieval_boost: 1.0,
+            edge_type: None,
+            edge_label: None,
         };
         let result = citations_to_chunks_json(&[citation]);
         let parsed: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
@@ -479,6 +497,8 @@ mod tests {
                 source_title: None,
                 snippet: "".to_string(),
                 retrieval_boost: 1.0,
+                edge_type: None,
+                edge_label: None,
             },
             VaultCitation {
                 chunk_id: 2,
@@ -488,6 +508,8 @@ mod tests {
                 source_title: Some("B".to_string()),
                 snippet: "".to_string(),
                 retrieval_boost: 2.0,
+                edge_type: None,
+                edge_label: None,
             },
         ];
         let json_str = citations_to_chunks_json(&citations);
@@ -509,6 +531,8 @@ mod tests {
                 source_title: Some("CLI Guide".to_string()),
                 snippet: "CLI tool...".to_string(),
                 retrieval_boost: 1.0,
+                edge_type: None,
+                edge_label: None,
             },
         };
         let result = format_fragments_prompt(&[f]);

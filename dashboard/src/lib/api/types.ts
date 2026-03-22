@@ -801,6 +801,8 @@ export interface ProvenanceRef {
 	source_path?: string;
 	heading_path?: string;
 	snippet?: string;
+	edge_type?: string;
+	edge_label?: string;
 }
 
 export interface ProvenanceLink {
@@ -866,6 +868,24 @@ export interface VaultNoteDetail {
 
 // --- Ghostwriter selection (from Obsidian plugin) ---
 
+// --- Graph neighbor types (backlink synthesizer) ---
+
+export type GraphState = 'available' | 'no_related_notes' | 'unresolved_links' | 'node_not_indexed' | 'fallback_active';
+
+export interface NeighborItem {
+	node_id: number;
+	node_title: string;
+	reason: string;
+	reason_label: string;
+	intent: string;
+	matched_tags: string[];
+	score: number;
+	snippet: string;
+	best_chunk_id: number;
+	heading_path: string | null;
+	relative_path: string | null;
+}
+
 export interface VaultSelectionResponse {
 	session_id: string;
 	vault_name: string;
@@ -879,6 +899,8 @@ export interface VaultSelectionResponse {
 	created_at: string;
 	expires_at: string;
 	privacy_envelope?: string;
+	graph_neighbors?: NeighborItem[];
+	graph_state?: GraphState;
 }
 
 // --- Hook generation types (Ghostwriter) ---
@@ -894,6 +916,36 @@ export interface AssistHooksResponse {
 	hooks: HookOption[];
 	topic: string;
 	vault_citations?: VaultCitation[];
+}
+
+// --- Draft insertion types (backlink synthesizer, Session 5) ---
+
+/** A single suggestion insertion into a specific draft slot. */
+export interface DraftInsert {
+	/** Unique ID for this insertion action. */
+	id: string;
+	/** Stable block ID (ThreadBlock.id or 'tweet' for single tweet mode). */
+	blockId: string;
+	/** Human-readable slot label ("Opening hook", "Tweet 2", etc.). */
+	slotLabel: string;
+	/** Text content before this insertion (for undo). */
+	previousText: string;
+	/** Text content after this insertion. */
+	insertedText: string;
+	/** The neighbor node ID that sourced this insertion. */
+	sourceNodeId: number;
+	/** Title of the source note. */
+	sourceTitle: string;
+	/** Provenance ref for this insert. */
+	provenance: ProvenanceRef;
+	/** Timestamp of insertion (ms since epoch). */
+	timestamp: number;
+}
+
+/** Tracks the full insert history and per-block active inserts. */
+export interface DraftInsertState {
+	history: DraftInsert[];
+	blockInserts: Map<string, DraftInsert[]>;
 }
 
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.

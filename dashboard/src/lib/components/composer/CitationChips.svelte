@@ -1,30 +1,42 @@
 <script lang="ts">
-	import type { VaultCitation } from "$lib/api/types";
+	import type { VaultCitation, DraftInsert } from "$lib/api/types";
 	import {
 		X,
 		FileText,
+		Link,
 		ChevronDown,
 		ChevronUp,
 		ExternalLink,
+		Undo2,
 	} from "lucide-svelte";
 	import { buildObsidianUri, openExternalUrl } from "$lib/utils/obsidianUri";
+	import { trackCitationClicked } from "$lib/analytics/backlinkFunnel";
 
 	let {
 		citations,
 		onremove,
 		vaultPath = null,
 		isDesktop = false,
+		graphInserts = [],
+		onundoinsert,
 	}: {
 		citations: VaultCitation[];
 		onremove?: (chunkId: number) => void;
 		vaultPath?: string | null;
 		isDesktop?: boolean;
+		graphInserts?: DraftInsert[];
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
 	let expandedId = $state<number | null>(null);
 
 	function toggleExpand(chunkId: number) {
-		expandedId = expandedId === chunkId ? null : chunkId;
+		const wasExpanded = expandedId === chunkId;
+		expandedId = wasExpanded ? null : chunkId;
+		if (!wasExpanded) {
+			const cit = citations.find((c) => c.chunk_id === chunkId);
+			if (cit) trackCitationClicked(chipLabel(cit), false, isDesktop);
+		}
 	}
 
 	function handleKeydown(e: KeyboardEvent, chunkId: number) {
@@ -48,6 +60,7 @@
 
 	async function handleOpenInObsidian(e: Event, cit: VaultCitation) {
 		e.stopPropagation();
+		trackCitationClicked(chipLabel(cit), false, isDesktop);
 		const uri = obsidianUriFor(cit);
 		if (uri) await openExternalUrl(uri);
 	}
@@ -108,6 +121,35 @@
 								{cit.heading_path}
 							</div>
 							<div class="chip-detail-snippet">{cit.snippet}</div>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	</div>
+{/if}
+
+{#if graphInserts.length > 0}
+	<div class="citation-strip graph-strip" role="list" aria-label="Related notes used">
+		<span class="citation-label">Related notes:</span>
+		<div class="citation-chips">
+			{#each graphInserts as ins (ins.id)}
+				<div class="chip-wrapper" role="listitem">
+					<span class="citation-chip graph-chip">
+						<Link size={11} />
+						<span class="chip-text">{ins.sourceTitle}</span>
+						<span class="chip-slot-label">&rarr; {ins.slotLabel}</span>
+					</span>
+					{#if onundoinsert}
+						<div class="chip-actions">
+							<button
+								class="chip-action chip-remove"
+								onclick={() => onundoinsert?.(ins.id)}
+								aria-label="Undo insert from {ins.sourceTitle}"
+								title="Undo"
+							>
+								<Undo2 size={10} />
+							</button>
 						</div>
 					{/if}
 				</div>
@@ -255,6 +297,23 @@
 		line-clamp: 3;
 		-webkit-box-orient: vertical;
 		box-orient: vertical;
+	}
+
+	.graph-strip {
+		background: color-mix(in srgb, #9b59b6 5%, transparent);
+		border-color: color-mix(in srgb, #9b59b6 12%, transparent);
+	}
+
+	.graph-chip {
+		border-color: color-mix(in srgb, #9b59b6 20%, transparent);
+		background: color-mix(in srgb, #9b59b6 8%, transparent);
+		cursor: default;
+	}
+
+	.chip-slot-label {
+		font-size: 9px;
+		color: var(--color-text-subtle);
+		white-space: nowrap;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

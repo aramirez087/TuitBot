@@ -1,32 +1,54 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { VaultSelectionResponse, HookOption } from '$lib/api/types';
-	import { Zap, FileText } from 'lucide-svelte';
+	import type { VaultSelectionResponse, HookOption, NeighborItem, GraphState, ThreadBlock, DraftInsertState } from '$lib/api/types';
+	import { Zap, FileText, ChevronDown, ChevronUp, Undo2 } from 'lucide-svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import HookPicker from './HookPicker.svelte';
+	import GraphSuggestionCards from './GraphSuggestionCards.svelte';
+	import SlotTargetPanel from './SlotTargetPanel.svelte';
+	import { createInsertState } from '$lib/stores/draftInsertStore';
+	import {
+		trackSuggestionAccepted,
+		trackSuggestionDismissed,
+		trackSuggestionRestored,
+		trackSynthesisToggled,
+		trackHooksGenerated,
+	} from '$lib/analytics/backlinkFunnel';
 
 	let {
 		sessionId,
 		outputFormat = $bindable('tweet'),
 		hasExistingContent = false,
 		showUndo = false,
+		threadBlocks = [],
+		mode = 'tweet',
+		insertState,
 		onundo,
 		ongenerate,
 		onSelectionConsumed,
 		onexpired,
 		onformatchange,
+		oninsert,
+		onundoinsert,
 	}: {
 		sessionId: string;
 		outputFormat?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
 		showUndo?: boolean;
+		threadBlocks?: ThreadBlock[];
+		mode?: 'tweet' | 'thread';
+		insertState?: DraftInsertState;
 		onundo?: () => void;
-		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
+		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
 		onSelectionConsumed?: () => void;
 		onexpired?: () => void;
 		onformatchange?: (format: 'tweet' | 'thread') => void;
+		oninsert?: (neighbor: NeighborItem, slotIndex: number, slotLabel: string) => void;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
+
+	const effectiveInsertState = $derived(insertState ?? createInsertState());
 
 	let selection = $state<VaultSelectionResponse | null>(null);
 	let loading = $state(true);
@@ -37,6 +59,23 @@
 	let hookOptions = $state<HookOption[] | null>(null);
 	let hookLoading = $state(false);
 	let hookError = $state<string | null>(null);
+
+	// Graph suggestion state (session-scoped)
+	let acceptedNeighbors = $state<Map<number, { neighbor: NeighborItem; role: string }>>(new Map());
+	let dismissedNodeIds = $state<Set<number>>(new Set());
+	let synthesisEnabled = $state(true);
+
+	let showDismissed = $state(false);
+
+	const graphNeighbors = $derived(selection?.graph_neighbors ?? []);
+	const graphState = $derived<GraphState>(selection?.graph_state ?? 'fallback_active');
+	const graphLoading = $derived(loading);
+	const visibleNeighbors = $derived(
+		graphNeighbors.filter((n) => !dismissedNodeIds.has(n.node_id))
+	);
+	const dismissedNeighbors = $derived(
+		graphNeighbors.filter((n) => dismissedNodeIds.has(n.node_id))
+	);
 
 	onMount(async () => {
 		try {
@@ -49,6 +88,38 @@
 		}
 	});
 
+	function handleAcceptNeighbor(neighbor: NeighborItem, role: string) {
+		const next = new Map(acceptedNeighbors);
+		next.set(neighbor.node_id, { neighbor, role });
+		acceptedNeighbors = next;
+		trackSuggestionAccepted(neighbor.node_id, neighbor.reason, neighbor.intent, neighbor.score, sessionId);
+	}
+
+	function handleDismissNeighbor(nodeId: number) {
+		const neighbor = graphNeighbors.find((n) => n.node_id === nodeId);
+		const nextDismissed = new Set(dismissedNodeIds);
+		nextDismissed.add(nodeId);
+		dismissedNodeIds = nextDismissed;
+		if (acceptedNeighbors.has(nodeId)) {
+			const next = new Map(acceptedNeighbors);
+			next.delete(nodeId);
+			acceptedNeighbors = next;
+		}
+		trackSuggestionDismissed(nodeId, neighbor?.reason ?? 'unknown', sessionId);
+	}
+
+	function handleRestoreNeighbor(nodeId: number) {
+		const nextDismissed = new Set(dismissedNodeIds);
+		nextDismissed.delete(nodeId);
+		dismissedNodeIds = nextDismissed;
+		trackSuggestionRestored(nodeId, sessionId);
+	}
+
+	function toggleSynthesis() {
+		synthesisEnabled = !synthesisEnabled;
+		trackSynthesisToggled(synthesisEnabled, sessionId);
+	}
+
 	async function handleGenerate() {
 		if (!selection || hookLoading) return;
 		hookLoading = true;
@@ -58,6 +129,7 @@
 			const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
 			const result = await api.assist.hooks(topic, { sessionId: sessionId });
 			hookOptions = result.hooks;
+			trackHooksGenerated(acceptedNeighbors.size, graphNeighbors.length, result.hooks.length, sessionId);
 		} catch (e) {
 			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
 		} finally {
@@ -76,7 +148,19 @@
 		confirmReplace = false;
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
-			await ongenerate(nodeIds, format, [hook.text], hook.style);
+			// Build neighbor provenance for accepted neighbors
+			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string }> = [];
+			if (synthesisEnabled && acceptedNeighbors.size > 0) {
+				for (const [nid, { neighbor }] of acceptedNeighbors) {
+					if (!nodeIds.includes(nid)) nodeIds.push(nid);
+					neighborProv.push({
+						node_id: nid,
+						edge_type: neighbor.reason,
+						edge_label: neighbor.reason_label,
+					});
+				}
+			}
+			await ongenerate(nodeIds, format, [hook.text], hook.style, neighborProv.length > 0 ? neighborProv : undefined);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
@@ -113,9 +197,9 @@
 {:else if expired}
 	<div class="vault-empty-state">
 		<FileText size={20} />
-		<p>Selection expired.</p>
+		<p>This selection has expired.</p>
 		<p class="vault-empty-hint">
-			Select blocks manually or send a new selection from Obsidian.
+			Please send a new selection from Obsidian.
 		</p>
 		<button class="vault-expired-dismiss" onclick={() => onexpired?.()}>Browse vault</button>
 	</div>
@@ -155,6 +239,83 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if graphState !== 'fallback_active'}
+		<div class="graph-toggle-row">
+			<button
+				class="synthesis-toggle"
+				class:active={synthesisEnabled}
+				onclick={toggleSynthesis}
+				aria-pressed={synthesisEnabled}
+				aria-label="Toggle related notes"
+			>
+				{#if synthesisEnabled}&#10003;{/if} Use related notes
+			</button>
+		</div>
+	{/if}
+
+	{#if synthesisEnabled}
+		<GraphSuggestionCards
+			neighbors={visibleNeighbors}
+			{graphState}
+			loading={graphLoading}
+			{sessionId}
+			onaccept={handleAcceptNeighbor}
+			ondismiss={handleDismissNeighbor}
+		/>
+	{/if}
+
+	{#if acceptedNeighbors.size > 0 && synthesisEnabled}
+		<div class="accepted-summary">
+			{acceptedNeighbors.size} {acceptedNeighbors.size === 1 ? 'note' : 'notes'} included in context
+		</div>
+	{/if}
+
+	{#if dismissedNeighbors.length > 0 && synthesisEnabled}
+		<div class="dismissed-section">
+			<button
+				class="dismissed-toggle"
+				onclick={() => { showDismissed = !showDismissed; }}
+				aria-expanded={showDismissed}
+			>
+				{#if showDismissed}
+					<ChevronUp size={10} />
+				{:else}
+					<ChevronDown size={10} />
+				{/if}
+				Show skipped ({dismissedNeighbors.length})
+			</button>
+			{#if showDismissed}
+				<div class="dismissed-list">
+					{#each dismissedNeighbors as neighbor (neighbor.node_id)}
+						<div class="dismissed-item">
+							<span class="dismissed-title">{neighbor.node_title}</span>
+							<button
+								class="dismissed-restore"
+								onclick={() => handleRestoreNeighbor(neighbor.node_id)}
+								aria-label="Restore {neighbor.node_title}"
+								title="Undo skip"
+							>
+								<Undo2 size={10} />
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	{#if hasExistingContent && acceptedNeighbors.size > 0 && synthesisEnabled}
+		<SlotTargetPanel
+			{threadBlocks}
+			{mode}
+			{acceptedNeighbors}
+			insertState={effectiveInsertState}
+			{oninsert}
+			{onundoinsert}
+		/>
+	{/if}
+
 	{#if error}
 		<div class="vault-error" role="alert">{error}</div>
 	{/if}
@@ -285,9 +446,116 @@
 		color: var(--color-text-subtle);
 	}
 
+	.graph-toggle-row {
+		display: flex;
+		align-items: center;
+		margin-top: 6px;
+	}
+
+	.synthesis-toggle {
+		padding: 2px 10px;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 10px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		font-size: 10px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.12s ease;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+	}
+
+	.synthesis-toggle.active {
+		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+	}
+
+	.synthesis-toggle:hover {
+		border-color: var(--color-accent);
+	}
+
+	.accepted-summary {
+		font-size: 10px;
+		color: var(--color-accent);
+		font-weight: 500;
+		margin-top: 4px;
+		padding: 0 2px;
+	}
+
+	.dismissed-section {
+		margin-top: 4px;
+	}
+
+	.dismissed-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		border: none;
+		background: transparent;
+		color: var(--color-text-subtle);
+		font-size: 10px;
+		font-weight: 500;
+		cursor: pointer;
+		padding: 2px 0;
+	}
+
+	.dismissed-toggle:hover {
+		color: var(--color-text-muted);
+	}
+
+	.dismissed-list {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-top: 4px;
+	}
+
+	.dismissed-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 3px 6px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--color-text-subtle) 5%, transparent);
+	}
+
+	.dismissed-title {
+		font-size: 11px;
+		color: var(--color-text-subtle);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		min-width: 0;
+	}
+
+	.dismissed-restore {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 18px;
+		height: 18px;
+		border: none;
+		border-radius: 3px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.dismissed-restore:hover {
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+	}
+
 	.vault-error {
 		font-size: 12px;
 		color: var(--color-danger);
 		margin-top: 4px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.synthesis-toggle { transition: none; }
 	}
 </style>

@@ -250,6 +250,8 @@ pub async fn publish_draft(
                 source_path: l.source_path.clone(),
                 heading_path: l.heading_path.clone(),
                 snippet: l.snippet.clone(),
+                edge_type: l.edge_type.clone(),
+                edge_label: l.edge_label.clone(),
             })
             .collect();
         let source_node_id = refs.iter().find_map(|r| r.node_id);

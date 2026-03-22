@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { VaultNoteItem, VaultNoteDetail } from '$lib/api/types';
+	import type { VaultNoteItem, VaultNoteDetail, ThreadBlock, NeighborItem, DraftInsertState } from '$lib/api/types';
 	import { X, Search, FileText } from 'lucide-svelte';
 	import { deploymentMode } from '$lib/stores/runtime';
 	import VaultNoteList from './VaultNoteList.svelte';
@@ -14,20 +14,28 @@
 		mode = 'tweet',
 		hasExistingContent = false,
 		selectionSessionId = null,
+		threadBlocks = [],
+		insertState,
 		ongenerate,
 		onclose,
 		onundo,
 		showUndo = false,
 		onSelectionConsumed,
+		onslotinsert,
+		onundoinsert,
 	}: {
 		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
 		selectionSessionId?: string | null;
-		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
+		threadBlocks?: ThreadBlock[];
+		insertState?: DraftInsertState;
+		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;
 		onSelectionConsumed?: () => void;
+		onslotinsert?: (neighbor: NeighborItem, slotIndex: number, slotLabel: string) => void;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
 	let outputFormat: 'tweet' | 'thread' = $state('tweet');
@@ -209,11 +217,16 @@
 			{outputFormat}
 			{hasExistingContent}
 			{showUndo}
+			{threadBlocks}
+			{mode}
+			{insertState}
 			{onundo}
 			{ongenerate}
 			{onSelectionConsumed}
 			onexpired={() => { selectionActive = false; }}
 			onformatchange={(f) => { outputFormat = f; }}
+			oninsert={onslotinsert}
+			onundoinsert={onundoinsert}
 		/>
 	{:else if noSources}
 		<div class="vault-empty-state">

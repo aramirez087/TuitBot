@@ -505,7 +505,7 @@ describe('FromVaultPanel', () => {
 		});
 		await vi.waitFor(() => {
 			const expiredText = container.textContent;
-			expect(expiredText).toContain('Selection expired');
+			expect(expiredText).toContain('This selection has expired');
 		});
 	});
 

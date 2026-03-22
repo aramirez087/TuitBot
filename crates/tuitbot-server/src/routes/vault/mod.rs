@@ -13,6 +13,7 @@ use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
+use tuitbot_core::context::graph_expansion::{self, GraphState};
 use tuitbot_core::context::retrieval::{self, VaultCitation};
 use tuitbot_core::storage::watchtower;
 
@@ -239,6 +240,113 @@ pub async fn note_detail(
 }
 
 // ---------------------------------------------------------------------------
+// GET /api/vault/notes/{id}/neighbors?max=8
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct NoteNeighborsQuery {
+    pub max: Option<u32>,
+}
+
+#[derive(Serialize)]
+pub struct NoteNeighborsResponse {
+    pub node_id: i64,
+    pub neighbors: Vec<NeighborItem>,
+    pub total_edges: u32,
+    pub graph_state: GraphState,
+}
+
+#[derive(Serialize)]
+pub struct NeighborItem {
+    pub node_id: i64,
+    pub node_title: Option<String>,
+    pub reason: String,
+    pub reason_label: String,
+    pub intent: String,
+    pub matched_tags: Vec<String>,
+    pub score: f64,
+    pub snippet: Option<String>,
+    pub best_chunk_id: Option<i64>,
+    pub heading_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relative_path: Option<String>,
+}
+
+impl NeighborItem {
+    fn from_graph_neighbor(n: graph_expansion::GraphNeighbor, is_cloud: bool) -> Self {
+        Self {
+            node_id: n.node_id,
+            node_title: n.node_title,
+            reason: serde_json::to_value(&n.reason)
+                .ok()
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_else(|| "related".to_string()),
+            reason_label: n.reason_label,
+            intent: serde_json::to_value(&n.intent)
+                .ok()
+                .and_then(|v| v.as_str().map(String::from))
+                .unwrap_or_else(|| "related".to_string()),
+            matched_tags: n.matched_tags,
+            score: n.score,
+            snippet: n.snippet,
+            best_chunk_id: n.best_chunk_id,
+            heading_path: n.heading_path,
+            relative_path: if is_cloud {
+                None
+            } else {
+                Some(n.relative_path)
+            },
+        }
+    }
+}
+
+pub async fn note_neighbors(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+    Path(id): Path<i64>,
+    Query(params): Query<NoteNeighborsQuery>,
+) -> Result<Json<NoteNeighborsResponse>, ApiError> {
+    let max = params
+        .max
+        .unwrap_or(graph_expansion::DEFAULT_MAX_NEIGHBORS)
+        .min(MAX_LIMIT);
+    let is_cloud = matches!(
+        state.deployment_mode,
+        tuitbot_core::config::DeploymentMode::Cloud
+    );
+
+    // Verify node exists and is account-scoped.
+    let node = watchtower::get_content_node_for(&state.db, &ctx.account_id, id).await?;
+    if node.is_none() {
+        return Ok(Json(NoteNeighborsResponse {
+            node_id: id,
+            neighbors: Vec::new(),
+            total_edges: 0,
+            graph_state: GraphState::NodeNotIndexed,
+        }));
+    }
+
+    // Expand graph neighbors (fail-open).
+    let result =
+        crate::routes::rag_helpers::resolve_graph_suggestions(&state, &ctx.account_id, id, max)
+            .await;
+
+    let total_edges: u32 = result.neighbors.iter().map(|n| n.edge_count).sum();
+    let items: Vec<NeighborItem> = result
+        .neighbors
+        .into_iter()
+        .map(|n| NeighborItem::from_graph_neighbor(n, is_cloud))
+        .collect();
+
+    Ok(Json(NoteNeighborsResponse {
+        node_id: id,
+        neighbors: items,
+        total_edges,
+        graph_state: result.graph_state,
+    }))
+}
+
+// ---------------------------------------------------------------------------
 // GET /api/vault/search?q=&limit=
 // ---------------------------------------------------------------------------
 
@@ -368,6 +476,7 @@ mod tests {
         Router::new()
             .route("/vault/sources", get(vault_sources))
             .route("/vault/notes", get(search_notes))
+            .route("/vault/notes/{id}/neighbors", get(note_neighbors))
             .route("/vault/notes/{id}", get(note_detail))
             .route("/vault/search", get(search_fragments))
             .route("/vault/resolve-refs", post(resolve_refs))

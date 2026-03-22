@@ -175,6 +175,9 @@ pub async fn chunk_node(
 
     let ids = store::upsert_chunks_for_node(pool, account_id, node_id, &new_chunks).await?;
 
+    // Extract links/tags and persist graph edges (fail-open).
+    super::graph_ingest::extract_and_persist_graph(pool, account_id, node_id, body_text).await;
+
     // Transition node status: pending → chunked.
     store::mark_node_chunked(pool, account_id, node_id).await?;
 
