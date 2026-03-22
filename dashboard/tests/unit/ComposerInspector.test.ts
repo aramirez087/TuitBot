@@ -164,19 +164,19 @@ describe('ComposerInspector', () => {
 		expect(typeof onclose).toBe('function');
 	});
 
-	it('handleGenerateFromVault with highlights calls improve API for tweet mode', async () => {
+	it('handleGenerateFromVault with hookStyle and tweet mode sets text directly', async () => {
 		const { component } = render(ComposerInspector, {
 			props: { ...defaultProps, open: true, mode: 'tweet' }
 		});
 		await (component as any).handleGenerateFromVault(
 			[1, 2],
 			'tweet',
-			['Highlight one', 'Highlight two']
+			['A great hook tweet'],
+			'question'
 		);
-		expect(mockImprove).toHaveBeenCalledWith(
-			'Highlight one\nHighlight two',
-			'Expand these key highlights into a polished tweet'
-		);
+		// Hook is ready-to-use for tweet mode — no API call
+		expect(mockImprove).not.toHaveBeenCalled();
+		expect(mockTweet).not.toHaveBeenCalled();
 	});
 
 	it('handleGenerateFromVault with highlights calls thread API for thread mode', async () => {
@@ -216,19 +216,21 @@ describe('ComposerInspector', () => {
 		expect(mockImprove).not.toHaveBeenCalled();
 	});
 
-	it('handleGenerateFromVault with voiceCue includes cue in context', async () => {
+	it('handleGenerateFromVault with voiceCue includes cue in topic for thread', async () => {
 		const { component } = render(ComposerInspector, {
 			props: { ...defaultProps, open: true, voiceCue: 'be witty' }
 		});
 		await (component as any).handleGenerateFromVault(
 			[1],
-			'tweet',
-			['A key insight']
+			'thread',
+			['A great hook opener'],
+			'question'
 		);
-		expect(mockImprove).toHaveBeenCalledWith(
-			'A key insight',
-			'be witty. Expand these key highlights into a polished tweet'
-		);
+		// Thread mode with hook should call thread API with opening hook
+		expect(mockThread).toHaveBeenCalled();
+		const callArgs = mockThread.mock.calls[0];
+		expect(callArgs[0]).toContain('be witty');
+		expect(callArgs[2]).toBe('A great hook opener');
 	});
 
 	it('handleGenerateFromVault reports errors via onsubmiterror', async () => {
@@ -256,7 +258,7 @@ describe('ComposerInspector', () => {
 		expect(mockTweet).not.toHaveBeenCalled();
 	});
 
-	it('handleGenerateFromVault with hookStyle and thread format sets blocks directly', async () => {
+	it('handleGenerateFromVault with hookStyle and thread format calls thread API with opening hook', async () => {
 		const { component } = render(ComposerInspector, {
 			props: { ...defaultProps, open: true, mode: 'thread' }
 		});
@@ -266,8 +268,10 @@ describe('ComposerInspector', () => {
 			['Hook opener for a thread'],
 			'storytelling'
 		);
-		// Should NOT call thread API — hook is ready-to-use
-		expect(mockThread).not.toHaveBeenCalled();
+		// Should call thread API with opening hook to generate full thread
+		expect(mockThread).toHaveBeenCalled();
+		const callArgs = mockThread.mock.calls[0];
+		expect(callArgs[2]).toBe('Hook opener for a thread');
 	});
 
 	it('getVaultProvenance returns empty array initially', () => {

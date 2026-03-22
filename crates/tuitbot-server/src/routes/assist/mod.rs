@@ -143,6 +143,8 @@ pub struct AssistThreadRequest {
     pub topic: String,
     #[serde(default)]
     pub selected_node_ids: Option<Vec<i64>>,
+    #[serde(default)]
+    pub opening_hook: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -168,10 +170,14 @@ pub async fn assist_thread(
         .map(|c| c.vault_citations.clone())
         .unwrap_or_default();
 
-    let output = gen
-        .generate_thread_with_context(&body.topic, None, prompt_block)
-        .await
-        .map_err(|e| ApiError::Internal(e.to_string()))?;
+    let output = if let Some(ref hook) = body.opening_hook {
+        gen.generate_thread_with_hook(&body.topic, hook, None, prompt_block)
+            .await
+    } else {
+        gen.generate_thread_with_context(&body.topic, None, prompt_block)
+            .await
+    }
+    .map_err(|e| ApiError::Internal(e.to_string()))?;
 
     Ok(Json(AssistThreadResponse {
         tweets: output.tweets,
@@ -496,6 +502,25 @@ mod tests {
         let json = r#"{"selected_node_ids": [1, 2]}"#;
         let req: AssistHighlightsRequest = serde_json::from_str(json).expect("deserialize");
         assert_eq!(req.selected_node_ids, vec![1, 2]);
+    }
+
+    #[test]
+    fn thread_request_with_opening_hook() {
+        let json =
+            r#"{"topic": "Rust async", "opening_hook": "Why does everyone get async wrong?"}"#;
+        let req: AssistThreadRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.topic, "Rust async");
+        assert_eq!(
+            req.opening_hook.unwrap(),
+            "Why does everyone get async wrong?"
+        );
+    }
+
+    #[test]
+    fn thread_request_without_opening_hook_backward_compat() {
+        let json = r#"{"topic": "Rust async"}"#;
+        let req: AssistThreadRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.opening_hook.is_none());
     }
 
     #[test]

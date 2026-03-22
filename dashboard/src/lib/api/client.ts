@@ -452,14 +452,15 @@ export const api = {
 					mention_product: mentionProduct
 				})
 			}),
-		thread: (topic: string, selectedNodeIds?: number[]) =>
+		thread: (topic: string, selectedNodeIds?: number[], openingHook?: string) =>
 			request<{ tweets: string[]; topic: string; vault_citations?: VaultCitation[] }>(
 				'/api/assist/thread',
 				{
 					method: 'POST',
 					body: JSON.stringify({
 						topic,
-						...(selectedNodeIds && { selected_node_ids: selectedNodeIds })
+						...(selectedNodeIds && { selected_node_ids: selectedNodeIds }),
+						...(openingHook && { opening_hook: openingHook })
 					})
 				}
 			),
