@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774139617779,
+  "lastUpdate": 1774184017746,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1911,6 +1911,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.36,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "12f9e7584298e62b078a2038bfc54328246e6f2a",
+          "message": "feat: backlink synthesizer (#282)\n\n* feat: Session 1 — graph RAG charter and audit\n\nDefine the product charter, architecture, UX journey, and implementation\nroadmap for the Backlink Synthesizer epic. Six documentation artifacts\ncreated covering current-state audit, epic charter, end-to-end UX journey,\ngraph RAG architecture, implementation map, and session handoff.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 1 — graph rag charter and audit\n\nAutomated execution of session-01-graph-rag-charter-and-audit.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — graph ingestion and storage\n\nAdd note_edges and note_tags tables with link extraction from wikilinks,\nmarkdown links, and inline tags. Integrate into chunk_node() pipeline with\nfail-open semantics. 34 new tests (17 extraction + 17 integration) all pass.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — graph ingestion and storage\n\nAutomated execution of session-02-graph-ingestion-and-storage.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — retrieval ranking and api\n\nGraph-aware retrieval with deterministic ranking (3.0 direct + 2.0 backlink + 1.0 shared tag + 0.5 chunk boost), privacy-safe GET /vault/notes/{id}/neighbors API with reason labels and intent hints, and auto-expanded graph suggestions in selection responses. All 6,062 tests pass.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — retrieval ranking and api\n\nAutomated execution of session-03-retrieval-ranking-and-api.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — ghostwriter ux integration\n\nIntegrated graph-aware retrieval into the Ghostwriter compose flow with suggestion cards showing reason badges and intent-based actions, accept/dismiss interactions, a session-level synthesis toggle, and provenance tracking for accepted neighbors through to the compose request.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — ghostwriter ux integration\n\nAutomated execution of session-04-ghostwriter-ux-integration.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — draft insertion and suggestion controls\n\nImplemented slot-aware suggestion acceptance with per-insert undo stack,\nvisible insert badges on thread cards, graph-sourced citation chips with\npurple accent, and actionable undo banner. 833 frontend tests pass.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — draft insertion and suggestion controls\n\nAutomated execution of session-05-draft-insertion-and-suggestion-controls.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 6 — polish copy and instrumentation\n\nRefine all user-facing strings for clarity and reduced cognitive load.\nAdd full-funnel analytics instrumentation (11 events) with backend\ntelemetry endpoint. Improve dismissed card recovery, card transitions,\nand cross-component insert state wiring.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* feat: Session 6 — polish copy and instrumentation\n\nAutomated execution of session-06-polish-copy-and-instrumentation.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 7 — validation and release readiness\n\nAdded 28 regression tests (6 backend, 18 frontend including backlinkFunnel suite), fixed GraphState consistency (TypeScript missing unresolved_links variant), and wrote QA matrix + release readiness assessment with GO recommendation.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 7 — validation and release readiness\n\nAutomated execution of session-07-validation-and-release-readiness.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* chore: clean up session artifacts\n\nRemove 36 session files (prompts, plans, logs, handoffs).\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* test: improve patch coverage for backlink-synthesizer composer components\n\nAdd tests for uncovered branches in ComposerInspector (handleSlotInsert,\nhandleUndoInsert, handleAiAssist, handleGenerateFromNotes, backdrop events),\nCitationChips (graph inserts strip, Obsidian open, expanded detail content),\nThreadFlowCard (insert badges, undo, drag events), ComposeWorkspace (embedded\nmode, prefill date, SR status region), and ComposerCanvas (submit pill states,\nundo banner, embedded mode).\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-03-22T06:48:01-06:00",
+          "tree_id": "dc4de3af63f7b2b5519b28e2885906d3e37b42af",
+          "url": "https://github.com/aramirez087/TuitBot/commit/12f9e7584298e62b078a2038bfc54328246e6f2a"
+        },
+        "date": 1774184017318,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 938.53,
             "unit": "ps"
           }
         ]
