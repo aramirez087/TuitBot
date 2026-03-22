@@ -1,0 +1,35 @@
+# Build artefacts — never send to Docker context
+target/
+dashboard/node_modules/
+dashboard/.svelte-kit/
+plugins/*/node_modules/
+
+# Git and CI metadata
+.git/
+.github/
+
+# Developer tooling
+.vscode/
+.idea/
+*.iml
+
+# Test and benchmark data
+*.bench
+benches/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Documentation site
+site/
+docs/
+
+# Tauri desktop app — not needed for server image
+dashboard/src-tauri/
+
+# Secrets / local config (never bake into image)
+*.env
+.env*
+config.toml
+~/.tuitbot/
