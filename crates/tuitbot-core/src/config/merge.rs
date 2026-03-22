@@ -190,7 +190,9 @@ pub fn merge_overrides(current_overrides: &str, patch: &Value) -> Result<String,
             current = Value::Object(serde_json::Map::new());
         }
         // Safety: we just checked `!current.is_object()` above and set it if not.
-        let current_obj = current.as_object_mut().expect("current is always an object here");
+        let current_obj = current
+            .as_object_mut()
+            .expect("current is always an object here");
         for (key, val) in patch_obj {
             if val.is_null() {
                 current_obj.remove(key);

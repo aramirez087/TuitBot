@@ -10,11 +10,9 @@ use crate::provider::SocialReadProvider;
 use tuitbot_core::x_api::types::{MentionResponse, SearchResponse, Tweet, User, UsersResponse};
 
 /// Scraper-based read provider (stub).
-#[allow(dead_code)]
 pub struct ScraperReadProvider;
 
 impl ScraperReadProvider {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self
     }
@@ -27,13 +25,11 @@ impl Default for ScraperReadProvider {
 }
 
 /// Message for methods that require authentication and cannot work with a scraper.
-#[allow(dead_code)]
 const AUTH_GATED_MSG: &str =
     "This method requires authentication and is not available via the scraper backend. \
      Switch to provider_backend = \"x_api\" in config.toml to use this feature.";
 
 /// Message for public-data methods not yet implemented.
-#[allow(dead_code)]
 const STUB_MSG: &str = "Scraper backend: method not yet implemented.";
 
 #[async_trait::async_trait]

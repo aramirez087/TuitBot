@@ -160,13 +160,13 @@ impl LocalModeXClient {
     /// guards against `cookie_transport.is_none()`).  Using this helper
     /// avoids `.unwrap()` scatter across every mutation method.
     fn transport(&self) -> Result<&CookieTransport, XApiError> {
-        self.cookie_transport.as_ref().ok_or_else(|| {
-            XApiError::ScraperTransportUnavailable {
+        self.cookie_transport
+            .as_ref()
+            .ok_or_else(|| XApiError::ScraperTransportUnavailable {
                 message: "no browser session imported. \
                           Import cookies via Settings → X API → Import Browser Session."
                     .to_string(),
-            }
-        })
+            })
     }
 
     /// Return a transport-unavailable error for read methods.

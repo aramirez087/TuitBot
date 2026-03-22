@@ -130,7 +130,6 @@ impl ToolResponse {
     }
 
     /// Convenience: validation error (not retryable).
-    #[allow(dead_code)]
     pub fn validation_error(message: impl Into<String>) -> Self {
         Self::error(ErrorCode::ValidationError, message)
     }
