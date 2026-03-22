@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774183778882,
+  "lastUpdate": 1774190904757,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2790,6 +2790,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/9f8db5d7e10904f881ff50bf88d2e52568d00802"
         },
         "date": 1774183777559,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 919278,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 324282,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1282810,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9381f6a0e9bdae94439b5e6e66320ede0c3748fc",
+          "message": "chore: release (#284)",
+          "timestamp": "2026-03-22T08:47:32-06:00",
+          "tree_id": "ed11a831d58af20a3071c69cd35e50eef4611342",
+          "url": "https://github.com/aramirez087/TuitBot/commit/9381f6a0e9bdae94439b5e6e66320ede0c3748fc"
+        },
+        "date": 1774190903552,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
