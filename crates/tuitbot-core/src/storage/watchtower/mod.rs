@@ -5,20 +5,26 @@
 
 pub mod chunks;
 pub mod connections;
+pub mod edges;
 mod nodes;
 mod seeds;
 mod sources;
+pub mod tags;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_graph;
 #[cfg(test)]
 mod tests_storage;
 
 pub use chunks::*;
 pub use connections::*;
+pub use edges::*;
 pub use nodes::*;
 pub use seeds::*;
 pub use sources::*;
+pub use tags::*;
 
 // ============================================================================
 // Row types (tuple aliases for sqlx::query_as)
