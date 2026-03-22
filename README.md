@@ -1,3 +1,5 @@
+<!-- Social preview: assets/social-preview.png (1280x640) -->
+
 <div align="center">
 
 <img src="assets/logo.svg" alt="Tuitbot Logo" width="120" />
@@ -27,11 +29,47 @@ Built for **founders**, **indie hackers**, and **solo makers** who'd rather buil
 
 ## Choose Your Path
 
-| I want… | Start here |
-|---------|------------|
-| **X API tools for my AI assistant** (Claude Code, Cursor, etc.) | [MCP Setup](#mcp-setup) — 2 commands |
-| **An autonomous growth co-pilot** (desktop app, CLI, self-hosted) | [Growth Co-Pilot](#growth-co-pilot) |
-| **Try without an X API key** (discovery + drafting, no posting) | [Local No-Key Mode](#5-local-no-key-mode-no-x-api-credentials) |
+| I want… | Time | Start here |
+|---------|------|------------|
+| **X API tools for my AI assistant** (Claude Code, Cursor, Windsurf…) | ~2 min | [MCP Setup](#mcp-setup) |
+| **An autonomous growth co-pilot** (desktop app, CLI, or self-hosted VPS) | ~5 min | [⚡ Quickstart](docs/quickstart.md) |
+| **Try without an X API key** (discovery + drafting only, no posting) | ~1 min | [Local No-Key Mode](#5-local-no-key-mode-no-x-api-credentials) |
+| **Self-host on a server** (24/7, Docker, VPS) | ~10 min | [Getting Started → Docker](docs/getting-started.md#2-docker-self-hosted) |
+
+---
+
+## Why TuitBot?
+
+| Feature | TuitBot | Typefully | Hypefury | Manual posting |
+|---------|:-------:|:---------:|:--------:|:--------------:|
+| Open source (MIT) | ✅ | ❌ | ❌ | — |
+| Self-hostable | ✅ | ❌ | ❌ | — |
+| MCP / AI agent integration | ✅ | ❌ | ❌ | — |
+| AI reply drafting | ✅ | ❌ | Partial | ❌ |
+| Discovery + scoring engine | ✅ | ❌ | ❌ | ❌ |
+| Approval queue (human-in-loop) | ✅ | ✅ | ✅ | ✅ |
+| Visual dashboard | ✅ | ✅ | ✅ | — |
+| Runs offline / local-first | ✅ | ❌ | ❌ | — |
+| Analytics & follower charts | ✅ | ✅ | ✅ | ❌ |
+| Autonomous posting | ✅ | Partial | ✅ | ❌ |
+| Price | Free | $12.50/mo | $19/mo | Free |
+
+---
+
+## Screenshots
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="assets/screenshot-discovery.png" alt="Discovery Feed — scored conversations" width="100%" /><br/>
+<em>Discovery Feed — scores and surfaces relevant conversations</em>
+</td>
+<td align="center" width="50%">
+<img src="assets/screenshot-approval.png" alt="Approval Queue — review AI drafts" width="100%" /><br/>
+<em>Approval Queue — review, edit, or approve AI-generated replies</em>
+</td>
+</tr>
+</table>
 
 ---
 
