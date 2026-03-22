@@ -416,6 +416,8 @@ async fn insert_draft_with_provenance_creates_links() {
         source_path: Some("notes/rust.md".to_string()),
         heading_path: Some("Testing".to_string()),
         snippet: Some("Use #[tokio::test]".to_string()),
+        edge_type: None,
+        edge_label: None,
     }];
 
     let id = insert_draft_with_provenance_for(&pool, acct, "tweet", "From vault", "assist", &refs)

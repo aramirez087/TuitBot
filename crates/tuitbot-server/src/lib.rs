@@ -241,6 +241,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // Vault
         .route("/vault/sources", get(routes::vault::vault_sources))
         .route("/vault/notes", get(routes::vault::search_notes))
+        .route(
+            "/vault/notes/{id}/neighbors",
+            get(routes::vault::note_neighbors),
+        )
         .route("/vault/notes/{id}", get(routes::vault::note_detail))
         .route("/vault/search", get(routes::vault::search_fragments))
         .route("/vault/resolve-refs", post(routes::vault::resolve_refs))

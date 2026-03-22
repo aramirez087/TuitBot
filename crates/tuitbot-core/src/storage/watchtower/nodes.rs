@@ -359,6 +359,43 @@ pub async fn find_node_by_path_for(
     Ok(row.map(ContentNode::from_row))
 }
 
+/// Batch lookup content nodes by IDs, scoped to account.
+///
+/// Uses parameterized `WHERE IN` clause. Only returns nodes owned by the account.
+pub async fn get_nodes_by_ids(
+    pool: &DbPool,
+    account_id: &str,
+    node_ids: &[i64],
+) -> Result<Vec<ContentNode>, StorageError> {
+    if node_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = node_ids.iter().map(|_| "?").collect();
+    let in_clause = placeholders.join(", ");
+    let sql = format!(
+        "SELECT id, account_id, source_id, relative_path, content_hash, \
+                title, body_text, front_matter_json, tags, status, \
+                ingested_at, updated_at \
+         FROM content_nodes \
+         WHERE account_id = ? AND id IN ({in_clause}) \
+         ORDER BY id"
+    );
+
+    let mut q = sqlx::query_as::<_, ContentNodeRow>(&sql);
+    q = q.bind(account_id);
+    for id in node_ids {
+        q = q.bind(id);
+    }
+
+    let rows = q
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(ContentNode::from_row).collect())
+}
+
 /// Mark a content node as 'chunked' for a specific account.
 pub async fn mark_node_chunked(
     pool: &DbPool,

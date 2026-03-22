@@ -20,6 +20,8 @@ pub struct ProvenanceLink {
     pub source_path: Option<String>,
     pub heading_path: Option<String>,
     pub snippet: Option<String>,
+    pub edge_type: Option<String>,
+    pub edge_label: Option<String>,
     pub created_at: String,
 }
 
@@ -41,6 +43,10 @@ pub struct ProvenanceRef {
     pub heading_path: Option<String>,
     #[serde(default)]
     pub snippet: Option<String>,
+    #[serde(default)]
+    pub edge_type: Option<String>,
+    #[serde(default)]
+    pub edge_label: Option<String>,
 }
 
 /// Insert provenance links for a content entity.
@@ -62,8 +68,8 @@ pub async fn insert_links_for(
         sqlx::query(
             "INSERT INTO vault_provenance_links \
              (account_id, entity_type, entity_id, node_id, chunk_id, seed_id, \
-              source_path, heading_path, snippet) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              source_path, heading_path, snippet, edge_type, edge_label) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(account_id)
         .bind(entity_type)
@@ -74,6 +80,8 @@ pub async fn insert_links_for(
         .bind(&r.source_path)
         .bind(&r.heading_path)
         .bind(&r.snippet)
+        .bind(&r.edge_type)
+        .bind(&r.edge_label)
         .execute(pool)
         .await
         .map_err(|e| StorageError::Query { source: e })?;
@@ -117,8 +125,9 @@ pub async fn copy_links_for(
     let result = sqlx::query(
         "INSERT INTO vault_provenance_links \
          (account_id, entity_type, entity_id, node_id, chunk_id, seed_id, \
-          source_path, heading_path, snippet) \
-         SELECT ?, ?, ?, node_id, chunk_id, seed_id, source_path, heading_path, snippet \
+          source_path, heading_path, snippet, edge_type, edge_label) \
+         SELECT ?, ?, ?, node_id, chunk_id, seed_id, source_path, heading_path, snippet, \
+                edge_type, edge_label \
          FROM vault_provenance_links \
          WHERE account_id = ? AND entity_type = ? AND entity_id = ?",
     )
@@ -170,6 +179,8 @@ mod tests {
                 source_path: Some("notes/rust.md".to_string()),
                 heading_path: Some("# Rust > ## Async".to_string()),
                 snippet: Some("Async patterns in Rust...".to_string()),
+                edge_type: None,
+                edge_label: None,
             },
             ProvenanceRef {
                 node_id: None,
@@ -178,6 +189,8 @@ mod tests {
                 source_path: Some("notes/testing.md".to_string()),
                 heading_path: None,
                 snippet: Some("Testing best practices...".to_string()),
+                edge_type: None,
+                edge_label: None,
             },
         ]
     }
@@ -329,6 +342,8 @@ mod tests {
             source_path: Some("notes/full.md".to_string()),
             heading_path: Some("# Full > ## Path".to_string()),
             snippet: Some("Full snippet text".to_string()),
+            edge_type: None,
+            edge_label: None,
         }];
 
         insert_links_for(&pool, account_id, "scheduled_content", 100, &refs)
@@ -359,6 +374,8 @@ mod tests {
             source_path: None,
             heading_path: None,
             snippet: None,
+            edge_type: None,
+            edge_label: None,
         }];
 
         insert_links_for(&pool, account_id, "thread", 50, &refs)
@@ -387,6 +404,8 @@ mod tests {
             source_path: Some("a.md".to_string()),
             heading_path: None,
             snippet: None,
+            edge_type: None,
+            edge_label: None,
         }];
 
         let refs_b = vec![ProvenanceRef {
@@ -396,6 +415,8 @@ mod tests {
             source_path: Some("b.md".to_string()),
             heading_path: None,
             snippet: None,
+            edge_type: None,
+            edge_label: None,
         }];
 
         insert_links_for(&pool, account_id, "approval_queue", 1, &refs_a)
@@ -455,6 +476,8 @@ mod tests {
             source_path: Some("test.md".to_string()),
             heading_path: None,
             snippet: Some("hello".to_string()),
+            edge_type: Some("wikilink".to_string()),
+            edge_label: None,
         };
 
         let json = serde_json::to_string(&pref).expect("serialize");
@@ -474,5 +497,55 @@ mod tests {
         assert!(pref.source_path.is_none());
         assert!(pref.heading_path.is_none());
         assert!(pref.snippet.is_none());
+        assert!(pref.edge_type.is_none());
+        assert!(pref.edge_label.is_none());
+    }
+
+    #[test]
+    fn provenance_ref_edge_fields_roundtrip() {
+        let pref = ProvenanceRef {
+            node_id: Some(10),
+            chunk_id: Some(20),
+            seed_id: None,
+            source_path: Some("notes/linked.md".to_string()),
+            heading_path: None,
+            snippet: None,
+            edge_type: Some("backlink".to_string()),
+            edge_label: Some("see also".to_string()),
+        };
+
+        let json = serde_json::to_string(&pref).expect("serialize");
+        let deserialized: ProvenanceRef = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.edge_type.as_deref(), Some("backlink"));
+        assert_eq!(deserialized.edge_label.as_deref(), Some("see also"));
+    }
+
+    #[tokio::test]
+    async fn insert_links_with_edge_fields() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let refs = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: Some("notes/graph.md".to_string()),
+            heading_path: None,
+            snippet: None,
+            edge_type: Some("wikilink".to_string()),
+            edge_label: Some("linked note".to_string()),
+        }];
+
+        insert_links_for(&pool, account_id, "approval_queue", 77, &refs)
+            .await
+            .expect("insert");
+
+        let links = get_links_for(&pool, account_id, "approval_queue", 77)
+            .await
+            .expect("get");
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].edge_type.as_deref(), Some("wikilink"));
+        assert_eq!(links[0].edge_label.as_deref(), Some("linked note"));
     }
 }

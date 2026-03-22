@@ -1,5 +1,6 @@
 //! Shared RAG context resolution for assist and discovery routes.
 
+use tuitbot_core::context::graph_expansion::{self, GraphNeighbor, GraphState};
 use tuitbot_core::context::winning_dna;
 use tuitbot_core::storage::vault_selections;
 
@@ -90,6 +91,43 @@ pub(crate) async fn resolve_selection_rag_context(
             Some(selection.selected_text)
         },
     })
+}
+
+/// Resolve graph neighbor suggestions for a note node.
+///
+/// Returns neighbors with a graph state indicator. Fail-open: any error
+/// yields `FallbackActive` with empty neighbors.
+pub(crate) async fn resolve_graph_suggestions(
+    state: &AppState,
+    account_id: &str,
+    node_id: i64,
+    max_neighbors: u32,
+) -> GraphSuggestionResult {
+    match graph_expansion::expand_graph_neighbors(&state.db, account_id, node_id, max_neighbors)
+        .await
+    {
+        Ok(neighbors) if neighbors.is_empty() => GraphSuggestionResult {
+            neighbors: Vec::new(),
+            graph_state: GraphState::NoRelatedNotes,
+        },
+        Ok(neighbors) => GraphSuggestionResult {
+            graph_state: GraphState::Available,
+            neighbors,
+        },
+        Err(e) => {
+            tracing::warn!(node_id, "graph expansion failed: {e}");
+            GraphSuggestionResult {
+                neighbors: Vec::new(),
+                graph_state: GraphState::FallbackActive,
+            }
+        }
+    }
+}
+
+/// Result of graph neighbor resolution.
+pub(crate) struct GraphSuggestionResult {
+    pub neighbors: Vec<GraphNeighbor>,
+    pub graph_state: GraphState,
 }
 
 /// RAG context resolved from a Ghostwriter selection.

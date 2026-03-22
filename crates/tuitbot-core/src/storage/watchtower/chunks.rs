@@ -311,6 +311,52 @@ pub async fn find_best_chunk_by_heading_for(
     Ok(best)
 }
 
+/// Get the highest-boost active chunk per node for a batch of node IDs.
+///
+/// Returns at most one chunk per node_id, selected by highest `retrieval_boost`
+/// then lowest `chunk_index`. Only returns chunks owned by the account.
+pub async fn get_best_chunks_for_nodes(
+    pool: &DbPool,
+    account_id: &str,
+    node_ids: &[i64],
+) -> Result<Vec<ContentChunk>, StorageError> {
+    if node_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = node_ids.iter().map(|_| "?").collect();
+    let in_clause = placeholders.join(", ");
+
+    // Use a correlated subquery to pick the best chunk per node.
+    let sql = format!(
+        "SELECT c.id, c.account_id, c.node_id, c.heading_path, c.chunk_text, c.chunk_hash, \
+                c.chunk_index, c.retrieval_boost, c.status, c.created_at, c.updated_at \
+         FROM content_chunks c \
+         WHERE c.account_id = ? AND c.status = 'active' AND c.node_id IN ({in_clause}) \
+           AND c.id = ( \
+               SELECT c2.id FROM content_chunks c2 \
+               WHERE c2.node_id = c.node_id AND c2.account_id = c.account_id \
+                 AND c2.status = 'active' \
+               ORDER BY c2.retrieval_boost DESC, c2.chunk_index ASC \
+               LIMIT 1 \
+           ) \
+         ORDER BY c.node_id"
+    );
+
+    let mut q = sqlx::query_as::<_, ContentChunkRow>(&sql);
+    q = q.bind(account_id);
+    for id in node_ids {
+        q = q.bind(id);
+    }
+
+    let rows = q
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(ContentChunk::from_row).collect())
+}
+
 /// Row type for chunk + node context JOIN query.
 type ChunkWithContextRow = (
     i64,            // cc.id
