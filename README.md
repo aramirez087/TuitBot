@@ -13,6 +13,8 @@
 [![codecov](https://codecov.io/gh/aramirez087/TuitBot/branch/main/graph/badge.svg?style=for-the-badge)](https://codecov.io/gh/aramirez087/TuitBot)
 [![Releases](https://img.shields.io/github/v/release/aramirez087/TuitBot?style=for-the-badge)](https://github.com/aramirez087/TuitBot/releases)
 
+<img src="assets/demo.gif" alt="TuitBot dashboard walkthrough — composer, discovery feed, and approval queue" width="100%" />
+
 Tuitbot discovers relevant conversations, drafts genuinely helpful replies, and queues everything for your review. When you're ready, flip the switch to let it post autonomously within strict safety guardrails. **Think of it as a growth-focused writing partner** that handles the research so you can focus on building.
 
 Built for **founders**, **indie hackers**, and **solo makers** who'd rather build their product than spend hours on X.
