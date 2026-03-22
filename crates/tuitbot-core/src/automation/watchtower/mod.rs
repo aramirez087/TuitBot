@@ -27,6 +27,7 @@ use crate::storage::watchtower as store;
 use crate::storage::DbPool;
 
 pub use monitor::{CooldownSet, RemoteSource};
+pub use tokio_util::sync::CancellationToken;
 
 use crate::config::{ConnectorConfig, ContentSourcesConfig};
 

@@ -20,7 +20,7 @@ use super::{
 
 /// Tracks recently-written paths to prevent re-ingestion of our own writes.
 pub struct CooldownSet {
-    entries: std::collections::HashMap<PathBuf, Instant>,
+    pub entries: std::collections::HashMap<PathBuf, Instant>,
     ttl: Duration,
 }
 
