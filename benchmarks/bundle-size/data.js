@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774183754920,
+  "lastUpdate": 1774183778882,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2766,6 +2766,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1282815,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9f8db5d7e10904f881ff50bf88d2e52568d00802",
+          "message": "ci: multi-arch Docker image to ghcr.io (P1) (#283)\n\n* ci: add multi-arch Docker image build and publish to ghcr.io\n\nAdds Dockerfile, docker-compose.yml, .dockerignore, and GitHub Actions\nworkflow (.github/workflows/docker.yml) for publishing a multi-arch\n(linux/amd64 + linux/arm64) container image to ghcr.io on every vX.Y.Z\ntag push.\n\nWhy multi-stage: keeps the final image ~80 MB vs ~2 GB for a full Rust\ntoolchain image. Why QEMU cross-compile: zero cost, avoids native ARM\nrunners. Cache-from/to=gha keeps subsequent release builds fast.\n\nCloses: P1 Docker image task (577ea81b)\n\n* fix: install curl in runtime image, fix healthcheck\n\n- Replace wget with curl in docker-compose.yml healthcheck (debian:bookworm-slim\n  does not ship wget)\n- Add curl to runtime apt-get install list\n- Remove dead ARG BINARY (both binaries are always copied)\n\n---------\n\nCo-authored-by: CI-Wrench <ci-wrench@tuitbot.local>\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-22T06:48:46-06:00",
+          "tree_id": "e6cecc78d9245c11fe0738f1681453e32ab85e7d",
+          "url": "https://github.com/aramirez087/TuitBot/commit/9f8db5d7e10904f881ff50bf88d2e52568d00802"
+        },
+        "date": 1774183777559,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 919278,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 324282,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1282810,
             "unit": "bytes"
           }
         ]
