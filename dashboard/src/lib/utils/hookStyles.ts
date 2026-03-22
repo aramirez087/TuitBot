@@ -12,6 +12,9 @@ const STYLE_LABELS: Record<string, string> = {
 	storytelling: 'Story',
 	before_after: 'Before/After',
 	general: 'General',
+	story: 'Story',
+	listicle: 'Listicle',
+	hot_take: 'Hot Take',
 };
 
 export function getStyleLabel(style: string): string {

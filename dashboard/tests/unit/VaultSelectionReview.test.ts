@@ -14,7 +14,7 @@ import VaultSelectionReview from '$lib/components/composer/VaultSelectionReview.
 vi.mock('$lib/api', () => ({
 	api: {
 		vault: { getSelection: vi.fn() },
-		assist: { hooks: vi.fn() }
+		assist: { hooks: vi.fn(), angles: vi.fn() }
 	}
 }));
 
@@ -869,8 +869,16 @@ describe('VaultSelectionReview', () => {
 		const ongenerate = vi.fn().mockResolvedValue(undefined);
 		const { api } = await import('$lib/api');
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
-		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
-			hooks: sampleHooks, topic: 'test', vault_citations: []
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle seed text',
+				char_count: 20,
+				evidence: [{ evidence_type: 'data_point', citation_text: 'test', source_node_id: 55, source_note_title: 'Async Patterns' }],
+				confidence: 'high',
+				rationale: 'Test rationale',
+			}],
+			topic: 'test',
 		});
 		const { container } = render(VaultSelectionReview, {
 			props: { ...defaultProps, ongenerate }
@@ -885,18 +893,18 @@ describe('VaultSelectionReview', () => {
 		await vi.waitFor(() => {
 			expect(container.textContent).toContain('1 note included in context');
 		});
-		// Generate hooks
+		// Generate — with neighbor accepted, goes to angles
 		const generateBtn = Array.from(container.querySelectorAll('button')).find(
 			(b) => b.textContent?.includes('Generate hooks')
 		) as HTMLButtonElement;
 		await fireEvent.click(generateBtn);
 		await vi.waitFor(() => {
-			expect(container.querySelector('.hook-picker')).toBeTruthy();
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
 		});
-		// Select first hook
-		const hookCards = container.querySelectorAll('.hook-card');
-		await fireEvent.click(hookCards[0]);
-		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		// Select first angle
+		const angleCards = container.querySelectorAll('.angle-card');
+		await fireEvent.click(angleCards[0]);
+		const confirmBtn = container.querySelector('.angle-confirm-btn') as HTMLButtonElement;
 		await fireEvent.click(confirmBtn);
 		await vi.waitFor(() => {
 			expect(ongenerate).toHaveBeenCalled();
@@ -1081,8 +1089,16 @@ describe('VaultSelectionReview', () => {
 		const ongenerate = vi.fn().mockResolvedValue(undefined);
 		const { api } = await import('$lib/api');
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
-		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
-			hooks: sampleHooks, topic: 'test', vault_citations: []
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle seed text',
+				char_count: 20,
+				evidence: [{ evidence_type: 'data_point', citation_text: 'test', source_node_id: 55, source_note_title: 'Async Patterns' }],
+				confidence: 'high',
+				rationale: 'Test rationale',
+			}],
+			topic: 'test',
 		});
 		const { container } = render(VaultSelectionReview, {
 			props: { ...defaultProps, ongenerate }
@@ -1093,17 +1109,17 @@ describe('VaultSelectionReview', () => {
 		// Accept first neighbor
 		const actionBtns = container.querySelectorAll('.graph-action-btn');
 		await fireEvent.click(actionBtns[0]);
-		// Generate and confirm
+		// Generate — with neighbor accepted, goes to angles
 		const generateBtn = Array.from(container.querySelectorAll('button')).find(
 			(b) => b.textContent?.includes('Generate hooks')
 		) as HTMLButtonElement;
 		await fireEvent.click(generateBtn);
 		await vi.waitFor(() => {
-			expect(container.querySelector('.hook-picker')).toBeTruthy();
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
 		});
-		const hookCards = container.querySelectorAll('.hook-card');
-		await fireEvent.click(hookCards[0]);
-		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		const angleCards = container.querySelectorAll('.angle-card');
+		await fireEvent.click(angleCards[0]);
+		const confirmBtn = container.querySelector('.angle-confirm-btn') as HTMLButtonElement;
 		await fireEvent.click(confirmBtn);
 		await vi.waitFor(() => {
 			expect(ongenerate).toHaveBeenCalled();

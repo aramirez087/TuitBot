@@ -918,6 +918,32 @@ export interface AssistHooksResponse {
 	vault_citations?: VaultCitation[];
 }
 
+// --- Mined Angle types (Hook Miner) ---
+
+export interface EvidenceItemResponse {
+	evidence_type: string;
+	citation_text: string;
+	source_node_id: number;
+	source_note_title: string;
+	source_heading_path?: string;
+}
+
+export interface MinedAngle {
+	angle_type: string;
+	seed_text: string;
+	char_count: number;
+	evidence: EvidenceItemResponse[];
+	confidence: string;
+	rationale: string;
+}
+
+export interface AssistAnglesResponse {
+	angles: MinedAngle[];
+	fallback_reason?: string;
+	topic: string;
+	vault_citations?: VaultCitation[];
+}
+
 // --- Draft insertion types (backlink synthesizer, Session 5) ---
 
 /** A single suggestion insertion into a specific draft slot. */

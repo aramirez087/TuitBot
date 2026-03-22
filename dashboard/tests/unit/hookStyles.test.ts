@@ -45,6 +45,18 @@ describe('getStyleLabel', () => {
 	it('handles single-word unknown style', () => {
 		expect(getStyleLabel('custom')).toBe('Custom');
 	});
+
+	it('maps "story" to "Story" (angle type)', () => {
+		expect(getStyleLabel('story')).toBe('Story');
+	});
+
+	it('maps "listicle" to "Listicle" (angle type)', () => {
+		expect(getStyleLabel('listicle')).toBe('Listicle');
+	});
+
+	it('maps "hot_take" to "Hot Take" (angle type)', () => {
+		expect(getStyleLabel('hot_take')).toBe('Hot Take');
+	});
 });
 
 describe('getConfidenceBadge', () => {

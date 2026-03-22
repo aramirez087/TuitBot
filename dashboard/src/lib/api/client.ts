@@ -60,7 +60,8 @@ import type {
 	ContentActivity,
 	ContentTag,
 	AnalyzeProfileResponse,
-	AssistHooksResponse
+	AssistHooksResponse,
+	AssistAnglesResponse
 } from './types';
 import { getCsrfToken } from './http';
 
@@ -500,6 +501,20 @@ export const api = {
 					topic,
 					...(opts?.selectedNodeIds && { selected_node_ids: opts.selectedNodeIds }),
 					...(opts?.sessionId && { session_id: opts.sessionId })
+				})
+			}),
+		angles: (
+			topic: string,
+			acceptedNeighborIds: number[],
+			opts?: { sessionId?: string; selectedNodeIds?: number[] }
+		) =>
+			request<AssistAnglesResponse>('/api/assist/angles', {
+				method: 'POST',
+				body: JSON.stringify({
+					topic,
+					accepted_neighbor_ids: acceptedNeighborIds,
+					...(opts?.sessionId && { session_id: opts.sessionId }),
+					...(opts?.selectedNodeIds && { selected_node_ids: opts.selectedNodeIds })
 				})
 			}),
 		mode: () => request<{ mode: string; approval_mode: boolean }>('/api/assist/mode')
