@@ -47,6 +47,7 @@ pub fn parse_backend(s: &str) -> ProviderBackend {
 
 /// Post-process a tool response JSON string to inject `provider_backend`
 /// into the `meta` object (if present) or add a minimal `meta` object.
+#[allow(dead_code)]
 pub fn inject_provider_backend(json: &str, backend: &str) -> String {
     match serde_json::from_str::<serde_json::Value>(json) {
         Ok(mut v) => {

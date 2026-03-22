@@ -5,6 +5,7 @@
 
 pub mod config;
 pub mod idempotency;
+#[allow(dead_code)]
 pub mod manifest;
 pub mod response;
 pub mod rollback;
