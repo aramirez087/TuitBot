@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774184054122,
+  "lastUpdate": 1774184059475,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1969,6 +1969,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 944.07,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "04e846da1a5926c664f6e5e01b8c29fb43959985",
+          "message": "chore: reduce unwrap() calls by 15 (D3 Sprint 8) (#281)\n\n* chore: reduce unwrap() calls in local_mode, config, mcp routes\n\nReplace 15 .unwrap() calls with proper error handling:\n\n- local_mode/mod.rs (9 calls): Add transport() helper to centralize cookie\n  transport availability check. Use ? operator in all mutation methods.\n  Reduces scatter of .as_ref().unwrap() across every method.\n\n- config/merge.rs (4 calls): Replace .unwrap() with .expect() paired with\n  safety comments (variables confirmed non-null in prior line). Aids\n  readability.\n\n- routes/mcp.rs (2 calls): Replace serde_json::to_value() unwrap with\n  proper error handling. Document why failure is extremely rare (non-string\n  map keys, NaN/infinity floats not in telemetry struct).\n\nProduction unwrap() count: 919 → 904 (net -15).\n\nSee task D3 comment for full analysis and remaining high-risk calls.\n\n* chore: sweep #[allow(dead_code)] in tuitbot-mcp + cargo fmt\n\nAudit of #[allow(dead_code)] across tuitbot-mcp (11 instances):\n\nREMOVED (stale — items are actually used):\n- provider/mod.rs: inject_provider_backend() used in lib.rs L606+\n- contract/envelope.rs: validation_error() used in tests and eval_session09\n- provider/scraper.rs: ScraperReadProvider, .new(), AUTH_GATED_MSG, STUB_MSG\n  all used in eval_session09/scenario_g.rs\n- tools/mod.rs: manifest module used by spec/ generators\n\nRETAINED + WHY documented:\n- kernel/mod.rs (engage/media/write): not wired into live server yet;\n  read-only profile is active. Write profile planned — kernel is the\n  canonical abstraction. Comment updated to explain context.\n- tools/workflow/x_actions/mod.rs (error_response): XApiError path not\n  yet called directly; shared helper for future write-module refactor.\n  Comment updated to explain purpose.\n\nAlso runs cargo fmt --all (format fixes in local_mode/mod.rs,\nconfig/merge.rs match rustfmt style).\n\n* fix: restore #[allow(dead_code)] for items not yet wired into live server\n\nThe previous commit incorrectly removed dead_code suppressions from\nscraper provider, inject_provider_backend, manifest module, and\nALL_FOUR constant — all of which are only used in tests/conformance.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: CI-Wrench <ci-wrench@tuitbot.local>\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-22T06:48:25-06:00",
+          "tree_id": "f86c871165c8f995abfa2e991b9b2a1ff7cd7d3c",
+          "url": "https://github.com/aramirez087/TuitBot/commit/04e846da1a5926c664f6e5e01b8c29fb43959985"
+        },
+        "date": 1774184058600,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 934.38,
             "unit": "ps"
           }
         ]
