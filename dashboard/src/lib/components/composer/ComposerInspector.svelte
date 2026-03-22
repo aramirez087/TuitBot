@@ -130,7 +130,7 @@
 			// Add neighbor provenance
 			vaultProvenance = [
 				...vaultProvenance,
-				{ node_id: neighbor.node_id, edge_type: neighbor.reason, edge_label: neighbor.reason_label },
+				{ node_id: neighbor.node_id, edge_type: neighbor.reason, edge_label: neighbor.reason_label, source_role: 'accepted_neighbor' },
 			];
 
 			undoMessage = `Applied "${neighbor.node_title}" to ${slotLabel}.`;
@@ -270,16 +270,25 @@
 		startUndoTimer();
 	}
 
-	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) {
+	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }>) {
 		if (selectedNodeIds.length === 0) return;
 		// Capture provenance from the vault node IDs used for generation.
-		// For accepted neighbors, include edge_type and edge_label for provenance tracking.
+		// For accepted neighbors, include edge_type, edge_label, and hook miner fields.
+		// Primary selection gets source_role: 'primary_selection'.
 		vaultProvenance = selectedNodeIds.map((id) => {
 			const neighborInfo = neighborProvenance?.find((n) => n.node_id === id);
 			if (neighborInfo) {
-				return { node_id: id, edge_type: neighborInfo.edge_type, edge_label: neighborInfo.edge_label };
+				return {
+					node_id: id,
+					edge_type: neighborInfo.edge_type,
+					edge_label: neighborInfo.edge_label,
+					angle_kind: neighborInfo.angle_kind,
+					signal_kind: neighborInfo.signal_kind,
+					signal_text: neighborInfo.signal_text,
+					source_role: neighborInfo.source_role,
+				};
 			}
-			return { node_id: id };
+			return { node_id: id, source_role: 'primary_selection' as const, angle_kind: hookStyle };
 		});
 		vaultHookStyle = hookStyle ?? null;
 		try {

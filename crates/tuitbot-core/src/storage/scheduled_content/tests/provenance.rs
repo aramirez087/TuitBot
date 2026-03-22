@@ -284,6 +284,10 @@ fn sample_provenance_refs() -> Vec<ProvenanceRef> {
             snippet: Some("Tokio runtime patterns...".to_string()),
             edge_type: None,
             edge_label: None,
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: None,
         },
         ProvenanceRef {
             node_id: None,
@@ -294,6 +298,10 @@ fn sample_provenance_refs() -> Vec<ProvenanceRef> {
             snippet: Some("Property-based testing...".to_string()),
             edge_type: None,
             edge_label: None,
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: None,
         },
     ]
 }

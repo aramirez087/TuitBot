@@ -44,7 +44,7 @@
 		mode?: 'tweet' | 'thread';
 		insertState?: DraftInsertState;
 		onundo?: () => void;
-		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
+		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }>) => Promise<void>;
 		onSelectionConsumed?: () => void;
 		onexpired?: () => void;
 		onformatchange?: (format: 'tweet' | 'thread') => void;
@@ -189,7 +189,7 @@
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
 			// Build neighbor provenance for accepted neighbors
-			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string }> = [];
+			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }> = [];
 			if (synthesisEnabled && acceptedNeighbors.size > 0) {
 				for (const [nid, { neighbor }] of acceptedNeighbors) {
 					if (!nodeIds.includes(nid)) nodeIds.push(nid);
@@ -197,6 +197,7 @@
 						node_id: nid,
 						edge_type: neighbor.reason,
 						edge_label: neighbor.reason_label,
+						source_role: 'accepted_neighbor',
 					});
 				}
 			}
@@ -239,14 +240,23 @@
 		confirmReplace = false;
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
-			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string }> = [];
+			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }> = [];
 			for (const [nid, { neighbor }] of acceptedNeighbors) {
 				if (!nodeIds.includes(nid)) nodeIds.push(nid);
-				neighborProv.push({
+				const prov: typeof neighborProv[number] = {
 					node_id: nid,
 					edge_type: neighbor.reason,
 					edge_label: neighbor.reason_label,
-				});
+					angle_kind: angle.angle_type,
+					source_role: 'accepted_neighbor',
+				};
+				// Attach evidence-level fields if this neighbor has matching evidence
+				const ev = angle.evidence.find((e) => e.source_node_id === nid);
+				if (ev) {
+					prov.signal_kind = ev.evidence_type;
+					prov.signal_text = ev.citation_text;
+				}
+				neighborProv.push(prov);
 			}
 			await ongenerate(nodeIds, format, [angle.seed_text], angle.angle_type, neighborProv.length > 0 ? neighborProv : undefined);
 		} catch (e) {

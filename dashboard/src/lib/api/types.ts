@@ -803,6 +803,10 @@ export interface ProvenanceRef {
 	snippet?: string;
 	edge_type?: string;
 	edge_label?: string;
+	angle_kind?: string;
+	signal_kind?: string;
+	signal_text?: string;
+	source_role?: string;
 }
 
 export interface ProvenanceLink {
@@ -816,6 +820,12 @@ export interface ProvenanceLink {
 	source_path: string | null;
 	heading_path: string | null;
 	snippet: string | null;
+	edge_type: string | null;
+	edge_label: string | null;
+	angle_kind: string | null;
+	signal_kind: string | null;
+	signal_text: string | null;
+	source_role: string | null;
 	created_at: string;
 }
 
