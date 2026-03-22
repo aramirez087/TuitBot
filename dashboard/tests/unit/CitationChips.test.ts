@@ -205,4 +205,98 @@ describe('CitationChips', () => {
 		const items = container.querySelectorAll('[role="listitem"]');
 		expect(items.length).toBe(2);
 	});
+
+	// ── Graph inserts strip ─────────────────────────────
+	it('renders nothing when graphInserts is empty', () => {
+		const { container } = render(CitationChips, {
+			props: { citations: [], graphInserts: [] },
+		});
+		const graphStrip = container.querySelector('.graph-strip');
+		expect(graphStrip).toBeNull();
+	});
+
+	it('renders graph insert chips with source title and slot label', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'tweet', slotLabel: 'Opening hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'My Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], graphInserts: inserts },
+		});
+		const graphStrip = container.querySelector('.graph-strip');
+		expect(graphStrip).toBeTruthy();
+		expect(graphStrip?.textContent).toContain('My Note');
+		expect(graphStrip?.textContent).toContain('Opening hook');
+	});
+
+	it('renders "Related notes:" label for graph inserts', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'tweet', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], graphInserts: inserts },
+		});
+		const labels = container.querySelectorAll('.citation-label');
+		const relatedLabel = Array.from(labels).find((l) => l.textContent?.includes('Related notes'));
+		expect(relatedLabel).toBeTruthy();
+	});
+
+	it('shows undo button on graph insert when onundoinsert is provided', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'tweet', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], graphInserts: inserts, onundoinsert: vi.fn() },
+		});
+		const undoBtn = container.querySelector('.graph-strip .chip-remove');
+		expect(undoBtn).toBeTruthy();
+	});
+
+	it('calls onundoinsert with insert ID when undo is clicked', async () => {
+		const onundoinsert = vi.fn();
+		const inserts = [
+			{ id: 'ins-42', blockId: 'tweet', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], graphInserts: inserts, onundoinsert },
+		});
+		const undoBtn = container.querySelector('.graph-strip .chip-remove') as HTMLButtonElement;
+		await fireEvent.click(undoBtn);
+		expect(onundoinsert).toHaveBeenCalledWith('ins-42');
+	});
+
+	it('hides undo button on graph insert when onundoinsert is not provided', () => {
+		const inserts = [
+			{ id: 'ins-1', blockId: 'tweet', slotLabel: 'Hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1 }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], graphInserts: inserts },
+		});
+		const undoBtn = container.querySelector('.graph-strip .chip-remove');
+		expect(undoBtn).toBeNull();
+	});
+
+	// ── Obsidian open handler ───────────────────────────
+	it('clicking "Open in Obsidian" calls openExternalUrl', async () => {
+		const { openExternalUrl } = await import('$lib/utils/obsidianUri');
+		const cit = makeCitation({ chunk_id: 1 });
+		const { container } = render(CitationChips, {
+			props: { citations: [cit], isDesktop: true, vaultPath: '/my/vault' },
+		});
+		const openBtn = container.querySelector('.chip-open') as HTMLButtonElement;
+		await fireEvent.click(openBtn);
+		expect(openExternalUrl).toHaveBeenCalled();
+	});
+
+	// ── expanded chip detail content ────────────────────
+	it('expanded chip shows heading path and snippet', async () => {
+		const cit = makeCitation({ chunk_id: 1, heading_path: 'Overview > Strategy', snippet: 'My snippet text' });
+		const { container } = render(CitationChips, {
+			props: { citations: [cit] },
+		});
+		const chip = container.querySelector('.citation-chip') as HTMLButtonElement;
+		await fireEvent.click(chip);
+		const detail = container.querySelector('.chip-detail');
+		expect(detail?.textContent).toContain('Overview > Strategy');
+		expect(detail?.textContent).toContain('My snippet text');
+	});
 });

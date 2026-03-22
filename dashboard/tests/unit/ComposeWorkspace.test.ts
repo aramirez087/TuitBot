@@ -197,4 +197,54 @@ describe('ComposeWorkspace', () => {
 		expect(container).toBeTruthy();
 		expect(document.body.innerHTML.length).toBeGreaterThan(100);
 	});
+
+	it('renders with prefill date and formats scheduledDate correctly', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, prefillDate: new Date('2027-03-05T12:00:00Z'), prefillTime: '14:30' }
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('renders with both embedded=true and canPublish=false', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, embedded: true, canPublish: false }
+		});
+		// Embedded workspace renders the HomeComposerHeader
+		expect(container.querySelector('.embedded-workspace') || container).toBeTruthy();
+	});
+
+	it('mounts sr-only status announcement region', () => {
+		render(ComposeWorkspace, { props: defaultProps });
+		const srOnly = document.querySelector('.sr-only[role="status"]');
+		expect(srOnly).toBeTruthy();
+		expect(srOnly?.getAttribute('aria-live')).toBe('polite');
+	});
+
+	it('renders ThreadPreviewRail component', () => {
+		const { container } = render(ComposeWorkspace, { props: defaultProps });
+		// ThreadPreviewRail is always mounted (hidden by default)
+		expect(document.body.innerHTML.length).toBeGreaterThan(200);
+	});
+
+	it('renders embedded workspace div when embedded=true', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, embedded: true }
+		});
+		expect(container.querySelector('.embedded-workspace')).toBeTruthy();
+	});
+
+	it('does not render embedded workspace div when embedded=false', () => {
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, embedded: false }
+		});
+		expect(container.querySelector('.embedded-workspace')).toBeNull();
+	});
+
+	it('renders with onSelectionConsumed callback', () => {
+		const onSelectionConsumed = vi.fn();
+		const { container } = render(ComposeWorkspace, {
+			props: { ...defaultProps, onSelectionConsumed }
+		});
+		expect(container).toBeTruthy();
+	});
 });

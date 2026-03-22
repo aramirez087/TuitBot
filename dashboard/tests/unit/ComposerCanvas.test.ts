@@ -172,4 +172,69 @@ describe('ComposerCanvas', () => {
 		}
 		expect(typeof onsubmit).toBe('function');
 	});
+
+	it('renders submit pill with "Post now" text when canPublish and no selectedTime', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, canSubmit: true, canPublish: true, selectedTime: null, embedded: false }
+		});
+		const submitBtn = document.querySelector('.submit-pill');
+		expect(submitBtn?.textContent).toContain('Post now');
+	});
+
+	it('renders submit pill with "Schedule" text when selectedTime is set', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, canSubmit: true, selectedTime: '14:30', embedded: false }
+		});
+		const submitBtn = document.querySelector('.submit-pill');
+		expect(submitBtn?.textContent).toContain('Schedule');
+	});
+
+	it('renders submit pill with "Save to Calendar" when canPublish=false', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, canSubmit: true, canPublish: false, selectedTime: null, embedded: false }
+		});
+		const submitBtn = document.querySelector('.submit-pill');
+		expect(submitBtn?.textContent).toContain('Save to Calendar');
+	});
+
+	it('hides submit pill in embedded mode', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, embedded: true }
+		});
+		const submitBtn = document.querySelector('.submit-pill');
+		expect(submitBtn).toBeNull();
+	});
+
+	it('submit pill is disabled when canSubmit=false', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, canSubmit: false, embedded: false }
+		});
+		const submitBtn = document.querySelector('.submit-pill') as HTMLButtonElement;
+		expect(submitBtn?.disabled).toBe(true);
+	});
+
+	it('shows "Submitting..." text when submitting=true', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, canSubmit: true, submitting: true, embedded: false }
+		});
+		const submitBtn = document.querySelector('.submit-pill');
+		expect(submitBtn?.textContent).toContain('Submitting...');
+	});
+
+	it('renders undo banner with message when showUndo=true', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, showUndo: true, undoMessage: 'Applied note.' }
+		});
+		const banner = document.querySelector('.undo-banner');
+		expect(banner).toBeTruthy();
+		expect(banner?.textContent).toContain('Applied note.');
+	});
+
+	it('renders undo button in banner when onundo callback provided', () => {
+		render(ComposerCanvas, {
+			props: { ...defaultProps, showUndo: true, undoMessage: 'Done.', onundo: vi.fn() }
+		});
+		const undoBtn = document.querySelector('.undo-banner-btn');
+		expect(undoBtn).toBeTruthy();
+	});
 });
