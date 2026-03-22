@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774190904757,
+  "lastUpdate": 1774192425390,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2829,6 +2829,43 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/9381f6a0e9bdae94439b5e6e66320ede0c3748fc"
         },
         "date": 1774190903552,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 919278,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 324282,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1282810,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "1a9021c2048214c21acdf34b884ec74c3c3ddb4c",
+          "message": "fix: add cloud mode privacy gate to POST /api/vault/send-selection\n\nCloud mode must reject vault send-selection requests with 403 since\nraw text should never leave the user's device in cloud deployments.\nThe GET handler already had this gate; POST was missing it.\n\nCaught by vault_selection_tests::send_selection_returns_403_in_cloud_mode.",
+          "timestamp": "2026-03-22T09:12:17-06:00",
+          "tree_id": "538bb0edfb73ab2df9f48b927022cef67065d034",
+          "url": "https://github.com/aramirez087/TuitBot/commit/1a9021c2048214c21acdf34b884ec74c3c3ddb4c"
+        },
+        "date": 1774192424791,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
