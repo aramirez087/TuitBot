@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774131258724,
+  "lastUpdate": 1774139116834,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -1853,6 +1853,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.89,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7680a944ca87f3f35e58ec85f199950c127a8cc1",
+          "message": "fix: redesign vault-to-content flow — skip highlights, fix thread generation (#279)\n\nThe \"From Vault\" flow had two problems: (1) selecting a hook in thread\nmode only inserted the hook as a single tweet instead of generating a\nfull thread, and (2) the 3-step highlights→hooks→generate pipeline was\nslow and error-prone with smaller LLMs like gpt-oss-20b.\n\nBackend:\n- Add `opening_hook` param to thread generation so the LLM writes\n  continuation tweets while the hook is prepended as tweet #1\n- Add `opening_hook` field to AssistThreadRequest (backward-compatible)\n- Make hooks parser tolerant of varied LLM formats (fallback parser)\n- Add debug logging to extract_highlights and generate_hooks\n\nFrontend:\n- Remove the highlights extraction step entirely — go directly from\n  chunk selection to hook generation (1 LLM call instead of 2)\n- Fix thread+hook path to call thread API with opening_hook instead\n  of inserting hook as the only block\n- Load capabilities at app layout level to fix \"Save to calendar\"\n  showing instead of \"Publish\" on first load\n- Delete VaultHighlights.svelte (no longer needed)\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-21T18:19:48-06:00",
+          "tree_id": "93de3c0f2bc6da8286c9f8566f39a29cbf047686",
+          "url": "https://github.com/aramirez087/TuitBot/commit/7680a944ca87f3f35e58ec85f199950c127a8cc1"
+        },
+        "date": 1774139116228,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.13,
             "unit": "ps"
           }
         ]
