@@ -1,0 +1,181 @@
+# =============================================================================
+# docker.yml — Build and publish multi-arch Docker image to ghcr.io
+#
+# Triggers:
+#   - Push of a vX.Y.Z release tag (e.g., v0.1.46)
+#   - Manual dispatch (workflow_dispatch) for testing
+#
+# Produces:
+#   ghcr.io/aramirez087/tuitbot:latest
+#   ghcr.io/aramirez087/tuitbot:vX.Y.Z
+#
+# Architectures:
+#   linux/amd64  — x86_64 servers and laptops
+#   linux/arm64  — Raspberry Pi, Orange Pi, Apple Silicon (Rosetta-free)
+#
+# Why QEMU: We cross-compile via Docker's buildx + QEMU user-mode emulation
+# rather than native ARM runners to keep costs at zero.  Rust compile times
+# on QEMU are ~3–4× slower than native but acceptable for a release workflow.
+# =============================================================================
+
+name: Docker
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to push (e.g. v0.1.46 or test)"
+        required: false
+        default: "test"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/tuitbot
+
+jobs:
+  docker:
+    name: Build & push (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write  # Required to push to ghcr.io
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # QEMU enables emulation of non-native architectures on the runner.
+      # Required to build linux/arm64 images on x86_64 GitHub-hosted runners.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Buildx is Docker's multi-platform build driver.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Derive human-readable tags and OCI labels from Git metadata.
+      # For a tag push:  :latest  +  :vX.Y.Z
+      # For dispatch:    :test  (or whatever the input specifies)
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Semver tag push → vX.Y.Z + latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            # workflow_dispatch → use the input tag
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      # Sanitise the platform string for use as a cache key suffix:
+      #   linux/amd64 → linux-amd64
+      - name: Sanitise platform for cache key
+        id: platform
+        run: echo "safe=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
+      # Build the image for this platform and push a platform-specific manifest
+      # (identified by digest, not tag).  The merge step below assembles the
+      # multi-platform index.
+      - name: Build and push platform image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: ${{ matrix.platform }}
+          # Push to registry without tagging yet; we tag via the merge step.
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # Layer cache backed by GitHub Actions cache (free, persistent across runs).
+          cache-from: type=gha,scope=${{ steps.platform.outputs.safe }}
+          cache-to:   type=gha,scope=${{ steps.platform.outputs.safe }},mode=max
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # Export the digest so the merge job can reference this platform image.
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ steps.platform.outputs.safe }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # -------------------------------------------------------------------------
+  # Merge: assemble a single multi-platform manifest and tag it.
+  # -------------------------------------------------------------------------
+  merge:
+    name: Merge multi-platform manifest
+    runs-on: ubuntu-latest
+    needs: docker
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      # Combine all per-platform digests into a single manifest list and push
+      # using the computed tags (e.g., :v0.1.46, :0.1, :latest).
+      - name: Create and push multi-platform manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+
+      - name: Inspect final manifest
+        run: |
+          docker buildx imagetools inspect \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
