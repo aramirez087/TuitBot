@@ -95,6 +95,10 @@ pub(super) fn not_configured_response(start: Instant) -> String {
 }
 
 /// Helper: build an error response from an XApiError via the ProviderError path.
+///
+/// Not yet called directly — mutation methods in the write module handle
+/// XApiError inline. Kept as the shared helper for when write actions are
+/// refactored to route through this module.
 #[allow(dead_code)]
 fn error_response(e: &XApiError, start: Instant) -> String {
     provider_error_to_response(&map_x_error(e), start)

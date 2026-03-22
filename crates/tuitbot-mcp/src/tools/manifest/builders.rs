@@ -16,6 +16,7 @@ pub(super) const ALL_SIX: &[Profile] = &[
     Profile::UtilityWrite,
 ];
 /// All four original profiles (no utility profiles).
+#[allow(dead_code)]
 pub(super) const ALL_FOUR: &[Profile] = &[
     Profile::Readonly,
     Profile::ApiReadonly,
