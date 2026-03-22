@@ -360,13 +360,13 @@ describe('FromVaultPanel', () => {
 		expect(container).toBeTruthy();
 	});
 
-	it('shows Extract key points button instead of Generate', () => {
+	it('shows Generate hooks button', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
 		const buttons = container.querySelectorAll('button');
-		const extractBtn = Array.from(buttons).find(
-			(b) => b.textContent?.includes('Extract key points')
+		const hooksBtn = Array.from(buttons).find(
+			(b) => b.textContent?.includes('Generate hooks')
 		);
-		expect(extractBtn).toBeTruthy();
+		expect(hooksBtn).toBeTruthy();
 	});
 
 	it('does not show Find hooks or Use this hook button in initial view', () => {
@@ -378,12 +378,12 @@ describe('FromVaultPanel', () => {
 		expect(hookBtn).toBeFalsy();
 	});
 
-	it('extract highlights button is disabled when no chunks selected', () => {
+	it('generate hooks button is disabled when no chunks selected', () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
-		const extractBtn = Array.from(container.querySelectorAll('button')).find(
-			(b) => b.textContent?.includes('Extract key points')
+		const hooksBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
 		) as HTMLButtonElement | undefined;
-		expect(extractBtn?.disabled).toBe(true);
+		expect(hooksBtn?.disabled).toBe(true);
 	});
 
 	it('renders with thread mode', () => {
@@ -421,14 +421,13 @@ describe('FromVaultPanel', () => {
 		expect(ongenerate).toHaveBeenCalledWith([1], 'tweet');
 	});
 
-	it('shows Extracting state text on button during extraction', async () => {
-		// We verify the initial disabled state renders "Extract key points"
+	it('shows Generate hooks button text in default state', async () => {
 		const { container } = render(FromVaultPanel, { props: defaultProps });
-		const extractBtn = Array.from(container.querySelectorAll('button')).find(
-			(b) => b.textContent?.includes('Extract key points') || b.textContent?.includes('Extracting')
+		const hooksBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
 		);
-		expect(extractBtn).toBeTruthy();
-		expect(extractBtn?.textContent?.trim()).toBe('Extract key points');
+		expect(hooksBtn).toBeTruthy();
+		expect(hooksBtn?.textContent?.trim()).toBe('Generate hooks');
 	});
 
 	// --- Selection hydration tests ---

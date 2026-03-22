@@ -61,8 +61,21 @@ pub fn parse_thread(text: &str) -> Vec<String> {
 ///
 /// Tolerant of common LLM formatting variations: case-insensitive prefixes,
 /// markdown bold (`**STYLE:**`), numbered prefixes (`1. STYLE:`), and
-/// leading/trailing quotes.
+/// leading/trailing quotes. When strict parsing yields fewer than 2 hooks,
+/// falls back to extracting non-empty text blocks (separated by `---` or
+/// numbered/bulleted lines).
 pub fn parse_hooks_response(text: &str) -> Vec<(String, String)> {
+    let results = parse_hooks_strict(text);
+    if !results.is_empty() {
+        return results;
+    }
+
+    // Fallback: strict parser found nothing — try extracting text blocks.
+    parse_hooks_fallback(text)
+}
+
+/// Strict parser: looks for STYLE:/HOOK: prefixed lines separated by ---.
+fn parse_hooks_strict(text: &str) -> Vec<(String, String)> {
     let mut results = Vec::new();
     let mut current_hook = String::new();
     let mut current_style = String::new();
@@ -105,6 +118,71 @@ pub fn parse_hooks_response(text: &str) -> Vec<(String, String)> {
     }
 
     results
+}
+
+/// Fallback parser: splits on `---` separators, or treats each non-empty
+/// line (after stripping numbering/bullets) as a hook with style "general".
+fn parse_hooks_fallback(text: &str) -> Vec<(String, String)> {
+    // Try --- separated blocks first
+    if text.contains("---") {
+        let blocks: Vec<(String, String)> = text
+            .split("---")
+            .map(|block| {
+                let cleaned = block
+                    .lines()
+                    .map(|l| strip_line_noise(l.trim()))
+                    .filter(|l| !l.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                strip_quotes(cleaned.trim())
+            })
+            .filter(|s| !s.is_empty())
+            .map(|s| extract_inline_style(&s))
+            .collect();
+
+        if blocks.len() >= 2 {
+            return blocks;
+        }
+    }
+
+    // Treat each non-empty line as a separate hook
+    text.lines()
+        .map(|line| strip_line_noise(line.trim()))
+        .map(|s| strip_quotes(s.trim()))
+        .filter(|s| !s.is_empty() && s.len() > 10) // skip very short lines (headers, etc.)
+        .map(|s| extract_inline_style(&s))
+        .collect()
+}
+
+/// Try to extract an inline style label like `[Question] hook text` or
+/// `Question: hook text` from the beginning of text.
+fn extract_inline_style(text: &str) -> (String, String) {
+    // Pattern: [Style] rest
+    if text.starts_with('[') {
+        if let Some(end) = text.find(']') {
+            let style = text[1..end].trim().to_string();
+            let rest = text[end + 1..].trim().to_string();
+            if !style.is_empty() && !rest.is_empty() {
+                return (style, strip_quotes(&rest));
+            }
+        }
+    }
+
+    // Pattern: Style: rest (short label before colon, up to 3 words)
+    if let Some(colon) = text.find(':') {
+        let candidate = text[..colon].trim();
+        if !candidate.is_empty()
+            && candidate.len() <= 25
+            && candidate.split_whitespace().count() <= 3
+        {
+            let rest = text[colon + 1..].trim();
+            if !rest.is_empty() && rest.len() > 10 {
+                return (candidate.to_string(), strip_quotes(rest));
+            }
+        }
+    }
+
+    ("general".to_string(), text.to_string())
 }
 
 /// Case-insensitive prefix strip. Returns the remainder after the prefix.

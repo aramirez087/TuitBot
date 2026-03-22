@@ -2,7 +2,7 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
-	import { canPost } from '$lib/stores/runtime';
+	import { canPost, loadCapabilities } from '$lib/stores/runtime';
 	import { loadSchedule } from '$lib/stores/calendar';
 	import * as studio from '$lib/stores/draftStudio.svelte';
 	import { api } from '$lib/api';
@@ -36,6 +36,8 @@
 
 	onMount(() => {
 		studio.initFromUrl($page.url);
+
+		loadCapabilities();
 
 		api.assist.mode().then((res) => {
 			approvalMode = res.approval_mode;

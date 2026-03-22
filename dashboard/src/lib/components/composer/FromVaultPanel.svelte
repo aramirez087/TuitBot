@@ -6,7 +6,6 @@
 	import { deploymentMode } from '$lib/stores/runtime';
 	import VaultNoteList from './VaultNoteList.svelte';
 	import VaultFooter from './VaultFooter.svelte';
-	import VaultHighlights from './VaultHighlights.svelte';
 	import HookPicker from './HookPicker.svelte';
 	import VaultSelectionReview from './VaultSelectionReview.svelte';
 	import type { HookOption } from '$lib/api/types';
@@ -49,8 +48,6 @@
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let searchRef: HTMLInputElement | undefined = $state();
 	let noSources = $state(false);
-	let highlightsStep = $state<Array<{ text: string; enabled: boolean }> | null>(null);
-	let extracting = $state(false);
 	let cachedNodeIds = $state<number[]>([]);
 	let selectionActive = $state(false);
 	let hookOptions = $state<HookOption[] | null>(null);
@@ -106,33 +103,22 @@
 		selectedChunks = next;
 	}
 
-	async function handleExtractHighlights() {
-		if (selectionCount === 0 || extracting) return;
-		extracting = true;
-		error = null;
-		try {
-			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
-			cachedNodeIds = nodeIds;
-			const result = await api.assist.highlights(nodeIds);
-			highlightsStep = result.highlights.map((text) => ({ text, enabled: true }));
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to extract highlights';
-		} finally {
-			extracting = false;
-		}
-	}
-
-	async function handleGenerateHooksFromHighlights(enabledHighlights: string[]) {
-		if (enabledHighlights.length === 0 || hookLoading) return;
+	async function handleGenerateHooks() {
+		if (selectionCount === 0 || hookLoading) return;
 		hookLoading = true;
 		hookError = null;
 		error = null;
 		try {
-			const topic = enabledHighlights.join('\n');
-			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
+			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
+			cachedNodeIds = nodeIds;
+			const headings = [...selectedChunks.values()].map((v) => v.heading).filter(Boolean);
+			const topic = headings.length > 0 ? headings.join('\n') : 'general topic';
+			const result = await api.assist.hooks(topic, { selectedNodeIds: nodeIds });
 			hookOptions = result.hooks;
 		} catch (e) {
-			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+			const msg = e instanceof Error ? e.message : 'Failed to generate hooks';
+			hookError = msg;
+			error = msg;
 		} finally {
 			hookLoading = false;
 		}
@@ -157,12 +143,12 @@
 	}
 
 	async function handleRegenerateHooks() {
-		if (!highlightsStep) return;
+		if (cachedNodeIds.length === 0) return;
 		hookLoading = true;
 		hookError = null;
 		try {
-			const enabledHighlights = highlightsStep.filter((h) => h.enabled).map((h) => h.text);
-			const topic = enabledHighlights.join('\n');
+			const headings = [...selectedChunks.values()].map((v) => v.heading).filter(Boolean);
+			const topic = headings.length > 0 ? headings.join('\n') : 'general topic';
 			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
 			hookOptions = result.hooks;
 		} catch (e) {
@@ -172,13 +158,7 @@
 		}
 	}
 
-	function handleBackToHighlights() {
-		hookOptions = null;
-		hookError = null;
-	}
-
 	function handleBackToChunks() {
-		highlightsStep = null;
 		hookOptions = null;
 		hookError = null;
 	}
@@ -255,19 +235,6 @@
 			error={hookError}
 			onselect={handleHookSelected}
 			onregenerate={handleRegenerateHooks}
-			onback={handleBackToHighlights}
-			onformatchange={(f) => { outputFormat = f; }}
-		/>
-	{:else if highlightsStep}
-		{#if error}
-			<div class="vault-error" role="alert">{error}</div>
-		{/if}
-
-		<VaultHighlights
-			highlights={highlightsStep}
-			{outputFormat}
-			generating={hookLoading}
-			ongenerate={handleGenerateHooksFromHighlights}
 			onback={handleBackToChunks}
 			onformatchange={(f) => { outputFormat = f; }}
 		/>
@@ -306,12 +273,12 @@
 			{selectionCount}
 			maxSelections={MAX_SELECTIONS}
 			{outputFormat}
-			extracting={extracting}
+			loading={hookLoading}
 			{generating}
 			{confirmReplace}
 			{showUndo}
 			{onundo}
-			onGenerate={handleExtractHighlights}
+			onGenerate={handleGenerateHooks}
 			onCancelReplace={cancelReplace}
 			onformatchange={(f) => { outputFormat = f; }}
 		/>

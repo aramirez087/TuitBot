@@ -4,6 +4,7 @@
 	import { loadStats as loadApprovalStats } from "$lib/stores/approval";
 	import { connected } from "$lib/stores/websocket";
 	import { checkForUpdate } from "$lib/stores/update";
+	import { loadCapabilities } from "$lib/stores/runtime";
 	import { initAccounts, syncCurrentProfile, bootstrapState, ACCOUNT_SWITCHED_EVENT } from "$lib/stores/accounts";
 	import { authMode } from "$lib/stores/auth";
 	import { onMount, onDestroy } from "svelte";
@@ -58,6 +59,7 @@
 
 	onMount(async () => {
 		await initAccounts();
+		loadCapabilities();
 		syncCurrentProfile();
 		loadApprovalStats();
 		checkForUpdate();

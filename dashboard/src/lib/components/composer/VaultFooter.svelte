@@ -3,7 +3,7 @@
 		selectionCount: number;
 		maxSelections: number;
 		outputFormat: 'tweet' | 'thread';
-		extracting?: boolean;
+		loading?: boolean;
 		generating: boolean;
 		confirmReplace: boolean;
 		showUndo: boolean;
@@ -18,7 +18,7 @@
 		selectionCount,
 		maxSelections,
 		outputFormat,
-		extracting = false,
+		loading = false,
 		generating,
 		confirmReplace,
 		showUndo,
@@ -31,9 +31,8 @@
 
 	function buttonLabel(): string {
 		if (generating) return 'Generating...';
-		if (extracting) return 'Extracting...';
-		if (selectionMode) return 'Generate hooks';
-		return 'Extract key points';
+		if (loading) return 'Generating hooks...';
+		return 'Generate hooks';
 	}
 </script>
 
@@ -72,7 +71,7 @@
 		<button
 			class="vault-generate-btn"
 			onclick={onGenerate}
-			disabled={selectionCount === 0 || extracting || generating}
+			disabled={selectionCount === 0 || loading || generating}
 		>
 			{buttonLabel()}
 		</button>

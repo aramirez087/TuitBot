@@ -436,6 +436,11 @@ impl ContentGenerator {
         usage.accumulate(&resp.usage);
         let model = resp.model.clone();
 
+        tracing::debug!(
+            raw_response = %resp.text,
+            "Raw LLM response for hook generation"
+        );
+
         let mut hooks = Self::build_hook_options(&parse_hooks_response(&resp.text));
 
         // Retry once if fewer than 3 hooks
@@ -447,6 +452,12 @@ impl ContentGenerator {
             );
             let resp = self.provider.complete(&system, &retry_msg, &params).await?;
             usage.accumulate(&resp.usage);
+
+            tracing::debug!(
+                raw_response = %resp.text,
+                "Raw LLM retry response for hook generation"
+            );
+
             hooks = Self::build_hook_options(&parse_hooks_response(&resp.text));
         }
 
@@ -547,21 +558,23 @@ impl ContentGenerator {
             .complete(&system, &user_message, &params)
             .await?;
 
+        tracing::debug!(
+            raw_response = %resp.text,
+            "Raw LLM response for highlight extraction"
+        );
+
         let highlights: Vec<String> = resp
             .text
             .lines()
-            .map(|line| {
-                line.trim()
-                    .trim_start_matches(['-', '*', '•'])
-                    .trim_start_matches(|c: char| c.is_ascii_digit())
-                    .trim_start_matches('.')
-                    .trim()
-                    .to_string()
-            })
+            .map(|line| strip_bullet_prefix(line.trim()))
             .filter(|s| !s.is_empty())
             .collect();
 
         if highlights.is_empty() {
+            tracing::warn!(
+                raw_response = %resp.text,
+                "Highlight extraction produced no results after parsing"
+            );
             return Err(LlmError::GenerationFailed(
                 "No highlights could be extracted from the provided context".to_string(),
             ));
@@ -576,7 +589,7 @@ impl ContentGenerator {
 
     /// Generate an educational thread of 5-8 tweets.
     pub async fn generate_thread(&self, topic: &str) -> Result<ThreadGenerationOutput, LlmError> {
-        self.generate_thread_inner(topic, None, None).await
+        self.generate_thread_inner(topic, None, None, None).await
     }
 
     /// Generate a thread using a specific structure for varied content.
@@ -585,7 +598,8 @@ impl ContentGenerator {
         topic: &str,
         structure: Option<ThreadStructure>,
     ) -> Result<ThreadGenerationOutput, LlmError> {
-        self.generate_thread_inner(topic, structure, None).await
+        self.generate_thread_inner(topic, structure, None, None)
+            .await
     }
 
     /// Generate a thread with optional RAG context injected into the prompt.
@@ -595,21 +609,38 @@ impl ContentGenerator {
         structure: Option<ThreadStructure>,
         rag_context: Option<&str>,
     ) -> Result<ThreadGenerationOutput, LlmError> {
-        self.generate_thread_inner(topic, structure, rag_context)
+        self.generate_thread_inner(topic, structure, rag_context, None)
             .await
     }
 
-    /// Internal thread generation with optional structure and RAG context.
+    /// Generate a thread that starts with a specific opening hook tweet.
+    ///
+    /// The hook is used verbatim as the first tweet, and the LLM generates
+    /// 4-7 additional tweets continuing from that opening.
+    pub async fn generate_thread_with_hook(
+        &self,
+        topic: &str,
+        opening_hook: &str,
+        structure: Option<ThreadStructure>,
+        rag_context: Option<&str>,
+    ) -> Result<ThreadGenerationOutput, LlmError> {
+        self.generate_thread_inner(topic, structure, rag_context, Some(opening_hook))
+            .await
+    }
+
+    /// Internal thread generation with optional structure, RAG context, and opening hook.
     async fn generate_thread_inner(
         &self,
         topic: &str,
         structure: Option<ThreadStructure>,
         rag_context: Option<&str>,
+        opening_hook: Option<&str>,
     ) -> Result<ThreadGenerationOutput, LlmError> {
         tracing::debug!(
             topic = %topic,
             structure = ?structure,
             has_rag_context = rag_context.is_some(),
+            has_opening_hook = opening_hook.is_some(),
             "Generating thread",
         );
 
@@ -626,6 +657,22 @@ impl ContentGenerator {
         let rag_section = Self::format_rag_section(rag_context);
         let audience_section = self.format_audience_section();
 
+        let (hook_rule, tweet_count_rule) = match opening_hook {
+            Some(hook) => (
+                format!(
+                    "\n- The first tweet of the thread is ALREADY WRITTEN. \
+                     Do NOT include it in your output.\n\
+                     - Here is the first tweet (for context only): \"{hook}\"\n\
+                     - Write 4 to 7 ADDITIONAL tweets that continue from that opening."
+                ),
+                "4 to 7",
+            ),
+            None => (
+                "\n- The first tweet should hook the reader.".to_string(),
+                "5 to 8",
+            ),
+        };
+
         let system = format!(
             "You are {}'s social media voice. {}.\
              {audience_section}\
@@ -635,10 +682,9 @@ impl ContentGenerator {
              {persona_section}\
              {rag_section}\n\n\
              Rules:\n\
-             - Write an educational thread of 5 to 8 tweets about the topic below.\n\
+             - Write an educational thread of {tweet_count_rule} tweets about the topic below.\n\
              - Separate each tweet with a line containing only \"---\".\n\
-             - Each tweet must be under 280 characters.\n\
-             - The first tweet should hook the reader.\n\
+             - Each tweet must be under 280 characters.{hook_rule}\n\
              - The last tweet should include a call to action or summary.\n\
              - Do not use hashtags.",
             self.business.product_name, self.business.product_description,
@@ -655,12 +701,19 @@ impl ContentGenerator {
         let provider_name = self.provider.name().to_string();
         let mut model = String::new();
 
+        // When we have an opening hook, we expect 4-7 generated tweets (prepend hook for 5-8 total).
+        let (min_gen, max_gen) = if opening_hook.is_some() {
+            (4, 7)
+        } else {
+            (5, 8)
+        };
+
         for attempt in 0..=MAX_THREAD_RETRIES {
             let msg = if attempt == 0 {
                 user_message.clone()
             } else {
                 format!(
-                    "{user_message}\n\nIMPORTANT: Write exactly 5-8 tweets, \
+                    "{user_message}\n\nIMPORTANT: Write exactly {tweet_count_rule} tweets, \
                      each under 280 characters, separated by lines containing only \"---\"."
                 )
             };
@@ -668,9 +721,15 @@ impl ContentGenerator {
             let resp = self.provider.complete(&system, &msg, &params).await?;
             usage.accumulate(&resp.usage);
             model.clone_from(&resp.model);
-            let tweets = parse_thread(&resp.text);
+            let mut tweets = parse_thread(&resp.text);
 
-            if (5..=8).contains(&tweets.len())
+            // If hook provided, prepend it to form the complete thread.
+            if let Some(hook) = opening_hook {
+                tweets.insert(0, hook.to_string());
+            }
+
+            let gen_count = tweets.len() - if opening_hook.is_some() { 1 } else { 0 };
+            if (min_gen..=max_gen).contains(&gen_count)
                 && tweets
                     .iter()
                     .all(|t| validate_tweet_length(t, MAX_TWEET_CHARS))
@@ -790,4 +849,17 @@ impl ContentGenerator {
             format!("\n{}", parts.join("\n"))
         }
     }
+}
+
+/// Strip common bullet/list prefixes from a line, tolerating varied LLM formats.
+///
+/// Handles: `- `, `* `, `• `, `1. `, `1) `, `(1) `, and combinations thereof.
+/// Returns the remaining text trimmed, or empty string if the line is only a prefix.
+fn strip_bullet_prefix(line: &str) -> String {
+    let s = line
+        .trim_start_matches(|c: char| c == '(' || c.is_ascii_whitespace())
+        .trim_start_matches(|c: char| c.is_ascii_digit())
+        .trim_start_matches(['.', ')', ':', '-', '*', '•', '—'])
+        .trim();
+    s.to_string()
 }

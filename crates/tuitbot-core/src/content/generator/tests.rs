@@ -305,6 +305,48 @@ mod tests {
         assert!((5..=8).contains(&output.tweets.len()));
     }
 
+    // --- generate_thread_with_hook tests ---
+
+    #[tokio::test]
+    async fn generate_thread_with_hook_prepends_hook() {
+        // LLM generates 4 continuation tweets (hook is prepended automatically)
+        let continuation = "Deep dive\n---\nKey insight\n---\nPractical tip\n---\nCall to action";
+        let provider = MockProvider::single(continuation);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let hook = "What if your tests could write themselves?";
+        let output = gen
+            .generate_thread_with_hook("testing", hook, None, None)
+            .await
+            .expect("thread with hook");
+
+        // First tweet should be the hook
+        assert_eq!(output.tweets[0], hook);
+        // Total should be 5 (hook + 4 generated)
+        assert_eq!(output.tweets.len(), 5);
+    }
+
+    #[tokio::test]
+    async fn generate_thread_with_hook_and_rag_context() {
+        let continuation = "Point 1\n---\nPoint 2\n---\nPoint 3\n---\nPoint 4\n---\nSummary";
+        let (provider, captured) = PromptCapturingProvider::new(continuation);
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+
+        let hook = "Hot take: testing is overrated.";
+        let rag = "Context from vault notes about testing.";
+        let output = gen
+            .generate_thread_with_hook("testing", hook, None, Some(rag))
+            .await
+            .expect("thread");
+
+        assert_eq!(output.tweets[0], hook);
+        // Verify the system prompt mentions the hook
+        let system = captured.lock().await;
+        let system = system.as_ref().unwrap();
+        assert!(system.contains("ALREADY WRITTEN"));
+        assert!(system.contains(hook));
+    }
+
     // --- improve_draft tests ---
 
     #[tokio::test]
@@ -901,6 +943,54 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[tokio::test]
+    async fn extract_highlights_parses_paren_numbered() {
+        let provider = MockProvider::single("1) First insight\n2) Second insight");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["First insight", "Second insight"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_parses_paren_wrapped_numbers() {
+        let provider = MockProvider::single("(1) First insight\n(2) Second insight");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["First insight", "Second insight"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_parses_colon_numbered() {
+        let provider = MockProvider::single("1: First insight\n2: Second insight");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["First insight", "Second insight"]);
+    }
+
+    #[tokio::test]
+    async fn extract_highlights_parses_em_dash_bullets() {
+        let provider = MockProvider::single("— First insight\n— Second insight");
+        let gen = ContentGenerator::new(Box::new(provider), test_business());
+        let result = gen.extract_highlights("some context").await.unwrap();
+        assert_eq!(result, vec!["First insight", "Second insight"]);
+    }
+
+    #[test]
+    fn strip_bullet_prefix_various_formats() {
+        use super::super::strip_bullet_prefix;
+        assert_eq!(strip_bullet_prefix("- hello"), "hello");
+        assert_eq!(strip_bullet_prefix("* hello"), "hello");
+        assert_eq!(strip_bullet_prefix("• hello"), "hello");
+        assert_eq!(strip_bullet_prefix("1. hello"), "hello");
+        assert_eq!(strip_bullet_prefix("1) hello"), "hello");
+        assert_eq!(strip_bullet_prefix("(1) hello"), "hello");
+        assert_eq!(strip_bullet_prefix("1: hello"), "hello");
+        assert_eq!(strip_bullet_prefix("— hello"), "hello");
+        assert_eq!(strip_bullet_prefix("  - hello"), "hello");
+        assert_eq!(strip_bullet_prefix("hello world"), "hello world");
+        assert_eq!(strip_bullet_prefix(""), "");
+    }
+
     // --- parse_hooks_response tests ---
 
     #[test]
@@ -997,6 +1087,42 @@ HOOK: One command that saves me 2 hours a week.";
         let results = super::super::parser::parse_hooks_response(text);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].1, "What if testing was fun?");
+    }
+
+    #[test]
+    fn parse_hooks_response_fallback_numbered_lines() {
+        let text = "\
+1. [Question] What if your tests could write themselves?
+2. [Tip] One cargo command saves me 2 hours a week.
+3. [Contrarian] Most devs test too much.";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert!(results.len() >= 3, "expected >= 3, got {}", results.len());
+        assert_eq!(results[0].0, "Question");
+        assert!(results[0].1.contains("tests could write"));
+    }
+
+    #[test]
+    fn parse_hooks_response_fallback_dash_separated_blocks() {
+        let text = "\
+Question: What if your tests could write themselves?
+---
+Tip: One cargo command saves me 2 hours a week.
+---
+Contrarian take: Most devs test too much.";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert!(results.len() >= 3, "expected >= 3, got {}", results.len());
+    }
+
+    #[test]
+    fn parse_hooks_response_fallback_plain_lines() {
+        let text = "\
+What if your tests could write themselves? Imagine a world where CI is your best friend.
+One cargo command saves me 2 hours every single week and you should try it too.
+Most developers test too much and here is why that actually hurts your product quality.";
+        let results = super::super::parser::parse_hooks_response(text);
+        assert!(results.len() >= 3, "expected >= 3, got {}", results.len());
+        // All should have "general" style since no style labels
+        assert!(results.iter().all(|(s, _)| s == "general"));
     }
 
     // --- generate_hooks tests ---
