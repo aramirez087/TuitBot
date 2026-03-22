@@ -155,10 +155,17 @@
 		startUndoTimer();
 	}
 
-	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[], hookStyle?: string) {
+	export async function handleGenerateFromVault(selectedNodeIds: number[], outputFormat: 'tweet' | 'thread' = mode, highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) {
 		if (selectedNodeIds.length === 0) return;
 		// Capture provenance from the vault node IDs used for generation.
-		vaultProvenance = selectedNodeIds.map((id) => ({ node_id: id }));
+		// For accepted neighbors, include edge_type and edge_label for provenance tracking.
+		vaultProvenance = selectedNodeIds.map((id) => {
+			const neighborInfo = neighborProvenance?.find((n) => n.node_id === id);
+			if (neighborInfo) {
+				return { node_id: id, edge_type: neighborInfo.edge_type, edge_label: neighborInfo.edge_label };
+			}
+			return { node_id: id };
+		});
 		vaultHookStyle = hookStyle ?? null;
 		try {
 			if (hookStyle && highlights && highlights.length > 0) {

@@ -50,7 +50,7 @@
 		onopenotes: () => void;
 		onopenvault: () => void;
 		ongenerate: (notes: string) => Promise<void>;
-		ongeneratefromvault: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
+		ongeneratefromvault: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
 		onclosenotes: () => void;
 		onundo: () => void;
 		onSelectionConsumed?: () => void;

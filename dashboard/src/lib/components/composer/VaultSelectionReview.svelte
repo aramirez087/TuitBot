@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { VaultSelectionResponse, HookOption } from '$lib/api/types';
+	import type { VaultSelectionResponse, HookOption, NeighborItem, GraphState } from '$lib/api/types';
 	import { Zap, FileText } from 'lucide-svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import HookPicker from './HookPicker.svelte';
+	import GraphSuggestionCards from './GraphSuggestionCards.svelte';
 
 	let {
 		sessionId,
@@ -22,7 +23,7 @@
 		hasExistingContent?: boolean;
 		showUndo?: boolean;
 		onundo?: () => void;
-		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
+		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
 		onSelectionConsumed?: () => void;
 		onexpired?: () => void;
 		onformatchange?: (format: 'tweet' | 'thread') => void;
@@ -38,6 +39,18 @@
 	let hookLoading = $state(false);
 	let hookError = $state<string | null>(null);
 
+	// Graph suggestion state (session-scoped)
+	let acceptedNeighbors = $state<Map<number, { neighbor: NeighborItem; role: string }>>(new Map());
+	let dismissedNodeIds = $state<Set<number>>(new Set());
+	let synthesisEnabled = $state(true);
+
+	const graphNeighbors = $derived(selection?.graph_neighbors ?? []);
+	const graphState = $derived<GraphState>(selection?.graph_state ?? 'fallback_active');
+	const graphLoading = $derived(loading);
+	const visibleNeighbors = $derived(
+		graphNeighbors.filter((n) => !dismissedNodeIds.has(n.node_id))
+	);
+
 	onMount(async () => {
 		try {
 			selection = await api.vault.getSelection(sessionId);
@@ -48,6 +61,28 @@
 			onSelectionConsumed?.();
 		}
 	});
+
+	function handleAcceptNeighbor(neighbor: NeighborItem, role: string) {
+		const next = new Map(acceptedNeighbors);
+		next.set(neighbor.node_id, { neighbor, role });
+		acceptedNeighbors = next;
+	}
+
+	function handleDismissNeighbor(nodeId: number) {
+		const nextDismissed = new Set(dismissedNodeIds);
+		nextDismissed.add(nodeId);
+		dismissedNodeIds = nextDismissed;
+		// Also remove from accepted if it was accepted
+		if (acceptedNeighbors.has(nodeId)) {
+			const next = new Map(acceptedNeighbors);
+			next.delete(nodeId);
+			acceptedNeighbors = next;
+		}
+	}
+
+	function toggleSynthesis() {
+		synthesisEnabled = !synthesisEnabled;
+	}
 
 	async function handleGenerate() {
 		if (!selection || hookLoading) return;
@@ -76,7 +111,19 @@
 		confirmReplace = false;
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
-			await ongenerate(nodeIds, format, [hook.text], hook.style);
+			// Build neighbor provenance for accepted neighbors
+			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string }> = [];
+			if (synthesisEnabled && acceptedNeighbors.size > 0) {
+				for (const [nid, { neighbor }] of acceptedNeighbors) {
+					if (!nodeIds.includes(nid)) nodeIds.push(nid);
+					neighborProv.push({
+						node_id: nid,
+						edge_type: neighbor.reason,
+						edge_label: neighbor.reason_label,
+					});
+				}
+			}
+			await ongenerate(nodeIds, format, [hook.text], hook.style, neighborProv.length > 0 ? neighborProv : undefined);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Generation failed';
 		} finally {
@@ -155,6 +202,37 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if graphState !== 'fallback_active'}
+		<div class="graph-toggle-row">
+			<button
+				class="synthesis-toggle"
+				class:active={synthesisEnabled}
+				onclick={toggleSynthesis}
+				aria-pressed={synthesisEnabled}
+				aria-label="Toggle related notes"
+			>
+				Related notes {synthesisEnabled ? 'ON' : 'OFF'}
+			</button>
+		</div>
+	{/if}
+
+	{#if synthesisEnabled}
+		<GraphSuggestionCards
+			neighbors={visibleNeighbors}
+			{graphState}
+			loading={graphLoading}
+			onaccept={handleAcceptNeighbor}
+			ondismiss={handleDismissNeighbor}
+		/>
+	{/if}
+
+	{#if acceptedNeighbors.size > 0 && synthesisEnabled}
+		<div class="accepted-summary">
+			{acceptedNeighbors.size} related {acceptedNeighbors.size === 1 ? 'note' : 'notes'} will be included
+		</div>
+	{/if}
+
 	{#if error}
 		<div class="vault-error" role="alert">{error}</div>
 	{/if}
@@ -285,9 +363,51 @@
 		color: var(--color-text-subtle);
 	}
 
+	.graph-toggle-row {
+		display: flex;
+		align-items: center;
+		margin-top: 6px;
+	}
+
+	.synthesis-toggle {
+		padding: 2px 10px;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 10px;
+		background: transparent;
+		color: var(--color-text-subtle);
+		font-size: 10px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.12s ease;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+	}
+
+	.synthesis-toggle.active {
+		border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+		color: var(--color-accent);
+		background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+	}
+
+	.synthesis-toggle:hover {
+		border-color: var(--color-accent);
+	}
+
+	.accepted-summary {
+		font-size: 10px;
+		color: var(--color-accent);
+		font-weight: 500;
+		margin-top: 4px;
+		padding: 0 2px;
+	}
+
 	.vault-error {
 		font-size: 12px;
 		color: var(--color-danger);
 		margin-top: 4px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.synthesis-toggle { transition: none; }
 	}
 </style>

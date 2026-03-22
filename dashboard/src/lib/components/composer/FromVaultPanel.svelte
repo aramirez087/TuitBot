@@ -23,7 +23,7 @@
 		mode?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
 		selectionSessionId?: string | null;
-		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string) => Promise<void>;
+		ongenerate: (selectedNodeIds: number[], outputFormat: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
 		onclose: () => void;
 		onundo?: () => void;
 		showUndo?: boolean;

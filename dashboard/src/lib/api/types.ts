@@ -801,6 +801,8 @@ export interface ProvenanceRef {
 	source_path?: string;
 	heading_path?: string;
 	snippet?: string;
+	edge_type?: string;
+	edge_label?: string;
 }
 
 export interface ProvenanceLink {
@@ -866,6 +868,24 @@ export interface VaultNoteDetail {
 
 // --- Ghostwriter selection (from Obsidian plugin) ---
 
+// --- Graph neighbor types (backlink synthesizer) ---
+
+export type GraphState = 'available' | 'no_related_notes' | 'node_not_indexed' | 'fallback_active';
+
+export interface NeighborItem {
+	node_id: number;
+	node_title: string;
+	reason: string;
+	reason_label: string;
+	intent: string;
+	matched_tags: string[];
+	score: number;
+	snippet: string;
+	best_chunk_id: number;
+	heading_path: string | null;
+	relative_path: string | null;
+}
+
 export interface VaultSelectionResponse {
 	session_id: string;
 	vault_name: string;
@@ -879,6 +899,8 @@ export interface VaultSelectionResponse {
 	created_at: string;
 	expires_at: string;
 	privacy_envelope?: string;
+	graph_neighbors?: NeighborItem[];
+	graph_state?: GraphState;
 }
 
 // --- Hook generation types (Ghostwriter) ---
