@@ -324,5 +324,4 @@ mod tests {
         let req: GetXUsageRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.days, Some(14));
     }
-
 }
