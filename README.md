@@ -19,7 +19,7 @@ Tuitbot discovers relevant conversations, drafts genuinely helpful replies, and 
 
 Built for **founders**, **indie hackers**, and **solo makers** who'd rather build their product than spend hours on X.
 
-[MCP Setup](#mcp-setup) · [Growth Co-Pilot](#growth-co-pilot) · [Features](#features) · [Getting Started](#getting-started) · [Full Docs](https://aramirez087.github.io/TuitBot/)
+[**⚡ Quickstart**](docs/quickstart.md) · [MCP Setup](#mcp-setup) · [Growth Co-Pilot](#growth-co-pilot) · [Features](#features) · [Getting Started](#getting-started) · [Full Docs](https://aramirez087.github.io/TuitBot/)
 
 </div>
 
