@@ -33,7 +33,7 @@ services:
     # Healthcheck: poll the /health endpoint every 30 s.
     # Unhealthy containers are automatically restarted by Docker.
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:3001/health || exit 1"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3

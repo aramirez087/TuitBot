@@ -56,13 +56,13 @@ RUN cargo build --release \
 # =============================================================================
 FROM debian:bookworm-slim AS runtime
 
-ARG BINARY=tuitbot-server
-
 # Runtime deps only:
 #   ca-certificates — HTTPS requests to X API / LLM providers
 #   libsqlite3-0    — SQLite shared library (sqlx links against it dynamically)
+#   curl            — used by docker-compose healthcheck to probe /health
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
 
