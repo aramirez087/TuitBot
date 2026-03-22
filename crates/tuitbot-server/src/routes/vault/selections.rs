@@ -67,6 +67,16 @@ pub async fn send_selection(
     ctx: AccountContext,
     Json(body): Json<SendSelectionRequest>,
 ) -> Response {
+    // Cloud mode privacy gate — vault selections must not be accepted in
+    // cloud deployments because the raw text never leaves the user's device.
+    if state.deployment_mode == DeploymentMode::Cloud {
+        return error_response(
+            StatusCode::FORBIDDEN,
+            "cloud_mode_prohibited",
+            "Vault selections are not available in cloud mode",
+        );
+    }
+
     // Validate vault_name
     if body.vault_name.is_empty() || body.vault_name.len() > 255 {
         return error_response(
