@@ -223,6 +223,11 @@
 	}
 
 	function handleUndo() {
+		// Prefer insert-level undo when available
+		if (inspectorRef?.hasPendingInsertUndo?.()) {
+			inspectorRef.handleUndoInsert();
+			return;
+		}
 		if (!undoSnapshot) return;
 		mode = undoSnapshot.mode; tweetText = undoSnapshot.text; threadBlocks = undoSnapshot.blocks;
 		if (undoSnapshot.media) attachedMedia = undoSnapshot.media;
@@ -274,6 +279,7 @@
 		bind:showUndo bind:undoMessage
 		bind:threadFlowRef bind:tweetEditorRef
 		onsubmiterror={(msg) => { submitError = msg; }}
+		onundo={handleUndo}
 	>
 		{#snippet inspector()}
 			<ComposerInspector

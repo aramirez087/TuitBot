@@ -918,6 +918,36 @@ export interface AssistHooksResponse {
 	vault_citations?: VaultCitation[];
 }
 
+// --- Draft insertion types (backlink synthesizer, Session 5) ---
+
+/** A single suggestion insertion into a specific draft slot. */
+export interface DraftInsert {
+	/** Unique ID for this insertion action. */
+	id: string;
+	/** Stable block ID (ThreadBlock.id or 'tweet' for single tweet mode). */
+	blockId: string;
+	/** Human-readable slot label ("Opening hook", "Tweet 2", etc.). */
+	slotLabel: string;
+	/** Text content before this insertion (for undo). */
+	previousText: string;
+	/** Text content after this insertion. */
+	insertedText: string;
+	/** The neighbor node ID that sourced this insertion. */
+	sourceNodeId: number;
+	/** Title of the source note. */
+	sourceTitle: string;
+	/** Provenance ref for this insert. */
+	provenance: ProvenanceRef;
+	/** Timestamp of insertion (ms since epoch). */
+	timestamp: number;
+}
+
+/** Tracks the full insert history and per-block active inserts. */
+export interface DraftInsertState {
+	history: DraftInsert[];
+	blockInserts: Map<string, DraftInsert[]>;
+}
+
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.
 export interface McpToolParam {
 	name: string;

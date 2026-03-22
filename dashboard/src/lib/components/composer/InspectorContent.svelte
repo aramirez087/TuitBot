@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { ScheduleConfig } from '$lib/api';
+	import type { ScheduleConfig, ThreadBlock } from '$lib/api';
+	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
 	import SchedulePicker from '../SchedulePicker.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import FromNotesPanel from '../FromNotesPanel.svelte';
@@ -18,6 +19,8 @@
 		showUndo,
 		mode,
 		selectionSessionId = null,
+		threadBlocks = [],
+		insertState,
 		onscheduleselect,
 		onunschedule,
 		oncuechange,
@@ -29,6 +32,8 @@
 		onclosenotes,
 		onundo,
 		onSelectionConsumed,
+		onslotinsert,
+		onundoinsert,
 		voicePanelRef = $bindable()
 	}: {
 		schedule: ScheduleConfig | null;
@@ -43,6 +48,8 @@
 		showUndo: boolean;
 		mode: 'tweet' | 'thread';
 		selectionSessionId?: string | null;
+		threadBlocks?: ThreadBlock[];
+		insertState?: DraftInsertState;
 		onscheduleselect: (date: string, time: string) => void;
 		onunschedule: () => void;
 		oncuechange: (cue: string) => void;
@@ -54,6 +61,8 @@
 		onclosenotes: () => void;
 		onundo: () => void;
 		onSelectionConsumed?: () => void;
+		onslotinsert?: (neighbor: NeighborItem, slotIndex: number, slotLabel: string) => void;
+		onundoinsert?: (insertId: string) => void;
 		voicePanelRef?: VoiceContextPanel;
 	} = $props();
 </script>
@@ -127,11 +136,15 @@
 			{mode}
 			{hasExistingContent}
 			{selectionSessionId}
+			{threadBlocks}
+			{insertState}
 			ongenerate={ongeneratefromvault}
 			onclose={onclosenotes}
 			onundo={onundo}
 			{showUndo}
 			{onSelectionConsumed}
+			onslotinsert={onslotinsert}
+			onundoinsert={onundoinsert}
 		/>
 	</div>
 {/if}

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { api, type ScheduleConfig, type ThreadBlock, type ProvenanceRef } from '$lib/api';
+	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
 	import { topicWithCue } from '$lib/utils/composeHandlers';
+	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel } from '$lib/stores/draftInsertStore';
 	import InspectorContent from './InspectorContent.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import type ThreadFlowLane from './ThreadFlowLane.svelte';
@@ -69,6 +71,108 @@
 	/** Get the current hook style (read by parent). */
 	export function getVaultHookStyle(): string | null {
 		return vaultHookStyle;
+	}
+
+	// ── Draft insert state ────────────────────────────────
+	let draftInsertState = $state<DraftInsertState>(createInsertState());
+
+	/** Get the current insert state (read by parent for prop drilling). */
+	export function getDraftInsertState(): DraftInsertState {
+		return draftInsertState;
+	}
+
+	/** Check if there are pending insert undos. */
+	export function hasPendingInsertUndo(): boolean {
+		return hasInserts(draftInsertState);
+	}
+
+	/** Handle slot insert: refine a specific block using a neighbor note. */
+	export async function handleSlotInsert(neighbor: NeighborItem, slotIndex: number, slotLabel: string) {
+		const blockId = mode === 'tweet' ? 'tweet' : threadBlocks[slotIndex]?.id;
+		if (!blockId) return;
+		const previousText = mode === 'tweet' ? tweetText : (threadBlocks[slotIndex]?.text ?? '');
+		if (!previousText.trim()) return;
+
+		assisting = true;
+		try {
+			const context = `This is the "${slotLabel}" of a ${mode}. Refine it using insights from the note "${neighbor.node_title}": ${neighbor.snippet}`;
+			const result = await api.assist.improve(previousText, context);
+			const insertedText = result.content;
+
+			if (mode === 'tweet') {
+				tweetText = insertedText;
+			} else {
+				threadBlocks = threadBlocks.map((b, i) =>
+					i === slotIndex ? { ...b, text: insertedText } : b
+				);
+			}
+
+			const insert = buildInsert({
+				blockId,
+				slotLabel,
+				previousText,
+				insertedText,
+				sourceNodeId: neighbor.node_id,
+				sourceTitle: neighbor.node_title,
+				edgeType: neighbor.reason,
+				edgeLabel: neighbor.reason_label,
+			});
+			draftInsertState = pushInsert(draftInsertState, insert);
+
+			// Add neighbor provenance
+			vaultProvenance = [
+				...vaultProvenance,
+				{ node_id: neighbor.node_id, edge_type: neighbor.reason, edge_label: neighbor.reason_label },
+			];
+
+			undoMessage = `Applied "${neighbor.node_title}" to ${slotLabel}.`;
+			startUndoTimer();
+		} catch (e) {
+			onsubmiterror?.(e instanceof Error ? e.message : 'Slot refinement failed');
+		} finally {
+			assisting = false;
+		}
+	}
+
+	/** Undo the most recent insert. Returns true if an insert was undone. */
+	export function handleUndoInsert(): boolean {
+		const result = popInsert(draftInsertState);
+		if (!result) return false;
+		const { newState, undone } = result;
+		draftInsertState = newState;
+
+		// Restore the previous text
+		if (undone.blockId === 'tweet') {
+			tweetText = undone.previousText;
+		} else {
+			threadBlocks = threadBlocks.map((b) =>
+				b.id === undone.blockId ? { ...b, text: undone.previousText } : b
+			);
+		}
+
+		undoMessage = `Reverted ${undone.slotLabel}.`;
+		startUndoTimer();
+		return true;
+	}
+
+	/** Undo a specific insert by ID. */
+	export function handleUndoInsertById(insertId: string): boolean {
+		const result = undoInsertById(draftInsertState, insertId);
+		if (!result) return false;
+		const { newState, undone } = result;
+		draftInsertState = newState;
+
+		if (undone.blockId === 'tweet') {
+			tweetText = undone.previousText;
+		} else {
+			threadBlocks = threadBlocks.map((b) =>
+				b.id === undone.blockId ? { ...b, text: undone.previousText } : b
+			);
+		}
+
+		undoMessage = `Reverted ${undone.slotLabel}.`;
+		startUndoTimer();
+		return true;
 	}
 
 	// ── Undo timer (AI operations) ─────────────────────────
@@ -222,6 +326,8 @@
 		showUndo,
 		mode,
 		selectionSessionId,
+		threadBlocks,
+		insertState: draftInsertState,
 	});
 
 	function handleScheduleSelect(date: string, time: string) {
@@ -259,6 +365,8 @@
 					onclosenotes={() => { notesPanelMode = null; }}
 					onundo={() => { onundo?.(); }}
 					{onSelectionConsumed}
+					onslotinsert={handleSlotInsert}
+					onundoinsert={handleUndoInsertById}
 				/>
 			</div>
 		</div>
@@ -278,6 +386,8 @@
 		onclosenotes={() => { notesPanelMode = null; }}
 		onundo={() => { onundo?.(); }}
 		{onSelectionConsumed}
+		onslotinsert={handleSlotInsert}
+		onundoinsert={handleUndoInsertById}
 	/>
 {/if}
 

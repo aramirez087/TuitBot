@@ -1,33 +1,47 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { VaultSelectionResponse, HookOption, NeighborItem, GraphState } from '$lib/api/types';
+	import type { VaultSelectionResponse, HookOption, NeighborItem, GraphState, ThreadBlock, DraftInsertState } from '$lib/api/types';
 	import { Zap, FileText } from 'lucide-svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import HookPicker from './HookPicker.svelte';
 	import GraphSuggestionCards from './GraphSuggestionCards.svelte';
+	import SlotTargetPanel from './SlotTargetPanel.svelte';
+	import { createInsertState } from '$lib/stores/draftInsertStore';
 
 	let {
 		sessionId,
 		outputFormat = $bindable('tweet'),
 		hasExistingContent = false,
 		showUndo = false,
+		threadBlocks = [],
+		mode = 'tweet',
+		insertState,
 		onundo,
 		ongenerate,
 		onSelectionConsumed,
 		onexpired,
 		onformatchange,
+		oninsert,
+		onundoinsert,
 	}: {
 		sessionId: string;
 		outputFormat?: 'tweet' | 'thread';
 		hasExistingContent?: boolean;
 		showUndo?: boolean;
+		threadBlocks?: ThreadBlock[];
+		mode?: 'tweet' | 'thread';
+		insertState?: DraftInsertState;
 		onundo?: () => void;
 		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
 		onSelectionConsumed?: () => void;
 		onexpired?: () => void;
 		onformatchange?: (format: 'tweet' | 'thread') => void;
+		oninsert?: (neighbor: NeighborItem, slotIndex: number, slotLabel: string) => void;
+		onundoinsert?: (insertId: string) => void;
 	} = $props();
+
+	const effectiveInsertState = $derived(insertState ?? createInsertState());
 
 	let selection = $state<VaultSelectionResponse | null>(null);
 	let loading = $state(true);
@@ -231,6 +245,17 @@
 		<div class="accepted-summary">
 			{acceptedNeighbors.size} related {acceptedNeighbors.size === 1 ? 'note' : 'notes'} will be included
 		</div>
+	{/if}
+
+	{#if hasExistingContent && acceptedNeighbors.size > 0 && synthesisEnabled}
+		<SlotTargetPanel
+			{threadBlocks}
+			{mode}
+			{acceptedNeighbors}
+			insertState={effectiveInsertState}
+			{oninsert}
+			{onundoinsert}
+		/>
 	{/if}
 
 	{#if error}

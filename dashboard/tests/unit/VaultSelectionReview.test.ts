@@ -919,4 +919,151 @@ describe('VaultSelectionReview', () => {
 		await fireEvent.click(toggle);
 		expect(toggle.getAttribute('aria-pressed')).toBe('false');
 	});
+
+	// --- Slot targeting integration (Session 5) ---
+
+	it('shows SlotTargetPanel when hasExistingContent and accepted neighbors exist', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: {
+				...defaultProps,
+				hasExistingContent: true,
+				threadBlocks: [
+					{ id: 'b1', text: 'Opening', media_paths: [], order: 0 },
+					{ id: 'b2', text: 'Closing', media_paths: [], order: 1 },
+				],
+				mode: 'thread',
+			}
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.slot-target-panel')).toBeTruthy();
+		});
+	});
+
+	it('does not show SlotTargetPanel when no existing content', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, hasExistingContent: false }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.textContent).toContain('1 related note will be included');
+		});
+		expect(container.querySelector('.slot-target-panel')).toBeFalsy();
+	});
+
+	it('slot insert callback is fired with correct neighbor and slot index', async () => {
+		const oninsert = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: {
+				...defaultProps,
+				hasExistingContent: true,
+				threadBlocks: [
+					{ id: 'b1', text: 'Opening text', media_paths: [], order: 0 },
+					{ id: 'b2', text: 'Closing text', media_paths: [], order: 1 },
+				],
+				mode: 'thread',
+				oninsert,
+			}
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.slot-target-panel')).toBeTruthy();
+		});
+		// Click "Apply" in the SlotTargetPanel
+		const applyBtn = container.querySelector('.apply-btn') as HTMLButtonElement;
+		await fireEvent.click(applyBtn);
+		expect(oninsert).toHaveBeenCalledWith(
+			expect.objectContaining({ node_id: 55, node_title: 'Async Patterns' }),
+			0,
+			'Opening hook'
+		);
+	});
+
+	it('tweet mode: insert targets single slot', async () => {
+		const oninsert = vi.fn();
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		const { container } = render(VaultSelectionReview, {
+			props: {
+				...defaultProps,
+				hasExistingContent: true,
+				mode: 'tweet',
+				oninsert,
+			}
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.slot-target-panel')).toBeTruthy();
+		});
+		const applyBtn = container.querySelector('.apply-btn') as HTMLButtonElement;
+		await fireEvent.click(applyBtn);
+		expect(oninsert).toHaveBeenCalledWith(
+			expect.objectContaining({ node_id: 55 }),
+			0,
+			'Tweet'
+		);
+	});
+
+	it('ongenerate includes neighbor provenance edge_type and edge_label', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept first neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		// Generate and confirm
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		const hookCards = container.querySelectorAll('.hook-card');
+		await fireEvent.click(hookCards[0]);
+		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalled();
+			const call = ongenerate.mock.calls[0];
+			const neighborProv = call[4];
+			expect(neighborProv).toBeDefined();
+			expect(neighborProv[0]).toEqual(
+				expect.objectContaining({ node_id: 55, edge_type: 'linked_note', edge_label: 'linked note' })
+			);
+		});
+	});
 });
