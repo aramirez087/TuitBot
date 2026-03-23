@@ -207,6 +207,70 @@ describe('EvidenceRail', () => {
 		expect(container.querySelector('.rail-content')).not.toBeNull();
 	});
 
+	it('shows strengthen button when pinned and has existing content', async () => {
+		apiMock.vault.indexStatus.mockResolvedValue(makeIndexStatus());
+		let state = createEvidenceState();
+		state = pinEvidence(state, makeResult({ chunk_id: 1 }));
+		const onevidence = vi.fn();
+		const onstrengthen = vi.fn();
+		const { container } = render(EvidenceRail, {
+			props: { evidenceState: state, onevidence, hasExistingContent: true, onstrengthen },
+		});
+		await vi.waitFor(() => {
+			expect(apiMock.vault.indexStatus).toHaveBeenCalled();
+		});
+		await new Promise((r) => setTimeout(r, 10));
+		const strengthenBtn = container.querySelector('.strengthen-btn');
+		expect(strengthenBtn).not.toBeNull();
+		expect(strengthenBtn?.textContent).toContain('Strengthen draft');
+	});
+
+	it('hides strengthen button when no existing content', async () => {
+		apiMock.vault.indexStatus.mockResolvedValue(makeIndexStatus());
+		let state = createEvidenceState();
+		state = pinEvidence(state, makeResult({ chunk_id: 1 }));
+		const onevidence = vi.fn();
+		const onstrengthen = vi.fn();
+		const { container } = render(EvidenceRail, {
+			props: { evidenceState: state, onevidence, hasExistingContent: false, onstrengthen },
+		});
+		await vi.waitFor(() => {
+			expect(apiMock.vault.indexStatus).toHaveBeenCalled();
+		});
+		await new Promise((r) => setTimeout(r, 10));
+		const strengthenBtn = container.querySelector('.strengthen-btn');
+		expect(strengthenBtn).toBeNull();
+	});
+
+	it('renders slot picker dropdown on evidence card in thread mode', async () => {
+		apiMock.vault.indexStatus.mockResolvedValue(makeIndexStatus());
+		let state = createEvidenceState();
+		state = pinEvidence(state, makeResult({ chunk_id: 1 }));
+		const onevidence = vi.fn();
+		const onapplytoSlot = vi.fn();
+		const threadBlocks = [
+			{ id: 'b1', text: 'First', media_paths: [], order: 0 },
+			{ id: 'b2', text: 'Second', media_paths: [], order: 1 },
+		];
+		const { container } = render(EvidenceRail, {
+			props: {
+				evidenceState: state,
+				onevidence,
+				onapplytoSlot,
+				hasExistingContent: true,
+				mode: 'thread',
+				threadBlocks,
+			},
+		});
+		await vi.waitFor(() => {
+			expect(apiMock.vault.indexStatus).toHaveBeenCalled();
+		});
+		await new Promise((r) => setTimeout(r, 10));
+		// The apply button should exist on the pinned card
+		const applyBtn = container.querySelector('.card-action-btn[aria-haspopup="true"]');
+		expect(applyBtn).not.toBeNull();
+	});
+
 	it('shows keyboard shortcut hint', async () => {
 		apiMock.vault.indexStatus.mockResolvedValue(makeIndexStatus());
 		const onevidence = vi.fn();

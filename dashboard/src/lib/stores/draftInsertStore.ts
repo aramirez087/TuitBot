@@ -90,11 +90,23 @@ export function buildInsert(params: {
 	sourceTitle: string;
 	edgeType?: string;
 	edgeLabel?: string;
+	matchReason?: string;
+	similarityScore?: number;
+	chunkId?: number;
+	sourceRole?: string;
+	headingPath?: string;
+	snippet?: string;
 }): DraftInsert {
 	const provenance: ProvenanceRef = {
 		node_id: params.sourceNodeId,
+		chunk_id: params.chunkId,
 		edge_type: params.edgeType,
 		edge_label: params.edgeLabel,
+		match_reason: params.matchReason as ProvenanceRef['match_reason'],
+		similarity_score: params.similarityScore,
+		source_role: params.sourceRole,
+		heading_path: params.headingPath,
+		snippet: params.snippet,
 	};
 	return {
 		id: crypto.randomUUID(),
@@ -107,4 +119,21 @@ export function buildInsert(params: {
 		provenance,
 		timestamp: Date.now(),
 	};
+}
+
+/** Partition inserts by source role into graph and evidence groups. */
+export function partitionInserts(state: DraftInsertState): {
+	graphInserts: DraftInsert[];
+	evidenceInserts: DraftInsert[];
+} {
+	const graphInserts: DraftInsert[] = [];
+	const evidenceInserts: DraftInsert[] = [];
+	for (const insert of state.history) {
+		if (insert.provenance.source_role === 'semantic_evidence') {
+			evidenceInserts.push(insert);
+		} else {
+			graphInserts.push(insert);
+		}
+	}
+	return { graphInserts, evidenceInserts };
 }

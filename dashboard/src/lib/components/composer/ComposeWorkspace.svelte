@@ -82,6 +82,7 @@
 	let recoveryData = $state<RecoveryData | null>(null);
 	let undoSnapshot = $state<{ mode: 'tweet' | 'thread'; text: string; blocks: ThreadBlock[]; media?: AttachedMedia[]; selectedTime?: string | null; scheduledDate?: string | null } | null>(null);
 	let currentInsertState = $state<DraftInsertState | undefined>(undefined);
+	let focusedBlockIndex = $state(0);
 
 	// Component refs
 	let threadFlowRef = $state<ThreadFlowLane | undefined>();
@@ -291,6 +292,7 @@
 		onundo={handleUndo}
 		insertState={currentInsertState}
 		onundoinsert={(id) => inspectorRef?.handleUndoInsertById(id)}
+		onfocusindexchange={(idx) => { focusedBlockIndex = idx; }}
 	>
 		{#snippet inspector()}
 			<ComposerInspector
@@ -300,7 +302,7 @@
 				bind:assisting bind:voiceCue bind:notesPanelMode bind:showUndo bind:undoMessage
 				bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
 				bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
-				{selectionSessionId} {onSelectionConsumed}
+				{selectionSessionId} {onSelectionConsumed} {focusedBlockIndex}
 				oninsertstatechange={(s) => { currentInsertState = s; }}
 				onundo={handleUndo}
 				onsubmiterror={(msg) => { submitError = msg; }}
@@ -315,7 +317,7 @@
 			bind:assisting bind:voiceCue bind:notesPanelMode bind:showUndo bind:undoMessage
 			bind:tweetText bind:threadBlocks bind:selectedTime bind:scheduledDate bind:voicePanelRef
 			bind:mode {schedule} {targetDate} timezone={accountTimezone} {hasExistingContent} {threadFlowRef}
-			{selectionSessionId} {onSelectionConsumed}
+			{selectionSessionId} {onSelectionConsumed} {focusedBlockIndex}
 			oninsertstatechange={(s) => { currentInsertState = s; }}
 			onclose={() => { inspectorOpen = false; }}
 			onundo={handleUndo}

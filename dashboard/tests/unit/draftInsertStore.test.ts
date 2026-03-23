@@ -13,6 +13,7 @@ import {
 	clearInserts,
 	hasInserts,
 	buildInsert,
+	partitionInserts,
 } from '$lib/stores/draftInsertStore';
 import type { DraftInsert } from '$lib/api/types';
 
@@ -207,6 +208,112 @@ describe('draftInsertStore', () => {
 			state = pushInsert(state, insert);
 			const result = popInsert(state);
 			expect(result!.undone.previousText).toBe('original draft text');
+		});
+	});
+
+	describe('buildInsert with evidence metadata', () => {
+		it('populates provenance with match_reason, similarity_score, chunk_id, and source_role', () => {
+			const insert = buildInsert({
+				blockId: 'b1',
+				slotLabel: 'Tweet',
+				previousText: 'old',
+				insertedText: 'new',
+				sourceNodeId: 10,
+				sourceTitle: 'Research Note',
+				matchReason: 'semantic',
+				similarityScore: 0.92,
+				chunkId: 42,
+				sourceRole: 'semantic_evidence',
+				headingPath: 'Overview > Key findings',
+				snippet: 'Important findings here',
+			});
+			expect(insert.provenance.match_reason).toBe('semantic');
+			expect(insert.provenance.similarity_score).toBe(0.92);
+			expect(insert.provenance.chunk_id).toBe(42);
+			expect(insert.provenance.source_role).toBe('semantic_evidence');
+			expect(insert.provenance.heading_path).toBe('Overview > Key findings');
+			expect(insert.provenance.snippet).toBe('Important findings here');
+			expect(insert.provenance.node_id).toBe(10);
+		});
+
+		it('leaves optional evidence fields undefined when not provided', () => {
+			const insert = buildInsert({
+				blockId: 'b1',
+				slotLabel: 'Tweet',
+				previousText: 'old',
+				insertedText: 'new',
+				sourceNodeId: 10,
+				sourceTitle: 'Note',
+			});
+			expect(insert.provenance.match_reason).toBeUndefined();
+			expect(insert.provenance.similarity_score).toBeUndefined();
+			expect(insert.provenance.chunk_id).toBeUndefined();
+			expect(insert.provenance.source_role).toBeUndefined();
+		});
+	});
+
+	describe('partitionInserts', () => {
+		it('separates graph and evidence inserts', () => {
+			let state = createInsertState();
+			const graphInsert = makeInsert({
+				id: 'g1',
+				blockId: 'b1',
+				provenance: { node_id: 1, edge_type: 'linked_note', source_role: 'accepted_neighbor' },
+			});
+			const evidenceInsert = makeInsert({
+				id: 'e1',
+				blockId: 'b1',
+				provenance: { node_id: 2, source_role: 'semantic_evidence', match_reason: 'semantic' },
+			});
+			state = pushInsert(state, graphInsert);
+			state = pushInsert(state, evidenceInsert);
+			const { graphInserts, evidenceInserts } = partitionInserts(state);
+			expect(graphInserts).toHaveLength(1);
+			expect(graphInserts[0].id).toBe('g1');
+			expect(evidenceInserts).toHaveLength(1);
+			expect(evidenceInserts[0].id).toBe('e1');
+		});
+
+		it('returns empty arrays for empty state', () => {
+			const state = createInsertState();
+			const { graphInserts, evidenceInserts } = partitionInserts(state);
+			expect(graphInserts).toHaveLength(0);
+			expect(evidenceInserts).toHaveLength(0);
+		});
+
+		it('undo of evidence insert removes from evidence partition', () => {
+			let state = createInsertState();
+			const evidenceInsert = makeInsert({
+				id: 'e1',
+				blockId: 'b1',
+				provenance: { node_id: 2, source_role: 'semantic_evidence' },
+			});
+			state = pushInsert(state, evidenceInsert);
+			const result = undoInsertById(state, 'e1');
+			expect(result).not.toBeNull();
+			const { evidenceInserts } = partitionInserts(result!.newState);
+			expect(evidenceInserts).toHaveLength(0);
+		});
+
+		it('multiple evidence inserts to same block are individually undoable', () => {
+			let state = createInsertState();
+			const e1 = makeInsert({
+				id: 'e1',
+				blockId: 'b1',
+				provenance: { node_id: 1, source_role: 'semantic_evidence' },
+			});
+			const e2 = makeInsert({
+				id: 'e2',
+				blockId: 'b1',
+				provenance: { node_id: 2, source_role: 'semantic_evidence' },
+			});
+			state = pushInsert(state, e1);
+			state = pushInsert(state, e2);
+			const result = undoInsertById(state, 'e1');
+			expect(result).not.toBeNull();
+			const { evidenceInserts } = partitionInserts(result!.newState);
+			expect(evidenceInserts).toHaveLength(1);
+			expect(evidenceInserts[0].id).toBe('e2');
 		});
 	});
 });

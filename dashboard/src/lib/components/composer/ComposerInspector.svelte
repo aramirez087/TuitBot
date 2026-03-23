@@ -2,7 +2,7 @@
 	import { api, type ScheduleConfig, type ThreadBlock, type ProvenanceRef } from '$lib/api';
 	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
 	import { topicWithCue } from '$lib/utils/composeHandlers';
-	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel } from '$lib/stores/draftInsertStore';
+	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel, partitionInserts } from '$lib/stores/draftInsertStore';
 	import { createEvidenceState, type EvidenceState, type PinnedEvidence } from '$lib/stores/evidenceStore';
 	import { trackSlotTargeted, trackInsertUndone } from '$lib/analytics/backlinkFunnel';
 	import InspectorContent from './InspectorContent.svelte';
@@ -32,6 +32,7 @@
 		onclose,
 		onundo,
 		onsubmiterror,
+		focusedBlockIndex = 0,
 		onSelectionConsumed,
 		oninsertstatechange,
 	}: {
@@ -51,6 +52,7 @@
 		targetDate: Date;
 		timezone?: string;
 		hasExistingContent: boolean;
+		focusedBlockIndex?: number;
 		selectionSessionId?: string | null;
 		threadFlowRef?: ThreadFlowLane;
 		voicePanelRef?: VoiceContextPanel;
@@ -116,6 +118,12 @@
 				insertedText,
 				sourceNodeId: evidence.node_id,
 				sourceTitle: evidence.node_title ?? 'Evidence',
+				matchReason: evidence.match_reason,
+				similarityScore: evidence.score,
+				chunkId: evidence.chunk_id,
+				sourceRole: 'semantic_evidence',
+				headingPath: evidence.heading_path,
+				snippet: evidence.snippet,
 			});
 			draftInsertState = pushInsert(draftInsertState, insert);
 
@@ -136,6 +144,82 @@
 			startUndoTimer();
 		} catch (e) {
 			onsubmiterror?.(e instanceof Error ? e.message : 'Evidence application failed');
+		} finally {
+			assisting = false;
+		}
+	}
+
+	async function handleStrengthenDraft() {
+		const pinned = evidenceState.pinned;
+		if (pinned.length === 0) return;
+
+		const evidenceContext = pinned
+			.map((p) => `"${p.node_title ?? 'vault'}": ${p.snippet}`)
+			.join('\n');
+
+		assisting = true;
+		try {
+			if (mode === 'tweet') {
+				if (!tweetText.trim()) return;
+				const context = `Strengthen this tweet using these evidence points:\n${evidenceContext}`;
+				const result = await api.assist.improve(tweetText, context);
+				const insert = buildInsert({
+					blockId: 'tweet',
+					slotLabel: 'Tweet',
+					previousText: tweetText,
+					insertedText: result.content,
+					sourceNodeId: pinned[0].node_id,
+					sourceTitle: `${pinned.length} evidence items`,
+					matchReason: 'semantic',
+					sourceRole: 'semantic_evidence',
+				});
+				tweetText = result.content;
+				draftInsertState = pushInsert(draftInsertState, insert);
+			} else {
+				for (let i = 0; i < threadBlocks.length; i++) {
+					const block = threadBlocks[i];
+					if (!block.text.trim()) continue;
+					const slotLabel = getSlotLabel(i, threadBlocks.length);
+					const context = `This is the "${slotLabel}" of a thread. Strengthen it using these evidence points:\n${evidenceContext}`;
+					const result = await api.assist.improve(block.text, context);
+					const insert = buildInsert({
+						blockId: block.id,
+						slotLabel,
+						previousText: block.text,
+						insertedText: result.content,
+						sourceNodeId: pinned[0].node_id,
+						sourceTitle: `${pinned.length} evidence items`,
+						matchReason: 'semantic',
+						sourceRole: 'semantic_evidence',
+					});
+					threadBlocks = threadBlocks.map((b, j) =>
+						j === i ? { ...b, text: result.content } : b
+					);
+					draftInsertState = pushInsert(draftInsertState, insert);
+				}
+			}
+
+			for (const pin of pinned) {
+				vaultProvenance = [
+					...vaultProvenance,
+					{
+						node_id: pin.node_id,
+						chunk_id: pin.chunk_id,
+						heading_path: pin.heading_path,
+						snippet: pin.snippet,
+						match_reason: pin.match_reason,
+						similarity_score: pin.score,
+						source_role: 'semantic_evidence',
+					},
+				];
+			}
+
+			undoMessage = mode === 'tweet'
+				? 'Strengthened tweet with evidence.'
+				: `Strengthened ${threadBlocks.filter((b) => b.text.trim()).length} blocks with evidence.`;
+			startUndoTimer();
+		} catch (e) {
+			onsubmiterror?.(e instanceof Error ? e.message : 'Strengthen failed');
 		} finally {
 			assisting = false;
 		}
@@ -415,6 +499,7 @@
 		threadBlocks,
 		insertState: draftInsertState,
 		evidenceState,
+		focusedBlockIndex,
 	});
 
 	function handleScheduleSelect(date: string, time: string) {
@@ -456,6 +541,7 @@
 					onundoinsert={handleUndoInsertById}
 					onevidence={handleEvidenceChange}
 					onapplyevidence={handleApplyEvidence}
+					onstrengthen={handleStrengthenDraft}
 				/>
 			</div>
 		</div>
@@ -479,6 +565,7 @@
 		onundoinsert={handleUndoInsertById}
 		onevidence={handleEvidenceChange}
 		onapplyevidence={handleApplyEvidence}
+		onstrengthen={handleStrengthenDraft}
 	/>
 {/if}
 

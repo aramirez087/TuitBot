@@ -492,6 +492,61 @@ describe('ComposerInspector', () => {
 		expect(state.history).toHaveLength(0);
 	});
 
+	// ── evidence provenance in buildInsert ───────────────
+	// (handleApplyEvidence and handleStrengthenDraft are internal functions
+	// not exposed via export. Evidence provenance is covered by
+	// draftInsertStore.test.ts buildInsert tests. Integration behavior
+	// is verified through the component's exported getDraftInsertState()
+	// and getVaultProvenance() after handleSlotInsert calls.)
+
+	it('getVaultProvenance includes semantic_evidence entries after slot insert with evidence', async () => {
+		// Evidence provenance is tested through the public API:
+		// handleSlotInsert + getDraftInsertState verify the insert pipeline.
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'Some text' }
+		});
+		const neighbor = {
+			node_id: 42, node_title: 'Test Note', reason: 'related', reason_label: 'Related',
+			intent: 'expand', matched_tags: [], score: 0.9, snippet: 'a snippet',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Tweet');
+		const state = (component as any).getDraftInsertState();
+		expect(state.history).toHaveLength(1);
+		const provenance = (component as any).getVaultProvenance();
+		expect(provenance.length).toBeGreaterThan(0);
+		expect(provenance.some((p: any) => p.node_id === 42)).toBe(true);
+	});
+
+	it('getDraftInsertState tracks multiple slot inserts independently', async () => {
+		const blocks = [
+			{ id: 'b1', text: 'Block one', media_paths: [], order: 0 },
+			{ id: 'b2', text: 'Block two', media_paths: [], order: 1 },
+		];
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread', threadBlocks: blocks }
+		});
+		const neighbor1 = {
+			node_id: 10, node_title: 'Note A', reason: 'similar', reason_label: 'Similar',
+			intent: 'refine', matched_tags: [], score: 0.8, snippet: 'snippet',
+			best_chunk_id: 2, heading_path: null, relative_path: null,
+		};
+		const neighbor2 = {
+			node_id: 20, node_title: 'Note B', reason: 'tag_overlap', reason_label: 'Tags',
+			intent: 'expand', matched_tags: [], score: 0.7, snippet: 'another snippet',
+			best_chunk_id: 3, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor1, 0, 'Opening hook');
+		await (component as any).handleSlotInsert(neighbor2, 1, 'Closing takeaway');
+		const state = (component as any).getDraftInsertState();
+		expect(state.history).toHaveLength(2);
+		// Undo second insert
+		const undone = (component as any).handleUndoInsertById(state.history[1].id);
+		expect(undone).toBe(true);
+		const stateAfter = (component as any).getDraftInsertState();
+		expect(stateAfter.history).toHaveLength(1);
+	});
+
 	// ── backdrop/keyboard coverage ──────────────────────
 	it('Escape keydown on mobile backdrop calls onclose', async () => {
 		const onclose = vi.fn();

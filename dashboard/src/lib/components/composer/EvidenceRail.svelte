@@ -11,6 +11,7 @@
 		canPin,
 		setLastManualQuery,
 	} from '$lib/stores/evidenceStore';
+	import { getSlotLabel } from '$lib/stores/draftInsertStore';
 	import {
 		trackEvidenceRailOpened,
 		trackEvidenceSearchExecuted,
@@ -35,6 +36,7 @@
 		evidenceState,
 		onevidence,
 		onapplytoSlot,
+		onstrengthen,
 	}: {
 		tweetText?: string;
 		threadBlocks?: ThreadBlock[];
@@ -46,6 +48,7 @@
 		evidenceState: EvidenceState;
 		onevidence: (newState: EvidenceState) => void;
 		onapplytoSlot?: (evidence: PinnedEvidence, slotIndex: number, slotLabel: string) => void;
+		onstrengthen?: () => void;
 	} = $props();
 
 	let collapsed = $state(false);
@@ -174,15 +177,22 @@
 		trackAutoQueryToggled(next.autoQueryEnabled);
 	}
 
+	const slotOptions = $derived.by(() => {
+		if (mode === 'tweet') return [{ index: 0, label: 'Tweet' }];
+		return threadBlocks.map((_, i) => ({
+			index: i,
+			label: getSlotLabel(i, threadBlocks.length),
+		}));
+	});
+
 	function handleApply(evidence: PinnedEvidence) {
 		const slotIndex = mode === 'tweet' ? 0 : (focusedBlockIndex ?? 0);
-		const total = mode === 'tweet' ? 1 : threadBlocks.length;
-		let slotLabel = 'Tweet';
-		if (total > 1) {
-			if (slotIndex === 0) slotLabel = 'Opening hook';
-			else if (slotIndex === total - 1) slotLabel = 'Closing takeaway';
-			else slotLabel = `Tweet ${slotIndex + 1}`;
-		}
+		const slotLabel = getSlotLabel(slotIndex, mode === 'tweet' ? 1 : threadBlocks.length);
+		trackEvidenceAppliedToSlot(evidence.chunk_id, slotIndex, slotLabel, evidence.match_reason);
+		onapplytoSlot?.(evidence, slotIndex, slotLabel);
+	}
+
+	function handleApplyToSlot(evidence: PinnedEvidence, slotIndex: number, slotLabel: string) {
 		trackEvidenceAppliedToSlot(evidence.chunk_id, slotIndex, slotLabel, evidence.match_reason);
 		onapplytoSlot?.(evidence, slotIndex, slotLabel);
 	}
@@ -267,15 +277,28 @@
 
 					{#if evidenceState.pinned.length > 0}
 						<div class="pinned-section">
-							<span class="section-label">Pinned ({evidenceState.pinned.length}/5)</span>
+							<div class="pinned-header">
+								<span class="section-label">Pinned ({evidenceState.pinned.length}/5)</span>
+								{#if hasExistingContent && onstrengthen}
+									<button
+										class="strengthen-btn"
+										onclick={onstrengthen}
+										title="Apply all pinned evidence to strengthen the entire draft"
+									>
+										Strengthen draft
+									</button>
+								{/if}
+							</div>
 							<div class="card-list">
 								{#each evidenceState.pinned as pin (pin.chunk_id)}
 									<EvidenceCard
 										result={{ ...pin, relative_path: pin.relative_path }}
 										pinned
 										{hasExistingContent}
+										{slotOptions}
 										onunpin={() => handleUnpin(pin.chunk_id)}
 										onapply={() => handleApply(pin)}
+										onapplyToSlot={(idx, label) => handleApplyToSlot(pin, idx, label)}
 									/>
 								{/each}
 							</div>
@@ -301,6 +324,7 @@
 										{result}
 										suggested={isSuggested}
 										{hasExistingContent}
+										{slotOptions}
 										onpin={() => handlePin(result)}
 										ondismiss={() => handleDismiss(result)}
 										onapply={() => {
@@ -308,6 +332,12 @@
 											onevidence(pinned);
 											const pe = pinned.pinned.find(p => p.chunk_id === result.chunk_id);
 											if (pe) handleApply(pe);
+										}}
+										onapplyToSlot={(idx, label) => {
+											const pinned = pinEvidence(evidenceState, result);
+											onevidence(pinned);
+											const pe = pinned.pinned.find(p => p.chunk_id === result.chunk_id);
+											if (pe) handleApplyToSlot(pe, idx, label);
 										}}
 									/>
 								{/each}
@@ -476,6 +506,39 @@
 
 	.pinned-section {
 		margin-bottom: 10px;
+	}
+
+	.pinned-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 6px;
+	}
+
+	.pinned-header .section-label {
+		margin-bottom: 0;
+	}
+
+	.strengthen-btn {
+		padding: 3px 8px;
+		border: 1px solid color-mix(in srgb, #a855f7 40%, transparent);
+		border-radius: 4px;
+		background: color-mix(in srgb, #a855f7 8%, transparent);
+		color: #a855f7;
+		font-size: 10px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.1s ease;
+	}
+
+	.strengthen-btn:hover {
+		background: color-mix(in srgb, #a855f7 16%, transparent);
+		border-color: #a855f7;
+	}
+
+	.strengthen-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 1px;
 	}
 
 	.results-section {

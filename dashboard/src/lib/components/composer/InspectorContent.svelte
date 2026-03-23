@@ -42,6 +42,7 @@
 		onundoinsert,
 		onevidence,
 		onapplyevidence,
+		onstrengthen,
 		voicePanelRef = $bindable()
 	}: {
 		schedule: ScheduleConfig | null;
@@ -77,6 +78,7 @@
 		onundoinsert?: (insertId: string) => void;
 		onevidence?: (newState: EvidenceState) => void;
 		onapplyevidence?: (evidence: PinnedEvidence, slotIndex: number, slotLabel: string) => void;
+		onstrengthen?: () => void;
 		voicePanelRef?: VoiceContextPanel;
 	} = $props();
 </script>
@@ -118,6 +120,7 @@
 			{evidenceState}
 			{onevidence}
 			onapplytoSlot={onapplyevidence}
+			{onstrengthen}
 		/>
 	</div>
 {/if}

@@ -4,11 +4,13 @@
 	import type { ThreadBlock } from '$lib/api';
 	import type { DraftInsertState } from '$lib/api/types';
 	import { saveAutoSave, clearAutoSave as clearAutoSaveStorage, readAutoSave, restoreMedia, AUTOSAVE_DEBOUNCE_MS } from '$lib/utils/composerAutosave';
+	import { partitionInserts } from '$lib/stores/draftInsertStore';
 	import type { RecoveryData } from '$lib/stores/composerAutosave';
 	import TweetEditor from './TweetEditor.svelte';
 	import ThreadFlowLane from './ThreadFlowLane.svelte';
 	import AddTweetDivider from './AddTweetDivider.svelte';
 	import ComposerInsertBar from './ComposerInsertBar.svelte';
+	import CitationChips from './CitationChips.svelte';
 	import { currentAccount } from '$lib/stores/accounts';
 	import type { AttachedMedia } from './TweetEditor.svelte';
 
@@ -43,6 +45,7 @@
 		// Insert state for ThreadFlowLane
 		insertState,
 		onundoinsert,
+		onfocusindexchange,
 	}: {
 		canSubmit: boolean;
 		submitting: boolean;
@@ -70,11 +73,16 @@
 		onundo?: () => void;
 		insertState?: DraftInsertState;
 		onundoinsert?: (insertId: string) => void;
+		onfocusindexchange?: (index: number) => void;
 	} = $props();
 
 	const avatarUrl = $derived($currentAccount?.x_avatar_url ?? null);
 	const displayName = $derived($currentAccount?.x_display_name ?? null);
 	const handle = $derived($currentAccount?.x_username ?? null);
+
+	const insertPartition = $derived(insertState ? partitionInserts(insertState) : null);
+	const graphInserts = $derived(insertPartition?.graphInserts ?? []);
+	const evidenceInserts = $derived(insertPartition?.evidenceInserts ?? []);
 
 	// ── Autosave ───────────────────────────────────────────
 	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -202,10 +210,20 @@
 				onchange={(b) => { threadBlocks = b; }}
 				onvalidchange={(v) => { threadValid = v; }}
 				{onundoinsert}
+				{onfocusindexchange}
 			/>
 		{/if}
 
 		<ComposerInsertBar oninsert={handleInsertText} />
+
+		{#if graphInserts.length > 0 || evidenceInserts.length > 0}
+			<CitationChips
+				citations={[]}
+				{graphInserts}
+				{evidenceInserts}
+				onundoinsert={onundoinsert}
+			/>
+		{/if}
 
 		{#if showUndo}
 			<div class="undo-banner">

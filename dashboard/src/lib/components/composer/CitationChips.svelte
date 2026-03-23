@@ -8,6 +8,7 @@
 		ChevronUp,
 		ExternalLink,
 		Undo2,
+		Sparkles,
 	} from "lucide-svelte";
 	import { buildObsidianUri, openExternalUrl } from "$lib/utils/obsidianUri";
 	import { trackCitationClicked } from "$lib/analytics/backlinkFunnel";
@@ -18,6 +19,7 @@
 		vaultPath = null,
 		isDesktop = false,
 		graphInserts = [],
+		evidenceInserts = [],
 		onundoinsert,
 	}: {
 		citations: VaultCitation[];
@@ -25,6 +27,7 @@
 		vaultPath?: string | null;
 		isDesktop?: boolean;
 		graphInserts?: DraftInsert[];
+		evidenceInserts?: DraftInsert[];
 		onundoinsert?: (insertId: string) => void;
 	} = $props();
 
@@ -146,6 +149,35 @@
 								class="chip-action chip-remove"
 								onclick={() => onundoinsert?.(ins.id)}
 								aria-label="Undo insert from {ins.sourceTitle}"
+								title="Undo"
+							>
+								<Undo2 size={10} />
+							</button>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	</div>
+{/if}
+
+{#if evidenceInserts.length > 0}
+	<div class="citation-strip evidence-strip" role="list" aria-label="Evidence used">
+		<span class="citation-label">Evidence used:</span>
+		<div class="citation-chips">
+			{#each evidenceInserts as ins (ins.id)}
+				<div class="chip-wrapper" role="listitem">
+					<span class="citation-chip evidence-chip">
+						<Sparkles size={11} />
+						<span class="chip-text">{ins.sourceTitle}</span>
+						<span class="chip-slot-label">&rarr; {ins.slotLabel}</span>
+					</span>
+					{#if onundoinsert}
+						<div class="chip-actions">
+							<button
+								class="chip-action chip-remove"
+								onclick={() => onundoinsert?.(ins.id)}
+								aria-label="Undo evidence from {ins.sourceTitle}"
 								title="Undo"
 							>
 								<Undo2 size={10} />
@@ -307,6 +339,17 @@
 	.graph-chip {
 		border-color: color-mix(in srgb, #9b59b6 20%, transparent);
 		background: color-mix(in srgb, #9b59b6 8%, transparent);
+		cursor: default;
+	}
+
+	.evidence-strip {
+		background: color-mix(in srgb, #a855f7 5%, transparent);
+		border-color: color-mix(in srgb, #a855f7 12%, transparent);
+	}
+
+	.evidence-chip {
+		border-color: color-mix(in srgb, #a855f7 20%, transparent);
+		background: color-mix(in srgb, #a855f7 8%, transparent);
 		cursor: default;
 	}
 
