@@ -604,6 +604,115 @@ jobs:
           fi
           gh release upload "$TAG" "${files[@]}" --clobber --repo "$GH_REPO"
 
+  # ── Homebrew tap update — runs after assets are published ──
+  # Why: users can `brew install aramirez087/tuitbot/tuitbot` once the tap
+  # formula is updated. We write the new version + per-arch SHA256 values
+  # directly into Formula/tuitbot.rb and push to aramirez087/homebrew-tuitbot.
+  # This job only runs on CLI releases (tuitbot-cli-v* tags), not desktop app
+  # releases, because the tap formula only tracks the CLI binary.
+  update-homebrew:
+    name: Update Homebrew tap formula
+    runs-on: ubuntu-latest
+    needs:
+      - release
+      - publish-assets
+    if: >-
+      ${{ !cancelled() &&
+          needs.release.outputs.asset_release_ready == 'true' &&
+          startsWith(needs.release.outputs.release_tag, 'tuitbot-cli-v') }}
+    permissions:
+      contents: read
+    steps:
+      - name: Update homebrew-tuitbot formula
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ needs.release.outputs.release_tag }}
+          VERSION: ${{ needs.release.outputs.release_version }}
+        run: |
+          set -euo pipefail
+
+          BASE_URL="https://github.com/aramirez087/TuitBot/releases/download/${TAG}"
+
+          # Download SHA256SUMS from the published release
+          curl -fsSL "${BASE_URL}/SHA256SUMS" -o SHA256SUMS
+
+          sha_darwin_arm64=$(grep  "tuitbot-aarch64-apple-darwin.tar.gz"         SHA256SUMS | awk '{print $1}')
+          sha_darwin_x86_64=$(grep "tuitbot-x86_64-apple-darwin.tar.gz"          SHA256SUMS | awk '{print $1}')
+          sha_linux_arm64=$(grep   "tuitbot-aarch64-unknown-linux-gnu.tar.gz"     SHA256SUMS | awk '{print $1}')
+          sha_linux_x86_64=$(grep  "tuitbot-x86_64-unknown-linux-gnu.tar.gz"     SHA256SUMS | awk '{print $1}')
+
+          if [[ -z "$sha_darwin_arm64" || -z "$sha_darwin_x86_64" || -z "$sha_linux_arm64" || -z "$sha_linux_x86_64" ]]; then
+            echo "::error::One or more SHAs missing from SHA256SUMS — aborting tap update"
+            exit 1
+          fi
+
+          # Clone tap, patch formula, push
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/aramirez087/homebrew-tuitbot.git" tap
+          cd tap
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+
+          FORMULA="Formula/tuitbot.rb"
+
+          # Bump version line
+          sed -i "s/^  version \".*\"/  version \"${VERSION}\"/" "$FORMULA"
+
+          # Patch each per-arch SHA (order matches on_macos/on_arm, on_macos/on_intel,
+          # on_linux/on_arm, on_linux/on_intel blocks in the formula)
+          sed -i "s|tuitbot-aarch64-apple-darwin\.tar\.gz\"\n.*sha256.*|tuitbot-aarch64-apple-darwin.tar.gz\"\n      sha256 \"${sha_darwin_arm64}\"|" "$FORMULA" || true
+
+          # Use Python for reliable multi-arch SHA replacement (sed -i multiline is fragile)
+          python3 - <<'PYEOF'
+          import re, os, sys
+
+          formula_path = "Formula/tuitbot.rb"
+          with open(formula_path) as f:
+              src = f.read()
+
+          version    = os.environ["VERSION"]
+          base_url   = os.environ["BASE_URL"]
+          sha_da     = os.environ["sha_darwin_arm64"]
+          sha_dx     = os.environ["sha_darwin_x86_64"]
+          sha_la     = os.environ["sha_linux_arm64"]
+          sha_lx     = os.environ["sha_linux_x86_64"]
+
+          # Replace version
+          src = re.sub(r'version "\d+\.\d+\.\d+"', f'version "{version}"', src)
+
+          # Replace SHA + URL for each arch block (url then sha256 on next non-blank line)
+          def replace_block(text, filename, new_sha):
+              """Replace sha256 line immediately following the given filename reference."""
+              pattern = rf'(url "https://[^"]*/{re.escape(filename)}"\n\s+sha256 ")[0-9a-f]{{64}}'
+              replacement = rf'\g<1>{new_sha}'
+              return re.sub(pattern, replacement, text)
+
+          src = replace_block(src, "tuitbot-aarch64-apple-darwin.tar.gz",        sha_da)
+          src = replace_block(src, "tuitbot-x86_64-apple-darwin.tar.gz",         sha_dx)
+          src = replace_block(src, "tuitbot-aarch64-unknown-linux-gnu.tar.gz",   sha_la)
+          src = replace_block(src, "tuitbot-x86_64-unknown-linux-gnu.tar.gz",    sha_lx)
+
+          with open(formula_path, "w") as f:
+              f.write(src)
+
+          print(f"✅ Formula patched for version {version}")
+          PYEOF
+
+          if git diff --quiet; then
+            echo "Formula already up to date — no commit needed"
+            exit 0
+          fi
+
+          git add "$FORMULA"
+          git commit -m "chore: bump tuitbot formula to v${VERSION}
+
+          Auto-updated by TuitBot release workflow.
+          Release: ${TAG}
+          Repo: https://github.com/aramirez087/TuitBot/releases/tag/${TAG}"
+
+          git push origin main
+          echo "✅ Homebrew tap updated to v${VERSION}"
+
   # ── Desktop app build (Tauri) — triggered on app-v* tags ──
   build-desktop:
     name: Build desktop app (${{ matrix.target }})
