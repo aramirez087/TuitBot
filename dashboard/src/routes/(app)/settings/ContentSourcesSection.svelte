@@ -9,13 +9,15 @@
 	import { capabilities, deploymentMode, loadCapabilities } from '$lib/stores/runtime';
 	import { loadConnections, expiredGoogleDrive } from '$lib/stores/connectors';
 	import { api } from '$lib/api';
-	import type { VaultSourceStatus } from '$lib/api/types';
+	import type { VaultSourceStatus, IndexStatusResponse } from '$lib/api/types';
+	import IndexStatusBadge from '$lib/components/composer/IndexStatusBadge.svelte';
 
 	let browseError = $state('');
 	let advancedOpen = $state(false);
 	let vaultSources = $state<VaultSourceStatus[]>([]);
 	let healthLoading = $state(true);
 	let rescanning = $state(false);
+	let semanticIndex = $state<IndexStatusResponse | null>(null);
 
 	const currentSource = $derived($draft?.content_sources?.sources?.[0]);
 	const sourceType = $derived(currentSource?.source_type ?? 'local_fs');
@@ -68,12 +70,27 @@
 		return `${days}d ago`;
 	}
 
+	const semanticPrivacyLabel = $derived.by(() => {
+		if (isCloud) return 'Embeddings processed server-side. Snippets truncated to 120 chars.';
+		if (isSelfHost) return 'Embeddings stored on your server. No external vector database.';
+		return 'Embeddings stored locally. Vectors never leave this machine.';
+	});
+
 	onMount(() => {
 		loadCapabilities();
 		loadConnections();
 		loadHealth();
+		loadSemanticIndex();
 		resetAnalyticsSyncPrompt();
 	});
+
+	async function loadSemanticIndex() {
+		try {
+			semanticIndex = await api.vault.indexStatus();
+		} catch {
+			semanticIndex = null;
+		}
+	}
 
 	async function loadHealth() {
 		healthLoading = true;
@@ -227,6 +244,47 @@
 		<div class="notice notice-info">No vault source configured yet. Choose a source type below to get started.</div>
 	{/if}
 
+	<!-- Semantic Index Status -->
+	{#if semanticIndex?.provider_configured}
+		<div class="semantic-index-summary">
+			<div class="semantic-header">
+				<IndexStatusBadge status={semanticIndex} deploymentMode={mode} />
+				<span class="semantic-title">Semantic Index</span>
+			</div>
+			<div class="semantic-details">
+				<div class="semantic-row">
+					<span class="semantic-label">Indexed</span>
+					<span class="semantic-value">{semanticIndex.embedded_chunks} / {semanticIndex.total_chunks} chunks ({semanticIndex.freshness_pct}% fresh)</span>
+				</div>
+				{#if semanticIndex.model_id}
+					<div class="semantic-row">
+						<span class="semantic-label">Model</span>
+						<span class="semantic-value">{semanticIndex.model_id}</span>
+					</div>
+				{/if}
+				{#if semanticIndex.provider_name}
+					<div class="semantic-row">
+						<span class="semantic-label">Provider</span>
+						<span class="semantic-value">{semanticIndex.provider_name}</span>
+					</div>
+				{/if}
+				{#if semanticIndex.last_indexed_at}
+					<div class="semantic-row">
+						<span class="semantic-label">Last indexed</span>
+						<span class="semantic-value">{new Date(semanticIndex.last_indexed_at).toLocaleString()}</span>
+					</div>
+				{/if}
+				<div class="semantic-row">
+					<span class="semantic-label">Search</span>
+					<span class="semantic-value" class:search-ok={semanticIndex.search_available} class:search-warn={!semanticIndex.search_available}>
+						{semanticIndex.search_available ? 'Available' : 'Keyword fallback'}
+					</span>
+				</div>
+			</div>
+			<div class="semantic-privacy">{semanticPrivacyLabel}</div>
+		</div>
+	{/if}
+
 	<div class="field-grid">
 		{#if !isCloud}
 			<div class="field full-width">
@@ -374,6 +432,18 @@
 
 	.open-obsidian-link { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: none; background: none; color: var(--color-accent); font-size: 12px; cursor: pointer; transition: opacity 0.15s; }
 	.open-obsidian-link:hover { opacity: 0.8; text-decoration: underline; }
+
+	/* Semantic index section */
+	.semantic-index-summary { padding: 12px 14px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 4px; }
+	.semantic-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+	.semantic-title { font-size: 13px; font-weight: 600; color: var(--color-text); }
+	.semantic-details { display: flex; flex-direction: column; gap: 4px; }
+	.semantic-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+	.semantic-label { color: var(--color-text-muted); font-weight: 500; }
+	.semantic-value { color: var(--color-text); text-align: right; }
+	.search-ok { color: #22c55e; }
+	.search-warn { color: #f59e0b; }
+	.semantic-privacy { margin-top: 8px; padding: 6px 8px; border-radius: 4px; background: color-mix(in srgb, var(--color-accent) 6%, transparent); font-size: 11px; color: var(--color-text-subtle); line-height: 1.4; }
 
 	:global(.spin) { animation: spin 1s linear infinite; }
 	@keyframes spin { to { transform: rotate(360deg); } }

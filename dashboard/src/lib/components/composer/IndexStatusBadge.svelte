@@ -4,9 +4,11 @@
 	let {
 		status,
 		compact = false,
+		deploymentMode = 'desktop',
 	}: {
 		status: IndexStatusResponse | null;
 		compact?: boolean;
+		deploymentMode?: string;
 	} = $props();
 
 	const badgeState = $derived.by(() => {
@@ -17,6 +19,23 @@
 		if (status.freshness_pct >= 50) return { color: 'amber', label: `Index partially stale (${status.freshness_pct}% fresh)` };
 		return { color: 'red', label: `Index stale (${status.freshness_pct}% fresh)` };
 	});
+
+	const effectiveMode = $derived(status?.deployment_mode ?? deploymentMode);
+
+	const privacyLabel = $derived.by(() => {
+		if (effectiveMode === 'cloud') return 'Embeddings processed server-side. Snippets truncated to 120 chars.';
+		if (effectiveMode === 'self_host') return 'Embeddings stored on your server. No external vector database.';
+		return 'Embeddings stored locally. Vectors never leave this machine.';
+	});
+
+	const searchLabel = $derived.by(() => {
+		if (!status) return 'Unknown';
+		if (status.search_available) return 'Available';
+		if (status.provider_configured) return 'Provider unreachable — using keyword fallback';
+		return 'Keyword only';
+	});
+
+	const searchColor = $derived(status?.search_available ? 'green' : 'amber');
 
 	let showPopover = $state(false);
 
@@ -56,12 +75,26 @@
 					<span class="popover-value">{status.model_id}</span>
 				</div>
 			{/if}
+			{#if status.provider_name}
+				<div class="popover-row">
+					<span class="popover-label">Provider</span>
+					<span class="popover-value">{status.provider_name}</span>
+				</div>
+			{/if}
 			{#if status.last_indexed_at}
 				<div class="popover-row">
 					<span class="popover-label">Last indexed</span>
 					<span class="popover-value">{new Date(status.last_indexed_at).toLocaleString()}</span>
 				</div>
 			{/if}
+			<div class="popover-row">
+				<span class="popover-label">Privacy</span>
+				<span class="popover-value popover-privacy">{privacyLabel}</span>
+			</div>
+			<div class="popover-row">
+				<span class="popover-label">Search</span>
+				<span class="popover-value" class:search-green={searchColor === 'green'} class:search-amber={searchColor === 'amber'}>{searchLabel}</span>
+			</div>
 			<button class="popover-reindex-btn" disabled title="Reindex available in a future update">
 				Reindex Now
 			</button>
@@ -117,7 +150,7 @@
 		position: absolute;
 		top: calc(100% + 6px);
 		right: 0;
-		min-width: 220px;
+		min-width: 240px;
 		padding: 10px 12px;
 		background: var(--color-surface);
 		border: 1px solid var(--color-border);
@@ -137,12 +170,22 @@
 	.popover-label {
 		color: var(--color-text-muted);
 		font-weight: 500;
+		flex-shrink: 0;
 	}
 
 	.popover-value {
 		color: var(--color-text);
 		text-align: right;
 	}
+
+	.popover-privacy {
+		font-size: 10px;
+		max-width: 180px;
+		line-height: 1.3;
+	}
+
+	.search-green { color: #22c55e; }
+	.search-amber { color: #f59e0b; }
 
 	.popover-reindex-btn {
 		margin-top: 8px;

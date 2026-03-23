@@ -5,6 +5,7 @@
 	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel, partitionInserts } from '$lib/stores/draftInsertStore';
 	import { createEvidenceState, type EvidenceState, type PinnedEvidence } from '$lib/stores/evidenceStore';
 	import { trackSlotTargeted, trackInsertUndone } from '$lib/analytics/backlinkFunnel';
+	import { trackEvidenceStrengthen } from '$lib/analytics/evidenceFunnel';
 	import InspectorContent from './InspectorContent.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import type ThreadFlowLane from './ThreadFlowLane.svelte';
@@ -152,6 +153,8 @@
 	async function handleStrengthenDraft() {
 		const pinned = evidenceState.pinned;
 		if (pinned.length === 0) return;
+		const blockCount = mode === 'tweet' ? 1 : threadBlocks.filter((b) => b.text.trim()).length;
+		trackEvidenceStrengthen(blockCount, pinned.length);
 
 		const evidenceContext = pinned
 			.map((p) => `"${p.node_title ?? 'vault'}": ${p.snippet}`)

@@ -26,6 +26,12 @@ pub struct IndexStatusResponse {
     pub provider_configured: bool,
     pub index_loaded: bool,
     pub index_size: usize,
+    /// Deployment mode for privacy envelope display.
+    pub deployment_mode: String,
+    /// Whether semantic search is available right now.
+    pub search_available: bool,
+    /// Provider name (e.g., "openai", "ollama") if configured.
+    pub provider_name: Option<String>,
 }
 
 pub async fn get_index_status(
@@ -43,6 +49,12 @@ pub async fn get_index_status(
         (false, 0)
     };
 
+    let search_available = provider_configured && index_loaded;
+    let provider_name = state
+        .embedding_provider
+        .as_ref()
+        .map(|p| p.name().to_string());
+
     Ok(Json(IndexStatusResponse {
         total_chunks: stats.total_chunks,
         embedded_chunks: stats.embedded_chunks,
@@ -53,6 +65,9 @@ pub async fn get_index_status(
         provider_configured,
         index_loaded,
         index_size,
+        deployment_mode: state.deployment_mode.to_string(),
+        search_available,
+        provider_name,
     }))
 }
 
@@ -138,6 +153,9 @@ mod tests {
         assert_eq!(body["provider_configured"], false);
         assert_eq!(body["index_loaded"], false);
         assert_eq!(body["index_size"], 0);
+        assert_eq!(body["deployment_mode"], "desktop");
+        assert_eq!(body["search_available"], false);
+        assert!(body["provider_name"].is_null());
     }
 
     #[tokio::test]
@@ -163,6 +181,31 @@ mod tests {
         )
         .unwrap();
         assert_eq!(body["provider_configured"], false);
+    }
+
+    #[tokio::test]
+    async fn search_unavailable_without_provider() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/index-status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let body: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(resp.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(body["search_available"], false);
+        assert_eq!(body["deployment_mode"], "desktop");
     }
 
     #[tokio::test]

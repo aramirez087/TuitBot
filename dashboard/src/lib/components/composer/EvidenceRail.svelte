@@ -19,6 +19,7 @@
 		trackEvidenceDismissed,
 		trackAutoQueryToggled,
 		trackEvidenceAppliedToSlot,
+		trackEvidenceSearchLatency,
 	} from '$lib/analytics/evidenceFunnel';
 	import EvidenceCard from './EvidenceCard.svelte';
 	import IndexStatusBadge from './IndexStatusBadge.svelte';
@@ -122,11 +123,14 @@
 		error = null;
 		isSuggested = suggested;
 
+		const searchStart = Date.now();
 		try {
 			const response = await api.vault.searchEvidence({ q: query, limit, mode: searchMode });
 			if (controller.signal.aborted) return;
+			const latencyMs = Date.now() - searchStart;
 			results = response.results;
 			trackEvidenceSearchExecuted(query.length, response.results.length, searchMode);
+			trackEvidenceSearchLatency(latencyMs, searchMode, response.results.length === 0 && searchMode !== 'keyword');
 		} catch (e) {
 			if (controller.signal.aborted) return;
 			error = e instanceof Error ? e.message : 'Search failed';

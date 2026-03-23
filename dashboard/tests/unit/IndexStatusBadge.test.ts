@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { render, fireEvent } from '@testing-library/svelte';
 import IndexStatusBadge from '$lib/components/composer/IndexStatusBadge.svelte';
 import type { IndexStatusResponse } from '$lib/api/types';
 
@@ -18,6 +18,9 @@ function makeStatus(overrides: Partial<IndexStatusResponse> = {}): IndexStatusRe
 		provider_configured: overrides.provider_configured ?? true,
 		index_loaded: overrides.index_loaded ?? true,
 		index_size: overrides.index_size ?? 1024,
+		deployment_mode: overrides.deployment_mode ?? 'desktop',
+		search_available: overrides.search_available ?? true,
+		provider_name: overrides.provider_name ?? 'openai',
 	};
 }
 
@@ -90,5 +93,77 @@ describe('IndexStatusBadge', () => {
 		});
 		const dot = container.querySelector('.badge-dot');
 		expect(dot?.classList.contains('pulse')).toBe(false);
+	});
+
+	it('shows privacy label for desktop in popover', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ deployment_mode: 'desktop' }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('Vectors never leave this machine');
+	});
+
+	it('shows privacy label for cloud in popover', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ deployment_mode: 'cloud' }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('Snippets truncated to 120 chars');
+	});
+
+	it('shows privacy label for self_host in popover', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ deployment_mode: 'self_host' }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('No external vector database');
+	});
+
+	it('shows search available when search_available is true', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ search_available: true }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('Available');
+	});
+
+	it('shows keyword fallback when search_available is false and provider configured', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ search_available: false, provider_configured: true }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('Provider unreachable');
+	});
+
+	it('shows provider name in popover', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ provider_name: 'ollama' }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('ollama');
+	});
+
+	it('uses deploymentMode prop as fallback when status has no deployment_mode', async () => {
+		const status = makeStatus();
+		delete (status as unknown as Record<string, unknown>).deployment_mode;
+		const { container } = render(IndexStatusBadge, {
+			props: { status, deploymentMode: 'cloud' },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('Snippets truncated');
 	});
 });

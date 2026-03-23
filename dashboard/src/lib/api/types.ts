@@ -850,6 +850,9 @@ export interface IndexStatusResponse {
 	provider_configured: boolean;
 	index_loaded: boolean;
 	index_size: number;
+	deployment_mode?: string;
+	search_available?: boolean;
+	provider_name?: string;
 }
 
 export interface ProvenanceLink {

@@ -104,11 +104,23 @@ pub async fn search_evidence(
     };
 
     // Semantic search (if mode != "keyword" and provider is available)
+    let search_start = std::time::Instant::now();
     let semantic_hits = if mode != "keyword" {
         embed_and_search(&state, &query, limit).await
     } else {
         None
     };
+    let semantic_elapsed = search_start.elapsed();
+    let did_fallback =
+        mode != "keyword" && semantic_hits.is_none() && state.embedding_provider.is_some();
+
+    tracing::info!(
+        latency_ms = semantic_elapsed.as_millis() as u64,
+        fallback = did_fallback,
+        mode = mode,
+        result_count = semantic_hits.as_ref().map(|h| h.len()).unwrap_or(0),
+        "evidence_search_completed"
+    );
 
     // In semantic-only mode, skip keyword search (pass empty query to hybrid_search)
     let effective_query = if mode == "semantic" { "" } else { &query };
@@ -445,6 +457,67 @@ mod tests {
             .unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn limit_zero_defaults_to_8() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=test&limit=0")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn limit_over_max_clamped_to_20() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=test&limit=50")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn invalid_scope_returns_ok_with_empty_results() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=test&mode=keyword&scope=selection:nonexistent-session")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(resp.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(body["results"].as_array().unwrap().is_empty());
     }
 
     #[tokio::test]

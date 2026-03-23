@@ -31,6 +31,7 @@ vi.mock('$lib/analytics/evidenceFunnel', () => ({
 	trackAutoQueryToggled: vi.fn(),
 	trackEvidenceAppliedToSlot: vi.fn(),
 	trackEvidenceContributedToDraft: vi.fn(),
+	trackEvidenceSearchLatency: vi.fn(),
 }));
 
 function makeResult(overrides: Partial<EvidenceResult> = {}): EvidenceResult {
@@ -70,7 +71,7 @@ let apiMock: {
 beforeEach(async () => {
 	vi.clearAllMocks();
 	const { api } = await import('$lib/api');
-	apiMock = api as typeof apiMock;
+	apiMock = api as unknown as typeof apiMock;
 });
 
 describe('EvidenceRail', () => {

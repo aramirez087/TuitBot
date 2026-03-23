@@ -11,7 +11,7 @@ use serde::Deserialize;
 const MAX_BATCH_SIZE: usize = 50;
 
 /// Allowed event name prefixes (namespace isolation).
-const ALLOWED_PREFIXES: &[&str] = &["backlink.", "hook_miner.", "forge."];
+const ALLOWED_PREFIXES: &[&str] = &["backlink.", "hook_miner.", "forge.", "evidence."];
 
 #[derive(Deserialize)]
 pub struct TelemetryBatch {
@@ -150,6 +150,15 @@ mod tests {
                 make_event("hook_miner.angle_selected"),
                 make_event("forge.enabled"),
             ],
+        };
+        let result = ingest_events(Json(batch)).await;
+        assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn evidence_prefix_accepted() {
+        let batch = TelemetryBatch {
+            events: vec![make_event("evidence.search_latency")],
         };
         let result = ingest_events(Json(batch)).await;
         assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
