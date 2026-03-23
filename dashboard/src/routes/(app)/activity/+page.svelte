@@ -7,6 +7,7 @@
 	import ActivityItem from '$lib/components/ActivityItem.svelte';
 	import ErrorState from '$lib/components/ErrorState.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import AnalyticsSyncPrompt from '$lib/components/settings/AnalyticsSyncPrompt.svelte';
 	import {
 		actions,
 		rateLimits,
@@ -22,9 +23,36 @@
 		stopAutoRefresh
 	} from '$lib/stores/activity';
 	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
+	import {
+		config,
+		pendingAnalyticsSyncPrompt,
+		analyticsSyncPromptDismissed,
+		dismissAnalyticsSyncPrompt,
+		clearPendingAnalyticsSyncPrompt,
+	} from '$lib/stores/settings';
 
 	let loadingMore = $state(false);
 	let exportOpen = $state(false);
+
+	const currentSource = $derived($config?.content_sources?.sources?.[0]);
+	const showSyncPrompt = $derived(
+		$pendingAnalyticsSyncPrompt &&
+		!$analyticsSyncPromptDismissed &&
+		currentSource?.source_type === 'local_fs' &&
+		currentSource?.loop_back_enabled === true &&
+		currentSource?.analytics_sync_enabled === false
+	);
+
+	function handleEnableSync() {
+		clearPendingAnalyticsSyncPrompt();
+		window.location.hash = '';
+		window.location.href = '/settings#sources';
+	}
+
+	function handleDismissSync() {
+		dismissAnalyticsSyncPrompt();
+		clearPendingAnalyticsSyncPrompt();
+	}
 
 	function triggerExport(format: 'csv' | 'json') {
 		const filter = $selectedFilter === 'all' ? undefined : $selectedFilter;
@@ -79,6 +107,10 @@
 		</div>
 	</div>
 </div>
+
+{#if showSyncPrompt}
+	<AnalyticsSyncPrompt onEnable={handleEnableSync} onDismiss={handleDismissSync} />
+{/if}
 
 {#if $error && $actions.length === 0}
 	<ErrorState message={$error} onretry={() => loadActivity(true)} />
@@ -335,34 +367,10 @@
 		cursor: not-allowed;
 	}
 
-	.skeleton-bar {
-		height: 40px;
-		margin-top: 12px;
-		background-color: var(--color-surface-active);
-		border-radius: 6px;
-		animation: pulse 1.5s ease-in-out infinite;
-	}
-
-	.skeleton-item {
-		height: 56px;
-		border-bottom: 1px solid var(--color-border-subtle);
-		background-color: var(--color-surface-active);
-		animation: pulse 1.5s ease-in-out infinite;
-	}
-
-	.skeleton-item:last-child {
-		border-bottom: none;
-	}
-
-	@keyframes pulse {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.4;
-		}
-	}
+	.skeleton-bar { height: 40px; margin-top: 12px; background-color: var(--color-surface-active); border-radius: 6px; animation: pulse 1.5s ease-in-out infinite; }
+	.skeleton-item { height: 56px; border-bottom: 1px solid var(--color-border-subtle); background-color: var(--color-surface-active); animation: pulse 1.5s ease-in-out infinite; }
+	.skeleton-item:last-child { border-bottom: none; }
+	@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 	@media (max-width: 640px) {
 		.rate-limits-grid {

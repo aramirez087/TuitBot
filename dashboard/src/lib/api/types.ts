@@ -487,6 +487,7 @@ export interface TuitbotConfig {
 			watch: boolean;
 			file_patterns: string[];
 			loop_back_enabled: boolean;
+			analytics_sync_enabled: boolean;
 			poll_interval_seconds: number | null;
 		}>;
 	};

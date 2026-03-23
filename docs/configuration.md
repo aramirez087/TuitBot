@@ -237,7 +237,8 @@ loop_back_enabled = true
 | `path` | — | Path to content directory (supports `~` expansion) |
 | `watch` | `true` | Watch for real-time file changes |
 | `file_patterns` | `["*.md", "*.txt"]` | Glob patterns for files to ingest |
-| `loop_back_enabled` | `true` | Write tweet metadata back to source file front-matter |
+| `loop_back_enabled` | `true` | Write publish metadata (tweet ID, URL, timestamp) back to source file front-matter |
+| `analytics_sync_enabled` | `false` | Periodically enrich note frontmatter with engagement metrics (impressions, likes, performance score). Requires `loop_back_enabled`. Local filesystem sources only. |
 
 ### Google Drive via Linked Account (Recommended)
 

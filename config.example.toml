@@ -334,6 +334,7 @@ active_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 # watch = true
 # file_patterns = ["*.md", "*.txt"]
 # loop_back_enabled = true
+# analytics_sync_enabled = false         # enrich notes with engagement metrics (local_fs only)
 
 # Example: Google Drive source (recommended for SelfHost / Cloud)
 # [[content_sources.sources]]
