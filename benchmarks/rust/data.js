@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774272223277,
+  "lastUpdate": 1774272246060,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2199,6 +2199,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 941.18,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e54ecdfda8e5e6e786427e9a683f5d28d80d21fc",
+          "message": "ci: add Homebrew tap auto-update job to release workflow (#287)\n\nWhy: users can  after every CLI\nrelease without manual formula bumps. The update-homebrew job runs after\npublish-assets, downloads SHA256SUMS from the GitHub Release, and uses\nPython to reliably patch all four per-arch SHAs + version in the formula.\n\nOnly triggers on tuitbot-cli-v* tags (not desktop app releases).\nRequires HOMEBREW_TAP_TOKEN secret (PAT with push access to\naramirez087/homebrew-tuitbot).\n\nTask: efacf140 (P2 Homebrew)\n\nCo-authored-by: Neo <neo_ai@agentmail.to>",
+          "timestamp": "2026-03-23T07:18:17-06:00",
+          "tree_id": "cf658e583db9db896d28948764ee27803e763e59",
+          "url": "https://github.com/aramirez087/TuitBot/commit/e54ecdfda8e5e6e786427e9a683f5d28d80d21fc"
+        },
+        "date": 1774272245298,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.41,
             "unit": "ps"
           }
         ]
