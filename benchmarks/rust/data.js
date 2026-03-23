@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774237130960,
+  "lastUpdate": 1774272187510,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2112,6 +2112,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.68,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4cdc8a71c30bbe72ae6382afc29a5d4b04329da4",
+          "message": "chore(deps): bump the all-dependencies group with 3 updates (#289)\n\nBumps the all-dependencies group with 3 updates: [zip](https://github.com/zip-rs/zip2), [arc-swap](https://github.com/vorner/arc-swap) and [iri-string](https://github.com/lo48576/iri-string).\n\n\nUpdates `zip` from 8.3.0 to 8.3.1\n- [Release notes](https://github.com/zip-rs/zip2/releases)\n- [Changelog](https://github.com/zip-rs/zip2/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/zip-rs/zip2/compare/v8.3.0...v8.3.1)\n\nUpdates `arc-swap` from 1.8.2 to 1.9.0\n- [Changelog](https://github.com/vorner/arc-swap/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/vorner/arc-swap/compare/v1.8.2...v1.9.0)\n\nUpdates `iri-string` from 0.7.10 to 0.7.11\n- [Changelog](https://github.com/lo48576/iri-string/blob/develop/CHANGELOG.md)\n- [Commits](https://github.com/lo48576/iri-string/compare/v0.7.10...v0.7.11)\n\n---\nupdated-dependencies:\n- dependency-name: zip\n  dependency-version: 8.3.1\n  dependency-type: direct:production\n  update-type: version-update:semver-patch\n  dependency-group: all-dependencies\n- dependency-name: arc-swap\n  dependency-version: 1.9.0\n  dependency-type: indirect\n  update-type: version-update:semver-minor\n  dependency-group: all-dependencies\n- dependency-name: iri-string\n  dependency-version: 0.7.11\n  dependency-type: indirect\n  update-type: version-update:semver-patch\n  dependency-group: all-dependencies\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-23T07:17:18-06:00",
+          "tree_id": "775a4e2e4654644530df1b5f2ae479fe8223d97d",
+          "url": "https://github.com/aramirez087/TuitBot/commit/4cdc8a71c30bbe72ae6382afc29a5d4b04329da4"
+        },
+        "date": 1774272186871,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 938.02,
             "unit": "ps"
           }
         ]
