@@ -6,7 +6,7 @@ use tuitbot_core::content::{
     serialize_blocks_for_storage, tweet_weighted_len, validate_thread_blocks, ThreadBlock,
     MAX_TWEET_CHARS,
 };
-use tuitbot_core::storage::{action_log, approval_queue, provenance, scheduled_content};
+use tuitbot_core::storage::{action_log, approval_queue, provenance, scheduled_content, threads};
 use tuitbot_core::x_api::{XApiClient, XApiHttpClient};
 
 use crate::account::AccountContext;
@@ -229,7 +229,7 @@ pub(super) async fn compose_thread_blocks_flow(
             })));
         }
 
-        try_post_thread_now(state, ctx, &core_blocks).await
+        try_post_thread_now(state, ctx, &core_blocks, body.provenance.as_deref()).await
     }
 }
 
@@ -475,6 +475,7 @@ async fn try_post_thread_now(
     state: &AppState,
     ctx: &AccountContext,
     blocks: &[ThreadBlock],
+    body_provenance: Option<&[provenance::ProvenanceRef]>,
 ) -> Result<Json<Value>, ApiError> {
     let client = build_x_client(state, ctx).await?;
 
@@ -493,6 +494,24 @@ async fn try_post_thread_now(
         match posted {
             Ok(p) => tweet_ids.push(p.id),
             Err(e) => {
+                // Persist partial thread records for whatever was posted.
+                if !tweet_ids.is_empty() {
+                    let partial_contents: Vec<String> = sorted
+                        .iter()
+                        .take(tweet_ids.len())
+                        .map(|b| b.text.clone())
+                        .collect();
+                    let _ = threads::persist_thread_records(
+                        &state.db,
+                        &ctx.account_id,
+                        "",
+                        &tweet_ids,
+                        &partial_contents,
+                        "partial",
+                    )
+                    .await;
+                }
+
                 // Log partial failure with the IDs we did post.
                 let metadata = json!({
                     "posted_tweet_ids": tweet_ids,
@@ -521,6 +540,42 @@ async fn try_post_thread_now(
                     sorted.len(),
                     tweet_ids.len()
                 )));
+            }
+        }
+    }
+
+    // Persist thread records: threads + thread_tweets + original_tweets rows.
+    let tweet_contents: Vec<String> = sorted.iter().map(|b| b.text.clone()).collect();
+
+    if let Ok((thread_id, ot_id)) = threads::persist_thread_records(
+        &state.db,
+        &ctx.account_id,
+        "",
+        &tweet_ids,
+        &tweet_contents,
+        "sent",
+    )
+    .await
+    {
+        // Propagate provenance to both original_tweet and thread entities.
+        if let Some(refs) = body_provenance {
+            if !refs.is_empty() {
+                let _ = provenance::insert_links_for(
+                    &state.db,
+                    &ctx.account_id,
+                    "original_tweet",
+                    ot_id,
+                    refs,
+                )
+                .await;
+                let _ = provenance::insert_links_for(
+                    &state.db,
+                    &ctx.account_id,
+                    "thread",
+                    thread_id,
+                    refs,
+                )
+                .await;
             }
         }
     }

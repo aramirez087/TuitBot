@@ -25,6 +25,9 @@ pub struct LoopBackEntry {
     /// Thread URL when this entry is part of a thread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_url: Option<String>,
+    /// Tweet IDs of child tweets in a thread (excludes the root).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub child_tweet_ids: Option<Vec<String>>,
 }
 
 /// Result of an `execute_loopback()` call.
@@ -105,6 +108,7 @@ pub async fn execute_loopback(
         content_type: content_type.to_string(),
         status: Some("posted".to_string()),
         thread_url: None,
+        child_tweet_ids: None,
     };
 
     match write_metadata_to_file(&full_path, &entry) {
@@ -116,6 +120,85 @@ pub async fn execute_loopback(
                 path = %full_path.display(),
                 error = %e,
                 "Loopback file write failed"
+            );
+            LoopBackResult::FileNotFound
+        }
+    }
+}
+
+/// Execute provenance-driven loop-back for a thread.
+///
+/// Like `execute_loopback`, but builds a thread-typed entry with
+/// `child_tweet_ids` and `thread_url` populated.
+pub async fn execute_loopback_thread(
+    pool: &DbPool,
+    node_id: i64,
+    root_tweet_id: &str,
+    url: &str,
+    child_tweet_ids: Vec<String>,
+) -> LoopBackResult {
+    use crate::storage::watchtower::{get_content_node, get_source_context};
+
+    let node = match get_content_node(pool, node_id).await {
+        Ok(Some(n)) => n,
+        Ok(None) => return LoopBackResult::NodeNotFound,
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "Loopback thread: failed to get content node");
+            return LoopBackResult::NodeNotFound;
+        }
+    };
+
+    let source = match get_source_context(pool, node.source_id).await {
+        Ok(Some(s)) => s,
+        Ok(None) => return LoopBackResult::SourceNotWritable("source not found".into()),
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "Loopback thread: failed to get source context");
+            return LoopBackResult::SourceNotWritable("db error".into());
+        }
+    };
+
+    if source.source_type != "local_fs" {
+        return LoopBackResult::SourceNotWritable(source.source_type);
+    }
+
+    let base_path = match serde_json::from_str::<serde_json::Value>(&source.config_json)
+        .ok()
+        .and_then(|v| v.get("path")?.as_str().map(String::from))
+    {
+        Some(p) => p,
+        None => return LoopBackResult::SourceNotWritable("no path in config".into()),
+    };
+
+    let expanded = crate::storage::expand_tilde(&base_path);
+    let full_path = std::path::PathBuf::from(expanded).join(&node.relative_path);
+
+    if !full_path.exists() {
+        return LoopBackResult::FileNotFound;
+    }
+
+    let entry = LoopBackEntry {
+        tweet_id: root_tweet_id.to_string(),
+        url: url.to_string(),
+        published_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        content_type: "thread".to_string(),
+        status: Some("posted".to_string()),
+        thread_url: Some(url.to_string()),
+        child_tweet_ids: if child_tweet_ids.is_empty() {
+            None
+        } else {
+            Some(child_tweet_ids)
+        },
+    };
+
+    match write_metadata_to_file(&full_path, &entry) {
+        Ok(true) => LoopBackResult::Written,
+        Ok(false) => LoopBackResult::AlreadyPresent,
+        Err(e) => {
+            tracing::warn!(
+                node_id,
+                path = %full_path.display(),
+                error = %e,
+                "Loopback thread file write failed"
             );
             LoopBackResult::FileNotFound
         }
@@ -232,6 +315,7 @@ mod tests {
             content_type: "tweet".to_string(),
             status: None,
             thread_url: None,
+            child_tweet_ids: None,
         }
     }
 
@@ -343,6 +427,7 @@ mod tests {
             content_type: "thread".to_string(),
             status: None,
             thread_url: None,
+            child_tweet_ids: None,
         };
         write_metadata_to_file(&path, &entry_b).unwrap();
 
@@ -351,5 +436,107 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].tweet_id, "1234567890");
         assert_eq!(entries[1].tweet_id, "9876543210");
+    }
+
+    #[test]
+    fn thread_entry_serializes_child_tweet_ids() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, "Thread note.\n").unwrap();
+
+        let entry = LoopBackEntry {
+            tweet_id: "root_001".to_string(),
+            url: "https://x.com/i/status/root_001".to_string(),
+            published_at: "2026-03-22T10:00:00Z".to_string(),
+            content_type: "thread".to_string(),
+            status: Some("posted".to_string()),
+            thread_url: Some("https://x.com/i/status/root_001".to_string()),
+            child_tweet_ids: Some(vec!["child_002".to_string(), "child_003".to_string()]),
+        };
+        let modified = write_metadata_to_file(&path, &entry).unwrap();
+        assert!(modified);
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("child_tweet_ids"));
+        assert!(content.contains("child_002"));
+        assert!(content.contains("child_003"));
+        assert!(content.contains("thread_url"));
+    }
+
+    #[test]
+    fn thread_entry_without_child_ids_omits_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, "Note.\n").unwrap();
+
+        let entry = LoopBackEntry {
+            tweet_id: "t_100".to_string(),
+            url: "https://x.com/i/status/t_100".to_string(),
+            published_at: "2026-03-22T10:00:00Z".to_string(),
+            content_type: "thread".to_string(),
+            status: Some("posted".to_string()),
+            thread_url: None,
+            child_tweet_ids: None,
+        };
+        let modified = write_metadata_to_file(&path, &entry).unwrap();
+        assert!(modified);
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(!content.contains("child_tweet_ids"));
+    }
+
+    #[test]
+    fn thread_entry_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, "Roundtrip note.\n").unwrap();
+
+        let entry = LoopBackEntry {
+            tweet_id: "rt_001".to_string(),
+            url: "https://x.com/i/status/rt_001".to_string(),
+            published_at: "2026-03-22T12:00:00Z".to_string(),
+            content_type: "thread".to_string(),
+            status: Some("posted".to_string()),
+            thread_url: Some("https://x.com/i/status/rt_001".to_string()),
+            child_tweet_ids: Some(vec!["rt_002".to_string()]),
+        };
+        write_metadata_to_file(&path, &entry).unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        let entries = parse_tuitbot_metadata(&content);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].tweet_id, "rt_001");
+        assert_eq!(entries[0].content_type, "thread");
+        assert_eq!(
+            entries[0].thread_url.as_deref(),
+            Some("https://x.com/i/status/rt_001")
+        );
+        assert_eq!(entries[0].child_tweet_ids, Some(vec!["rt_002".to_string()]));
+    }
+
+    #[test]
+    fn thread_entry_idempotent_by_root_tweet_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, "Idem note.\n").unwrap();
+
+        let entry = LoopBackEntry {
+            tweet_id: "idem_root".to_string(),
+            url: "https://x.com/i/status/idem_root".to_string(),
+            published_at: "2026-03-22T12:00:00Z".to_string(),
+            content_type: "thread".to_string(),
+            status: Some("posted".to_string()),
+            thread_url: Some("https://x.com/i/status/idem_root".to_string()),
+            child_tweet_ids: Some(vec!["idem_child".to_string()]),
+        };
+
+        let first = write_metadata_to_file(&path, &entry).unwrap();
+        assert!(first);
+        let second = write_metadata_to_file(&path, &entry).unwrap();
+        assert!(!second);
+
+        let content = fs::read_to_string(&path).unwrap();
+        let entries = parse_tuitbot_metadata(&content);
+        assert_eq!(entries.len(), 1);
     }
 }
