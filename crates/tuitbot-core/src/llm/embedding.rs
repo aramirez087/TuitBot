@@ -200,4 +200,46 @@ mod tests {
         };
         assert!(err.to_string().contains("30"));
     }
+
+    #[test]
+    fn embedding_error_display_network() {
+        let err = EmbeddingError::Network("connection refused".to_string());
+        let msg = err.to_string();
+        assert!(msg.contains("connection refused"));
+        assert!(msg.contains("network"));
+    }
+
+    #[test]
+    fn embedding_error_display_internal() {
+        let err = EmbeddingError::Internal("something broke".to_string());
+        let msg = err.to_string();
+        assert!(msg.contains("something broke"));
+        assert!(msg.contains("internal"));
+    }
+
+    #[test]
+    fn embedding_usage_display_zero() {
+        let usage = EmbeddingUsage::default();
+        assert_eq!(usage.to_string(), "EmbeddingUsage(tokens=0)");
+    }
+
+    #[test]
+    fn embedding_response_empty_vectors() {
+        let response = EmbeddingResponse {
+            embeddings: vec![],
+            model: "empty".to_string(),
+            dimension: 0,
+            usage: EmbeddingUsage::default(),
+        };
+        assert!(response.embeddings.is_empty());
+        assert_eq!(response.dimension, 0);
+    }
+
+    #[test]
+    fn embedding_usage_serde_roundtrip() {
+        let usage = EmbeddingUsage { total_tokens: 100 };
+        let json = serde_json::to_string(&usage).expect("serialize");
+        let deserialized: EmbeddingUsage = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.total_tokens, 100);
+    }
 }

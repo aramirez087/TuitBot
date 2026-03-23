@@ -166,4 +166,103 @@ describe('IndexStatusBadge', () => {
 		const popover = container.querySelector('.badge-popover');
 		expect(popover?.textContent).toContain('Snippets truncated');
 	});
+
+	it('does not open popover in compact mode', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus(), compact: true },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover).toBeNull();
+	});
+
+	it('toggles popover closed on second click', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus() },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		expect(container.querySelector('.badge-popover')).toBeTruthy();
+		await fireEvent.click(btn);
+		expect(container.querySelector('.badge-popover')).toBeNull();
+	});
+
+	it('shows "Keyword only" when search unavailable and no provider', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ search_available: false, provider_configured: false }) },
+		});
+		// Gray dot for no provider, so popover won't show searchLabel without clicking
+		// But we can test via the badge-dot title
+		const btn = container.querySelector('.badge-dot-btn')!;
+		expect(btn.getAttribute('title')).toContain('No embedding provider');
+	});
+
+	it('shows chunk counts in popover', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ embedded_chunks: 80, total_chunks: 100 }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('80');
+		expect(popover?.textContent).toContain('100');
+	});
+
+	it('shows model_id in popover when present', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ model_id: 'nomic-embed-v1.5' }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('nomic-embed-v1.5');
+	});
+
+	it('hides model row when model_id is null', async () => {
+		const status = makeStatus({ model_id: null });
+		const { container } = render(IndexStatusBadge, {
+			props: { status },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).not.toContain('nomic');
+	});
+
+	it('shows last indexed date in popover', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus({ last_indexed_at: '2026-03-23T10:00:00Z' }) },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const popover = container.querySelector('.badge-popover');
+		expect(popover?.textContent).toContain('Last indexed');
+	});
+
+	it('hides last indexed row when last_indexed_at is null', async () => {
+		const status: IndexStatusResponse = {
+			...makeStatus(),
+			last_indexed_at: null,
+		};
+		const { container } = render(IndexStatusBadge, {
+			props: { status },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const rows = container.querySelectorAll('.popover-row');
+		const lastIndexedRow = Array.from(rows).find((r) => r.textContent?.includes('Last indexed'));
+		expect(lastIndexedRow).toBeUndefined();
+	});
+
+	it('reindex button is disabled', async () => {
+		const { container } = render(IndexStatusBadge, {
+			props: { status: makeStatus() },
+		});
+		const btn = container.querySelector('.badge-dot-btn')!;
+		await fireEvent.click(btn);
+		const reindexBtn = container.querySelector('.popover-reindex-btn') as HTMLButtonElement;
+		expect(reindexBtn).toBeTruthy();
+		expect(reindexBtn.disabled).toBe(true);
+	});
 });

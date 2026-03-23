@@ -349,6 +349,55 @@ mod tests {
         assert_eq!(index.read().await.len(), 1);
     }
 
+    /// Provider that returns a mismatched number of embeddings.
+    struct MismatchCountProvider;
+
+    #[async_trait::async_trait]
+    impl EmbeddingProvider for MismatchCountProvider {
+        fn name(&self) -> &str {
+            "mismatch"
+        }
+        fn dimension(&self) -> usize {
+            3
+        }
+        fn model_id(&self) -> &str {
+            "mismatch"
+        }
+        async fn embed(&self, _inputs: Vec<String>) -> Result<EmbeddingResponse, EmbeddingError> {
+            // Always return 0 embeddings regardless of input count
+            Ok(EmbeddingResponse {
+                embeddings: vec![],
+                model: "mismatch".to_string(),
+                dimension: 3,
+                usage: EmbeddingUsage { total_tokens: 0 },
+            })
+        }
+        async fn health_check(&self) -> Result<(), EmbeddingError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn worker_detects_embedding_count_mismatch() {
+        let pool = init_test_db().await.expect("init db");
+        let _chunk_id = setup_with_chunk(&pool).await;
+
+        let provider = Arc::new(MismatchCountProvider);
+        let index = Arc::new(RwLock::new(SemanticIndex::new(
+            3,
+            "mismatch".to_string(),
+            100,
+        )));
+
+        let worker = EmbeddingWorker::new(pool.clone(), provider, index, 10, "default".to_string());
+
+        let err = worker.process_dirty_batch().await.unwrap_err();
+        assert!(
+            matches!(err, EmbeddingError::Internal(ref msg) if msg.contains("0 embeddings for 1 inputs")),
+            "expected Internal mismatch error, got: {err}"
+        );
+    }
+
     #[tokio::test]
     async fn worker_respects_cancellation() {
         let pool = init_test_db().await.expect("init db");

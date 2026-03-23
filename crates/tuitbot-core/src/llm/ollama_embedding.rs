@@ -194,4 +194,114 @@ mod tests {
         assert_eq!(provider.dimension(), 768);
         assert_eq!(provider.model_id(), "mxbai-embed-large");
     }
+
+    #[tokio::test]
+    async fn batch_exceeding_max_returns_error() {
+        let provider = OllamaEmbeddingProvider::new(None, None);
+        let inputs: Vec<String> = (0..101).map(|i| format!("text {i}")).collect();
+        let err = provider.embed(inputs).await.unwrap_err();
+        assert!(
+            matches!(
+                err,
+                EmbeddingError::BatchTooLarge {
+                    size: 101,
+                    max: 100
+                }
+            ),
+            "expected BatchTooLarge, got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn api_error_status() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/embed"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("model not found"))
+            .mount(&server)
+            .await;
+
+        let provider = OllamaEmbeddingProvider::new(None, Some(server.uri()));
+        let err = provider.embed(vec!["test".to_string()]).await.unwrap_err();
+        assert!(
+            matches!(err, EmbeddingError::Api { status: 500, ref message } if message.contains("model not found")),
+            "expected Api error with status 500, got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn health_check_success() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/tags"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({"models": []})),
+            )
+            .mount(&server)
+            .await;
+
+        let provider = OllamaEmbeddingProvider::new(None, Some(server.uri()));
+        provider
+            .health_check()
+            .await
+            .expect("health check should succeed");
+    }
+
+    #[tokio::test]
+    async fn health_check_network_failure() {
+        let provider = OllamaEmbeddingProvider::new(None, Some("http://127.0.0.1:1".to_string()));
+        let err = provider.health_check().await.unwrap_err();
+        assert!(
+            matches!(err, EmbeddingError::Network(_)),
+            "expected Network error, got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn malformed_response_returns_api_error() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/embed"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+            .mount(&server)
+            .await;
+
+        let provider = OllamaEmbeddingProvider::new(None, Some(server.uri()));
+        let err = provider.embed(vec!["test".to_string()]).await.unwrap_err();
+        assert!(
+            matches!(err, EmbeddingError::Api { status: 0, .. }),
+            "expected Api parse error, got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn dimension_inferred_from_response() {
+        let server = MockServer::start().await;
+        let response_body = serde_json::json!({
+            "embeddings": [vec![0.1_f32; 768]]
+        });
+
+        Mock::given(method("POST"))
+            .and(path("/api/embed"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
+            .mount(&server)
+            .await;
+
+        let provider = OllamaEmbeddingProvider::new(None, Some(server.uri()));
+        let result = provider
+            .embed(vec!["hello".to_string()])
+            .await
+            .expect("should succeed");
+
+        assert_eq!(result.dimension, 768);
+        assert_eq!(result.embeddings.len(), 1);
+    }
+
+    #[test]
+    fn default_values() {
+        let provider = OllamaEmbeddingProvider::new(None, None);
+        assert_eq!(provider.model_id(), "nomic-embed-text");
+        assert_eq!(provider.dimension(), 768);
+        assert_eq!(provider.base_url, "http://localhost:11434");
+    }
 }
