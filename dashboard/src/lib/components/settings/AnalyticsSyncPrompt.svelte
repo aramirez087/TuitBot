@@ -1,5 +1,26 @@
 <script lang="ts">
-	let { onEnable, onDismiss }: { onEnable: () => void; onDismiss: () => void } = $props();
+	import { trackForgePromptShown, trackForgeEnabled } from '$lib/analytics/hookMinerFunnel';
+
+	let {
+		sourcePathStem = 'unknown',
+		localEligible = true,
+		onEnable,
+		onDismiss,
+	}: {
+		sourcePathStem?: string;
+		localEligible?: boolean;
+		onEnable: () => void;
+		onDismiss: () => void;
+	} = $props();
+
+	$effect(() => {
+		trackForgePromptShown(sourcePathStem, localEligible);
+	});
+
+	function handleEnable() {
+		trackForgeEnabled(sourcePathStem, 'prompt');
+		onEnable();
+	}
 </script>
 
 <div class="sync-prompt" role="status">
@@ -15,7 +36,7 @@
 		</p>
 	</div>
 	<div class="sync-prompt-actions">
-		<button type="button" class="btn-enable" onclick={onEnable}>
+		<button type="button" class="btn-enable" onclick={handleEnable}>
 			Enable in Settings
 		</button>
 		<button type="button" class="btn-dismiss" onclick={onDismiss}>

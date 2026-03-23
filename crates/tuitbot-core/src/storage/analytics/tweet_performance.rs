@@ -118,3 +118,54 @@ pub async fn get_all_tweet_performances_for(
     .await
     .map_err(|e| StorageError::Query { source: e })
 }
+
+/// Percentile thresholds for the account's historical performance.
+///
+/// Used by Forge sync to assign performance tiers (high/medium/low/none).
+#[derive(Debug, Clone)]
+pub struct PerformancePercentiles {
+    pub p50_impressions: i64,
+    pub p90_impressions: i64,
+    /// False if fewer than 10 posts — tier defaults to "none".
+    pub has_sufficient_data: bool,
+}
+
+/// Compute impression percentiles (p50, p90) for an account from the
+/// `tweet_performance` table.
+///
+/// Uses the nearest-rank method: fetches all impressions sorted ascending,
+/// then picks the value at the 50th and 90th percentile indices. If fewer
+/// than 10 rows exist, returns `has_sufficient_data: false`.
+pub async fn compute_performance_percentiles_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<PerformancePercentiles, StorageError> {
+    let rows: Vec<(i64,)> = sqlx::query_as(
+        "SELECT impressions FROM tweet_performance \
+         WHERE account_id = ? ORDER BY impressions ASC",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let impressions: Vec<i64> = rows.into_iter().map(|(v,)| v).collect();
+
+    if impressions.len() < 10 {
+        return Ok(PerformancePercentiles {
+            p50_impressions: 0,
+            p90_impressions: 0,
+            has_sufficient_data: false,
+        });
+    }
+
+    let count = impressions.len();
+    let p50 = impressions[count / 2];
+    let p90 = impressions[count * 9 / 10];
+
+    Ok(PerformancePercentiles {
+        p50_impressions: p50,
+        p90_impressions: p90,
+        has_sufficient_data: true,
+    })
+}

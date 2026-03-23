@@ -31,14 +31,8 @@ pub struct EntryAnalytics {
     pub synced_at: String,
 }
 
-/// Percentile thresholds for the account's historical performance.
-#[derive(Debug, Clone)]
-pub struct PerformancePercentiles {
-    pub p50_impressions: i64,
-    pub p90_impressions: i64,
-    /// False if fewer than 10 posts — tier defaults to "none".
-    pub has_sufficient_data: bool,
-}
+// Re-export from storage so callers that import from sync continue to work.
+pub use crate::storage::analytics::PerformancePercentiles;
 
 /// Metrics from the tweet_performance table for Forge sync.
 #[derive(Debug, Clone)]

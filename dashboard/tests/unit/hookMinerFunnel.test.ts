@@ -44,6 +44,14 @@ describe('sanitizePathStem', () => {
 	it('handles multiple dots in filename', () => {
 		expect(sanitizePathStem('my.note.draft.md')).toBe('my.note.draft');
 	});
+
+	it('handles empty string without crashing', () => {
+		expect(sanitizePathStem('')).toBe('');
+	});
+
+	it('returns bare stem when no extension', () => {
+		expect(sanitizePathStem('README')).toBe('README');
+	});
 });
 
 // ── Hook Miner events ────────────────────────────────────────

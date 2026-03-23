@@ -32,7 +32,13 @@ const mockApi = vi.hoisted(() => ({
 	}
 }));
 
+const mockSetPendingPrompt = vi.hoisted(() => vi.fn());
+
 vi.mock('$lib/api', () => ({ api: mockApi }));
+
+vi.mock('$lib/stores/settings', () => ({
+	setPendingAnalyticsSyncPrompt: mockSetPendingPrompt
+}));
 
 vi.mock('$lib/stores/websocket', () => ({
 	events: {
@@ -147,5 +153,17 @@ describe('wsEvents subscription branches', () => {
 		dispatch({ type: 'UnknownEvent', id: 99 });
 		expect(mockApi.approval.stats).not.toHaveBeenCalled();
 		expect(mockApi.approval.list).not.toHaveBeenCalled();
+	});
+
+	it('fires ApprovalUpdated with approved status and triggers sync prompt', () => {
+		mockSetPendingPrompt.mockClear();
+		dispatch({ type: 'ApprovalUpdated', id: 20, status: 'approved' });
+		expect(mockSetPendingPrompt).toHaveBeenCalled();
+	});
+
+	it('fires ApprovalUpdated with rejected status and does NOT trigger sync prompt', () => {
+		mockSetPendingPrompt.mockClear();
+		dispatch({ type: 'ApprovalUpdated', id: 21, status: 'rejected' });
+		expect(mockSetPendingPrompt).not.toHaveBeenCalled();
 	});
 });

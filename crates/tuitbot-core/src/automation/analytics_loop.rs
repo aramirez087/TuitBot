@@ -86,6 +86,15 @@ pub trait AnalyticsStorage: Send + Sync {
         status: &str,
         message: &str,
     ) -> Result<(), AnalyticsError>;
+
+    /// Run Forge sync if the active content source has analytics sync enabled.
+    ///
+    /// Returns `Ok(Some(summary))` when sync ran, `Ok(None)` when disabled
+    /// or not applicable, `Err` on failure.
+    async fn run_forge_sync_if_enabled(&self) -> Result<Option<ForgeSyncResult>, AnalyticsError> {
+        // Default: no Forge sync (backwards-compatible for existing impls).
+        Ok(None)
+    }
 }
 
 // ============================================================================
@@ -301,6 +310,25 @@ impl AnalyticsLoop {
             }
         }
 
+        // 4. Forge sync (if enabled)
+        match self.storage.run_forge_sync_if_enabled().await {
+            Ok(Some(forge_result)) => {
+                tracing::info!(
+                    tweets_synced = forge_result.tweets_synced,
+                    threads_synced = forge_result.threads_synced,
+                    "Forge sync complete"
+                );
+                summary.forge_synced = true;
+            }
+            Ok(None) => {
+                // Forge sync not enabled — no action
+            }
+            Err(e) => {
+                // Forge sync failure is non-fatal
+                tracing::warn!(error = %e, "Forge sync failed");
+            }
+        }
+
         let _ = self
             .storage
             .log_action(
@@ -323,6 +351,14 @@ pub struct AnalyticsSummary {
     pub follower_count: i64,
     pub replies_measured: usize,
     pub tweets_measured: usize,
+    pub forge_synced: bool,
+}
+
+/// Result of a Forge sync iteration (returned by `run_forge_sync_if_enabled`).
+#[derive(Debug, Default, Clone)]
+pub struct ForgeSyncResult {
+    pub tweets_synced: usize,
+    pub threads_synced: usize,
 }
 
 /// Compute the performance score for content engagement.
@@ -370,6 +406,7 @@ mod tests {
         tweet_ids: Vec<String>,
         reply_perfs: Mutex<Vec<(String, f64)>>,
         tweet_perfs: Mutex<Vec<(String, f64)>>,
+        forge_sync_result: Option<Result<Option<ForgeSyncResult>, AnalyticsError>>,
     }
 
     impl MockAnalyticsStorage {
@@ -381,6 +418,7 @@ mod tests {
                 tweet_ids: Vec::new(),
                 reply_perfs: Mutex::new(Vec::new()),
                 tweet_perfs: Mutex::new(Vec::new()),
+                forge_sync_result: None,
             }
         }
 
@@ -396,6 +434,14 @@ mod tests {
 
         fn with_tweets(mut self, ids: Vec<String>) -> Self {
             self.tweet_ids = ids;
+            self
+        }
+
+        fn with_forge_sync(
+            mut self,
+            result: Result<Option<ForgeSyncResult>, AnalyticsError>,
+        ) -> Self {
+            self.forge_sync_result = Some(result);
             self
         }
     }
@@ -474,6 +520,16 @@ mod tests {
             _message: &str,
         ) -> Result<(), AnalyticsError> {
             Ok(())
+        }
+
+        async fn run_forge_sync_if_enabled(
+            &self,
+        ) -> Result<Option<ForgeSyncResult>, AnalyticsError> {
+            match &self.forge_sync_result {
+                Some(Ok(v)) => Ok(v.clone()),
+                Some(Err(_)) => Err(AnalyticsError::Other("forge sync failed".to_string())),
+                None => Ok(None),
+            }
         }
     }
 
@@ -731,6 +787,7 @@ mod tests {
             follower_count: 500,
             replies_measured: 3,
             tweets_measured: 2,
+            forge_synced: false,
         };
         let debug = format!("{summary:?}");
         assert!(debug.contains("500"));
@@ -838,5 +895,68 @@ mod tests {
         // Failures are silently skipped, not counted
         assert_eq!(summary.replies_measured, 0);
         assert_eq!(summary.tweets_measured, 0);
+    }
+
+    // --- Forge sync tests ---
+
+    #[tokio::test]
+    async fn iteration_with_forge_sync_enabled() {
+        let storage = Arc::new(MockAnalyticsStorage::new().with_forge_sync(Ok(Some(
+            ForgeSyncResult {
+                tweets_synced: 5,
+                threads_synced: 2,
+            },
+        ))));
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: default_profile(),
+            }),
+            Arc::new(MockEngagementFetcher {
+                metrics: default_tweet_metrics(),
+            }),
+            storage,
+        );
+
+        let summary = analytics.run_iteration().await.expect("iteration");
+        assert!(summary.forge_synced);
+    }
+
+    #[tokio::test]
+    async fn iteration_with_forge_sync_disabled() {
+        let storage = Arc::new(MockAnalyticsStorage::new().with_forge_sync(Ok(None)));
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: default_profile(),
+            }),
+            Arc::new(MockEngagementFetcher {
+                metrics: default_tweet_metrics(),
+            }),
+            storage,
+        );
+
+        let summary = analytics.run_iteration().await.expect("iteration");
+        assert!(!summary.forge_synced);
+    }
+
+    #[tokio::test]
+    async fn iteration_forge_sync_failure_non_fatal() {
+        let storage = Arc::new(
+            MockAnalyticsStorage::new()
+                .with_forge_sync(Err(AnalyticsError::Other("disk full".to_string()))),
+        );
+        let analytics = AnalyticsLoop::new(
+            Arc::new(MockProfileFetcher {
+                metrics: default_profile(),
+            }),
+            Arc::new(MockEngagementFetcher {
+                metrics: default_tweet_metrics(),
+            }),
+            storage,
+        );
+
+        // Forge sync failure must not fail the iteration
+        let summary = analytics.run_iteration().await.expect("iteration");
+        assert!(!summary.forge_synced);
+        assert_eq!(summary.follower_count, 1000);
     }
 }

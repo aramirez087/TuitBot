@@ -3,12 +3,16 @@
 	import type { MinedAngle } from '$lib/api/types';
 	import { getAngleTypeLabel, getEvidenceTypeConfig, truncateCitation } from '$lib/utils/angleStyles';
 	import { getConfidenceBadge } from '$lib/utils/hookStyles';
+	import { trackAnglesShown, trackAngleSelected } from '$lib/analytics/hookMinerFunnel';
 
 	let {
 		angles,
 		outputFormat = 'tweet',
 		loading = false,
 		error = null,
+		sessionId = 'unknown',
+		sourcePathStem = 'unknown',
+		localEligible = true,
 		onselect,
 		onremine,
 		onback,
@@ -19,12 +23,24 @@
 		outputFormat: 'tweet' | 'thread';
 		loading?: boolean;
 		error?: string | null;
+		sessionId?: string;
+		sourcePathStem?: string;
+		localEligible?: boolean;
 		onselect: (angle: MinedAngle, format: 'tweet' | 'thread') => void;
 		onremine: () => void;
 		onback: () => void;
 		onfallback: () => void;
 		onformatchange: (format: 'tweet' | 'thread') => void;
 	} = $props();
+
+	let trackedAnglesCount = $state(0);
+
+	$effect(() => {
+		if (angles.length > 0 && angles.length !== trackedAnglesCount) {
+			trackedAnglesCount = angles.length;
+			trackAnglesShown(angles.length, sessionId, sourcePathStem, localEligible);
+		}
+	});
 
 	let selectedIndex = $state<number | null>(null);
 
@@ -41,7 +57,9 @@
 
 	function handleConfirm() {
 		if (selectedIndex !== null && angles[selectedIndex]) {
-			onselect(angles[selectedIndex], outputFormat);
+			const angle = angles[selectedIndex];
+			trackAngleSelected(angle.angle_type, sessionId, sourcePathStem, angle.evidence.length);
+			onselect(angle, outputFormat);
 		}
 	}
 

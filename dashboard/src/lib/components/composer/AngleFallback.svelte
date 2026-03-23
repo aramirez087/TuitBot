@@ -1,13 +1,23 @@
 <script lang="ts">
+	import { trackFallbackOpened } from '$lib/analytics/hookMinerFunnel';
+
 	let {
 		reason,
+		sessionId = 'unknown',
+		acceptedCount = 0,
 		onusegenerichooks,
 		onbacktoneighbors,
 	}: {
 		reason?: string;
+		sessionId?: string;
+		acceptedCount?: number;
 		onusegenerichooks: () => void;
 		onbacktoneighbors: () => void;
 	} = $props();
+
+	$effect(() => {
+		trackFallbackOpened(reason ?? 'weak_signal', sessionId, acceptedCount);
+	});
 
 	const heading = $derived(
 		reason === 'timeout'

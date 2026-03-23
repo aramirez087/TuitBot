@@ -870,3 +870,101 @@ fn update_analytics_thread_aggregation() {
     assert!(content.contains("tuitbot_social_performance"));
     assert!(content.contains("tuitbot_best_post_impressions"));
 }
+
+#[test]
+fn aggregate_thread_zero_impressions() {
+    let performances = vec![
+        TweetPerformanceRow {
+            tweet_id: "root".to_string(),
+            likes_received: 0,
+            retweets_received: 0,
+            replies_received: 0,
+            impressions: 0,
+            performance_score: 0.0,
+        },
+        TweetPerformanceRow {
+            tweet_id: "child_1".to_string(),
+            likes_received: 0,
+            retweets_received: 0,
+            replies_received: 0,
+            impressions: 0,
+            performance_score: 0.0,
+        },
+    ];
+
+    let analytics = aggregate_thread_metrics(&performances).unwrap();
+    assert_eq!(analytics.impressions, 0);
+    assert!(analytics.engagement_rate.is_none());
+    assert!(analytics.performance_score.is_none());
+}
+
+#[test]
+fn aggregate_thread_mixed_zero_and_positive_impressions() {
+    let performances = vec![
+        TweetPerformanceRow {
+            tweet_id: "root".to_string(),
+            likes_received: 10,
+            retweets_received: 3,
+            replies_received: 2,
+            impressions: 500,
+            performance_score: 80.0,
+        },
+        TweetPerformanceRow {
+            tweet_id: "child_1".to_string(),
+            likes_received: 0,
+            retweets_received: 0,
+            replies_received: 0,
+            impressions: 0,
+            performance_score: 0.0,
+        },
+    ];
+
+    let analytics = aggregate_thread_metrics(&performances).unwrap();
+    assert_eq!(analytics.impressions, 500);
+    assert_eq!(analytics.likes, 10);
+    // engagement_rate = (10+3+2)/500*100 = 3.0
+    let er = analytics.engagement_rate.unwrap();
+    assert!((er - 3.0).abs() < 0.01, "engagement_rate was {er}");
+    // Only root has impressions, so weighted avg = root's score
+    let ps = analytics.performance_score.unwrap();
+    assert!((ps - 80.0).abs() < 0.01, "performance_score was {ps}");
+}
+
+#[test]
+fn aggregate_thread_single_child_only() {
+    let performances = vec![TweetPerformanceRow {
+        tweet_id: "child_1".to_string(),
+        likes_received: 5,
+        retweets_received: 1,
+        replies_received: 2,
+        impressions: 200,
+        performance_score: 45.0,
+    }];
+
+    let analytics = aggregate_thread_metrics(&performances).unwrap();
+    assert_eq!(analytics.impressions, 200);
+    assert_eq!(analytics.likes, 5);
+    assert!(analytics.engagement_rate.is_some());
+    assert_eq!(analytics.performance_score, Some(45.0));
+}
+
+#[test]
+fn update_analytics_no_frontmatter_returns_entry_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("plain.md");
+    fs::write(&path, "Just plain text, no frontmatter.\n").unwrap();
+
+    let analytics = EntryAnalytics {
+        impressions: 1000,
+        likes: 10,
+        retweets: 5,
+        replies: 3,
+        engagement_rate: Some(1.8),
+        performance_score: Some(55.0),
+        synced_at: "2026-03-22T12:00:00Z".to_string(),
+    };
+
+    let result =
+        update_entry_analytics(&path, "tweet_999", &analytics, &default_percentiles()).unwrap();
+    assert_eq!(result, UpdateResult::EntryNotFound);
+}
