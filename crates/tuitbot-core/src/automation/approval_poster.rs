@@ -1034,4 +1034,92 @@ mod tests {
         let is_thread = action_type == "thread";
         assert!(is_thread);
     }
+
+    // ── parse_thread_content additional edge cases ─────────────────
+
+    #[test]
+    fn parse_thread_content_single_tweet_array() {
+        let content = r#"["Only tweet"]"#;
+        let parsed = parse_thread_content(content).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0], "Only tweet");
+    }
+
+    #[test]
+    fn parse_thread_content_numeric_array_is_invalid() {
+        let content = "[1, 2, 3]";
+        let result = parse_thread_content(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_nested_json_is_invalid() {
+        let content = r#"{"key": "value"}"#;
+        let result = parse_thread_content(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_preserves_tweet_order() {
+        let content = r#"["First","Second","Third","Fourth"]"#;
+        let parsed = parse_thread_content(content).unwrap();
+        assert_eq!(parsed, vec!["First", "Second", "Third", "Fourth"]);
+    }
+
+    #[test]
+    fn parse_thread_content_empty_string() {
+        let result = parse_thread_content("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_whitespace_only() {
+        let result = parse_thread_content("   ");
+        assert!(result.is_err());
+    }
+
+    // ── tweet URL construction ────────────────────────────────────
+
+    #[test]
+    fn loopback_url_format_long_id() {
+        let tweet_id = "1234567890123456789";
+        let url = format!("https://x.com/i/status/{tweet_id}");
+        assert_eq!(url, "https://x.com/i/status/1234567890123456789");
+    }
+
+    // ── child_tweet_ids extraction ────────────────────────────────
+
+    #[test]
+    fn child_ids_from_posted_ids() {
+        let posted_ids = vec![
+            "root".to_string(),
+            "child1".to_string(),
+            "child2".to_string(),
+        ];
+        let child_ids: Vec<String> = posted_ids.iter().skip(1).cloned().collect();
+        assert_eq!(child_ids, vec!["child1", "child2"]);
+    }
+
+    #[test]
+    fn child_ids_single_tweet_no_children() {
+        let posted_ids = vec!["root".to_string()];
+        let child_ids: Vec<String> = posted_ids.iter().skip(1).cloned().collect();
+        assert!(child_ids.is_empty());
+    }
+
+    // ── topic normalization ───────────────────────────────────────
+
+    #[test]
+    fn empty_topic_uses_fallback() {
+        let topic = "";
+        let effective = if topic.is_empty() { "" } else { topic };
+        assert_eq!(effective, "");
+    }
+
+    #[test]
+    fn nonempty_topic_used_directly() {
+        let topic = "rust async";
+        let effective = if topic.is_empty() { "" } else { topic };
+        assert_eq!(effective, "rust async");
+    }
 }

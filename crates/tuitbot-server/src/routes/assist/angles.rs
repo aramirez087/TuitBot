@@ -298,4 +298,112 @@ mod tests {
         assert!(result.len() <= 503); // 500 + "..."
         assert!(result.ends_with("..."));
     }
+
+    #[test]
+    fn truncate_snippet_multibyte_boundary() {
+        // 4-byte emoji repeated; truncating mid-emoji should back up
+        let s = "\u{1F600}".repeat(5); // 5 emojis = 20 bytes
+        let result = truncate_snippet(&s, 6); // byte 6 is mid-emoji
+                                              // Should back up to byte 4 (1 emoji) + "..."
+        assert!(result.ends_with("..."));
+        // Must not panic from splitting a char
+    }
+
+    #[test]
+    fn truncate_snippet_exact_boundary() {
+        let result = truncate_snippet("abcde", 5);
+        assert_eq!(result, "abcde");
+    }
+
+    #[test]
+    fn truncate_snippet_empty_string() {
+        assert_eq!(truncate_snippet("", 100), "");
+    }
+
+    // -- Request deserialization edge cases --
+
+    #[test]
+    fn angles_request_empty_topic_deserializes() {
+        let json = r#"{"topic": "", "accepted_neighbor_ids": [1]}"#;
+        let req: AssistAnglesRequest = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(req.topic, "");
+    }
+
+    #[test]
+    fn angles_request_empty_neighbor_ids_defaults() {
+        let json = r#"{"topic": "test"}"#;
+        let req: AssistAnglesRequest = serde_json::from_str(json).expect("deserialize");
+        assert!(req.accepted_neighbor_ids.is_empty());
+    }
+
+    // -- DTO serialization edge cases --
+
+    #[test]
+    fn mined_angle_dto_empty_evidence() {
+        let dto = MinedAngleDto {
+            angle_type: "hot_take".to_string(),
+            seed_text: "Bold claim".to_string(),
+            char_count: 10,
+            evidence: vec![],
+            confidence: "medium".to_string(),
+            rationale: "Why not.".to_string(),
+        };
+        let json = serde_json::to_string(&dto).expect("serialize");
+        assert!(json.contains("\"evidence\":[]"));
+    }
+
+    #[test]
+    fn mined_angle_dto_multiple_evidence_items() {
+        let dto = MinedAngleDto {
+            angle_type: "story".to_string(),
+            seed_text: "A tale".to_string(),
+            char_count: 6,
+            evidence: vec![
+                EvidenceItemDto {
+                    evidence_type: "data_point".to_string(),
+                    citation_text: "45%".to_string(),
+                    source_node_id: 1,
+                    source_note_title: "A".to_string(),
+                    source_heading_path: None,
+                },
+                EvidenceItemDto {
+                    evidence_type: "contradiction".to_string(),
+                    citation_text: "but also".to_string(),
+                    source_node_id: 2,
+                    source_note_title: "B".to_string(),
+                    source_heading_path: Some("# H".to_string()),
+                },
+            ],
+            confidence: "high".to_string(),
+            rationale: "Two sources.".to_string(),
+        };
+        let json = serde_json::to_string(&dto).expect("serialize");
+        assert!(json.contains("\"data_point\""));
+        assert!(json.contains("\"contradiction\""));
+    }
+
+    #[test]
+    fn angles_response_with_citations_serialized() {
+        use tuitbot_core::context::retrieval::VaultCitation;
+
+        let resp = AssistAnglesResponse {
+            angles: vec![],
+            fallback_reason: None,
+            topic: "test".to_string(),
+            vault_citations: vec![VaultCitation {
+                chunk_id: 1,
+                node_id: 10,
+                heading_path: "# H".to_string(),
+                source_path: "note.md".to_string(),
+                source_title: Some("Note".to_string()),
+                snippet: "text".to_string(),
+                retrieval_boost: 0.0,
+                edge_type: None,
+                edge_label: None,
+            }],
+        };
+        let json = serde_json::to_string(&resp).expect("serialize");
+        assert!(json.contains("vault_citations"));
+        assert!(json.contains("\"node_id\":10"));
+    }
 }

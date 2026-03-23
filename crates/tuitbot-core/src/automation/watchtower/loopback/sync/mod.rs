@@ -11,6 +11,9 @@ use super::{
     parse_tuitbot_metadata, serialize_frontmatter_to_file, split_front_matter, TuitbotFrontMatter,
 };
 
+#[cfg(test)]
+mod tests;
+
 /// Result of an analytics update attempt on a single entry.
 #[derive(Debug, PartialEq, Eq)]
 pub enum UpdateResult {

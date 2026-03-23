@@ -824,6 +824,85 @@ mod tests {
         assert_eq!(links[0].source_role.as_deref(), Some("accepted_neighbor"));
     }
 
+    // -----------------------------------------------------------------------
+    // get_primary_source_for_tweet coverage
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn get_primary_source_no_links_returns_none() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        let result = get_primary_source_for_tweet(&pool, account_id, 999)
+            .await
+            .expect("query");
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_primary_source_wrong_role_returns_none() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        // Insert a link with source_role != primary_selection (node_id None to avoid FK)
+        let refs = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: Some("notes/test.md".to_string()),
+            heading_path: None,
+            snippet: None,
+            edge_type: None,
+            edge_label: None,
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: Some("accepted_neighbor".to_string()),
+        }];
+
+        insert_links_for(&pool, account_id, "original_tweet", 43, &refs)
+            .await
+            .expect("insert");
+
+        // source_role is "accepted_neighbor", not "primary_selection" → None
+        let result = get_primary_source_for_tweet(&pool, account_id, 43)
+            .await
+            .expect("query");
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_primary_source_wrong_entity_type_returns_none() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = "00000000-0000-0000-0000-000000000000";
+
+        // Insert a link for entity_type = "approval_queue", not "original_tweet"
+        let refs = vec![ProvenanceRef {
+            node_id: None,
+            chunk_id: None,
+            seed_id: None,
+            source_path: Some("notes/test.md".to_string()),
+            heading_path: None,
+            snippet: None,
+            edge_type: None,
+            edge_label: None,
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: Some("primary_selection".to_string()),
+        }];
+
+        insert_links_for(&pool, account_id, "approval_queue", 44, &refs)
+            .await
+            .expect("insert");
+
+        // Query for original_tweet entity type — should not find approval_queue link
+        let result = get_primary_source_for_tweet(&pool, account_id, 44)
+            .await
+            .expect("query");
+        assert!(result.is_none());
+    }
+
     #[tokio::test]
     async fn hook_miner_fields_null_for_legacy_rows() {
         let pool = init_test_db().await.expect("init db");

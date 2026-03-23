@@ -799,3 +799,166 @@ async fn recent_performance_items_with_tweets_and_replies() {
     assert_eq!(items[0].likes, 20);
     assert_eq!(items[1].likes, 30);
 }
+
+// ============================================================================
+// Tweet performance: percentiles, multi-get, and account-scoped queries
+// ============================================================================
+
+#[tokio::test]
+async fn compute_percentiles_insufficient_data() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-perc-few";
+    crate::storage::accounts::create_account(&pool, acct, "PF")
+        .await
+        .expect("create");
+
+    // Insert only 5 rows — below the 10-row threshold
+    for i in 0..5 {
+        upsert_tweet_performance_for(
+            &pool,
+            acct,
+            &format!("tw-p{i}"),
+            i,
+            0,
+            0,
+            (i + 1) * 100,
+            10.0,
+        )
+        .await
+        .expect("upsert");
+    }
+
+    let p = compute_performance_percentiles_for(&pool, acct)
+        .await
+        .expect("percentiles");
+    assert!(!p.has_sufficient_data);
+    assert_eq!(p.p50_impressions, 0);
+    assert_eq!(p.p90_impressions, 0);
+}
+
+#[tokio::test]
+async fn compute_percentiles_empty_account() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-perc-empty";
+    crate::storage::accounts::create_account(&pool, acct, "PE")
+        .await
+        .expect("create");
+
+    let p = compute_performance_percentiles_for(&pool, acct)
+        .await
+        .expect("percentiles");
+    assert!(!p.has_sufficient_data);
+}
+
+#[tokio::test]
+async fn compute_percentiles_sufficient_data() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-perc-ok";
+    crate::storage::accounts::create_account(&pool, acct, "PO")
+        .await
+        .expect("create");
+
+    // Insert 20 rows with impressions 100, 200, ..., 2000
+    for i in 1..=20 {
+        upsert_tweet_performance_for(&pool, acct, &format!("tw-pc{i}"), i, 0, 0, i * 100, 10.0)
+            .await
+            .expect("upsert");
+    }
+
+    let p = compute_performance_percentiles_for(&pool, acct)
+        .await
+        .expect("percentiles");
+    assert!(p.has_sufficient_data);
+    // Sorted: [100, 200, ..., 2000]. count=20.
+    // p50 = impressions[20/2] = impressions[10] = 1100
+    // p90 = impressions[20*9/10] = impressions[18] = 1900
+    assert_eq!(p.p50_impressions, 1100);
+    assert_eq!(p.p90_impressions, 1900);
+}
+
+#[tokio::test]
+async fn compute_percentiles_exactly_ten_rows() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-perc-ten";
+    crate::storage::accounts::create_account(&pool, acct, "PT")
+        .await
+        .expect("create");
+
+    // Insert exactly 10 rows with impressions 10, 20, ..., 100
+    for i in 1..=10 {
+        upsert_tweet_performance_for(&pool, acct, &format!("tw-p10-{i}"), i, 0, 0, i * 10, 10.0)
+            .await
+            .expect("upsert");
+    }
+
+    let p = compute_performance_percentiles_for(&pool, acct)
+        .await
+        .expect("percentiles");
+    assert!(p.has_sufficient_data);
+    // p50 = impressions[5] = 60, p90 = impressions[9] = 100
+    assert_eq!(p.p50_impressions, 60);
+    assert_eq!(p.p90_impressions, 100);
+}
+
+#[tokio::test]
+async fn get_tweet_performances_for_empty_ids() {
+    let pool = init_test_db().await.expect("init db");
+    let result = get_tweet_performances_for(&pool, DEFAULT_ACCOUNT_ID, &[])
+        .await
+        .expect("get");
+    assert!(result.is_empty());
+}
+
+#[tokio::test]
+async fn get_tweet_performances_for_returns_matching() {
+    let pool = init_test_db().await.expect("init db");
+
+    upsert_tweet_performance(&pool, "tp-a", 10, 5, 3, 500, 82.0)
+        .await
+        .expect("upsert");
+    upsert_tweet_performance(&pool, "tp-b", 20, 10, 5, 1000, 95.0)
+        .await
+        .expect("upsert");
+    upsert_tweet_performance(&pool, "tp-c", 5, 2, 1, 200, 40.0)
+        .await
+        .expect("upsert");
+
+    let ids = vec!["tp-a".to_string(), "tp-c".to_string()];
+    let result = get_tweet_performances_for(&pool, DEFAULT_ACCOUNT_ID, &ids)
+        .await
+        .expect("get");
+    assert_eq!(result.len(), 2);
+    let tweet_ids: Vec<&str> = result.iter().map(|r| r.tweet_id.as_str()).collect();
+    assert!(tweet_ids.contains(&"tp-a"));
+    assert!(tweet_ids.contains(&"tp-c"));
+}
+
+#[tokio::test]
+async fn get_all_tweet_performances_for_account() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = "acct-all-perf";
+    crate::storage::accounts::create_account(&pool, acct, "AP")
+        .await
+        .expect("create");
+
+    upsert_tweet_performance_for(&pool, acct, "all-1", 10, 5, 3, 500, 82.0)
+        .await
+        .expect("upsert");
+    upsert_tweet_performance_for(&pool, acct, "all-2", 20, 10, 5, 1000, 95.0)
+        .await
+        .expect("upsert");
+
+    let result = get_all_tweet_performances_for(&pool, acct)
+        .await
+        .expect("get");
+    assert_eq!(result.len(), 2);
+
+    // Default account should not see these
+    let default_result = get_all_tweet_performances_for(&pool, DEFAULT_ACCOUNT_ID)
+        .await
+        .expect("get default");
+    // May have data from other tests, but should not contain our acct's rows
+    assert!(default_result
+        .iter()
+        .all(|r| r.tweet_id != "all-1" && r.tweet_id != "all-2"));
+}

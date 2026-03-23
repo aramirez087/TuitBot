@@ -17,6 +17,9 @@ use crate::content::evidence::{
 use crate::error::LlmError;
 use crate::llm::{GenerationParams, LlmProvider, TokenUsage};
 
+#[cfg(test)]
+mod tests;
+
 /// Run the full angle mining pipeline.
 ///
 /// 1. Pre-filter neighbors for data point candidates.
@@ -346,8 +349,8 @@ fn strip_formatting(line: &str) -> String {
             }
         }
     }
-    if s.starts_with("- ") || s.starts_with("• ") {
-        s = s[2..].to_string();
+    if let Some(rest) = s.strip_prefix("- ").or_else(|| s.strip_prefix("\u{2022} ")) {
+        s = rest.to_string();
     }
     s
 }
@@ -358,131 +361,5 @@ fn strip_quotes(text: &str) -> String {
         t[1..t.len() - 1].to_string()
     } else {
         t.to_string()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::content::angles::EvidenceType;
-
-    fn sample_evidence() -> Vec<EvidenceItem> {
-        vec![
-            EvidenceItem {
-                evidence_type: EvidenceType::DataPoint,
-                citation_text: "45% growth".to_string(),
-                source_node_id: 1,
-                source_note_title: "Metrics".to_string(),
-                source_heading_path: None,
-                confidence: 0.8,
-            },
-            EvidenceItem {
-                evidence_type: EvidenceType::Contradiction,
-                citation_text: "But costs rose too".to_string(),
-                source_node_id: 2,
-                source_note_title: "Costs".to_string(),
-                source_heading_path: None,
-                confidence: 0.7,
-            },
-            EvidenceItem {
-                evidence_type: EvidenceType::AhaMoment,
-                citation_text: "Unexpected correlation".to_string(),
-                source_node_id: 3,
-                source_note_title: "Insights".to_string(),
-                source_heading_path: None,
-                confidence: 0.9,
-            },
-        ]
-    }
-
-    #[test]
-    fn parse_angles_well_formatted() {
-        let response = "\
-ANGLE_TYPE: story
-SEED_TEXT: We grew 45% but our costs told a different story...
-RATIONALE: Tension between growth and cost creates a compelling narrative.
-EVIDENCE_IDS: 1, 2
----
-ANGLE_TYPE: listicle
-SEED_TEXT: 3 things nobody tells you about scaling fast:
-RATIONALE: List format works well for multi-faceted insights.
-EVIDENCE_IDS: 1, 3
----
-ANGLE_TYPE: hot_take
-SEED_TEXT: Growth without profit isn't growth—it's a slow leak.
-RATIONALE: Bold opinion backed by evidence of rising costs.
-EVIDENCE_IDS: 2";
-
-        let evidence = sample_evidence();
-        let angles = parse_angles_response(response, &evidence);
-
-        assert_eq!(angles.len(), 3);
-        assert_eq!(angles[0].angle_type, AngleType::Story);
-        assert_eq!(angles[0].evidence.len(), 2);
-        assert_eq!(angles[1].angle_type, AngleType::Listicle);
-        assert_eq!(angles[1].evidence.len(), 2);
-        assert_eq!(angles[2].angle_type, AngleType::HotTake);
-        assert_eq!(angles[2].evidence.len(), 1);
-    }
-
-    #[test]
-    fn parse_angles_partial() {
-        let response = "\
-ANGLE_TYPE: story
-SEED_TEXT: A tale of growth
-RATIONALE: Good narrative.
-EVIDENCE_IDS: 1
----
-ANGLE_TYPE: listicle
-SEED_TEXT: Top insights from the data
-RATIONALE: Lists perform well.
-EVIDENCE_IDS: 1, 3";
-
-        let evidence = sample_evidence();
-        let angles = parse_angles_response(response, &evidence);
-        assert_eq!(angles.len(), 2);
-    }
-
-    #[test]
-    fn parse_angles_empty() {
-        let angles = parse_angles_response("", &sample_evidence());
-        assert!(angles.is_empty());
-    }
-
-    #[test]
-    fn fallback_no_neighbors() {
-        // Tested via the pipeline: empty neighbors → "no_neighbors_accepted"
-        // This is a sync verification of the pipeline's early return logic.
-        let neighbors: Vec<NeighborContent> = vec![];
-        assert!(neighbors.is_empty());
-    }
-
-    #[test]
-    fn parse_angle_type_variants() {
-        assert_eq!(parse_angle_type("story"), Some(AngleType::Story));
-        assert_eq!(parse_angle_type("listicle"), Some(AngleType::Listicle));
-        assert_eq!(parse_angle_type("hot_take"), Some(AngleType::HotTake));
-        assert_eq!(parse_angle_type("hottake"), Some(AngleType::HotTake));
-        assert_eq!(parse_angle_type("hot take"), Some(AngleType::HotTake));
-        assert_eq!(parse_angle_type("STORY"), Some(AngleType::Story));
-        assert_eq!(parse_angle_type("unknown"), None);
-    }
-
-    #[test]
-    fn parse_angles_with_evidence_mapping() {
-        let response = "\
-ANGLE_TYPE: story
-SEED_TEXT: The data surprised us all.
-RATIONALE: Data-backed narrative.
-EVIDENCE_IDS: 1, 3";
-
-        let evidence = sample_evidence();
-        let angles = parse_angles_response(response, &evidence);
-        assert_eq!(angles.len(), 1);
-        assert_eq!(angles[0].evidence.len(), 2);
-        assert_eq!(angles[0].evidence[0].evidence_type, EvidenceType::DataPoint);
-        assert_eq!(angles[0].evidence[1].evidence_type, EvidenceType::AhaMoment);
-        // 2 items with avg conf (0.8+0.9)/2 = 0.85 >= 0.6 → "high"
-        assert_eq!(angles[0].confidence, "high");
     }
 }
