@@ -10,8 +10,8 @@ use serde::Deserialize;
 /// Maximum events per batch to prevent abuse.
 const MAX_BATCH_SIZE: usize = 50;
 
-/// Required prefix for event names (namespace isolation).
-const EVENT_PREFIX: &str = "backlink.";
+/// Allowed event name prefixes (namespace isolation).
+const ALLOWED_PREFIXES: &[&str] = &["backlink.", "hook_miner.", "forge."];
 
 #[derive(Deserialize)]
 pub struct TelemetryBatch {
@@ -46,12 +46,12 @@ pub async fn ingest_events(
     }
 
     for ev in &batch.events {
-        if !ev.event.starts_with(EVENT_PREFIX) {
+        if !ALLOWED_PREFIXES.iter().any(|p| ev.event.starts_with(p)) {
             return Err((
                 StatusCode::BAD_REQUEST,
                 format!(
-                    "Invalid event name \"{}\": must start with \"{}\"",
-                    ev.event, EVENT_PREFIX
+                    "Invalid event name \"{}\": must start with one of {:?}",
+                    ev.event, ALLOWED_PREFIXES
                 ),
             ));
         }
@@ -122,5 +122,47 @@ mod tests {
         let batch = TelemetryBatch { events: vec![] };
         let result = ingest_events(Json(batch)).await;
         assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn hook_miner_prefix_accepted() {
+        let batch = TelemetryBatch {
+            events: vec![make_event("hook_miner.angles_shown")],
+        };
+        let result = ingest_events(Json(batch)).await;
+        assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn forge_prefix_accepted() {
+        let batch = TelemetryBatch {
+            events: vec![make_event("forge.sync_succeeded")],
+        };
+        let result = ingest_events(Json(batch)).await;
+        assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn mixed_namespace_batch_accepted() {
+        let batch = TelemetryBatch {
+            events: vec![
+                make_event("backlink.suggestions_shown"),
+                make_event("hook_miner.angle_selected"),
+                make_event("forge.enabled"),
+            ],
+        };
+        let result = ingest_events(Json(batch)).await;
+        assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn unknown_prefix_rejected() {
+        let batch = TelemetryBatch {
+            events: vec![make_event("other.event")],
+        };
+        let result = ingest_events(Json(batch)).await;
+        let err = result.unwrap_err();
+        assert_eq!(err.0, StatusCode::BAD_REQUEST);
+        assert!(err.1.contains("must start with one of"));
     }
 }
