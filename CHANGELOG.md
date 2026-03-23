@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.50](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.49...tuitbot-cli-v0.1.50) - 2026-03-23
+
+### Other
+
+- update Cargo.lock dependencies
+
 ## [0.1.49](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.48...tuitbot-cli-v0.1.49) - 2026-03-21
 
 ### Fixed
