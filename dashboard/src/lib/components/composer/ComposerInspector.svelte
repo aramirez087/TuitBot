@@ -3,6 +3,7 @@
 	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
 	import { topicWithCue } from '$lib/utils/composeHandlers';
 	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel } from '$lib/stores/draftInsertStore';
+	import { createEvidenceState, type EvidenceState, type PinnedEvidence } from '$lib/stores/evidenceStore';
 	import { trackSlotTargeted, trackInsertUndone } from '$lib/analytics/backlinkFunnel';
 	import InspectorContent from './InspectorContent.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
@@ -74,6 +75,70 @@
 	/** Get the current hook style (read by parent). */
 	export function getVaultHookStyle(): string | null {
 		return vaultHookStyle;
+	}
+
+	// ── Evidence state ────────────────────────────────────
+	let evidenceState = $state<EvidenceState>(createEvidenceState());
+
+	/** Get the current pinned evidence (read by parent). */
+	export function getPinnedEvidence(): PinnedEvidence[] {
+		return evidenceState.pinned;
+	}
+
+	function handleEvidenceChange(newState: EvidenceState) {
+		evidenceState = newState;
+	}
+
+	async function handleApplyEvidence(evidence: PinnedEvidence, slotIndex: number, slotLabel: string) {
+		const blockId = mode === 'tweet' ? 'tweet' : threadBlocks[slotIndex]?.id;
+		if (!blockId) return;
+		const previousText = mode === 'tweet' ? tweetText : (threadBlocks[slotIndex]?.text ?? '');
+		if (!previousText.trim()) return;
+
+		assisting = true;
+		try {
+			const context = `This is the "${slotLabel}" of a ${mode}. Refine it using this evidence from "${evidence.node_title ?? 'vault'}": ${evidence.snippet}`;
+			const result = await api.assist.improve(previousText, context);
+			const insertedText = result.content;
+
+			if (mode === 'tweet') {
+				tweetText = insertedText;
+			} else {
+				threadBlocks = threadBlocks.map((b, i) =>
+					i === slotIndex ? { ...b, text: insertedText } : b
+				);
+			}
+
+			const insert = buildInsert({
+				blockId,
+				slotLabel,
+				previousText,
+				insertedText,
+				sourceNodeId: evidence.node_id,
+				sourceTitle: evidence.node_title ?? 'Evidence',
+			});
+			draftInsertState = pushInsert(draftInsertState, insert);
+
+			vaultProvenance = [
+				...vaultProvenance,
+				{
+					node_id: evidence.node_id,
+					chunk_id: evidence.chunk_id,
+					heading_path: evidence.heading_path,
+					snippet: evidence.snippet,
+					match_reason: evidence.match_reason,
+					similarity_score: evidence.score,
+					source_role: 'semantic_evidence',
+				},
+			];
+
+			undoMessage = `Applied evidence from "${evidence.node_title ?? 'vault'}" to ${slotLabel}.`;
+			startUndoTimer();
+		} catch (e) {
+			onsubmiterror?.(e instanceof Error ? e.message : 'Evidence application failed');
+		} finally {
+			assisting = false;
+		}
 	}
 
 	// ── Draft insert state ────────────────────────────────
@@ -340,6 +405,7 @@
 		targetDate,
 		timezone,
 		voiceCue,
+		tweetText,
 		assisting,
 		hasExistingContent,
 		notesPanelMode,
@@ -348,6 +414,7 @@
 		selectionSessionId,
 		threadBlocks,
 		insertState: draftInsertState,
+		evidenceState,
 	});
 
 	function handleScheduleSelect(date: string, time: string) {
@@ -387,6 +454,8 @@
 					{onSelectionConsumed}
 					onslotinsert={handleSlotInsert}
 					onundoinsert={handleUndoInsertById}
+					onevidence={handleEvidenceChange}
+					onapplyevidence={handleApplyEvidence}
 				/>
 			</div>
 		</div>
@@ -408,6 +477,8 @@
 		{onSelectionConsumed}
 		onslotinsert={handleSlotInsert}
 		onundoinsert={handleUndoInsertById}
+		onevidence={handleEvidenceChange}
+		onapplyevidence={handleApplyEvidence}
 	/>
 {/if}
 

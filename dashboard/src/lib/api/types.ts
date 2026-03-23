@@ -1027,6 +1027,9 @@ export interface DraftInsertState {
 	blockInserts: Map<string, DraftInsert[]>;
 }
 
+// Re-export PinnedEvidence from evidenceStore for convenience
+export type { PinnedEvidence } from '$lib/stores/evidenceStore';
+
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.
 export interface McpToolParam {
 	name: string;
