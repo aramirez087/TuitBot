@@ -469,6 +469,8 @@ mod tests {
             pending_oauth: Mutex::new(HashMap::new()),
             token_managers: Mutex::new(HashMap::new()),
             x_client_id: String::new(),
+            semantic_index: None,
+            embedding_provider: None,
         })
     }
 
@@ -742,6 +744,8 @@ mod tests {
             pending_oauth: Mutex::new(HashMap::new()),
             token_managers: Mutex::new(HashMap::new()),
             x_client_id: String::new(),
+            semantic_index: None,
+            embedding_provider: None,
         })
     }
 

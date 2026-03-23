@@ -6,6 +6,7 @@
 pub mod chunks;
 pub mod connections;
 pub mod edges;
+pub mod embeddings;
 mod nodes;
 mod seeds;
 mod sources;
@@ -21,6 +22,7 @@ mod tests_storage;
 pub use chunks::*;
 pub use connections::*;
 pub use edges::*;
+pub use embeddings::*;
 pub use nodes::*;
 pub use seeds::*;
 pub use sources::*;

@@ -67,6 +67,8 @@ pub async fn test_router() -> axum::Router {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     tuitbot_server::build_router(state)
@@ -196,6 +198,8 @@ product_keywords = ["test"]
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: "test-client-id".to_string(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     (tuitbot_server::build_router(state), pool)

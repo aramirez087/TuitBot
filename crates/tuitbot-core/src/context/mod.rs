@@ -8,6 +8,7 @@ pub mod author;
 pub mod engagement;
 pub mod graph_expansion;
 pub mod retrieval;
+pub mod semantic_index;
 pub mod topics;
 pub mod winning_dna;
 
