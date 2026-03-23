@@ -2,8 +2,10 @@
 	import { api, type ScheduleConfig, type ThreadBlock, type ProvenanceRef } from '$lib/api';
 	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
 	import { topicWithCue } from '$lib/utils/composeHandlers';
-	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel } from '$lib/stores/draftInsertStore';
+	import { createInsertState, pushInsert, popInsert, undoInsertById, buildInsert, hasInserts, getSlotLabel, partitionInserts } from '$lib/stores/draftInsertStore';
+	import { createEvidenceState, type EvidenceState, type PinnedEvidence } from '$lib/stores/evidenceStore';
 	import { trackSlotTargeted, trackInsertUndone } from '$lib/analytics/backlinkFunnel';
+	import { trackEvidenceStrengthen } from '$lib/analytics/evidenceFunnel';
 	import InspectorContent from './InspectorContent.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import type ThreadFlowLane from './ThreadFlowLane.svelte';
@@ -31,6 +33,7 @@
 		onclose,
 		onundo,
 		onsubmiterror,
+		focusedBlockIndex = 0,
 		onSelectionConsumed,
 		oninsertstatechange,
 	}: {
@@ -50,6 +53,7 @@
 		targetDate: Date;
 		timezone?: string;
 		hasExistingContent: boolean;
+		focusedBlockIndex?: number;
 		selectionSessionId?: string | null;
 		threadFlowRef?: ThreadFlowLane;
 		voicePanelRef?: VoiceContextPanel;
@@ -74,6 +78,154 @@
 	/** Get the current hook style (read by parent). */
 	export function getVaultHookStyle(): string | null {
 		return vaultHookStyle;
+	}
+
+	// ── Evidence state ────────────────────────────────────
+	let evidenceState = $state<EvidenceState>(createEvidenceState());
+
+	/** Get the current pinned evidence (read by parent). */
+	export function getPinnedEvidence(): PinnedEvidence[] {
+		return evidenceState.pinned;
+	}
+
+	function handleEvidenceChange(newState: EvidenceState) {
+		evidenceState = newState;
+	}
+
+	async function handleApplyEvidence(evidence: PinnedEvidence, slotIndex: number, slotLabel: string) {
+		const blockId = mode === 'tweet' ? 'tweet' : threadBlocks[slotIndex]?.id;
+		if (!blockId) return;
+		const previousText = mode === 'tweet' ? tweetText : (threadBlocks[slotIndex]?.text ?? '');
+		if (!previousText.trim()) return;
+
+		assisting = true;
+		try {
+			const context = `This is the "${slotLabel}" of a ${mode}. Refine it using this evidence from "${evidence.node_title ?? 'vault'}": ${evidence.snippet}`;
+			const result = await api.assist.improve(previousText, context);
+			const insertedText = result.content;
+
+			if (mode === 'tweet') {
+				tweetText = insertedText;
+			} else {
+				threadBlocks = threadBlocks.map((b, i) =>
+					i === slotIndex ? { ...b, text: insertedText } : b
+				);
+			}
+
+			const insert = buildInsert({
+				blockId,
+				slotLabel,
+				previousText,
+				insertedText,
+				sourceNodeId: evidence.node_id,
+				sourceTitle: evidence.node_title ?? 'Evidence',
+				matchReason: evidence.match_reason,
+				similarityScore: evidence.score,
+				chunkId: evidence.chunk_id,
+				sourceRole: 'semantic_evidence',
+				headingPath: evidence.heading_path,
+				snippet: evidence.snippet,
+			});
+			draftInsertState = pushInsert(draftInsertState, insert);
+
+			vaultProvenance = [
+				...vaultProvenance,
+				{
+					node_id: evidence.node_id,
+					chunk_id: evidence.chunk_id,
+					heading_path: evidence.heading_path,
+					snippet: evidence.snippet,
+					match_reason: evidence.match_reason,
+					similarity_score: evidence.score,
+					source_role: 'semantic_evidence',
+				},
+			];
+
+			undoMessage = `Applied evidence from "${evidence.node_title ?? 'vault'}" to ${slotLabel}.`;
+			startUndoTimer();
+		} catch (e) {
+			onsubmiterror?.(e instanceof Error ? e.message : 'Evidence application failed');
+		} finally {
+			assisting = false;
+		}
+	}
+
+	async function handleStrengthenDraft() {
+		const pinned = evidenceState.pinned;
+		if (pinned.length === 0) return;
+		const blockCount = mode === 'tweet' ? 1 : threadBlocks.filter((b) => b.text.trim()).length;
+		trackEvidenceStrengthen(blockCount, pinned.length);
+
+		const evidenceContext = pinned
+			.map((p) => `"${p.node_title ?? 'vault'}": ${p.snippet}`)
+			.join('\n');
+
+		assisting = true;
+		try {
+			if (mode === 'tweet') {
+				if (!tweetText.trim()) return;
+				const context = `Strengthen this tweet using these evidence points:\n${evidenceContext}`;
+				const result = await api.assist.improve(tweetText, context);
+				const insert = buildInsert({
+					blockId: 'tweet',
+					slotLabel: 'Tweet',
+					previousText: tweetText,
+					insertedText: result.content,
+					sourceNodeId: pinned[0].node_id,
+					sourceTitle: `${pinned.length} evidence items`,
+					matchReason: 'semantic',
+					sourceRole: 'semantic_evidence',
+				});
+				tweetText = result.content;
+				draftInsertState = pushInsert(draftInsertState, insert);
+			} else {
+				for (let i = 0; i < threadBlocks.length; i++) {
+					const block = threadBlocks[i];
+					if (!block.text.trim()) continue;
+					const slotLabel = getSlotLabel(i, threadBlocks.length);
+					const context = `This is the "${slotLabel}" of a thread. Strengthen it using these evidence points:\n${evidenceContext}`;
+					const result = await api.assist.improve(block.text, context);
+					const insert = buildInsert({
+						blockId: block.id,
+						slotLabel,
+						previousText: block.text,
+						insertedText: result.content,
+						sourceNodeId: pinned[0].node_id,
+						sourceTitle: `${pinned.length} evidence items`,
+						matchReason: 'semantic',
+						sourceRole: 'semantic_evidence',
+					});
+					threadBlocks = threadBlocks.map((b, j) =>
+						j === i ? { ...b, text: result.content } : b
+					);
+					draftInsertState = pushInsert(draftInsertState, insert);
+				}
+			}
+
+			for (const pin of pinned) {
+				vaultProvenance = [
+					...vaultProvenance,
+					{
+						node_id: pin.node_id,
+						chunk_id: pin.chunk_id,
+						heading_path: pin.heading_path,
+						snippet: pin.snippet,
+						match_reason: pin.match_reason,
+						similarity_score: pin.score,
+						source_role: 'semantic_evidence',
+					},
+				];
+			}
+
+			undoMessage = mode === 'tweet'
+				? 'Strengthened tweet with evidence.'
+				: `Strengthened ${threadBlocks.filter((b) => b.text.trim()).length} blocks with evidence.`;
+			startUndoTimer();
+		} catch (e) {
+			onsubmiterror?.(e instanceof Error ? e.message : 'Strengthen failed');
+		} finally {
+			assisting = false;
+		}
 	}
 
 	// ── Draft insert state ────────────────────────────────
@@ -340,6 +492,7 @@
 		targetDate,
 		timezone,
 		voiceCue,
+		tweetText,
 		assisting,
 		hasExistingContent,
 		notesPanelMode,
@@ -348,6 +501,8 @@
 		selectionSessionId,
 		threadBlocks,
 		insertState: draftInsertState,
+		evidenceState,
+		focusedBlockIndex,
 	});
 
 	function handleScheduleSelect(date: string, time: string) {
@@ -387,6 +542,9 @@
 					{onSelectionConsumed}
 					onslotinsert={handleSlotInsert}
 					onundoinsert={handleUndoInsertById}
+					onevidence={handleEvidenceChange}
+					onapplyevidence={handleApplyEvidence}
+					onstrengthen={handleStrengthenDraft}
 				/>
 			</div>
 		</div>
@@ -408,6 +566,9 @@
 		{onSelectionConsumed}
 		onslotinsert={handleSlotInsert}
 		onundoinsert={handleUndoInsertById}
+		onevidence={handleEvidenceChange}
+		onapplyevidence={handleApplyEvidence}
+		onstrengthen={handleStrengthenDraft}
 	/>
 {/if}
 

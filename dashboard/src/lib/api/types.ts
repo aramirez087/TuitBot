@@ -785,6 +785,8 @@ export interface AccountAuthStatus {
 
 // --- Vault types ---
 
+export type MatchReason = 'semantic' | 'keyword' | 'graph' | 'hybrid';
+
 export interface VaultCitation {
 	chunk_id: number;
 	node_id: number;
@@ -793,6 +795,8 @@ export interface VaultCitation {
 	source_title: string | null;
 	snippet: string;
 	retrieval_boost: number;
+	match_reason?: MatchReason;
+	score?: number;
 }
 
 export interface ProvenanceRef {
@@ -808,6 +812,47 @@ export interface ProvenanceRef {
 	signal_kind?: string;
 	signal_text?: string;
 	source_role?: string;
+	match_reason?: MatchReason;
+	similarity_score?: number;
+}
+
+export interface EvidenceResult {
+	chunk_id: number;
+	node_id: number;
+	heading_path: string;
+	snippet: string;
+	relative_path?: string;
+	match_reason: MatchReason;
+	score: number;
+	node_title: string | null;
+}
+
+export interface IndexStatusSummary {
+	total_chunks: number;
+	embedded_chunks: number;
+	freshness_pct: number;
+}
+
+export interface EvidenceResponse {
+	results: EvidenceResult[];
+	query: string;
+	mode: string;
+	index_status: IndexStatusSummary;
+}
+
+export interface IndexStatusResponse {
+	total_chunks: number;
+	embedded_chunks: number;
+	dirty_chunks: number;
+	freshness_pct: number;
+	last_indexed_at: string | null;
+	model_id: string | null;
+	provider_configured: boolean;
+	index_loaded: boolean;
+	index_size: number;
+	deployment_mode?: string;
+	search_available?: boolean;
+	provider_name?: string;
 }
 
 export interface ProvenanceLink {
@@ -984,6 +1029,9 @@ export interface DraftInsertState {
 	history: DraftInsert[];
 	blockInserts: Map<string, DraftInsert[]>;
 }
+
+// Re-export PinnedEvidence from evidenceStore for convenience
+export type { PinnedEvidence } from '$lib/stores/evidenceStore';
 
 // MCP tool discovery (GET /mcp/tools) — read-only, shows available tools + parameter hints.
 export interface McpToolParam {

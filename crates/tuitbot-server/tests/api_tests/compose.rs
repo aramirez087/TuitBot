@@ -96,6 +96,8 @@ async fn add_and_list_target() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -144,6 +146,8 @@ async fn add_duplicate_target_fails() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -193,6 +197,8 @@ async fn remove_target_works() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -260,6 +266,8 @@ async fn settings_get_returns_json() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -300,6 +308,8 @@ async fn settings_patch_round_trips() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 

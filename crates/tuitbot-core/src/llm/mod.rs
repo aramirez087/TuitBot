@@ -4,8 +4,12 @@
 //! with typed responses, token usage tracking, and health checking.
 
 pub mod anthropic;
+pub mod embedding;
+pub mod embedding_factory;
 pub mod factory;
+pub mod ollama_embedding;
 pub mod openai_compat;
+pub mod openai_embedding;
 pub mod pricing;
 
 use crate::error::LlmError;

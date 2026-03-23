@@ -7,6 +7,7 @@
 //! identical state transitions.
 
 pub mod chunker;
+pub mod embedding_worker;
 pub mod graph_ingest;
 pub mod link_extractor;
 pub mod loopback;

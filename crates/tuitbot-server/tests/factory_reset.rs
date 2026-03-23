@@ -61,6 +61,8 @@ async fn test_state_with_dir(dir: &std::path::Path) -> Arc<AppState> {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     })
 }
 
@@ -218,7 +220,7 @@ async fn factory_reset_success() {
     assert_eq!(json["status"], "reset_complete");
 
     let cleared = &json["cleared"];
-    assert_eq!(cleared["tables_cleared"], 40);
+    assert_eq!(cleared["tables_cleared"], 41);
     // Migration seeds 1 account + 2 account_roles = at least 3 rows.
     assert!(cleared["rows_deleted"].as_u64().unwrap() >= 3);
     assert_eq!(cleared["config_deleted"], true);

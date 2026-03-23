@@ -254,6 +254,8 @@ async fn main() -> Result<()> {
             .as_ref()
             .map(|c| c.x_api.client_id.clone())
             .unwrap_or_default(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     let router = tuitbot_server::build_router(state.clone());

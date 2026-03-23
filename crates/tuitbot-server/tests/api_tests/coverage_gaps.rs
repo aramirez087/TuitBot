@@ -120,6 +120,8 @@ async fn list_tags_after_create_shows_new_tag() {
         pending_oauth: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         token_managers: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 

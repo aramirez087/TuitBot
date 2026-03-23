@@ -33,6 +33,21 @@ vi.mock('$lib/api', () => ({
 	api: {}
 }));
 
+vi.mock('$lib/stores/draftInsertStore', () => ({
+	partitionInserts: vi.fn((state: { history: Array<{ provenance: { source_role?: string } }> }) => {
+		const graphInserts: unknown[] = [];
+		const evidenceInserts: unknown[] = [];
+		for (const insert of state.history) {
+			if (insert.provenance.source_role === 'semantic_evidence') {
+				evidenceInserts.push(insert);
+			} else {
+				graphInserts.push(insert);
+			}
+		}
+		return { graphInserts, evidenceInserts };
+	})
+}));
+
 const defaultProps = {
 	canSubmit: false,
 	submitting: false,
@@ -236,5 +251,78 @@ describe('ComposerCanvas', () => {
 		});
 		const undoBtn = document.querySelector('.undo-banner-btn');
 		expect(undoBtn).toBeTruthy();
+	});
+
+	it('renders with insertState prop (undefined)', () => {
+		const { container } = render(ComposerCanvas, {
+			props: { ...defaultProps, insertState: undefined }
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('renders with insertState containing evidence inserts', () => {
+		const { container } = render(ComposerCanvas, {
+			props: {
+				...defaultProps,
+				insertState: {
+					history: [
+						{
+							id: 'e-1',
+							blockId: 'tweet',
+							slotLabel: 'Tweet',
+							previousText: '',
+							insertedText: 'new text',
+							sourceNodeId: 1,
+							sourceTitle: 'Evidence Note',
+							provenance: { node_id: 1, source_role: 'semantic_evidence' },
+							timestamp: Date.now()
+						}
+					],
+					blockInserts: new Map()
+				}
+			}
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('renders with insertState containing graph inserts', () => {
+		const { container } = render(ComposerCanvas, {
+			props: {
+				...defaultProps,
+				insertState: {
+					history: [
+						{
+							id: 'g-1',
+							blockId: 'tweet',
+							slotLabel: 'Opening hook',
+							previousText: '',
+							insertedText: 'hook text',
+							sourceNodeId: 2,
+							sourceTitle: 'Graph Note',
+							provenance: { node_id: 2, source_role: 'graph_neighbor' },
+							timestamp: Date.now()
+						}
+					],
+					blockInserts: new Map()
+				}
+			}
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('renders with onfocusindexchange callback', () => {
+		const onfocusindexchange = vi.fn();
+		const { container } = render(ComposerCanvas, {
+			props: { ...defaultProps, onfocusindexchange }
+		});
+		expect(container).toBeTruthy();
+	});
+
+	it('renders with onundoinsert callback', () => {
+		const onundoinsert = vi.fn();
+		const { container } = render(ComposerCanvas, {
+			props: { ...defaultProps, onundoinsert }
+		});
+		expect(container).toBeTruthy();
 	});
 });

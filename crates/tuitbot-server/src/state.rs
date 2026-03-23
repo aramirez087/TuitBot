@@ -15,6 +15,8 @@ use tuitbot_core::config::{
     effective_config, Config, ConnectorConfig, ContentSourcesConfig, DeploymentMode,
 };
 use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::context::semantic_index::SemanticIndex;
+use tuitbot_core::llm::embedding::EmbeddingProvider;
 use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage::accounts::{self, DEFAULT_ACCOUNT_ID};
 use tuitbot_core::storage::DbPool;
@@ -82,6 +84,10 @@ pub struct AppState {
     pub token_managers: Mutex<HashMap<String, Arc<TokenManager>>>,
     /// X API client ID from config (needed to create token managers).
     pub x_client_id: String,
+    /// In-memory semantic search index (None if embedding not configured).
+    pub semantic_index: Option<Arc<RwLock<SemanticIndex>>>,
+    /// Embedding provider for semantic indexing (None if not configured).
+    pub embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
 }
 
 impl AppState {

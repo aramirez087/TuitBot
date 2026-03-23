@@ -85,6 +85,8 @@ async fn discovery_feed_each_item_has_required_fields() {
         pending_oauth: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         token_managers: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     // Insert a discovered tweet directly.

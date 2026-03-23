@@ -55,6 +55,8 @@ async fn approval_stats_returns_counts() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -107,6 +109,8 @@ async fn approval_list_with_status_filter() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -169,6 +173,8 @@ async fn approval_edit_content() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -229,6 +235,8 @@ async fn approval_edit_empty_content() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 

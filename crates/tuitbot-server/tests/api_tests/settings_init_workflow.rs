@@ -35,6 +35,8 @@ async fn init_then_get_returns_created_config() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     // Step 1: Init settings.
@@ -149,6 +151,8 @@ async fn init_settings_rejects_non_object_body() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 

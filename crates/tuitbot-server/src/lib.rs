@@ -243,6 +243,14 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         )
         .route("/assist/mode", get(routes::assist::get_mode))
         // Vault
+        .route(
+            "/vault/evidence",
+            get(routes::vault::evidence::search_evidence),
+        )
+        .route(
+            "/vault/index-status",
+            get(routes::vault::index_status::get_index_status),
+        )
         .route("/vault/sources", get(routes::vault::vault_sources))
         .route("/vault/notes", get(routes::vault::search_notes))
         .route(

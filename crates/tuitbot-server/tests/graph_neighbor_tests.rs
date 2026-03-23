@@ -57,6 +57,8 @@ async fn build_test_state() -> (Arc<AppState>, tempfile::TempDir) {
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     (state, dir)
@@ -314,6 +316,8 @@ async fn neighbors_cloud_mode_omits_relative_path() {
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     let (main_id, _) = seed_graph_data(&state.db).await;

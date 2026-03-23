@@ -40,6 +40,8 @@ async fn test_router_with_config(
         pending_oauth: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         token_managers: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         x_client_id: "test-client-id".to_string(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     (tuitbot_server::build_router(state), pool)

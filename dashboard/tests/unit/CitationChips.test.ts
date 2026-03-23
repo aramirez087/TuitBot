@@ -287,6 +287,70 @@ describe('CitationChips', () => {
 		expect(openExternalUrl).toHaveBeenCalled();
 	});
 
+	// ── Evidence inserts strip ──────────────────────────
+	it('renders nothing for evidence strip when evidenceInserts is empty', () => {
+		const { container } = render(CitationChips, {
+			props: { citations: [], evidenceInserts: [] },
+		});
+		const evidenceStrip = container.querySelector('.evidence-strip');
+		expect(evidenceStrip).toBeNull();
+	});
+
+	it('renders evidence strip when evidenceInserts provided', () => {
+		const inserts = [
+			{ id: 'e-1', blockId: 'tweet', slotLabel: 'Tweet', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: '3 evidence items', provenance: { node_id: 1, source_role: 'semantic_evidence' }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], evidenceInserts: inserts },
+		});
+		const evidenceStrip = container.querySelector('.evidence-strip');
+		expect(evidenceStrip).toBeTruthy();
+	});
+
+	it('evidence strip shows "Evidence used:" label', () => {
+		const inserts = [
+			{ id: 'e-1', blockId: 'tweet', slotLabel: 'Tweet', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1, source_role: 'semantic_evidence' }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], evidenceInserts: inserts },
+		});
+		const labels = container.querySelectorAll('.citation-label');
+		const evidenceLabel = Array.from(labels).find((l) => l.textContent?.includes('Evidence used'));
+		expect(evidenceLabel).toBeTruthy();
+	});
+
+	it('evidence chip shows sourceTitle and slotLabel', () => {
+		const inserts = [
+			{ id: 'e-1', blockId: 'tweet', slotLabel: 'Opening hook', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Research Note', provenance: { node_id: 1, source_role: 'semantic_evidence' }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], evidenceInserts: inserts },
+		});
+		const evidenceStrip = container.querySelector('.evidence-strip');
+		expect(evidenceStrip?.textContent).toContain('Research Note');
+		expect(evidenceStrip?.textContent).toContain('Opening hook');
+	});
+
+	it('evidence undo button calls onundoinsert', async () => {
+		const onundoinsert = vi.fn();
+		const inserts = [
+			{ id: 'e-42', blockId: 'tweet', slotLabel: 'Tweet', previousText: '', insertedText: 'new', sourceNodeId: 1, sourceTitle: 'Note', provenance: { node_id: 1, source_role: 'semantic_evidence' }, timestamp: Date.now() },
+		];
+		const { container } = render(CitationChips, {
+			props: { citations: [], evidenceInserts: inserts, onundoinsert },
+		});
+		const undoBtn = container.querySelector('.evidence-strip .chip-remove') as HTMLButtonElement;
+		await fireEvent.click(undoBtn);
+		expect(onundoinsert).toHaveBeenCalledWith('e-42');
+	});
+
+	it('evidence strip hidden when evidenceInserts empty', () => {
+		const { container } = render(CitationChips, {
+			props: { citations: [], evidenceInserts: [] },
+		});
+		expect(container.querySelector('.evidence-strip')).toBeNull();
+	});
+
 	// ── expanded chip detail content ────────────────────
 	it('expanded chip shows heading path and snippet', async () => {
 		const cit = makeCitation({ chunk_id: 1, heading_path: 'Overview > Strategy', snippet: 'My snippet text' });

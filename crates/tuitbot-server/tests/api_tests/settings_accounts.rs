@@ -110,6 +110,8 @@ async fn init_settings_creates_config() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -225,6 +227,8 @@ async fn create_and_get_account() {
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
     let router = tuitbot_server::build_router(state);
 
@@ -659,7 +663,9 @@ async fn onboarding_start_auth_no_client_id() {
         deployment_mode: Default::default(),
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
-        x_client_id: String::new(), // empty = no client_id
+        x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None, // empty = no client_id
     });
     let router = tuitbot_server::build_router(state);
 

@@ -5,6 +5,8 @@
 //! privacy-safe responses (no raw note bodies — only titles, paths,
 //! tags, heading paths, and truncated snippets).
 
+pub mod evidence;
+pub mod index_status;
 pub mod selections;
 
 use std::sync::Arc;
@@ -469,6 +471,8 @@ mod tests {
             pending_oauth: Mutex::new(HashMap::new()),
             token_managers: Mutex::new(HashMap::new()),
             x_client_id: String::new(),
+            semantic_index: None,
+            embedding_provider: None,
         })
     }
 
@@ -742,6 +746,8 @@ mod tests {
             pending_oauth: Mutex::new(HashMap::new()),
             token_managers: Mutex::new(HashMap::new()),
             x_client_id: String::new(),
+            semantic_index: None,
+            embedding_provider: None,
         })
     }
 

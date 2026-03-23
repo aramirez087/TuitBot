@@ -29,9 +29,9 @@ pub use merge::{
 };
 pub use types::{
     AuthConfig, BusinessProfile, ConnectorConfig, ContentSourceEntry, ContentSourcesConfig,
-    DeploymentCapabilities, DeploymentMode, GoogleDriveConnectorConfig, IntervalsConfig,
-    LimitsConfig, LlmConfig, LoggingConfig, ScoringConfig, ServerConfig, StorageConfig,
-    TargetsConfig, XApiConfig,
+    DeploymentCapabilities, DeploymentMode, EmbeddingConfig, GoogleDriveConnectorConfig,
+    IntervalsConfig, LimitsConfig, LlmConfig, LoggingConfig, ScoringConfig, ServerConfig,
+    StorageConfig, TargetsConfig, XApiConfig,
 };
 pub use types_policy::{CircuitBreakerConfig, McpPolicyConfig, ScheduleConfig};
 
@@ -156,6 +156,11 @@ pub struct Config {
     /// Connector configuration for remote source OAuth flows.
     #[serde(default)]
     pub connectors: ConnectorConfig,
+
+    /// Embedding provider configuration for semantic search indexing.
+    /// When `None`, semantic indexing is disabled.
+    #[serde(default)]
+    pub embedding: Option<EmbeddingConfig>,
 }
 
 impl Config {

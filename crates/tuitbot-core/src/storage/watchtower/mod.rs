@@ -6,6 +6,7 @@
 pub mod chunks;
 pub mod connections;
 pub mod edges;
+pub mod embeddings;
 mod nodes;
 mod seeds;
 mod sources;
@@ -14,6 +15,10 @@ pub mod tags;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_chunks;
+#[cfg(test)]
+mod tests_embeddings;
+#[cfg(test)]
 mod tests_graph;
 #[cfg(test)]
 mod tests_storage;
@@ -21,6 +26,7 @@ mod tests_storage;
 pub use chunks::*;
 pub use connections::*;
 pub use edges::*;
+pub use embeddings::*;
 pub use nodes::*;
 pub use seeds::*;
 pub use sources::*;

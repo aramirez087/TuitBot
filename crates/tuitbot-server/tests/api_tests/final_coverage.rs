@@ -777,6 +777,8 @@ async fn build_test_state(
         pending_oauth: Mutex::new(std::collections::HashMap::new()),
         token_managers: Mutex::new(std::collections::HashMap::new()),
         x_client_id: "test-client-id".to_string(),
+        semantic_index: None,
+        embedding_provider: None,
     })
 }
 

@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { ScheduleConfig, ThreadBlock } from '$lib/api';
 	import type { NeighborItem, DraftInsertState } from '$lib/api/types';
+	import type { EvidenceState, PinnedEvidence } from '$lib/stores/evidenceStore';
 	import SchedulePicker from '../SchedulePicker.svelte';
 	import VoiceContextPanel from './VoiceContextPanel.svelte';
 	import FromNotesPanel from '../FromNotesPanel.svelte';
 	import FromVaultPanel from './FromVaultPanel.svelte';
+	import EvidenceRail from './EvidenceRail.svelte';
 
 	let {
 		schedule,
@@ -13,6 +15,7 @@
 		targetDate,
 		timezone = 'UTC',
 		voiceCue,
+		tweetText = '',
 		assisting,
 		hasExistingContent,
 		notesPanelMode,
@@ -21,6 +24,9 @@
 		selectionSessionId = null,
 		threadBlocks = [],
 		insertState,
+		evidenceState,
+		focusedBlockIndex,
+		graphNeighborChunkIds,
 		onscheduleselect,
 		onunschedule,
 		oncuechange,
@@ -34,6 +40,9 @@
 		onSelectionConsumed,
 		onslotinsert,
 		onundoinsert,
+		onevidence,
+		onapplyevidence,
+		onstrengthen,
 		voicePanelRef = $bindable()
 	}: {
 		schedule: ScheduleConfig | null;
@@ -42,6 +51,7 @@
 		targetDate: Date;
 		timezone?: string;
 		voiceCue: string;
+		tweetText?: string;
 		assisting: boolean;
 		hasExistingContent: boolean;
 		notesPanelMode: 'notes' | 'vault' | null;
@@ -50,6 +60,9 @@
 		selectionSessionId?: string | null;
 		threadBlocks?: ThreadBlock[];
 		insertState?: DraftInsertState;
+		evidenceState?: EvidenceState;
+		focusedBlockIndex?: number;
+		graphNeighborChunkIds?: Set<number>;
 		onscheduleselect: (date: string, time: string) => void;
 		onunschedule: () => void;
 		oncuechange: (cue: string) => void;
@@ -63,6 +76,9 @@
 		onSelectionConsumed?: () => void;
 		onslotinsert?: (neighbor: NeighborItem, slotIndex: number, slotLabel: string) => void;
 		onundoinsert?: (insertId: string) => void;
+		onevidence?: (newState: EvidenceState) => void;
+		onapplyevidence?: (evidence: PinnedEvidence, slotIndex: number, slotLabel: string) => void;
+		onstrengthen?: () => void;
 		voicePanelRef?: VoiceContextPanel;
 	} = $props();
 </script>
@@ -90,6 +106,24 @@
 		inline={true}
 	/>
 </div>
+
+{#if evidenceState && onevidence}
+	<div class="inspector-section">
+		<EvidenceRail
+			{tweetText}
+			{threadBlocks}
+			{mode}
+			{focusedBlockIndex}
+			{hasExistingContent}
+			{selectionSessionId}
+			{graphNeighborChunkIds}
+			{evidenceState}
+			{onevidence}
+			onapplytoSlot={onapplyevidence}
+			{onstrengthen}
+		/>
+	</div>
+{/if}
 
 <div class="inspector-section">
 	<div class="inspector-section-label">

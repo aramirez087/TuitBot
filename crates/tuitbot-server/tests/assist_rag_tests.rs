@@ -359,6 +359,8 @@ async fn build_test_router_with_generator(
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     let router = tuitbot_server::build_router(state);
@@ -401,6 +403,8 @@ async fn build_test_router_no_generator() -> (axum::Router, tempfile::TempDir) {
         pending_oauth: Mutex::new(HashMap::new()),
         token_managers: Mutex::new(HashMap::new()),
         x_client_id: String::new(),
+        semantic_index: None,
+        embedding_provider: None,
     });
 
     let router = tuitbot_server::build_router(state);
