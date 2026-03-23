@@ -52,6 +52,8 @@ import type {
 	VaultNoteDetail,
 	VaultSelectionResponse,
 	VaultSourcesResponse,
+	EvidenceResponse,
+	IndexStatusResponse,
 	ProvenanceRef,
 	ProvenanceLink,
 	DraftSummary,
@@ -840,6 +842,14 @@ export const api = {
 				body: JSON.stringify({ node_ids: nodeIds })
 			}),
 		getSelection: (sessionId: string) =>
-			request<VaultSelectionResponse>(`/api/vault/selection/${encodeURIComponent(sessionId)}`)
+			request<VaultSelectionResponse>(`/api/vault/selection/${encodeURIComponent(sessionId)}`),
+		searchEvidence: (params: { q: string; limit?: number; mode?: string; scope?: string }) => {
+			const query = new URLSearchParams({ q: params.q });
+			if (params.limit) query.set('limit', params.limit.toString());
+			if (params.mode) query.set('mode', params.mode);
+			if (params.scope) query.set('scope', params.scope);
+			return request<EvidenceResponse>(`/api/vault/evidence?${query.toString()}`);
+		},
+		indexStatus: () => request<IndexStatusResponse>('/api/vault/index-status')
 	}
 };

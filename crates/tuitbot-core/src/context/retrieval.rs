@@ -23,6 +23,21 @@ const CITATION_SNIPPET_LEN: usize = 120;
 // Structs
 // ============================================================================
 
+/// How a search result was matched: semantic embedding, keyword text search,
+/// graph edge traversal, or a blend of multiple signals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchReason {
+    /// Matched via embedding cosine similarity.
+    Semantic,
+    /// Matched via keyword / LIKE text search.
+    Keyword,
+    /// Matched via graph edge (wikilink, backlink, shared tag).
+    Graph,
+    /// Matched by two or more signal types.
+    Hybrid,
+}
+
 /// A structured citation linking a prompt fragment back to its vault source.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct VaultCitation {
@@ -46,6 +61,12 @@ pub struct VaultCitation {
     /// Graph edge label for provenance tracking. None for non-graph citations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub edge_label: Option<String>,
+    /// How this citation was matched (semantic, keyword, graph, or hybrid).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_reason: Option<MatchReason>,
+    /// Retrieval score from the ranking algorithm (RRF or raw similarity).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
 }
 
 /// Intermediate result pairing chunk text with citation metadata.
@@ -257,6 +278,8 @@ fn fragment_from_chunk_with_context(cwc: ChunkWithNodeContext) -> FragmentContex
             retrieval_boost: cwc.chunk.retrieval_boost,
             edge_type: None,
             edge_label: None,
+            match_reason: None,
+            score: None,
         },
     }
 }
@@ -290,6 +313,8 @@ mod tests {
                 retrieval_boost: 1.0,
                 edge_type: None,
                 edge_label: None,
+                match_reason: None,
+                score: None,
             },
         }
     }
@@ -305,6 +330,8 @@ mod tests {
             retrieval_boost: 1.0,
             edge_type: None,
             edge_label: None,
+            match_reason: None,
+            score: None,
         }
     }
 
@@ -398,6 +425,8 @@ mod tests {
             retrieval_boost: 1.5,
             edge_type: None,
             edge_label: None,
+            match_reason: None,
+            score: None,
         };
         let refs = citations_to_provenance_refs(&[citation]);
         assert_eq!(refs.len(), 1);
@@ -430,6 +459,8 @@ mod tests {
             retrieval_boost: 1.0,
             edge_type: None,
             edge_label: None,
+            match_reason: None,
+            score: None,
         };
         let result = citations_to_chunks_json(&[citation]);
         let parsed: Vec<serde_json::Value> = serde_json::from_str(&result).unwrap();
@@ -503,6 +534,8 @@ mod tests {
                 retrieval_boost: 1.0,
                 edge_type: None,
                 edge_label: None,
+                match_reason: None,
+                score: None,
             },
             VaultCitation {
                 chunk_id: 2,
@@ -514,6 +547,8 @@ mod tests {
                 retrieval_boost: 2.0,
                 edge_type: None,
                 edge_label: None,
+                match_reason: None,
+                score: None,
             },
         ];
         let json_str = citations_to_chunks_json(&citations);
@@ -537,6 +572,8 @@ mod tests {
                 retrieval_boost: 1.0,
                 edge_type: None,
                 edge_label: None,
+                match_reason: None,
+                score: None,
             },
         };
         let result = format_fragments_prompt(&[f]);

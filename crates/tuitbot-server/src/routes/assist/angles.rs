@@ -147,6 +147,8 @@ pub async fn assist_angles(
                         retrieval_boost: chunk.chunk.retrieval_boost,
                         edge_type: None,
                         edge_label: None,
+                        match_reason: None,
+                        score: None,
                     });
                 }
             }
@@ -400,6 +402,8 @@ mod tests {
                 retrieval_boost: 0.0,
                 edge_type: None,
                 edge_label: None,
+                match_reason: None,
+                score: None,
             }],
         };
         let json = serde_json::to_string(&resp).expect("serialize");

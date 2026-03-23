@@ -429,6 +429,46 @@ pub async fn search_chunks_with_context(
     Ok(rows.into_iter().map(chunk_with_context_from_row).collect())
 }
 
+/// Get chunks by chunk IDs, joined with parent node metadata.
+///
+/// Returns active chunks for the given chunk IDs with their parent node's
+/// `relative_path` and `title`. Used to enrich semantic search hits with
+/// display metadata.
+pub async fn get_chunks_with_context_by_ids(
+    pool: &DbPool,
+    account_id: &str,
+    chunk_ids: &[i64],
+) -> Result<Vec<ChunkWithNodeContext>, StorageError> {
+    if chunk_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = chunk_ids.iter().map(|_| "?").collect();
+    let in_clause = placeholders.join(", ");
+
+    let sql = format!(
+        "SELECT cc.id, cc.account_id, cc.node_id, cc.heading_path, cc.chunk_text, \
+                cc.chunk_hash, cc.chunk_index, cc.retrieval_boost, cc.status, \
+                cc.created_at, cc.updated_at, cn.relative_path, cn.title \
+         FROM content_chunks cc \
+         JOIN content_nodes cn ON cn.id = cc.node_id AND cn.account_id = cc.account_id \
+         WHERE cc.account_id = ? AND cc.status = 'active' AND cc.id IN ({in_clause})"
+    );
+
+    let mut q = sqlx::query_as::<_, ChunkWithContextRow>(&sql);
+    q = q.bind(account_id);
+    for cid in chunk_ids {
+        q = q.bind(cid);
+    }
+
+    let rows = q
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows.into_iter().map(chunk_with_context_from_row).collect())
+}
+
 /// Get chunks for specific nodes, joined with parent node metadata.
 ///
 /// Returns active chunks for the given node IDs, ordered by retrieval_boost DESC.
