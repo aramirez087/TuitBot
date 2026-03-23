@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774271885343,
+  "lastUpdate": 1774271905974,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -2998,6 +2998,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1309279,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3dfcd44aab0761b8ec21b9facf3172325c8ff018",
+          "message": "chore(deps): dashboard: bump the all-dependencies group (#290)\n\nBumps the all-dependencies group in /dashboard with 2 updates: [jsdom](https://github.com/jsdom/jsdom) and [svelte](https://github.com/sveltejs/svelte/tree/HEAD/packages/svelte).\n\n\nUpdates `jsdom` from 29.0.0 to 29.0.1\n- [Release notes](https://github.com/jsdom/jsdom/releases)\n- [Commits](https://github.com/jsdom/jsdom/compare/v29.0.0...v29.0.1)\n\nUpdates `svelte` from 5.54.0 to 5.54.1\n- [Release notes](https://github.com/sveltejs/svelte/releases)\n- [Changelog](https://github.com/sveltejs/svelte/blob/main/packages/svelte/CHANGELOG.md)\n- [Commits](https://github.com/sveltejs/svelte/commits/svelte@5.54.1/packages/svelte)\n\n---\nupdated-dependencies:\n- dependency-name: jsdom\n  dependency-version: 29.0.1\n  dependency-type: direct:development\n  update-type: version-update:semver-patch\n  dependency-group: all-dependencies\n- dependency-name: svelte\n  dependency-version: 5.54.1\n  dependency-type: direct:development\n  update-type: version-update:semver-patch\n  dependency-group: all-dependencies\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-03-23T07:17:33-06:00",
+          "tree_id": "d02f1b2bc33637dc642e5f18db344dc113e739a5",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3dfcd44aab0761b8ec21b9facf3172325c8ff018"
+        },
+        "date": 1774271904933,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 935502,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 335045,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1309796,
             "unit": "bytes"
           }
         ]
