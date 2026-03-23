@@ -40,6 +40,11 @@ Tuitbot's MCP server exposes up to **140 typed tools** covering the X API v2 pub
 **Install:**
 
 ```bash
+# One-liner (Linux / macOS) — detects OS/arch, verifies SHA256, installs to PATH
+curl -fsSL https://raw.githubusercontent.com/aramirez087/TuitBot/main/scripts/install.sh | bash
+```
+
+```bash
 cargo install tuitbot-cli --locked   # or grab a binary from Releases
 ```
 
@@ -240,7 +245,11 @@ Then navigate to `http://localhost:3001` to access the full graphical dashboard 
 For power users who prefer the terminal. **Hello world in under 2 minutes:**
 
 ```bash
-cargo install tuitbot-cli --locked   # or grab a binary from Releases
+# Option A: one-liner installer (Linux / macOS, no Rust required)
+curl -fsSL https://raw.githubusercontent.com/aramirez087/TuitBot/main/scripts/install.sh | bash
+
+# Option B: build from source with Cargo
+cargo install tuitbot-cli --locked
 
 tuitbot init                         # guided setup: config → auth → test → preview
 ```
