@@ -277,7 +277,8 @@ describe('ComposerCanvas', () => {
 							provenance: { node_id: 1, source_role: 'semantic_evidence' },
 							timestamp: Date.now()
 						}
-					]
+					],
+					blockInserts: new Map()
 				}
 			}
 		});
@@ -301,7 +302,8 @@ describe('ComposerCanvas', () => {
 							provenance: { node_id: 2, source_role: 'graph_neighbor' },
 							timestamp: Date.now()
 						}
-					]
+					],
+					blockInserts: new Map()
 				}
 			}
 		});
