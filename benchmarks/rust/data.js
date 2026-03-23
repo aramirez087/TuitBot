@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774272522938,
+  "lastUpdate": 1774290475107,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2257,6 +2257,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.13,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c4c24c94f620923c32bcb50bf7d403714b21edcb",
+          "message": "feat: vault indexer semantic search (#292)\n\n* feat: Session 1 — semantic evidence charter and ux\n\nDefine the product charter, UX specification, and implementation architecture\nfor a background semantic vault index that upgrades Ghostwriter into an\nevidence-first drafting workspace. Six deliverables: current-state audit,\nepic charter, semantic index architecture, evidence UX spec, implementation\nmap (Sessions 2-6), and session handoff.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 1 — semantic evidence charter and ux\n\nAutomated execution of session-01-semantic-evidence-charter-and-ux.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — indexer and storage foundation\n\nAdd embedding provider abstraction (OpenAI + Ollama), chunk_embeddings\nSQLite schema with dirty-state tracking, in-memory brute-force cosine\nsearch index, and background EmbeddingWorker that incrementally embeds\nvault chunks. All infrastructure is fail-open: when embedding is not\nconfigured or providers are unavailable, the system degrades cleanly\nto existing keyword+graph retrieval.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — indexer and storage foundation\n\nAutomated execution of session-02-indexer-and-storage-foundation.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — hybrid retrieval and api contract\n\nAdd GET /api/vault/evidence and GET /api/vault/index-status endpoints with\nRRF-based hybrid ranking (semantic + keyword + graph), per-result MatchReason\nclassification, and clean fallback when semantic indexing is unavailable.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — hybrid retrieval and api contract\n\nAutomated execution of session-03-hybrid-retrieval-and-api-contract.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — ghostwriter evidence panel\n\nAdd the Evidence Rail to the Ghostwriter composer sidebar: semantic evidence search with auto-query from draft text, pin/dismiss/apply workflow, index status badge, and degraded state handling. All 1076 frontend tests pass with 36 new tests covering evidenceStore, IndexStatusBadge, and EvidenceRail.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — ghostwriter evidence panel\n\nAutomated execution of session-04-ghostwriter-evidence-panel.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — provenance and slot actions\n\nConnect semantic evidence to draft editing via slot-targeted apply, whole-draft\nstrengthen with per-block undo, and a third citation strip for evidence inserts.\nAll changes are frontend-only; existing ProvenanceRef types support the new fields.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — draft and slot actions\n\nAutomated execution of session-05-draft-and-slot-actions.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 6 — observability and release readiness\n\nInstrumented semantic evidence search with 10 telemetry events (frontend funnel + backend relay), added tracing spans for search latency and fallback tracking, extended IndexStatusResponse with deployment_mode/search_available/provider_name fields, added privacy envelope and degraded-state surfaces to IndexStatusBadge and ContentSourcesSection, validated 20 QA scenarios across 3 deployment modes, and produced GO release recommendation backed by 6401 Rust tests and 1114 frontend tests passing.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 6 — observability and release readiness\n\nAutomated execution of session-06-observability-and-release-readiness.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* chore: clean up session artifacts\n\nRemove 31 session files (prompts, plans, logs, handoffs).\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* test: add coverage for vault-indexer-semantic-search PR\n\nAddresses Codecov patch coverage gaps on PR #292:\n\nFrontend (57 new tests):\n- EvidenceCard.test.ts: 37 tests (rendering, match reasons, pin/unpin,\n  slot picker, truncation, edge cases)\n- EvidenceRail.test.ts: 19 new tests (search, keyboard shortcuts, index\n  status, auto-query, pin/dismiss, thread slot options)\n- ComposerInspector.test.ts: 11 new tests (undo insert, AI assist,\n  mobile drawer, pinned evidence)\n\nRust (46 new tests):\n- hybrid_retrieval.rs: 15 tests (classify sources, truncation, RRF\n  scoring, empty hits, graph branches)\n- tests_chunks.rs: 20 integration tests (CRUD, keyword search, heading\n  match, boost clamping, account scoping)\n- vault/evidence.rs: 11 tests (DTO serialization, scope parsing,\n  validation, mode defaults)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* test: cover remaining codecov gaps for vault-indexer PR\n\nRust (22 new tests):\n- embedding_worker.rs: mismatch count detection test\n- ollama_embedding.rs: 7 tests (batch limit, API errors, health check,\n  malformed response, dimension inference, defaults)\n- embeddings.rs: 7 tests extracted to tests_embeddings.rs (delete,\n  index stats, bytes_to_vec edge cases)\n- embedding.rs: 4 tests (error Display, usage, serde)\n- index_status.rs: 3 tests (search availability, DTO serialization)\n\nFrontend (41 new tests):\n- apiClientVault.test.ts: 12 tests (searchEvidence, indexStatus, reindex)\n- ContentSourcesSection.test.ts: 15 tests (rendering, index stats,\n  privacy notice, search availability states)\n- IndexStatusBadge.test.ts: 9 new tests (compact mode, popover, chunks)\n- ComposerCanvas.test.ts: 5 new tests (evidence/graph inserts, callbacks)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix: add missing blockInserts to DraftInsertState in ComposerCanvas tests\n\nFixes svelte-check type error where DraftInsertState was missing the\nrequired blockInserts property.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-03-23T12:21:58-06:00",
+          "tree_id": "ea9351c56432566a33d418e1794d186a777f76eb",
+          "url": "https://github.com/aramirez087/TuitBot/commit/c4c24c94f620923c32bcb50bf7d403714b21edcb"
+        },
+        "date": 1774290474235,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 937.1,
             "unit": "ps"
           }
         ]
