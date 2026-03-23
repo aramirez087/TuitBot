@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774272187510,
+  "lastUpdate": 1774272217251,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2141,6 +2141,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 938.02,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f4e4e4b552218c4f67b9ae32cf41f030fb9da00e",
+          "message": "feat(install): add SHA256 checksum verification to install.sh, link from README (#288)\n\nWHY: The install.sh script had OS/arch detection and download logic but no\nintegrity check. Release assets already ship a SHA256SUMS file — wire it up.\n\nChanges:\n- Download SHA256SUMS alongside the tarball\n- Verify with sha256sum (Linux) or shasum -a 256 (macOS); warn+continue if\n  neither tool is available (graceful degradation, not a hard failure)\n- Emit CHECKSUMS_URL in both pinned-tag and latest-tag resolution paths\n- Error messages directed to stderr; friendly Windows redirect message added\n- Header comment documents USAGE and env overrides for amnesiac maintainers\n- README: add curl-pipe-bash one-liner in hero Install block and Getting\n  Started §4 alongside the existing cargo install option\n\nFixes: cc79ab2d (P3: Add install.sh one-liner for quick setup)\n\nCo-authored-by: Neo <neo_ai@agentmail.to>",
+          "timestamp": "2026-03-23T07:17:58-06:00",
+          "tree_id": "42c50b3e6700c7a9dae22d89172a14972169bbb9",
+          "url": "https://github.com/aramirez087/TuitBot/commit/f4e4e4b552218c4f67b9ae32cf41f030fb9da00e"
+        },
+        "date": 1774272216786,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 934.07,
             "unit": "ps"
           }
         ]
