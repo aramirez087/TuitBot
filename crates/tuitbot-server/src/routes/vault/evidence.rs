@@ -545,4 +545,206 @@ mod tests {
         assert_eq!(body["index_status"]["total_chunks"], 0);
         assert_eq!(body["index_status"]["embedded_chunks"], 0);
     }
+
+    // --- evidence_to_item tests ---
+
+    fn make_evidence_result() -> EvidenceResult {
+        EvidenceResult {
+            chunk_id: 42,
+            node_id: 7,
+            heading_path: "# Intro > Details".to_string(),
+            source_path: "notes/test.md".to_string(),
+            source_title: Some("Test Note".to_string()),
+            snippet: "some snippet".to_string(),
+            score: 0.5,
+            match_reason: MatchReason::Semantic,
+            node_title: Some("Test Note".to_string()),
+        }
+    }
+
+    #[test]
+    fn evidence_to_item_local_mode_includes_path() {
+        let r = make_evidence_result();
+        let item = evidence_to_item(r, false);
+        assert_eq!(item.relative_path, Some("notes/test.md".to_string()));
+        assert_eq!(item.chunk_id, 42);
+        assert_eq!(item.node_id, 7);
+        assert_eq!(item.heading_path, "# Intro > Details");
+        assert_eq!(item.snippet, "some snippet");
+        assert!((item.score - 0.5).abs() < f64::EPSILON);
+        assert_eq!(item.match_reason, MatchReason::Semantic);
+        assert_eq!(item.node_title, Some("Test Note".to_string()));
+    }
+
+    #[test]
+    fn evidence_to_item_cloud_mode_omits_path() {
+        let r = make_evidence_result();
+        let item = evidence_to_item(r, true);
+        assert!(item.relative_path.is_none());
+    }
+
+    #[test]
+    fn evidence_to_item_no_node_title() {
+        let mut r = make_evidence_result();
+        r.node_title = None;
+        let item = evidence_to_item(r, false);
+        assert!(item.node_title.is_none());
+    }
+
+    // --- DTO serialization tests ---
+
+    #[test]
+    fn evidence_result_item_serializes_correctly() {
+        let item = EvidenceResultItem {
+            chunk_id: 1,
+            node_id: 2,
+            heading_path: "# H".to_string(),
+            snippet: "text".to_string(),
+            relative_path: Some("path.md".to_string()),
+            match_reason: MatchReason::Keyword,
+            score: 0.123,
+            node_title: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["chunk_id"], 1);
+        assert_eq!(json["node_id"], 2);
+        assert_eq!(json["heading_path"], "# H");
+        assert_eq!(json["snippet"], "text");
+        assert_eq!(json["relative_path"], "path.md");
+        assert_eq!(json["score"], 0.123);
+        // node_title should be present as null
+        assert!(json["node_title"].is_null());
+    }
+
+    #[test]
+    fn evidence_result_item_skips_none_relative_path() {
+        let item = EvidenceResultItem {
+            chunk_id: 1,
+            node_id: 2,
+            heading_path: "# H".to_string(),
+            snippet: "text".to_string(),
+            relative_path: None,
+            match_reason: MatchReason::Graph,
+            score: 0.5,
+            node_title: Some("Title".to_string()),
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        // skip_serializing_if = "Option::is_none" means the key is absent
+        assert!(json.get("relative_path").is_none());
+        assert_eq!(json["node_title"], "Title");
+    }
+
+    #[test]
+    fn index_status_summary_serializes() {
+        let status = IndexStatusSummary {
+            total_chunks: 100,
+            embedded_chunks: 75,
+            freshness_pct: 75.0,
+        };
+        let json = serde_json::to_value(&status).unwrap();
+        assert_eq!(json["total_chunks"], 100);
+        assert_eq!(json["embedded_chunks"], 75);
+        assert_eq!(json["freshness_pct"], 75.0);
+    }
+
+    #[test]
+    fn evidence_response_serializes_all_fields() {
+        let resp = EvidenceResponse {
+            results: vec![],
+            query: "test query".to_string(),
+            mode: "hybrid".to_string(),
+            index_status: IndexStatusSummary {
+                total_chunks: 0,
+                embedded_chunks: 0,
+                freshness_pct: 0.0,
+            },
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["query"], "test query");
+        assert_eq!(json["mode"], "hybrid");
+        assert!(json["results"].as_array().unwrap().is_empty());
+        assert!(json["index_status"].is_object());
+    }
+
+    // --- Scope parsing edge cases ---
+
+    #[tokio::test]
+    async fn non_selection_scope_prefix_ignored() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        // "folder:xyz" is not a recognized scope prefix — should be ignored, not error
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=test&mode=keyword&scope=folder:xyz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn whitespace_only_query_returns_400() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=%20%20%20")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn explicit_limit_5_returns_ok() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=test&limit=5&mode=keyword")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn default_mode_is_hybrid() {
+        let state = test_state().await;
+        let app = test_router(state);
+
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/vault/evidence?q=test")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(resp.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(body["mode"], "hybrid");
+    }
 }

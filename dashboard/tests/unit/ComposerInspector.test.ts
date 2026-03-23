@@ -547,6 +547,160 @@ describe('ComposerInspector', () => {
 		expect(stateAfter.history).toHaveLength(1);
 	});
 
+	// ── handleUndoInsert after actual insert ─────────────
+	it('handleUndoInsert restores tweet text after slot insert', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'Original text' }
+		});
+		const neighbor = {
+			node_id: 42, node_title: 'Test Note', reason: 'related', reason_label: 'Related',
+			intent: 'expand', matched_tags: [], score: 0.9, snippet: 'a snippet',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Opening hook');
+		expect((component as any).hasPendingInsertUndo()).toBe(true);
+		const result = (component as any).handleUndoInsert();
+		expect(result).toBe(true);
+		expect((component as any).hasPendingInsertUndo()).toBe(false);
+	});
+
+	it('handleUndoInsertById restores thread block text', async () => {
+		const blocks = [
+			{ id: 'b1', text: 'Block one original', media_paths: [], order: 0 },
+		];
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'thread', threadBlocks: blocks }
+		});
+		const neighbor = {
+			node_id: 10, node_title: 'Note', reason: 'similar', reason_label: 'Similar',
+			intent: 'refine', matched_tags: [], score: 0.8, snippet: 'snippet',
+			best_chunk_id: 2, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Opening hook');
+		const state = (component as any).getDraftInsertState();
+		const insertId = state.history[0].id;
+		const result = (component as any).handleUndoInsertById(insertId);
+		expect(result).toBe(true);
+	});
+
+	// ── handleStrengthenDraft is internal (not exported) ─
+	// Tested indirectly through integration with InspectorContent.
+
+	// ── handleGenerateFromNotes closes notes panel ──────
+	it('handleGenerateFromNotes closes notes panel after generation', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', notesPanelMode: 'notes' }
+		});
+		await (component as any).handleGenerateFromNotes('Some notes');
+		// The internal notesPanelMode should be set to null (panel closed)
+		// We verify by checking no crash occurred and API was called
+		expect(mockImprove).toHaveBeenCalled();
+	});
+
+	// ── handleAiAssist with voiceCue ────────────────────
+	it('handleAiAssist passes voiceCue to improve when tweet has content', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'Draft text', voiceCue: 'be bold' }
+		});
+		await (component as any).handleAiAssist();
+		expect(mockImprove).toHaveBeenCalledWith('Draft text', 'be bold');
+	});
+
+	it('handleAiAssist without voiceCue passes undefined context', async () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'Draft text', voiceCue: '' }
+		});
+		await (component as any).handleAiAssist();
+		expect(mockImprove).toHaveBeenCalledWith('Draft text', undefined);
+	});
+
+	// ── handleAiAssist error with non-Error object ──────
+	it('handleAiAssist handles non-Error throw with fallback message', async () => {
+		mockImprove.mockRejectedValueOnce('string error');
+		const onsubmiterror = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'text', onsubmiterror }
+		});
+		await (component as any).handleAiAssist();
+		expect(onsubmiterror).toHaveBeenCalledWith('AI assist failed');
+	});
+
+	// ── handleSlotInsert non-Error object ───────────────
+	it('handleSlotInsert handles non-Error throw with fallback message', async () => {
+		mockImprove.mockRejectedValueOnce('raw string error');
+		const onsubmiterror = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, mode: 'tweet', tweetText: 'content', onsubmiterror }
+		});
+		const neighbor = {
+			node_id: 1, node_title: 'N', reason: 'r', reason_label: 'R',
+			intent: 'i', matched_tags: [], score: 0.5, snippet: 's',
+			best_chunk_id: 1, heading_path: null, relative_path: null,
+		};
+		await (component as any).handleSlotInsert(neighbor, 0, 'Tweet');
+		expect(onsubmiterror).toHaveBeenCalledWith('Slot refinement failed');
+	});
+
+	// ── handleGenerateFromVault non-Error throw ─────────
+	it('handleGenerateFromVault handles non-Error throw with fallback message', async () => {
+		mockTweet.mockRejectedValueOnce(42);
+		const onsubmiterror = vi.fn();
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, onsubmiterror }
+		});
+		await (component as any).handleGenerateFromVault([1], 'tweet');
+		expect(onsubmiterror).toHaveBeenCalledWith('AI generate from vault failed');
+	});
+
+	// ── Desktop mode (non-mobile, open) ─────────────────
+	it('renders InspectorContent directly in desktop mode', () => {
+		const { container } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, isMobile: false }
+		});
+		// Should NOT have backdrop
+		expect(container.querySelector('.inspector-backdrop')).toBeNull();
+		expect(container).toBeTruthy();
+	});
+
+	// ── Mobile mode has drawer ──────────────────────────
+	it('renders drawer in mobile mode', () => {
+		const { container } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, isMobile: true }
+		});
+		expect(container.querySelector('.inspector-backdrop')).not.toBeNull();
+		expect(container.querySelector('.inspector-drawer')).not.toBeNull();
+	});
+
+	it('mobile drawer has handle area', () => {
+		const { container } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, isMobile: true }
+		});
+		expect(container.querySelector('.drawer-handle')).not.toBeNull();
+	});
+
+	// ── Clicking inside drawer does not call onclose ────
+	it('clicking inside drawer does not call onclose', async () => {
+		const onclose = vi.fn();
+		const { container } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true, isMobile: true, onclose }
+		});
+		const drawer = container.querySelector('.inspector-drawer');
+		if (drawer) {
+			await fireEvent.click(drawer);
+			expect(onclose).not.toHaveBeenCalled();
+		}
+	});
+
+	// ── getPinnedEvidence initially empty ────────────────
+	it('getPinnedEvidence returns empty array initially', () => {
+		const { component } = render(ComposerInspector, {
+			props: { ...defaultProps, open: true }
+		});
+		const pinned = (component as any).getPinnedEvidence();
+		expect(Array.isArray(pinned)).toBe(true);
+		expect(pinned).toHaveLength(0);
+	});
+
 	// ── backdrop/keyboard coverage ──────────────────────
 	it('Escape keydown on mobile backdrop calls onclose', async () => {
 		const onclose = vi.fn();

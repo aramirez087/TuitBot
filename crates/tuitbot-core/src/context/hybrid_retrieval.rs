@@ -301,4 +301,130 @@ mod tests {
             .unwrap();
         assert!(results.is_empty());
     }
+
+    // --- classify_match_reason edge cases ---
+
+    #[test]
+    fn classify_zero_sources_defaults_to_keyword() {
+        // 0 sources shouldn't happen in practice, but covers the fallback branch
+        assert_eq!(classify_match_reason(0b000), MatchReason::Keyword);
+    }
+
+    #[test]
+    fn classify_hybrid_keyword_graph() {
+        assert_eq!(classify_match_reason(0b110), MatchReason::Hybrid);
+    }
+
+    #[test]
+    fn classify_invalid_single_bit_defaults_to_keyword() {
+        // A single bit set outside the known range (e.g., 0b1000)
+        // count_ones() == 1 but doesn't match any known pattern
+        assert_eq!(classify_match_reason(0b1000), MatchReason::Keyword);
+    }
+
+    // --- truncate_text edge cases ---
+
+    #[test]
+    fn truncate_text_exact_boundary() {
+        let text = "a".repeat(120);
+        let result = truncate_text(&text, 120);
+        assert_eq!(result, text); // exactly at max, no truncation
+    }
+
+    #[test]
+    fn truncate_text_one_over_boundary() {
+        let text = "a".repeat(121);
+        let result = truncate_text(&text, 120);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 120);
+    }
+
+    #[test]
+    fn truncate_text_unicode_multibyte() {
+        // Each emoji is 4 bytes. Build a string that must be truncated
+        // mid-character to test the char_boundary loop.
+        let text = "\u{1F600}".repeat(40); // 160 bytes, 40 chars
+        let result = truncate_text(&text, 20);
+        assert!(result.ends_with("..."));
+        // Ensure the result is valid UTF-8 (would panic if not)
+        assert!(result.len() <= 20);
+    }
+
+    #[test]
+    fn truncate_text_empty() {
+        assert_eq!(truncate_text("", 10), "");
+    }
+
+    #[test]
+    fn truncate_text_max_zero() {
+        // max_len = 0 means everything gets truncated
+        let result = truncate_text("hello", 0);
+        assert_eq!(result, "...");
+    }
+
+    #[test]
+    fn truncate_text_max_three() {
+        // max_len = 3 means just the ellipsis fits
+        let result = truncate_text("hello", 3);
+        assert_eq!(result, "...");
+    }
+
+    #[test]
+    fn truncate_text_max_four() {
+        let result = truncate_text("hello", 4);
+        assert_eq!(result, "h...");
+    }
+
+    // --- RRF scoring properties ---
+
+    #[test]
+    fn rrf_score_diminishes_with_rank() {
+        let scores: Vec<f64> = (1..=10).map(|r| 1.0 / (RRF_K + r as f64)).collect();
+        for w in scores.windows(2) {
+            assert!(w[0] > w[1], "RRF scores must decrease with rank");
+        }
+    }
+
+    #[test]
+    fn rrf_k_constant_is_60() {
+        assert!((RRF_K - 60.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn snippet_max_len_is_120() {
+        assert_eq!(SNIPPET_MAX_LEN, 120);
+    }
+
+    // --- hybrid_search with empty semantic hits ---
+
+    #[tokio::test]
+    async fn empty_semantic_hits_vec_returns_empty() {
+        let db = crate::storage::init_test_db().await.unwrap();
+        let empty_hits: Vec<crate::context::semantic_search::SemanticHit> = vec![];
+        // Non-empty query + empty semantic hits (Some(&[]))
+        let results = hybrid_search(&db, "test-acct", "", Some(&empty_hits), None, 10)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn graph_only_with_empty_node_ids_returns_empty() {
+        let db = crate::storage::init_test_db().await.unwrap();
+        let empty_ids: Vec<i64> = vec![];
+        let results = hybrid_search(&db, "test-acct", "test", None, Some(&empty_ids), 10)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn graph_with_nonexistent_node_ids_returns_empty() {
+        let db = crate::storage::init_test_db().await.unwrap();
+        let node_ids = vec![99999, 88888];
+        let results = hybrid_search(&db, "test-acct", "test", None, Some(&node_ids), 10)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
 }

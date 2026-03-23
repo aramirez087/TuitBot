@@ -15,6 +15,8 @@ pub mod tags;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_chunks;
+#[cfg(test)]
 mod tests_graph;
 #[cfg(test)]
 mod tests_storage;
