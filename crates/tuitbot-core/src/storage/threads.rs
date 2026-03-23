@@ -134,6 +134,24 @@ pub async fn insert_original_tweet_with_provenance_for(
     Ok(id)
 }
 
+/// Get original_tweet row ID by tweet_id for a specific account.
+pub async fn get_original_tweet_id_by_tweet_id(
+    pool: &DbPool,
+    account_id: &str,
+    tweet_id: &str,
+) -> Result<Option<i64>, StorageError> {
+    let row: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM original_tweets WHERE account_id = ? AND tweet_id = ? LIMIT 1",
+    )
+    .bind(account_id)
+    .bind(tweet_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(|r| r.0))
+}
+
 /// Get the timestamp of the most recent successfully posted original tweet for a specific account.
 pub async fn get_last_original_tweet_time_for(
     pool: &DbPool,

@@ -183,6 +183,58 @@ pub async fn delete_links_for(
     Ok(result.rows_affected())
 }
 
+/// Resolve the source file path for an original_tweet entity via provenance.
+///
+/// Returns `(relative_path, source_type, base_path)` from the `primary_selection`
+/// provenance link, joined with the source context to get the base path and type.
+pub async fn get_primary_source_for_tweet(
+    pool: &DbPool,
+    account_id: &str,
+    original_tweet_id: i64,
+) -> Result<Option<(String, String, String)>, StorageError> {
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT source_path, node_id FROM vault_provenance_links \
+         WHERE account_id = ? AND entity_type = 'original_tweet' \
+         AND entity_id = ? AND source_role = 'primary_selection' \
+         LIMIT 1",
+    )
+    .bind(account_id)
+    .bind(original_tweet_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let (source_path, node_id) = match row {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    // Look up the source context via content_nodes → source_contexts.
+    let ctx: Option<(String, String)> = sqlx::query_as(
+        "SELECT sc.source_type, sc.config_json \
+         FROM content_nodes cn \
+         JOIN source_contexts sc ON cn.source_id = sc.id \
+         WHERE cn.id = ?",
+    )
+    .bind(node_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let (source_type, config_json) = match ctx {
+        Some(c) => c,
+        None => return Ok(None),
+    };
+
+    // Extract base path from config_json.
+    let base_path = serde_json::from_str::<serde_json::Value>(&config_json)
+        .ok()
+        .and_then(|v| v.get("path")?.as_str().map(String::from))
+        .unwrap_or_default();
+
+    Ok(Some((source_path, source_type, base_path)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

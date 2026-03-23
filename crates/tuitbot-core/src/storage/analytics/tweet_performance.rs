@@ -60,3 +60,61 @@ pub async fn upsert_tweet_performance(
     )
     .await
 }
+
+/// Performance metrics row from the tweet_performance table.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TweetPerformanceRow {
+    pub tweet_id: String,
+    pub likes_received: i64,
+    pub retweets_received: i64,
+    pub replies_received: i64,
+    pub impressions: i64,
+    pub performance_score: f64,
+}
+
+/// Get performance metrics for multiple tweet IDs in one query.
+pub async fn get_tweet_performances_for(
+    pool: &DbPool,
+    account_id: &str,
+    tweet_ids: &[String],
+) -> Result<Vec<TweetPerformanceRow>, StorageError> {
+    if tweet_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = tweet_ids.iter().map(|_| "?").collect();
+    let sql = format!(
+        "SELECT tweet_id, likes_received, retweets_received, replies_received, \
+         impressions, performance_score \
+         FROM tweet_performance \
+         WHERE account_id = ? AND tweet_id IN ({})",
+        placeholders.join(", ")
+    );
+
+    let mut query = sqlx::query_as::<_, TweetPerformanceRow>(&sql).bind(account_id);
+    for id in tweet_ids {
+        query = query.bind(id);
+    }
+
+    query
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })
+}
+
+/// Get all tweet performance rows for an account.
+pub async fn get_all_tweet_performances_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<Vec<TweetPerformanceRow>, StorageError> {
+    sqlx::query_as::<_, TweetPerformanceRow>(
+        "SELECT tweet_id, likes_received, retweets_received, replies_received, \
+         impressions, performance_score \
+         FROM tweet_performance \
+         WHERE account_id = ?",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}

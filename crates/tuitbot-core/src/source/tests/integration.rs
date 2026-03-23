@@ -424,6 +424,13 @@ async fn e2e_loopback_writes_metadata_and_reingest_detects_change() {
         status: None,
         thread_url: None,
         child_tweet_ids: None,
+        impressions: None,
+        likes: None,
+        retweets: None,
+        replies: None,
+        engagement_rate: None,
+        performance_score: None,
+        synced_at: None,
     };
     let written =
         loopback::write_metadata_to_file(dir.path().join("launch.md").as_path(), &entry).unwrap();
