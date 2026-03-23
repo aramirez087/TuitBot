@@ -252,6 +252,10 @@ pub async fn publish_draft(
                 snippet: l.snippet.clone(),
                 edge_type: l.edge_type.clone(),
                 edge_label: l.edge_label.clone(),
+                angle_kind: l.angle_kind.clone(),
+                signal_kind: l.signal_kind.clone(),
+                signal_text: l.signal_text.clone(),
+                source_role: l.source_role.clone(),
             })
             .collect();
         let source_node_id = refs.iter().find_map(|r| r.node_id);

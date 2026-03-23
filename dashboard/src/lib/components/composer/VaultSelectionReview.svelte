@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { VaultSelectionResponse, HookOption, NeighborItem, GraphState, ThreadBlock, DraftInsertState } from '$lib/api/types';
+	import type { VaultSelectionResponse, HookOption, MinedAngle, AssistAnglesResponse, NeighborItem, GraphState, ThreadBlock, DraftInsertState } from '$lib/api/types';
 	import { Zap, FileText, ChevronDown, ChevronUp, Undo2 } from 'lucide-svelte';
 	import VaultFooter from './VaultFooter.svelte';
 	import HookPicker from './HookPicker.svelte';
+	import AngleCards from './AngleCards.svelte';
+	import AngleFallback from './AngleFallback.svelte';
 	import GraphSuggestionCards from './GraphSuggestionCards.svelte';
 	import SlotTargetPanel from './SlotTargetPanel.svelte';
 	import { createInsertState } from '$lib/stores/draftInsertStore';
@@ -14,6 +16,8 @@
 		trackSuggestionRestored,
 		trackSynthesisToggled,
 		trackHooksGenerated,
+		trackAnglesMined,
+		trackAngleFallback,
 	} from '$lib/analytics/backlinkFunnel';
 
 	let {
@@ -40,7 +44,7 @@
 		mode?: 'tweet' | 'thread';
 		insertState?: DraftInsertState;
 		onundo?: () => void;
-		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string }>) => Promise<void>;
+		ongenerate: (nodeIds: number[], format: 'tweet' | 'thread', highlights?: string[], hookStyle?: string, neighborProvenance?: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }>) => Promise<void>;
 		onSelectionConsumed?: () => void;
 		onexpired?: () => void;
 		onformatchange?: (format: 'tweet' | 'thread') => void;
@@ -59,6 +63,13 @@
 	let hookOptions = $state<HookOption[] | null>(null);
 	let hookLoading = $state(false);
 	let hookError = $state<string | null>(null);
+
+	// Angle mining state (Hook Miner)
+	let angleResult = $state<AssistAnglesResponse | null>(null);
+	let angleLoading = $state(false);
+	let angleError = $state<string | null>(null);
+	let showAngleFallback = $state(false);
+	let angleFallbackReason = $state<string | null>(null);
 
 	// Graph suggestion state (session-scoped)
 	let acceptedNeighbors = $state<Map<number, { neighbor: NeighborItem; role: string }>>(new Map());
@@ -121,19 +132,48 @@
 	}
 
 	async function handleGenerate() {
-		if (!selection || hookLoading) return;
-		hookLoading = true;
-		hookError = null;
-		error = null;
-		try {
-			const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
-			const result = await api.assist.hooks(topic, { sessionId: sessionId });
-			hookOptions = result.hooks;
-			trackHooksGenerated(acceptedNeighbors.size, graphNeighbors.length, result.hooks.length, sessionId);
-		} catch (e) {
-			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
-		} finally {
-			hookLoading = false;
+		if (!selection || hookLoading || angleLoading) return;
+
+		const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
+
+		if (synthesisEnabled && acceptedNeighbors.size > 0) {
+			angleLoading = true;
+			angleError = null;
+			error = null;
+			try {
+				const neighborIds = [...acceptedNeighbors.keys()];
+				const result = await api.assist.angles(topic, neighborIds, { sessionId });
+				if (result.fallback_reason || result.angles.length === 0) {
+					showAngleFallback = true;
+					angleFallbackReason = result.fallback_reason || 'all_angles_filtered';
+					trackAngleFallback(result.fallback_reason ?? 'empty', acceptedNeighbors.size, sessionId);
+				} else {
+					angleResult = result;
+					trackAnglesMined(acceptedNeighbors.size, result.angles.length, sessionId);
+				}
+			} catch (e) {
+				if (e instanceof Error && e.message.includes('timeout')) {
+					showAngleFallback = true;
+					angleFallbackReason = 'timeout';
+				} else {
+					angleError = e instanceof Error ? e.message : 'Failed to mine angles';
+				}
+			} finally {
+				angleLoading = false;
+			}
+		} else {
+			hookLoading = true;
+			hookError = null;
+			error = null;
+			try {
+				const result = await api.assist.hooks(topic, { sessionId });
+				hookOptions = result.hooks;
+				trackHooksGenerated(acceptedNeighbors.size, graphNeighbors.length, result.hooks.length, sessionId);
+			} catch (e) {
+				hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+			} finally {
+				hookLoading = false;
+			}
 		}
 	}
 
@@ -149,7 +189,7 @@
 		try {
 			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
 			// Build neighbor provenance for accepted neighbors
-			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string }> = [];
+			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }> = [];
 			if (synthesisEnabled && acceptedNeighbors.size > 0) {
 				for (const [nid, { neighbor }] of acceptedNeighbors) {
 					if (!nodeIds.includes(nid)) nodeIds.push(nid);
@@ -157,6 +197,7 @@
 						node_id: nid,
 						edge_type: neighbor.reason,
 						edge_label: neighbor.reason_label,
+						source_role: 'accepted_neighbor',
 					});
 				}
 			}
@@ -187,6 +228,105 @@
 		hookOptions = null;
 		hookError = null;
 	}
+
+	async function handleAngleSelected(angle: MinedAngle, format: 'tweet' | 'thread') {
+		if (!selection || generating) return;
+		if (hasExistingContent && !confirmReplace) {
+			confirmReplace = true;
+			return;
+		}
+		generating = true;
+		error = null;
+		confirmReplace = false;
+		try {
+			const nodeIds = selection.resolved_node_id ? [selection.resolved_node_id] : [];
+			const neighborProv: Array<{ node_id: number; edge_type?: string; edge_label?: string; angle_kind?: string; signal_kind?: string; signal_text?: string; source_role?: string }> = [];
+			for (const [nid, { neighbor }] of acceptedNeighbors) {
+				if (!nodeIds.includes(nid)) nodeIds.push(nid);
+				const prov: typeof neighborProv[number] = {
+					node_id: nid,
+					edge_type: neighbor.reason,
+					edge_label: neighbor.reason_label,
+					angle_kind: angle.angle_type,
+					source_role: 'accepted_neighbor',
+				};
+				// Attach evidence-level fields if this neighbor has matching evidence
+				const ev = angle.evidence.find((e) => e.source_node_id === nid);
+				if (ev) {
+					prov.signal_kind = ev.evidence_type;
+					prov.signal_text = ev.citation_text;
+				}
+				neighborProv.push(prov);
+			}
+			await ongenerate(nodeIds, format, [angle.seed_text], angle.angle_type, neighborProv.length > 0 ? neighborProv : undefined);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Generation failed';
+		} finally {
+			generating = false;
+		}
+	}
+
+	async function handleFallbackToGenericHooks() {
+		showAngleFallback = false;
+		angleFallbackReason = null;
+		angleResult = null;
+		hookLoading = true;
+		hookError = null;
+		try {
+			const topic = selection!.selected_text || selection!.note_title || selection!.heading_context || 'general topic';
+			const result = await api.assist.hooks(topic, { sessionId });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	function handleBackToNeighbors() {
+		showAngleFallback = false;
+		angleFallbackReason = null;
+		angleResult = null;
+		angleError = null;
+	}
+
+	async function handleMoreHookStyles() {
+		angleResult = null;
+		angleError = null;
+		hookLoading = true;
+		hookError = null;
+		try {
+			const topic = selection!.selected_text || selection!.note_title || selection!.heading_context || 'general topic';
+			const result = await api.assist.hooks(topic, { sessionId });
+			hookOptions = result.hooks;
+		} catch (e) {
+			hookError = e instanceof Error ? e.message : 'Failed to generate hooks';
+		} finally {
+			hookLoading = false;
+		}
+	}
+
+	async function handleRemineAngles() {
+		if (!selection) return;
+		angleLoading = true;
+		angleError = null;
+		angleResult = null;
+		try {
+			const topic = selection.selected_text || selection.note_title || selection.heading_context || 'general topic';
+			const neighborIds = [...acceptedNeighbors.keys()];
+			const result = await api.assist.angles(topic, neighborIds, { sessionId });
+			if (result.fallback_reason || result.angles.length === 0) {
+				showAngleFallback = true;
+				angleFallbackReason = result.fallback_reason || 'all_angles_filtered';
+			} else {
+				angleResult = result;
+			}
+		} catch (e) {
+			angleError = e instanceof Error ? e.message : 'Failed to mine angles';
+		} finally {
+			angleLoading = false;
+		}
+	}
 </script>
 
 {#if loading}
@@ -203,6 +343,27 @@
 		</p>
 		<button class="vault-expired-dismiss" onclick={() => onexpired?.()}>Browse vault</button>
 	</div>
+{:else if selection && showAngleFallback}
+	<AngleFallback
+		reason={angleFallbackReason ?? undefined}
+		onusegenerichooks={handleFallbackToGenericHooks}
+		onbacktoneighbors={handleBackToNeighbors}
+	/>
+{:else if selection && (angleResult || angleLoading)}
+	{#if error}
+		<div class="vault-error" role="alert">{error}</div>
+	{/if}
+	<AngleCards
+		angles={angleResult?.angles ?? []}
+		{outputFormat}
+		loading={angleLoading}
+		error={angleError}
+		onselect={handleAngleSelected}
+		onremine={handleRemineAngles}
+		onback={handleBackToNeighbors}
+		onfallback={handleMoreHookStyles}
+		onformatchange={(f) => { outputFormat = f; onformatchange?.(f); }}
+	/>
 {:else if selection && (hookOptions || hookLoading)}
 	{#if error}
 		<div class="vault-error" role="alert">{error}</div>
@@ -323,7 +484,7 @@
 		selectionCount={1}
 		maxSelections={1}
 		{outputFormat}
-		generating={hookLoading}
+		generating={hookLoading || angleLoading}
 		{confirmReplace}
 		{showUndo}
 		{onundo}

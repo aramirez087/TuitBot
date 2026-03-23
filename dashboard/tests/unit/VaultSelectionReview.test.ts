@@ -14,8 +14,34 @@ import VaultSelectionReview from '$lib/components/composer/VaultSelectionReview.
 vi.mock('$lib/api', () => ({
 	api: {
 		vault: { getSelection: vi.fn() },
-		assist: { hooks: vi.fn() }
+		assist: { hooks: vi.fn(), angles: vi.fn() }
 	}
+}));
+
+// Mock analytics to prevent real tracking calls from child components
+vi.mock('$lib/analytics/backlinkFunnel', () => ({
+	trackSuggestionAccepted: vi.fn(),
+	trackSuggestionDismissed: vi.fn(),
+	trackSuggestionRestored: vi.fn(),
+	trackSynthesisToggled: vi.fn(),
+	trackHooksGenerated: vi.fn(),
+	trackAnglesMined: vi.fn(),
+	trackAngleFallback: vi.fn(),
+	trackSuggestionsShown: vi.fn(),
+	trackEmptyGraph: vi.fn(),
+	trackSlotTargeted: vi.fn(),
+	trackInsertUndone: vi.fn(),
+	trackDraftCompleted: vi.fn(),
+	trackCitationClicked: vi.fn(),
+}));
+
+vi.mock('$lib/analytics/hookMinerFunnel', () => ({
+	trackFallbackOpened: vi.fn(),
+	trackAnglesShown: vi.fn(),
+	trackAngleSelected: vi.fn(),
+	trackForgePromptShown: vi.fn(),
+	trackForgeEnabled: vi.fn(),
+	sanitizePathStem: vi.fn((s: string) => s),
 }));
 
 const sampleNeighbors = [
@@ -869,8 +895,16 @@ describe('VaultSelectionReview', () => {
 		const ongenerate = vi.fn().mockResolvedValue(undefined);
 		const { api } = await import('$lib/api');
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
-		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
-			hooks: sampleHooks, topic: 'test', vault_citations: []
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle seed text',
+				char_count: 20,
+				evidence: [{ evidence_type: 'data_point', citation_text: 'test', source_node_id: 55, source_note_title: 'Async Patterns' }],
+				confidence: 'high',
+				rationale: 'Test rationale',
+			}],
+			topic: 'test',
 		});
 		const { container } = render(VaultSelectionReview, {
 			props: { ...defaultProps, ongenerate }
@@ -885,18 +919,18 @@ describe('VaultSelectionReview', () => {
 		await vi.waitFor(() => {
 			expect(container.textContent).toContain('1 note included in context');
 		});
-		// Generate hooks
+		// Generate — with neighbor accepted, goes to angles
 		const generateBtn = Array.from(container.querySelectorAll('button')).find(
 			(b) => b.textContent?.includes('Generate hooks')
 		) as HTMLButtonElement;
 		await fireEvent.click(generateBtn);
 		await vi.waitFor(() => {
-			expect(container.querySelector('.hook-picker')).toBeTruthy();
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
 		});
-		// Select first hook
-		const hookCards = container.querySelectorAll('.hook-card');
-		await fireEvent.click(hookCards[0]);
-		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		// Select first angle
+		const angleCards = container.querySelectorAll('.angle-card');
+		await fireEvent.click(angleCards[0]);
+		const confirmBtn = container.querySelector('.angle-confirm-btn') as HTMLButtonElement;
 		await fireEvent.click(confirmBtn);
 		await vi.waitFor(() => {
 			expect(ongenerate).toHaveBeenCalled();
@@ -1081,8 +1115,16 @@ describe('VaultSelectionReview', () => {
 		const ongenerate = vi.fn().mockResolvedValue(undefined);
 		const { api } = await import('$lib/api');
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
-		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
-			hooks: sampleHooks, topic: 'test', vault_citations: []
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle seed text',
+				char_count: 20,
+				evidence: [{ evidence_type: 'data_point', citation_text: 'test', source_node_id: 55, source_note_title: 'Async Patterns' }],
+				confidence: 'high',
+				rationale: 'Test rationale',
+			}],
+			topic: 'test',
 		});
 		const { container } = render(VaultSelectionReview, {
 			props: { ...defaultProps, ongenerate }
@@ -1093,17 +1135,17 @@ describe('VaultSelectionReview', () => {
 		// Accept first neighbor
 		const actionBtns = container.querySelectorAll('.graph-action-btn');
 		await fireEvent.click(actionBtns[0]);
-		// Generate and confirm
+		// Generate — with neighbor accepted, goes to angles
 		const generateBtn = Array.from(container.querySelectorAll('button')).find(
 			(b) => b.textContent?.includes('Generate hooks')
 		) as HTMLButtonElement;
 		await fireEvent.click(generateBtn);
 		await vi.waitFor(() => {
-			expect(container.querySelector('.hook-picker')).toBeTruthy();
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
 		});
-		const hookCards = container.querySelectorAll('.hook-card');
-		await fireEvent.click(hookCards[0]);
-		const confirmBtn = container.querySelector('.hook-confirm-btn') as HTMLButtonElement;
+		const angleCards = container.querySelectorAll('.angle-card');
+		await fireEvent.click(angleCards[0]);
+		const confirmBtn = container.querySelector('.angle-confirm-btn') as HTMLButtonElement;
 		await fireEvent.click(confirmBtn);
 		await vi.waitFor(() => {
 			expect(ongenerate).toHaveBeenCalled();
@@ -1114,5 +1156,342 @@ describe('VaultSelectionReview', () => {
 				expect.objectContaining({ node_id: 55, edge_type: 'linked_note', edge_label: 'linked note' })
 			);
 		});
+	});
+
+	// --- Angle mining flow (Hook Miner) ---
+
+	it('calls api.assist.angles (not hooks) when synthesis enabled and neighbors accepted', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle',
+				char_count: 11,
+				evidence: [],
+				confidence: 'high',
+				rationale: 'Test',
+			}],
+			topic: 'test',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		// Accept a neighbor
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		// Click generate
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(api.assist.angles).toHaveBeenCalled();
+		});
+		expect(api.assist.hooks).not.toHaveBeenCalled();
+	});
+
+	it('renders AngleCards when angles are returned', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle text',
+				char_count: 15,
+				evidence: [],
+				confidence: 'high',
+				rationale: 'Test rationale',
+			}],
+			topic: 'test',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
+		});
+	});
+
+	it('shows AngleFallback when angles have fallback_reason', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [],
+			fallback_reason: 'weak_signal',
+			topic: 'test',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-fallback')).toBeTruthy();
+		});
+	});
+
+	it('handleAngleSelected calls ongenerate with angle provenance', async () => {
+		const ongenerate = vi.fn().mockResolvedValue(undefined);
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'hot_take',
+				seed_text: 'Bold take on async',
+				char_count: 18,
+				evidence: [{ evidence_type: 'contradiction', citation_text: 'conflicting data', source_node_id: 55, source_note_title: 'Async Patterns' }],
+				confidence: 'high',
+				rationale: 'Strong contradiction',
+			}],
+			topic: 'test',
+		});
+		const { container } = render(VaultSelectionReview, {
+			props: { ...defaultProps, ongenerate }
+		});
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
+		});
+		const angleCards = container.querySelectorAll('.angle-card');
+		await fireEvent.click(angleCards[0]);
+		const confirmBtn = container.querySelector('.angle-confirm-btn') as HTMLButtonElement;
+		await fireEvent.click(confirmBtn);
+		await vi.waitFor(() => {
+			expect(ongenerate).toHaveBeenCalled();
+			const call = ongenerate.mock.calls[0];
+			// format
+			expect(call[1]).toBe('tweet');
+			// highlights = [seed_text]
+			expect(call[2]).toEqual(['Bold take on async']);
+			// hookStyle = angle_type
+			expect(call[3]).toBe('hot_take');
+			// neighbor provenance with angle_kind and signal fields
+			const prov = call[4];
+			expect(prov).toBeDefined();
+			expect(prov[0]).toEqual(
+				expect.objectContaining({
+					node_id: 55,
+					angle_kind: 'hot_take',
+					signal_kind: 'contradiction',
+					signal_text: 'conflicting data',
+				})
+			);
+		});
+	});
+
+	it('handleFallbackToGenericHooks transitions from angle fallback to hook picker', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [],
+			fallback_reason: 'weak_signal',
+			topic: 'test',
+		});
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-fallback')).toBeTruthy();
+		});
+		// Click "Use generic hooks" in fallback
+		const primaryBtn = container.querySelector('.angle-fallback-primary') as HTMLButtonElement;
+		await fireEvent.click(primaryBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		expect(container.querySelector('.angle-fallback')).toBeFalsy();
+	});
+
+	it('handleBackToNeighbors clears angle state and returns to selection view', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [],
+			fallback_reason: 'weak_signal',
+			topic: 'test',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-fallback')).toBeTruthy();
+		});
+		// Click secondary button (back to neighbors)
+		const secondaryBtn = container.querySelector('.angle-fallback-secondary') as HTMLButtonElement;
+		await fireEvent.click(secondaryBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-selection-review')).toBeTruthy();
+		});
+		expect(container.querySelector('.angle-fallback')).toBeFalsy();
+		expect(container.querySelector('.angle-picker')).toBeFalsy();
+	});
+
+	it('handleMoreHookStyles transitions from angle view to hooks', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [{
+				angle_type: 'story',
+				seed_text: 'Test angle',
+				char_count: 11,
+				evidence: [],
+				confidence: 'high',
+				rationale: 'Test',
+			}],
+			topic: 'test',
+		});
+		(api.assist.hooks as ReturnType<typeof vi.fn>).mockResolvedValue({
+			hooks: sampleHooks, topic: 'test', vault_citations: []
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
+		});
+		// Click "More hook styles" fallback button in AngleCards
+		const fallbackBtn = container.querySelector('.angle-fallback-btn') as HTMLButtonElement;
+		await fireEvent.click(fallbackBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.hook-picker')).toBeTruthy();
+		});
+		expect(container.querySelector('.angle-picker')).toBeFalsy();
+	});
+
+	it('handleRemineAngles retries angle mining', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>)
+			.mockResolvedValueOnce({
+				angles: [{
+					angle_type: 'story',
+					seed_text: 'First result',
+					char_count: 12,
+					evidence: [],
+					confidence: 'high',
+					rationale: 'Test',
+				}],
+				topic: 'test',
+			})
+			.mockResolvedValueOnce({
+				angles: [{
+					angle_type: 'listicle',
+					seed_text: 'Second result',
+					char_count: 13,
+					evidence: [],
+					confidence: 'medium',
+					rationale: 'Remine test',
+				}],
+				topic: 'test',
+			});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-picker')).toBeTruthy();
+		});
+		const firstCallCount = (api.assist.angles as ReturnType<typeof vi.fn>).mock.calls.length;
+		// Click "Mine again" button in AngleCards
+		const remineBtn = container.querySelector('.angle-remine-btn') as HTMLButtonElement;
+		await fireEvent.click(remineBtn);
+		await vi.waitFor(() => {
+			expect((api.assist.angles as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(firstCallCount);
+		});
+	});
+
+	it('shows AngleFallback when angles response has empty angles array', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockResolvedValue({
+			angles: [],
+			topic: 'test',
+		});
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-fallback')).toBeTruthy();
+		});
+	});
+
+	it('shows AngleFallback with timeout reason on timeout error', async () => {
+		const { api } = await import('$lib/api');
+		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce(sampleSelectionWithGraph);
+		(api.assist.angles as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Request timeout'));
+		const { container } = render(VaultSelectionReview, { props: defaultProps });
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.graph-card').length).toBe(2);
+		});
+		const actionBtns = container.querySelectorAll('.graph-action-btn');
+		await fireEvent.click(actionBtns[0]);
+		const generateBtn = Array.from(container.querySelectorAll('button')).find(
+			(b) => b.textContent?.includes('Generate hooks')
+		) as HTMLButtonElement;
+		await fireEvent.click(generateBtn);
+		await vi.waitFor(() => {
+			expect(container.querySelector('.angle-fallback')).toBeTruthy();
+		});
+		const heading = container.querySelector('.angle-fallback-heading');
+		expect(heading?.textContent).toContain('Mining took too long');
 	});
 });

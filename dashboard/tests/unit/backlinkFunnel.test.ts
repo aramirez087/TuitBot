@@ -24,6 +24,8 @@ import {
 	trackDraftCompleted,
 	trackEmptyGraph,
 	trackCitationClicked,
+	trackAnglesMined,
+	trackAngleFallback,
 	bufferEvent,
 	flushToBackend,
 } from '$lib/analytics/backlinkFunnel';
@@ -130,6 +132,24 @@ describe('backlink funnel event helpers', () => {
 			source_title: 'Async Patterns',
 			is_graph_insert: true,
 			is_desktop: false,
+		});
+	});
+
+	it('trackAnglesMined calls trackFunnel with correct event and props', () => {
+		trackAnglesMined(3, 5, 'sess-1');
+		expect(trackFunnel).toHaveBeenCalledWith('backlink.angles_mined', {
+			accepted_count: 3,
+			angle_count: 5,
+			session_id: 'sess-1',
+		});
+	});
+
+	it('trackAngleFallback calls trackFunnel with correct event and props', () => {
+		trackAngleFallback('weak_signal', 2, 'sess-1');
+		expect(trackFunnel).toHaveBeenCalledWith('backlink.angle_fallback', {
+			reason: 'weak_signal',
+			accepted_count: 2,
+			session_id: 'sess-1',
 		});
 	});
 });

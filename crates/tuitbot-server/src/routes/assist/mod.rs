@@ -3,6 +3,7 @@
 //! These are stateless: they generate content and return it without posting.
 //! The user decides what to do with the results.
 
+pub mod angles;
 pub mod hooks;
 
 use std::sync::Arc;

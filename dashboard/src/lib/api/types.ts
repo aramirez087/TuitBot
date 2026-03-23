@@ -487,6 +487,7 @@ export interface TuitbotConfig {
 			watch: boolean;
 			file_patterns: string[];
 			loop_back_enabled: boolean;
+			analytics_sync_enabled: boolean;
 			poll_interval_seconds: number | null;
 		}>;
 	};
@@ -803,6 +804,10 @@ export interface ProvenanceRef {
 	snippet?: string;
 	edge_type?: string;
 	edge_label?: string;
+	angle_kind?: string;
+	signal_kind?: string;
+	signal_text?: string;
+	source_role?: string;
 }
 
 export interface ProvenanceLink {
@@ -816,6 +821,12 @@ export interface ProvenanceLink {
 	source_path: string | null;
 	heading_path: string | null;
 	snippet: string | null;
+	edge_type: string | null;
+	edge_label: string | null;
+	angle_kind: string | null;
+	signal_kind: string | null;
+	signal_text: string | null;
+	source_role: string | null;
 	created_at: string;
 }
 
@@ -914,6 +925,32 @@ export interface HookOption {
 
 export interface AssistHooksResponse {
 	hooks: HookOption[];
+	topic: string;
+	vault_citations?: VaultCitation[];
+}
+
+// --- Mined Angle types (Hook Miner) ---
+
+export interface EvidenceItemResponse {
+	evidence_type: string;
+	citation_text: string;
+	source_node_id: number;
+	source_note_title: string;
+	source_heading_path?: string;
+}
+
+export interface MinedAngle {
+	angle_type: string;
+	seed_text: string;
+	char_count: number;
+	evidence: EvidenceItemResponse[];
+	confidence: string;
+	rationale: string;
+}
+
+export interface AssistAnglesResponse {
+	angles: MinedAngle[];
+	fallback_reason?: string;
 	topic: string;
 	vault_citations?: VaultCitation[];
 }

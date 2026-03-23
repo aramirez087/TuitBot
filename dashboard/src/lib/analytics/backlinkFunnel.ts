@@ -55,6 +55,14 @@ export function trackCitationClicked(sourceTitle: string, isGraphInsert: boolean
 	trackFunnel('backlink.citation_clicked', { source_title: sourceTitle, is_graph_insert: isGraphInsert, is_desktop: isDesktop });
 }
 
+export function trackAnglesMined(acceptedCount: number, angleCount: number, sessionId: string): void {
+	trackFunnel('backlink.angles_mined', { accepted_count: acceptedCount, angle_count: angleCount, session_id: sessionId });
+}
+
+export function trackAngleFallback(reason: string, acceptedCount: number, sessionId: string): void {
+	trackFunnel('backlink.angle_fallback', { reason, accepted_count: acceptedCount, session_id: sessionId });
+}
+
 // ── Backend relay (opt-in, not wired by default) ─────────────
 
 let eventBuffer: FunnelEvent[] = [];

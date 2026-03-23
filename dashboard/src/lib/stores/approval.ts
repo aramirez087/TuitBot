@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { api, type ApprovalItem, type ApprovalStats } from '$lib/api';
 import { events as wsEvents } from './websocket';
+import { setPendingAnalyticsSyncPrompt } from './settings';
 
 // --- Writable stores ---
 
@@ -222,6 +223,11 @@ wsEvents.subscribe(($events) => {
 
 		const updatedId = latest.id as number;
 		const updatedStatus = latest.status as string;
+
+		// Trigger Forge consent prompt on publish success
+		if (updatedStatus === 'approved') {
+			setPendingAnalyticsSyncPrompt();
+		}
 
 		// If the current filter wouldn't show this status, remove the item.
 		// "scheduled" is a terminal status like "approved" — remove from pending view.

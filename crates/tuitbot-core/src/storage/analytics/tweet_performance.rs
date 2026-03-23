@@ -60,3 +60,112 @@ pub async fn upsert_tweet_performance(
     )
     .await
 }
+
+/// Performance metrics row from the tweet_performance table.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TweetPerformanceRow {
+    pub tweet_id: String,
+    pub likes_received: i64,
+    pub retweets_received: i64,
+    pub replies_received: i64,
+    pub impressions: i64,
+    pub performance_score: f64,
+}
+
+/// Get performance metrics for multiple tweet IDs in one query.
+pub async fn get_tweet_performances_for(
+    pool: &DbPool,
+    account_id: &str,
+    tweet_ids: &[String],
+) -> Result<Vec<TweetPerformanceRow>, StorageError> {
+    if tweet_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let placeholders: Vec<&str> = tweet_ids.iter().map(|_| "?").collect();
+    let sql = format!(
+        "SELECT tweet_id, likes_received, retweets_received, replies_received, \
+         impressions, performance_score \
+         FROM tweet_performance \
+         WHERE account_id = ? AND tweet_id IN ({})",
+        placeholders.join(", ")
+    );
+
+    let mut query = sqlx::query_as::<_, TweetPerformanceRow>(&sql).bind(account_id);
+    for id in tweet_ids {
+        query = query.bind(id);
+    }
+
+    query
+        .fetch_all(pool)
+        .await
+        .map_err(|e| StorageError::Query { source: e })
+}
+
+/// Get all tweet performance rows for an account.
+pub async fn get_all_tweet_performances_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<Vec<TweetPerformanceRow>, StorageError> {
+    sqlx::query_as::<_, TweetPerformanceRow>(
+        "SELECT tweet_id, likes_received, retweets_received, replies_received, \
+         impressions, performance_score \
+         FROM tweet_performance \
+         WHERE account_id = ?",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })
+}
+
+/// Percentile thresholds for the account's historical performance.
+///
+/// Used by Forge sync to assign performance tiers (high/medium/low/none).
+#[derive(Debug, Clone)]
+pub struct PerformancePercentiles {
+    pub p50_impressions: i64,
+    pub p90_impressions: i64,
+    /// False if fewer than 10 posts — tier defaults to "none".
+    pub has_sufficient_data: bool,
+}
+
+/// Compute impression percentiles (p50, p90) for an account from the
+/// `tweet_performance` table.
+///
+/// Uses the nearest-rank method: fetches all impressions sorted ascending,
+/// then picks the value at the 50th and 90th percentile indices. If fewer
+/// than 10 rows exist, returns `has_sufficient_data: false`.
+pub async fn compute_performance_percentiles_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<PerformancePercentiles, StorageError> {
+    let rows: Vec<(i64,)> = sqlx::query_as(
+        "SELECT impressions FROM tweet_performance \
+         WHERE account_id = ? ORDER BY impressions ASC",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    let impressions: Vec<i64> = rows.into_iter().map(|(v,)| v).collect();
+
+    if impressions.len() < 10 {
+        return Ok(PerformancePercentiles {
+            p50_impressions: 0,
+            p90_impressions: 0,
+            has_sufficient_data: false,
+        });
+    }
+
+    let count = impressions.len();
+    let p50 = impressions[count / 2];
+    let p90 = impressions[count * 9 / 10];
+
+    Ok(PerformancePercentiles {
+        p50_impressions: p50,
+        p90_impressions: p90,
+        has_sufficient_data: true,
+    })
+}

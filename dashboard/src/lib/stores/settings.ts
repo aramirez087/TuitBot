@@ -260,6 +260,49 @@ export async function resetSectionToBase(key: string): Promise<boolean> {
 	}
 }
 
+// --- Analytics sync prompt state (localStorage-backed) ---
+
+const ANALYTICS_SYNC_PROMPT_KEY = 'tuitbot:analytics-sync-prompt-dismissed';
+const PENDING_SYNC_PROMPT_KEY = 'tuitbot:pending-analytics-sync-prompt';
+
+function readLocalFlag(key: string): boolean {
+	if (typeof localStorage === 'undefined') return false;
+	return localStorage.getItem(key) === 'true';
+}
+
+function writeLocalFlag(key: string, value: boolean): void {
+	if (typeof localStorage === 'undefined') return;
+	if (value) {
+		localStorage.setItem(key, 'true');
+	} else {
+		localStorage.removeItem(key);
+	}
+}
+
+export const analyticsSyncPromptDismissed = writable<boolean>(readLocalFlag(ANALYTICS_SYNC_PROMPT_KEY));
+
+export function dismissAnalyticsSyncPrompt(): void {
+	analyticsSyncPromptDismissed.set(true);
+	writeLocalFlag(ANALYTICS_SYNC_PROMPT_KEY, true);
+}
+
+export function resetAnalyticsSyncPrompt(): void {
+	analyticsSyncPromptDismissed.set(false);
+	writeLocalFlag(ANALYTICS_SYNC_PROMPT_KEY, false);
+}
+
+export const pendingAnalyticsSyncPrompt = writable<boolean>(readLocalFlag(PENDING_SYNC_PROMPT_KEY));
+
+export function setPendingAnalyticsSyncPrompt(): void {
+	pendingAnalyticsSyncPrompt.set(true);
+	writeLocalFlag(PENDING_SYNC_PROMPT_KEY, true);
+}
+
+export function clearPendingAnalyticsSyncPrompt(): void {
+	pendingAnalyticsSyncPrompt.set(false);
+	writeLocalFlag(PENDING_SYNC_PROMPT_KEY, false);
+}
+
 export function hasDangerousChanges(): boolean {
 	const $config = get(config);
 	const $draft = get(draft);

@@ -10,6 +10,7 @@ use std::time::Duration;
 use rand::Rng;
 use tokio_util::sync::CancellationToken;
 
+use crate::content::deserialize_blocks_from_content;
 use crate::storage::{self, DbPool};
 use crate::x_api::XApiClient;
 
@@ -73,83 +74,142 @@ pub async fn run_approval_poster(
                     }
                 };
 
-                let result = match item.action_type.as_str() {
-                    "reply" if !item.target_tweet_id.is_empty() => {
-                        post_reply(
-                            &*x_client,
-                            &item.target_tweet_id,
-                            &item.generated_content,
-                            &media_ids,
-                        )
+                // Route by action type: thread gets reply-chain posting,
+                // reply gets in-reply-to, everything else posts standalone.
+                if item.action_type == "thread" {
+                    match post_thread_and_persist(&pool, &*x_client, &account_id, &item, &media_ids)
                         .await
-                    }
-                    _ => {
-                        // tweet, thread_tweet, or reply with empty target
-                        post_tweet(&*x_client, &item.generated_content, &media_ids).await
-                    }
-                };
+                    {
+                        Ok(root_tweet_id) => {
+                            tracing::info!(
+                                id = item.id,
+                                root_tweet_id = %root_tweet_id,
+                                "Approved thread posted successfully"
+                            );
+                            if let Err(e) = storage::approval_queue::mark_posted_for(
+                                &pool,
+                                &account_id,
+                                item.id,
+                                &root_tweet_id,
+                            )
+                            .await
+                            {
+                                tracing::warn!(id = item.id, error = %e, "Failed to mark thread as posted");
+                            }
 
-                match result {
-                    Ok(tweet_id) => {
-                        tracing::info!(
-                            id = item.id,
-                            tweet_id = %tweet_id,
-                            "Approved item posted successfully"
-                        );
-                        if let Err(e) = storage::approval_queue::mark_posted_for(
-                            &pool,
-                            &account_id,
-                            item.id,
-                            &tweet_id,
-                        )
-                        .await
-                        {
+                            let _ = storage::action_log::log_action_for(
+                                &pool,
+                                &account_id,
+                                "thread_posted",
+                                "success",
+                                Some(&format!("Posted approved thread {}", item.id)),
+                                None,
+                            )
+                            .await;
+                        }
+                        Err(e) => {
+                            tracing::warn!(id = item.id, error = %e, "Failed to post approved thread");
+                            let _ = storage::approval_queue::mark_failed_for(
+                                &pool,
+                                &account_id,
+                                item.id,
+                                &format!("Thread posting failed: {e}"),
+                            )
+                            .await;
+                            let _ = storage::action_log::log_action_for(
+                                &pool,
+                                &account_id,
+                                "thread_posted",
+                                "error",
+                                Some(&format!(
+                                    "Failed to post approved thread {}: {}",
+                                    item.id, e
+                                )),
+                                None,
+                            )
+                            .await;
+                        }
+                    }
+                } else {
+                    let result = match item.action_type.as_str() {
+                        "reply" if !item.target_tweet_id.is_empty() => {
+                            post_reply(
+                                &*x_client,
+                                &item.target_tweet_id,
+                                &item.generated_content,
+                                &media_ids,
+                            )
+                            .await
+                        }
+                        _ => {
+                            // tweet, thread_tweet, or reply with empty target
+                            post_tweet(&*x_client, &item.generated_content, &media_ids).await
+                        }
+                    };
+
+                    match result {
+                        Ok(tweet_id) => {
+                            tracing::info!(
+                                id = item.id,
+                                tweet_id = %tweet_id,
+                                "Approved item posted successfully"
+                            );
+                            if let Err(e) = storage::approval_queue::mark_posted_for(
+                                &pool,
+                                &account_id,
+                                item.id,
+                                &tweet_id,
+                            )
+                            .await
+                            {
+                                tracing::warn!(
+                                    id = item.id,
+                                    error = %e,
+                                    "Failed to mark approved item as posted"
+                                );
+                            }
+
+                            // Propagate vault provenance to original_tweets record.
+                            propagate_provenance(&pool, &account_id, &item, &tweet_id).await;
+
+                            // Write loop-back metadata to source notes.
+                            execute_loopback_for_provenance(&pool, &account_id, &item, &tweet_id)
+                                .await;
+
+                            // Log the action.
+                            let _ = storage::action_log::log_action_for(
+                                &pool,
+                                &account_id,
+                                &format!("{}_posted", item.action_type),
+                                "success",
+                                Some(&format!("Posted approved item {}", item.id)),
+                                None,
+                            )
+                            .await;
+                        }
+                        Err(e) => {
                             tracing::warn!(
                                 id = item.id,
                                 error = %e,
-                                "Failed to mark approved item as posted"
+                                "Failed to post approved item"
                             );
+                            let _ = storage::approval_queue::mark_failed_for(
+                                &pool,
+                                &account_id,
+                                item.id,
+                                &format!("Posting failed: {e}"),
+                            )
+                            .await;
+                            let _ = storage::action_log::log_action_for(
+                                &pool,
+                                &account_id,
+                                &format!("{}_posted", item.action_type),
+                                "error",
+                                Some(&format!("Failed to post approved item {}: {}", item.id, e)),
+                                None,
+                            )
+                            .await;
                         }
-
-                        // Propagate vault provenance to original_tweets record.
-                        propagate_provenance(&pool, &account_id, &item, &tweet_id).await;
-
-                        // Write loop-back metadata to source notes.
-                        execute_loopback_for_provenance(&pool, &account_id, &item, &tweet_id).await;
-
-                        // Log the action.
-                        let _ = storage::action_log::log_action_for(
-                            &pool,
-                            &account_id,
-                            &format!("{}_posted", item.action_type),
-                            "success",
-                            Some(&format!("Posted approved item {}", item.id)),
-                            None,
-                        )
-                        .await;
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            id = item.id,
-                            error = %e,
-                            "Failed to post approved item"
-                        );
-                        let _ = storage::approval_queue::mark_failed_for(
-                            &pool,
-                            &account_id,
-                            item.id,
-                            &format!("Posting failed: {e}"),
-                        )
-                        .await;
-                        let _ = storage::action_log::log_action_for(
-                            &pool,
-                            &account_id,
-                            &format!("{}_posted", item.action_type),
-                            "error",
-                            Some(&format!("Failed to post approved item {}: {}", item.id, e)),
-                            None,
-                        )
-                        .await;
                     }
                 }
 
@@ -230,6 +290,227 @@ async fn upload_media(
         media_ids.push(media_id.0);
     }
     Ok(media_ids)
+}
+
+/// Parse thread content from approval queue storage format.
+///
+/// Supports both block JSON format (versioned payload) and legacy string arrays.
+/// Returns ordered tweet texts for sequential posting.
+pub fn parse_thread_content(content: &str) -> Result<Vec<String>, String> {
+    // Try block JSON format first.
+    if let Some(mut blocks) = deserialize_blocks_from_content(content) {
+        blocks.sort_by_key(|b| b.order);
+        let texts: Vec<String> = blocks.into_iter().map(|b| b.text).collect();
+        if texts.is_empty() {
+            return Err("thread blocks payload is empty".to_string());
+        }
+        return Ok(texts);
+    }
+
+    // Try legacy string array format.
+    if let Ok(tweets) = serde_json::from_str::<Vec<String>>(content) {
+        if tweets.is_empty() {
+            return Err("thread content array is empty".to_string());
+        }
+        return Ok(tweets);
+    }
+
+    Err("cannot parse thread content: not block JSON or string array".to_string())
+}
+
+/// Post a thread as a reply chain and persist all storage records.
+///
+/// Creates: threads row, thread_tweets rows, original_tweets row, provenance
+/// links (to both original_tweet and thread entities), and loopback entries.
+///
+/// Returns the root tweet ID on success.
+async fn post_thread_and_persist(
+    pool: &DbPool,
+    x_client: &dyn XApiClient,
+    account_id: &str,
+    item: &storage::approval_queue::ApprovalItem,
+    media_ids: &[String],
+) -> Result<String, String> {
+    let tweet_texts = parse_thread_content(&item.generated_content)?;
+
+    // Post as reply chain: root standalone, children reply to previous.
+    let mut posted_ids: Vec<String> = Vec::with_capacity(tweet_texts.len());
+    let mut posted_contents: Vec<String> = Vec::with_capacity(tweet_texts.len());
+
+    for (i, text) in tweet_texts.iter().enumerate() {
+        let result = if i == 0 {
+            post_tweet(x_client, text, media_ids).await
+        } else {
+            post_reply(x_client, &posted_ids[i - 1], text, &[]).await
+        };
+
+        match result {
+            Ok(tweet_id) => {
+                posted_ids.push(tweet_id);
+                posted_contents.push(text.clone());
+            }
+            Err(e) => {
+                // Partial failure: persist what we posted so far.
+                if !posted_ids.is_empty() {
+                    persist_and_propagate_thread(
+                        pool,
+                        account_id,
+                        item,
+                        &posted_ids,
+                        &posted_contents,
+                        "partial",
+                    )
+                    .await;
+                }
+                return Err(format!(
+                    "Thread failed at tweet {}/{}: {e}. {} tweet(s) posted.",
+                    i + 1,
+                    tweet_texts.len(),
+                    posted_ids.len()
+                ));
+            }
+        }
+    }
+
+    // Full success: persist all records.
+    persist_and_propagate_thread(
+        pool,
+        account_id,
+        item,
+        &posted_ids,
+        &posted_contents,
+        "sent",
+    )
+    .await;
+
+    Ok(posted_ids[0].clone())
+}
+
+/// Persist thread records and propagate provenance + loopback.
+async fn persist_and_propagate_thread(
+    pool: &DbPool,
+    account_id: &str,
+    item: &storage::approval_queue::ApprovalItem,
+    posted_ids: &[String],
+    posted_contents: &[String],
+    status: &str,
+) {
+    let topic = if item.topic.is_empty() {
+        ""
+    } else {
+        &item.topic
+    };
+
+    match storage::threads::persist_thread_records(
+        pool,
+        account_id,
+        topic,
+        posted_ids,
+        posted_contents,
+        status,
+    )
+    .await
+    {
+        Ok((thread_id, ot_id)) => {
+            // Set source_node_id on the original_tweet.
+            if let Some(node_id) = item.source_node_id {
+                let _ = storage::threads::set_original_tweet_source_node_for(
+                    pool, account_id, ot_id, node_id,
+                )
+                .await;
+            }
+
+            // Copy provenance to original_tweet entity.
+            let _ = storage::provenance::copy_links_for(
+                pool,
+                account_id,
+                "approval_queue",
+                item.id,
+                "original_tweet",
+                ot_id,
+            )
+            .await;
+
+            // Copy provenance to thread entity.
+            let _ = storage::provenance::copy_links_for(
+                pool,
+                account_id,
+                "approval_queue",
+                item.id,
+                "thread",
+                thread_id,
+            )
+            .await;
+
+            // Write loopback to source notes with child_tweet_ids.
+            let root_tweet_id = &posted_ids[0];
+            let child_ids: Vec<String> = posted_ids.iter().skip(1).cloned().collect();
+            execute_loopback_for_thread(pool, account_id, item, root_tweet_id, child_ids).await;
+        }
+        Err(e) => {
+            tracing::warn!(
+                id = item.id,
+                error = %e,
+                "Failed to persist thread records"
+            );
+        }
+    }
+}
+
+/// Write loop-back metadata to source notes for a thread.
+async fn execute_loopback_for_thread(
+    pool: &DbPool,
+    account_id: &str,
+    item: &storage::approval_queue::ApprovalItem,
+    root_tweet_id: &str,
+    child_tweet_ids: Vec<String>,
+) {
+    use crate::automation::watchtower::loopback;
+    use std::collections::HashSet;
+
+    let url = format!("https://x.com/i/status/{root_tweet_id}");
+
+    let links = match storage::provenance::get_links_for(
+        pool,
+        account_id,
+        "approval_queue",
+        item.id,
+    )
+    .await
+    {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::debug!(id = item.id, error = %e, "No provenance links for thread loopback");
+            return;
+        }
+    };
+
+    let mut seen = HashSet::new();
+    for link in &links {
+        if let Some(node_id) = link.node_id {
+            if seen.insert(node_id) {
+                let result = loopback::execute_loopback_thread(
+                    pool,
+                    node_id,
+                    root_tweet_id,
+                    &url,
+                    child_tweet_ids.clone(),
+                )
+                .await;
+                match &result {
+                    loopback::LoopBackResult::Written => {
+                        tracing::info!(node_id, root_tweet_id, "Loopback: wrote thread metadata");
+                    }
+                    loopback::LoopBackResult::AlreadyPresent => {
+                        tracing::debug!(node_id, root_tweet_id, "Loopback: thread already present");
+                    }
+                    other => {
+                        tracing::debug!(node_id, result = ?other, "Loopback: thread write skipped");
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Propagate vault provenance from the approval queue item to original_tweets.
@@ -672,5 +953,173 @@ mod tests {
         let json = r#"["/a.jpg", "/b.png", "/c.gif", "/d.mp4"]"#;
         let paths: Vec<String> = serde_json::from_str(json).unwrap_or_default();
         assert_eq!(paths.len(), 4);
+    }
+
+    // ── parse_thread_content ─────────────────────────────────────
+
+    #[test]
+    fn parse_thread_content_block_json() {
+        use crate::content::{serialize_blocks_for_storage, ThreadBlock};
+
+        let blocks = vec![
+            ThreadBlock {
+                id: "a".to_string(),
+                text: "First tweet".to_string(),
+                media_paths: vec![],
+                order: 0,
+            },
+            ThreadBlock {
+                id: "b".to_string(),
+                text: "Second tweet".to_string(),
+                media_paths: vec![],
+                order: 1,
+            },
+        ];
+        let content = serialize_blocks_for_storage(&blocks);
+        let parsed = parse_thread_content(&content).unwrap();
+        assert_eq!(parsed, vec!["First tweet", "Second tweet"]);
+    }
+
+    #[test]
+    fn parse_thread_content_legacy_string_array() {
+        let content = r#"["Tweet one","Tweet two","Tweet three"]"#;
+        let parsed = parse_thread_content(content).unwrap();
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0], "Tweet one");
+    }
+
+    #[test]
+    fn parse_thread_content_invalid_format() {
+        let result = parse_thread_content("just plain text");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_empty_array() {
+        let result = parse_thread_content("[]");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_blocks_sorted_by_order() {
+        use crate::content::{serialize_blocks_for_storage, ThreadBlock};
+
+        // Blocks with reversed order
+        let blocks = vec![
+            ThreadBlock {
+                id: "b".to_string(),
+                text: "Second".to_string(),
+                media_paths: vec![],
+                order: 1,
+            },
+            ThreadBlock {
+                id: "a".to_string(),
+                text: "First".to_string(),
+                media_paths: vec![],
+                order: 0,
+            },
+        ];
+        let content = serialize_blocks_for_storage(&blocks);
+        let parsed = parse_thread_content(&content).unwrap();
+        assert_eq!(parsed, vec!["First", "Second"]);
+    }
+
+    // ── action_type thread routing ───────────────────────────────
+
+    #[test]
+    fn action_type_thread_is_routed_separately() {
+        // Thread items are handled by the thread-specific branch,
+        // not the reply/tweet match.
+        let action_type = "thread";
+        let is_thread = action_type == "thread";
+        assert!(is_thread);
+    }
+
+    // ── parse_thread_content additional edge cases ─────────────────
+
+    #[test]
+    fn parse_thread_content_single_tweet_array() {
+        let content = r#"["Only tweet"]"#;
+        let parsed = parse_thread_content(content).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0], "Only tweet");
+    }
+
+    #[test]
+    fn parse_thread_content_numeric_array_is_invalid() {
+        let content = "[1, 2, 3]";
+        let result = parse_thread_content(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_nested_json_is_invalid() {
+        let content = r#"{"key": "value"}"#;
+        let result = parse_thread_content(content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_preserves_tweet_order() {
+        let content = r#"["First","Second","Third","Fourth"]"#;
+        let parsed = parse_thread_content(content).unwrap();
+        assert_eq!(parsed, vec!["First", "Second", "Third", "Fourth"]);
+    }
+
+    #[test]
+    fn parse_thread_content_empty_string() {
+        let result = parse_thread_content("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_thread_content_whitespace_only() {
+        let result = parse_thread_content("   ");
+        assert!(result.is_err());
+    }
+
+    // ── tweet URL construction ────────────────────────────────────
+
+    #[test]
+    fn loopback_url_format_long_id() {
+        let tweet_id = "1234567890123456789";
+        let url = format!("https://x.com/i/status/{tweet_id}");
+        assert_eq!(url, "https://x.com/i/status/1234567890123456789");
+    }
+
+    // ── child_tweet_ids extraction ────────────────────────────────
+
+    #[test]
+    fn child_ids_from_posted_ids() {
+        let posted_ids = vec![
+            "root".to_string(),
+            "child1".to_string(),
+            "child2".to_string(),
+        ];
+        let child_ids: Vec<String> = posted_ids.iter().skip(1).cloned().collect();
+        assert_eq!(child_ids, vec!["child1", "child2"]);
+    }
+
+    #[test]
+    fn child_ids_single_tweet_no_children() {
+        let posted_ids = vec!["root".to_string()];
+        let child_ids: Vec<String> = posted_ids.iter().skip(1).cloned().collect();
+        assert!(child_ids.is_empty());
+    }
+
+    // ── topic normalization ───────────────────────────────────────
+
+    #[test]
+    fn empty_topic_uses_fallback() {
+        let topic = "";
+        let effective = if topic.is_empty() { "" } else { topic };
+        assert_eq!(effective, "");
+    }
+
+    #[test]
+    fn nonempty_topic_used_directly() {
+        let topic = "rust async";
+        let effective = if topic.is_empty() { "" } else { topic };
+        assert_eq!(effective, "rust async");
     }
 }

@@ -74,6 +74,10 @@ fn build_provenance_input_with_node_id() {
         snippet: None,
         edge_type: None,
         edge_label: None,
+        angle_kind: None,
+        signal_kind: None,
+        signal_text: None,
+        source_role: None,
     }];
     let result = build_provenance_input(Some(&refs)).unwrap();
     assert_eq!(result.source_node_id, Some(42));
@@ -92,6 +96,10 @@ fn build_provenance_input_with_seed_id() {
         snippet: None,
         edge_type: None,
         edge_label: None,
+        angle_kind: None,
+        signal_kind: None,
+        signal_text: None,
+        source_role: None,
     }];
     let result = build_provenance_input(Some(&refs)).unwrap();
     assert!(result.source_node_id.is_none());
@@ -110,6 +118,10 @@ fn build_provenance_input_with_multiple_refs_picks_first() {
             snippet: Some("text snippet".to_string()),
             edge_type: None,
             edge_label: None,
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: None,
         },
         ProvenanceRef {
             node_id: Some(2),
@@ -120,6 +132,10 @@ fn build_provenance_input_with_multiple_refs_picks_first() {
             snippet: None,
             edge_type: None,
             edge_label: None,
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: None,
         },
     ];
     let result = build_provenance_input(Some(&refs)).unwrap();

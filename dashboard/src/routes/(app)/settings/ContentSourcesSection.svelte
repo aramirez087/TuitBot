@@ -4,7 +4,8 @@
 	import { buildObsidianVaultUri, openExternalUrl } from '$lib/utils/obsidianUri';
 	import SettingsSection from '$lib/components/settings/SettingsSection.svelte';
 	import DriveConnectCard from '$lib/components/onboarding/DriveConnectCard.svelte';
-	import { draft, updateDraft } from '$lib/stores/settings';
+	import SourceTogglesSection from './SourceTogglesSection.svelte';
+	import { draft, updateDraft, resetAnalyticsSyncPrompt } from '$lib/stores/settings';
 	import { capabilities, deploymentMode, loadCapabilities } from '$lib/stores/runtime';
 	import { loadConnections, expiredGoogleDrive } from '$lib/stores/connectors';
 	import { api } from '$lib/api';
@@ -24,6 +25,7 @@
 	const serviceAccountKey = $derived(currentSource?.service_account_key ?? '');
 	const sourceWatch = $derived(currentSource?.watch ?? true);
 	const sourceLoopBack = $derived(currentSource?.loop_back_enabled ?? true);
+	const sourceAnalyticsSync = $derived(currentSource?.analytics_sync_enabled ?? false);
 	const filePatterns = $derived(currentSource?.file_patterns ?? ['*.md', '*.txt']);
 	const pollInterval = $derived(currentSource?.poll_interval_seconds ?? 300);
 
@@ -70,6 +72,7 @@
 		loadCapabilities();
 		loadConnections();
 		loadHealth();
+		resetAnalyticsSyncPrompt();
 	});
 
 	async function loadHealth() {
@@ -127,6 +130,7 @@
 				watch: current?.watch ?? true,
 				file_patterns: current?.file_patterns ?? ['*.md', '*.txt'],
 				loop_back_enabled: current?.loop_back_enabled ?? true,
+				analytics_sync_enabled: current?.analytics_sync_enabled ?? false,
 				poll_interval_seconds: current?.poll_interval_seconds ?? null,
 				...updates
 			}]
@@ -171,6 +175,7 @@
 
 	function toggleWatch() { updateSource({ watch: !sourceWatch }); }
 	function toggleLoopBack() { updateSource({ loop_back_enabled: !sourceLoopBack }); }
+	function toggleAnalyticsSync() { updateSource({ analytics_sync_enabled: !sourceAnalyticsSync }); }
 	function handleConnected(connId: number, _email: string) { updateSource({ connection_id: connId, service_account_key: null }); }
 	function handleDisconnected() { updateSource({ connection_id: null }); }
 </script>
@@ -302,30 +307,15 @@
 			</div>
 		{/if}
 
-		<div class="field full-width">
-			<div class="toggle-row">
-				<div class="toggle-info">
-					<span class="field-label">{sourceType === 'google_drive' ? 'Poll for Changes' : 'Watch for Changes'}</span>
-					<span class="field-hint">{sourceType === 'google_drive' ? 'Polls your Drive folder at the configured interval for new or modified files' : 'Automatically re-index when local files are added or modified'}</span>
-				</div>
-				<button type="button" class="toggle" class:active={sourceWatch} onclick={toggleWatch} role="switch" aria-checked={sourceWatch} aria-label="Toggle file watching">
-					<span class="toggle-track"><span class="toggle-thumb"></span></span>
-				</button>
-			</div>
-		</div>
-		{#if sourceType === 'local_fs'}
-			<div class="field full-width">
-				<div class="toggle-row">
-					<div class="toggle-info">
-						<span class="field-label">Loop Back</span>
-						<span class="field-hint">Write tweet performance data back into note frontmatter. Currently tracks which notes were used — file write-back coming soon.</span>
-					</div>
-					<button type="button" class="toggle" class:active={sourceLoopBack} onclick={toggleLoopBack} role="switch" aria-checked={sourceLoopBack} aria-label="Toggle loop back">
-						<span class="toggle-track"><span class="toggle-thumb"></span></span>
-					</button>
-				</div>
-			</div>
-		{/if}
+		<SourceTogglesSection
+			{sourceType}
+			{sourceWatch}
+			{sourceLoopBack}
+			{sourceAnalyticsSync}
+			{toggleWatch}
+			{toggleLoopBack}
+			{toggleAnalyticsSync}
+		/>
 		<div class="field full-width">
 			<span class="field-label">File Patterns</span>
 			<div class="patterns">{#each filePatterns as pattern}<span class="pattern-tag">{pattern}</span>{/each}</div>
@@ -358,13 +348,6 @@
 	select.text-input { cursor: pointer; }
 	.browse-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--color-surface-hover); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
 	.browse-btn:hover { background: var(--color-accent); border-color: var(--color-accent); color: white; }
-	.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
-	.toggle-info { display: flex; flex-direction: column; gap: 2px; }
-	.toggle { border: none; background: none; padding: 0; cursor: pointer; }
-	.toggle-track { display: flex; align-items: center; width: 42px; height: 24px; padding: 2px; background: var(--color-border); border-radius: 12px; transition: background 0.2s; }
-	.toggle.active .toggle-track { background: var(--color-accent); }
-	.toggle-thumb { width: 20px; height: 20px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
-	.toggle.active .toggle-thumb { transform: translateX(18px); }
 	.patterns { display: flex; gap: 6px; flex-wrap: wrap; }
 	.pattern-tag { padding: 4px 10px; background: color-mix(in srgb, var(--color-accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--color-accent) 20%, transparent); border-radius: 4px; font-size: 12px; font-family: monospace; color: var(--color-accent); }
 

@@ -418,6 +418,10 @@ async fn insert_draft_with_provenance_creates_links() {
         snippet: Some("Use #[tokio::test]".to_string()),
         edge_type: None,
         edge_label: None,
+        angle_kind: None,
+        signal_kind: None,
+        signal_text: None,
+        source_role: None,
     }];
 
     let id = insert_draft_with_provenance_for(&pool, acct, "tweet", "From vault", "assist", &refs)

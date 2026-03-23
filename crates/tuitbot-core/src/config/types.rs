@@ -535,6 +535,14 @@ pub struct ContentSourceEntry {
     #[serde(default = "default_loop_back")]
     pub loop_back_enabled: bool,
 
+    /// Whether to sync analytics data (impressions, engagement, performance
+    /// score) back into source file frontmatter on a periodic schedule.
+    ///
+    /// Only supported for `local_fs` sources.
+    /// Default: false.
+    #[serde(default)]
+    pub analytics_sync_enabled: bool,
+
     /// Polling interval in seconds for remote sources (default: 300 = 5 min).
     #[serde(default)]
     pub poll_interval_seconds: Option<u64>,
@@ -1057,6 +1065,7 @@ mod tests {
                 change_detection: "auto".into(),
                 file_patterns: vec!["*.md".into()],
                 loop_back_enabled: false,
+                analytics_sync_enabled: false,
                 poll_interval_seconds: None,
             }],
         };
@@ -1131,6 +1140,16 @@ mod tests {
         assert_eq!(entry.change_detection, "auto");
         assert_eq!(entry.file_patterns, vec!["*.md", "*.txt"]);
         assert!(entry.loop_back_enabled);
+        assert!(!entry.analytics_sync_enabled);
+    }
+
+    #[test]
+    fn content_source_entry_analytics_sync_roundtrip() {
+        let mut entry: ContentSourceEntry = serde_json::from_str("{}").unwrap();
+        entry.analytics_sync_enabled = true;
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: ContentSourceEntry = serde_json::from_str(&json).unwrap();
+        assert!(back.analytics_sync_enabled);
     }
 
     // --- DeploymentMode ---

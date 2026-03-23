@@ -3,6 +3,14 @@
 //! When content from a source file is published (e.g. as a tweet),
 //! this module writes the published metadata back into the originating
 //! note's YAML front-matter in an idempotent, parseable format.
+//!
+//! The Forge sync path (`sync` submodule) enriches existing entries
+//! with analytics data without creating new entries.
+
+pub mod sync;
+
+#[cfg(test)]
+mod tests;
 
 use std::io;
 use std::path::Path;
@@ -12,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::storage::DbPool;
 
 /// Metadata about a published piece of content, written back to the source file.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LoopBackEntry {
     pub tweet_id: String,
     pub url: String,
@@ -25,6 +33,25 @@ pub struct LoopBackEntry {
     /// Thread URL when this entry is part of a thread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_url: Option<String>,
+    /// Tweet IDs of child tweets in a thread (excludes the root).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub child_tweet_ids: Option<Vec<String>>,
+
+    // Analytics fields (Forge sync)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub impressions: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub likes: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retweets: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replies: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engagement_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performance_score: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synced_at: Option<String>,
 }
 
 /// Result of an `execute_loopback()` call.
@@ -56,7 +83,6 @@ pub async fn execute_loopback(
 ) -> LoopBackResult {
     use crate::storage::watchtower::{get_content_node, get_source_context};
 
-    // 1. Look up the content node.
     let node = match get_content_node(pool, node_id).await {
         Ok(Some(n)) => n,
         Ok(None) => return LoopBackResult::NodeNotFound,
@@ -66,7 +92,6 @@ pub async fn execute_loopback(
         }
     };
 
-    // 2. Look up the source context.
     let source = match get_source_context(pool, node.source_id).await {
         Ok(Some(s)) => s,
         Ok(None) => return LoopBackResult::SourceNotWritable("source not found".into()),
@@ -76,12 +101,10 @@ pub async fn execute_loopback(
         }
     };
 
-    // 3. Gate on source type.
     if source.source_type != "local_fs" {
         return LoopBackResult::SourceNotWritable(source.source_type);
     }
 
-    // 4. Resolve the base path from config_json.
     let base_path = match serde_json::from_str::<serde_json::Value>(&source.config_json)
         .ok()
         .and_then(|v| v.get("path")?.as_str().map(String::from))
@@ -97,7 +120,6 @@ pub async fn execute_loopback(
         return LoopBackResult::FileNotFound;
     }
 
-    // 5. Build entry and write.
     let entry = LoopBackEntry {
         tweet_id: tweet_id.to_string(),
         url: url.to_string(),
@@ -105,6 +127,14 @@ pub async fn execute_loopback(
         content_type: content_type.to_string(),
         status: Some("posted".to_string()),
         thread_url: None,
+        child_tweet_ids: None,
+        impressions: None,
+        likes: None,
+        retweets: None,
+        replies: None,
+        engagement_rate: None,
+        performance_score: None,
+        synced_at: None,
     };
 
     match write_metadata_to_file(&full_path, &entry) {
@@ -122,13 +152,99 @@ pub async fn execute_loopback(
     }
 }
 
+/// Execute provenance-driven loop-back for a thread.
+///
+/// Like `execute_loopback`, but builds a thread-typed entry with
+/// `child_tweet_ids` and `thread_url` populated.
+pub async fn execute_loopback_thread(
+    pool: &DbPool,
+    node_id: i64,
+    root_tweet_id: &str,
+    url: &str,
+    child_tweet_ids: Vec<String>,
+) -> LoopBackResult {
+    use crate::storage::watchtower::{get_content_node, get_source_context};
+
+    let node = match get_content_node(pool, node_id).await {
+        Ok(Some(n)) => n,
+        Ok(None) => return LoopBackResult::NodeNotFound,
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "Loopback thread: failed to get content node");
+            return LoopBackResult::NodeNotFound;
+        }
+    };
+
+    let source = match get_source_context(pool, node.source_id).await {
+        Ok(Some(s)) => s,
+        Ok(None) => return LoopBackResult::SourceNotWritable("source not found".into()),
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "Loopback thread: failed to get source context");
+            return LoopBackResult::SourceNotWritable("db error".into());
+        }
+    };
+
+    if source.source_type != "local_fs" {
+        return LoopBackResult::SourceNotWritable(source.source_type);
+    }
+
+    let base_path = match serde_json::from_str::<serde_json::Value>(&source.config_json)
+        .ok()
+        .and_then(|v| v.get("path")?.as_str().map(String::from))
+    {
+        Some(p) => p,
+        None => return LoopBackResult::SourceNotWritable("no path in config".into()),
+    };
+
+    let expanded = crate::storage::expand_tilde(&base_path);
+    let full_path = std::path::PathBuf::from(expanded).join(&node.relative_path);
+
+    if !full_path.exists() {
+        return LoopBackResult::FileNotFound;
+    }
+
+    let entry = LoopBackEntry {
+        tweet_id: root_tweet_id.to_string(),
+        url: url.to_string(),
+        published_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        content_type: "thread".to_string(),
+        status: Some("posted".to_string()),
+        thread_url: Some(url.to_string()),
+        child_tweet_ids: if child_tweet_ids.is_empty() {
+            None
+        } else {
+            Some(child_tweet_ids)
+        },
+        impressions: None,
+        likes: None,
+        retweets: None,
+        replies: None,
+        engagement_rate: None,
+        performance_score: None,
+        synced_at: None,
+    };
+
+    match write_metadata_to_file(&full_path, &entry) {
+        Ok(true) => LoopBackResult::Written,
+        Ok(false) => LoopBackResult::AlreadyPresent,
+        Err(e) => {
+            tracing::warn!(
+                node_id,
+                path = %full_path.display(),
+                error = %e,
+                "Loopback thread file write failed"
+            );
+            LoopBackResult::FileNotFound
+        }
+    }
+}
+
 /// Parsed YAML front-matter with a `tuitbot` key.
 #[derive(Debug, Default, Serialize, Deserialize)]
-struct TuitbotFrontMatter {
+pub struct TuitbotFrontMatter {
     #[serde(default)]
-    tuitbot: Vec<LoopBackEntry>,
+    pub tuitbot: Vec<LoopBackEntry>,
     #[serde(flatten)]
-    other: serde_yaml::Mapping,
+    pub other: serde_yaml::Mapping,
 }
 
 /// Split a file's content into optional YAML front-matter and body.
@@ -201,14 +317,20 @@ pub fn write_metadata_to_file(path: &Path, entry: &LoopBackEntry) -> Result<bool
 
     fm.tuitbot.push(entry.clone());
 
-    // Serialize the front-matter.
-    let yaml_out = serde_yaml::to_string(&fm).map_err(io::Error::other)?;
+    serialize_frontmatter_to_file(path, &fm, body)
+}
 
-    // Reconstruct the file: --- + yaml + --- + body.
+/// Serialize `TuitbotFrontMatter` and write it back to a file with the given body.
+pub(crate) fn serialize_frontmatter_to_file(
+    path: &Path,
+    fm: &TuitbotFrontMatter,
+    body: &str,
+) -> Result<bool, io::Error> {
+    let yaml_out = serde_yaml::to_string(fm).map_err(io::Error::other)?;
+
     let mut output = String::with_capacity(yaml_out.len() + body.len() + 10);
     output.push_str("---\n");
     output.push_str(&yaml_out);
-    // serde_yaml already adds trailing newline, but ensure --- is on its own line.
     if !yaml_out.ends_with('\n') {
         output.push('\n');
     }
@@ -217,139 +339,4 @@ pub fn write_metadata_to_file(path: &Path, entry: &LoopBackEntry) -> Result<bool
 
     std::fs::write(path, output)?;
     Ok(true)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    fn sample_entry() -> LoopBackEntry {
-        LoopBackEntry {
-            tweet_id: "1234567890".to_string(),
-            url: "https://x.com/user/status/1234567890".to_string(),
-            published_at: "2026-02-28T14:30:00Z".to_string(),
-            content_type: "tweet".to_string(),
-            status: None,
-            thread_url: None,
-        }
-    }
-
-    #[test]
-    fn split_no_front_matter() {
-        let content = "Just a plain note.\n";
-        let (yaml, body) = split_front_matter(content);
-        assert!(yaml.is_none());
-        assert_eq!(body, content);
-    }
-
-    #[test]
-    fn split_with_front_matter() {
-        let content = "---\ntitle: Hello\n---\nBody text here.\n";
-        let (yaml, body) = split_front_matter(content);
-        assert_eq!(yaml.unwrap(), "title: Hello");
-        assert_eq!(body, "Body text here.\n");
-    }
-
-    #[test]
-    fn split_no_closing_delimiter() {
-        let content = "---\ntitle: Hello\nNo closing.\n";
-        let (yaml, body) = split_front_matter(content);
-        assert!(yaml.is_none());
-        assert_eq!(body, content);
-    }
-
-    #[test]
-    fn parse_tuitbot_entries() {
-        let content = "---\ntuitbot:\n  - tweet_id: \"123\"\n    url: \"https://x.com/u/status/123\"\n    published_at: \"2026-01-01T00:00:00Z\"\n    type: tweet\n---\nBody.\n";
-        let entries = parse_tuitbot_metadata(content);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].tweet_id, "123");
-    }
-
-    #[test]
-    fn parse_no_tuitbot_key() {
-        let content = "---\ntitle: Hello\n---\nBody.\n";
-        let entries = parse_tuitbot_metadata(content);
-        assert!(entries.is_empty());
-    }
-
-    #[test]
-    fn loopback_write_new_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("note.md");
-        fs::write(&path, "This is my note.\n").unwrap();
-
-        let entry = sample_entry();
-        let modified = write_metadata_to_file(&path, &entry).unwrap();
-        assert!(modified);
-
-        let content = fs::read_to_string(&path).unwrap();
-        assert!(content.starts_with("---\n"));
-        assert!(content.contains("tweet_id"));
-        assert!(content.contains("1234567890"));
-        assert!(content.contains("This is my note."));
-    }
-
-    #[test]
-    fn loopback_write_existing_frontmatter() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("note.md");
-        fs::write(&path, "---\ntitle: My Note\n---\nBody here.\n").unwrap();
-
-        let entry = sample_entry();
-        let modified = write_metadata_to_file(&path, &entry).unwrap();
-        assert!(modified);
-
-        let content = fs::read_to_string(&path).unwrap();
-        assert!(content.contains("title"));
-        assert!(content.contains("My Note"));
-        assert!(content.contains("tweet_id"));
-        assert!(content.contains("Body here."));
-    }
-
-    #[test]
-    fn loopback_idempotent() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("note.md");
-        fs::write(&path, "My note.\n").unwrap();
-
-        let entry = sample_entry();
-        let first = write_metadata_to_file(&path, &entry).unwrap();
-        assert!(first);
-
-        let second = write_metadata_to_file(&path, &entry).unwrap();
-        assert!(!second);
-
-        // Verify only one entry exists.
-        let content = fs::read_to_string(&path).unwrap();
-        let entries = parse_tuitbot_metadata(&content);
-        assert_eq!(entries.len(), 1);
-    }
-
-    #[test]
-    fn loopback_multiple_tweets() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("note.md");
-        fs::write(&path, "My note.\n").unwrap();
-
-        let entry_a = sample_entry();
-        write_metadata_to_file(&path, &entry_a).unwrap();
-
-        let entry_b = LoopBackEntry {
-            tweet_id: "9876543210".to_string(),
-            url: "https://x.com/user/status/9876543210".to_string(),
-            published_at: "2026-03-01T10:00:00Z".to_string(),
-            content_type: "thread".to_string(),
-            status: None,
-            thread_url: None,
-        };
-        write_metadata_to_file(&path, &entry_b).unwrap();
-
-        let content = fs::read_to_string(&path).unwrap();
-        let entries = parse_tuitbot_metadata(&content);
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].tweet_id, "1234567890");
-        assert_eq!(entries[1].tweet_id, "9876543210");
-    }
 }

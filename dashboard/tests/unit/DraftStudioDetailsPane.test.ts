@@ -41,6 +41,12 @@ function makeProvenance(overrides: Partial<ProvenanceLink> = {}): ProvenanceLink
 		heading_path: 'Overview > Strategy',
 		source_path: 'notes/ideas.md',
 		snippet: 'Relevant text snippet',
+		edge_type: null,
+		edge_label: null,
+		angle_kind: null,
+		signal_kind: null,
+		signal_text: null,
+		source_role: null,
 		created_at: '2024-01-01T00:00:00Z',
 		...overrides,
 	};

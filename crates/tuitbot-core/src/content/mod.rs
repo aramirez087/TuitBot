@@ -5,11 +5,14 @@
 //! The `frameworks` module provides reply archetypes, tweet formats,
 //! and thread structures that shape LLM prompts for varied output.
 
+pub mod angles;
+pub mod evidence;
 pub mod frameworks;
 pub mod generator;
 pub mod length;
 pub mod thread;
 
+pub use angles::{AngleMiningOutput, AngleType, EvidenceItem, EvidenceType, MinedAngle};
 pub use frameworks::{ReplyArchetype, ThreadStructure, TweetFormat};
 pub use generator::{ContentGenerator, GenerationOutput, ThreadGenerationOutput};
 pub use length::{

@@ -186,6 +186,10 @@ pub fn citations_to_provenance_refs(citations: &[VaultCitation]) -> Vec<Provenan
             snippet: Some(c.snippet.clone()),
             edge_type: c.edge_type.clone(),
             edge_label: c.edge_label.clone(),
+            angle_kind: None,
+            signal_kind: None,
+            signal_text: None,
+            source_role: None,
         })
         .collect()
 }

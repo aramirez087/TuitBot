@@ -370,6 +370,7 @@ impl WatchtowerLoop {
                 "path": path_str,
                 "file_patterns": src.file_patterns,
                 "loop_back_enabled": src.loop_back_enabled,
+                "analytics_sync_enabled": src.analytics_sync_enabled,
             })
             .to_string();
 

@@ -134,6 +134,24 @@ pub async fn insert_original_tweet_with_provenance_for(
     Ok(id)
 }
 
+/// Get original_tweet row ID by tweet_id for a specific account.
+pub async fn get_original_tweet_id_by_tweet_id(
+    pool: &DbPool,
+    account_id: &str,
+    tweet_id: &str,
+) -> Result<Option<i64>, StorageError> {
+    let row: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM original_tweets WHERE account_id = ? AND tweet_id = ? LIMIT 1",
+    )
+    .bind(account_id)
+    .bind(tweet_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(row.map(|r| r.0))
+}
+
 /// Get the timestamp of the most recent successfully posted original tweet for a specific account.
 pub async fn get_last_original_tweet_time_for(
     pool: &DbPool,
@@ -419,6 +437,102 @@ pub async fn get_recent_threads_for(
 /// Get the most recent threads, newest first.
 pub async fn get_recent_threads(pool: &DbPool, limit: u32) -> Result<Vec<Thread>, StorageError> {
     get_recent_threads_for(pool, DEFAULT_ACCOUNT_ID, limit).await
+}
+
+/// Get child tweet IDs for a thread by root tweet ID (excludes root, position > 0).
+///
+/// Used by Forge sync as a fallback when `child_tweet_ids` is not available
+/// in the frontmatter entry.
+pub async fn get_thread_tweet_ids_by_root_for(
+    pool: &DbPool,
+    account_id: &str,
+    root_tweet_id: &str,
+) -> Result<Vec<String>, StorageError> {
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT tt.tweet_id FROM thread_tweets tt \
+         JOIN threads t ON tt.thread_id = t.id \
+         WHERE t.account_id = ? AND t.root_tweet_id = ? AND tt.position > 0 \
+         ORDER BY tt.position ASC",
+    )
+    .bind(account_id)
+    .bind(root_tweet_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|r| if r.0.is_empty() { None } else { Some(r.0) })
+        .collect())
+}
+
+/// Persist thread records atomically: one `threads` row, N `thread_tweets` rows,
+/// and one `original_tweets` row for the root tweet.
+///
+/// Returns `(thread_id, original_tweet_id)` for provenance linking.
+///
+/// `tweet_ids` must have root at index 0 and children at 1..N.
+/// `tweet_contents` must be parallel to `tweet_ids`.
+pub async fn persist_thread_records(
+    pool: &DbPool,
+    account_id: &str,
+    topic: &str,
+    tweet_ids: &[String],
+    tweet_contents: &[String],
+    status: &str,
+) -> Result<(i64, i64), StorageError> {
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let root_tweet_id = tweet_ids.first().map(|s| s.as_str()).unwrap_or("");
+
+    // 1. Insert thread row.
+    let thread = Thread {
+        id: 0,
+        topic: topic.to_string(),
+        tweet_count: tweet_ids.len() as i64,
+        root_tweet_id: Some(root_tweet_id.to_string()),
+        created_at: now.clone(),
+        status: status.to_string(),
+    };
+    let thread_id = insert_thread_for(pool, account_id, &thread).await?;
+
+    // 2. Insert thread_tweets rows.
+    let thread_tweets: Vec<ThreadTweet> = tweet_ids
+        .iter()
+        .zip(tweet_contents.iter())
+        .enumerate()
+        .map(|(i, (tid, content))| ThreadTweet {
+            id: 0,
+            thread_id,
+            position: i as i64,
+            tweet_id: Some(tid.clone()),
+            content: content.clone(),
+            created_at: now.clone(),
+        })
+        .collect();
+    insert_thread_tweets_for(pool, account_id, thread_id, &thread_tweets).await?;
+
+    // 3. Insert original_tweets row for root tweet (analytics compatibility).
+    let ot = OriginalTweet {
+        id: 0,
+        tweet_id: Some(root_tweet_id.to_string()),
+        content: tweet_contents.first().cloned().unwrap_or_default(),
+        topic: if topic.is_empty() {
+            None
+        } else {
+            Some(topic.to_string())
+        },
+        llm_provider: None,
+        created_at: now,
+        status: if status == "partial" {
+            "sent".to_string()
+        } else {
+            status.to_string()
+        },
+        error_message: None,
+    };
+    let ot_id = insert_original_tweet_for(pool, account_id, &ot).await?;
+
+    Ok((thread_id, ot_id))
 }
 
 #[cfg(test)]
@@ -729,5 +843,170 @@ mod tests {
             .await
             .expect("range");
         assert_eq!(all.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn get_thread_tweet_ids_by_root_excludes_root() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = DEFAULT_ACCOUNT_ID;
+
+        let thread = sample_thread(); // root_tweet_id = "root_456"
+        let thread_id = insert_thread_for(&pool, account_id, &thread)
+            .await
+            .expect("insert thread");
+
+        // Position 0 = root, positions 1-2 = children
+        let tweets = vec![
+            ThreadTweet {
+                id: 0,
+                thread_id,
+                position: 0,
+                tweet_id: Some("root_456".to_string()),
+                content: "Root tweet".to_string(),
+                created_at: now_iso(),
+            },
+            ThreadTweet {
+                id: 0,
+                thread_id,
+                position: 1,
+                tweet_id: Some("child_1".to_string()),
+                content: "Child 1".to_string(),
+                created_at: now_iso(),
+            },
+            ThreadTweet {
+                id: 0,
+                thread_id,
+                position: 2,
+                tweet_id: Some("child_2".to_string()),
+                content: "Child 2".to_string(),
+                created_at: now_iso(),
+            },
+        ];
+        insert_thread_tweets_for(&pool, account_id, thread_id, &tweets)
+            .await
+            .expect("insert tweets");
+
+        let child_ids = get_thread_tweet_ids_by_root_for(&pool, account_id, "root_456")
+            .await
+            .expect("query");
+
+        assert_eq!(child_ids.len(), 2);
+        assert_eq!(child_ids[0], "child_1");
+        assert_eq!(child_ids[1], "child_2");
+    }
+
+    #[tokio::test]
+    async fn get_thread_tweet_ids_by_root_empty_when_no_children() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = DEFAULT_ACCOUNT_ID;
+
+        let ids = get_thread_tweet_ids_by_root_for(&pool, account_id, "nonexistent_root")
+            .await
+            .expect("query");
+        assert!(ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn persist_thread_records_creates_all_rows() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = DEFAULT_ACCOUNT_ID;
+
+        let tweet_ids = vec![
+            "root_t1".to_string(),
+            "child_t2".to_string(),
+            "child_t3".to_string(),
+        ];
+        let tweet_contents = vec![
+            "Root content".to_string(),
+            "Child 2 content".to_string(),
+            "Child 3 content".to_string(),
+        ];
+
+        let (thread_id, ot_id) = persist_thread_records(
+            &pool,
+            account_id,
+            "test topic",
+            &tweet_ids,
+            &tweet_contents,
+            "sent",
+        )
+        .await
+        .expect("persist");
+
+        assert!(thread_id > 0);
+        assert!(ot_id > 0);
+
+        // Verify thread row
+        let threads: Vec<(String, i64)> =
+            sqlx::query_as("SELECT root_tweet_id, tweet_count FROM threads WHERE id = ?")
+                .bind(thread_id)
+                .fetch_all(&pool)
+                .await
+                .expect("query threads");
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].0, "root_t1");
+        assert_eq!(threads[0].1, 3);
+
+        // Verify thread_tweets rows
+        let tt_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM thread_tweets WHERE thread_id = ?")
+                .bind(thread_id)
+                .fetch_one(&pool)
+                .await
+                .expect("count");
+        assert_eq!(tt_count.0, 3);
+
+        // Verify original_tweets row for root
+        let ot: Vec<(Option<String>,)> =
+            sqlx::query_as("SELECT tweet_id FROM original_tweets WHERE id = ?")
+                .bind(ot_id)
+                .fetch_all(&pool)
+                .await
+                .expect("query ot");
+        assert_eq!(ot.len(), 1);
+        assert_eq!(ot[0].0.as_deref(), Some("root_t1"));
+
+        // Verify child IDs via the query helper
+        let children = get_thread_tweet_ids_by_root_for(&pool, account_id, "root_t1")
+            .await
+            .expect("children");
+        assert_eq!(children, vec!["child_t2", "child_t3"]);
+    }
+
+    #[tokio::test]
+    async fn persist_thread_records_partial_status() {
+        let pool = init_test_db().await.expect("init db");
+        let account_id = DEFAULT_ACCOUNT_ID;
+
+        // Simulate a 4-tweet thread where only 2 posted
+        let tweet_ids = vec!["partial_root".to_string(), "partial_child".to_string()];
+        let tweet_contents = vec!["Root".to_string(), "Child".to_string()];
+
+        let (thread_id, _ot_id) = persist_thread_records(
+            &pool,
+            account_id,
+            "partial topic",
+            &tweet_ids,
+            &tweet_contents,
+            "partial",
+        )
+        .await
+        .expect("persist partial");
+
+        let status: (String,) = sqlx::query_as("SELECT status FROM threads WHERE id = ?")
+            .bind(thread_id)
+            .fetch_one(&pool)
+            .await
+            .expect("query");
+        assert_eq!(status.0, "partial");
+
+        // OT status should be "sent" even for partial threads (root was posted)
+        let ot_status: (String,) =
+            sqlx::query_as("SELECT status FROM original_tweets WHERE tweet_id = ?")
+                .bind("partial_root")
+                .fetch_one(&pool)
+                .await
+                .expect("query ot");
+        assert_eq!(ot_status.0, "sent");
     }
 }
