@@ -205,13 +205,21 @@ mod tests {
 
         // First reset clears migration-seeded rows.
         let stats1 = factory_reset(&pool).await.expect("first reset");
+<<<<<<< HEAD
         assert_eq!(stats1.tables_cleared, 44);
+=======
+        assert_eq!(stats1.tables_cleared, 41);
+>>>>>>> 1e16142a (feat: Session 2 — indexer and storage foundation)
         // Migration seeds 1 account + 2 account_roles = 3 rows.
         assert_eq!(stats1.rows_deleted, 3);
 
         // Second reset on now-empty DB succeeds with 0 rows.
         let stats2 = factory_reset(&pool).await.expect("second reset");
+<<<<<<< HEAD
         assert_eq!(stats2.tables_cleared, 44);
+=======
+        assert_eq!(stats2.tables_cleared, 41);
+>>>>>>> 1e16142a (feat: Session 2 — indexer and storage foundation)
         assert_eq!(stats2.rows_deleted, 0);
     }
 
