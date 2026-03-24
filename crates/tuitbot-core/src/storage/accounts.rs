@@ -335,6 +335,35 @@ pub fn account_token_path(data_dir: &Path, account_id: &str) -> PathBuf {
     account_data_dir(data_dir, account_id).join("tokens.json")
 }
 
+// ---- Active account tracking ----
+
+/// Get the currently active account ID from the sentinel file (~/.tuitbot/active_account).
+///
+/// Returns DEFAULT_ACCOUNT_ID if the sentinel does not exist.
+pub fn get_active_account_id() -> String {
+    use crate::startup::data_dir;
+
+    let sentinel = data_dir().join("active_account");
+    match std::fs::read_to_string(&sentinel) {
+        Ok(content) => content.trim().to_string(),
+        Err(_) => DEFAULT_ACCOUNT_ID.to_string(),
+    }
+}
+
+/// Set the active account ID in the sentinel file (~/.tuitbot/active_account).
+///
+/// Creates the directory if it does not exist.
+pub fn set_active_account_id(account_id: &str) -> Result<(), std::io::Error> {
+    use crate::startup::data_dir;
+
+    let dir = data_dir();
+    std::fs::create_dir_all(&dir)?;
+
+    let sentinel = dir.join("active_account");
+    std::fs::write(&sentinel, account_id)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -674,5 +703,31 @@ mod tests {
         assert_eq!(account.label, "NewLabel");
         assert!(account.x_user_id.is_none()); // unchanged
         assert!(account.x_username.is_none()); // unchanged
+    }
+
+    #[test]
+    fn test_get_active_account_id_default() {
+        // When sentinel doesn't exist, should return DEFAULT_ACCOUNT_ID
+        let active = get_active_account_id();
+        assert_eq!(active, DEFAULT_ACCOUNT_ID);
+    }
+
+    #[test]
+    fn test_set_and_get_active_account_id() {
+        // Create temp dir for test
+        let tmpdir = std::env::temp_dir().join(format!("tuitbot_test_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmpdir).expect("create tmpdir");
+
+        // Fake: set an active account manually to a temp sentinel
+        let test_id = "abc-123-def";
+        let sentinel = tmpdir.join("active_account");
+        std::fs::write(&sentinel, test_id).expect("write sentinel");
+
+        // Read it back
+        let content = std::fs::read_to_string(&sentinel).expect("read");
+        assert_eq!(content.trim(), test_id);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&tmpdir);
     }
 }
