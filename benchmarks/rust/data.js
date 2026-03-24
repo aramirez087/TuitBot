@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774316901923,
+  "lastUpdate": 1774344682076,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2373,6 +2373,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.1,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3466e3b7411496750e1aa7a5aeddc4743fdab007",
+          "message": "feat: wire up semantic search in server and desktop app (#296)",
+          "timestamp": "2026-03-24T03:25:42-06:00",
+          "tree_id": "85c6dc02dbc7ed66f2b8b8670690d6cc5e90bbad",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3466e3b7411496750e1aa7a5aeddc4743fdab007"
+        },
+        "date": 1774344681002,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 938.45,
             "unit": "ps"
           }
         ]
