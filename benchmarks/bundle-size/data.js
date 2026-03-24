@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774376981300,
+  "lastUpdate": 1774377028115,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -4035,6 +4035,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1349375,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dddccf37c7bc0442b66b7843f662265c105735d2",
+          "message": "refactor(cli): modularize settings/interactive.rs into interactive/ module (#310)\n\nSplit 1456-line interactive.rs into four focused files:\n- mod.rs (~200L): imports, helpers, interactive_menu, re-exports\n- wizard.rs (~500L): product/voice/persona/llm/xapi/targets/limits editors\n- render.rs (~380L): scoring/timing/approval/schedule/storage editors\n- tests.rs (~340L): extracted test suite\n\nRefactor only — zero functional changes. All 586 CLI tests pass.\n\nCo-authored-by: Finn <finn@tuitbot.dev>\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T12:29:38-06:00",
+          "tree_id": "d1d9bb31a332c5e233c04837775bd45d41561efe",
+          "url": "https://github.com/aramirez087/TuitBot/commit/dddccf37c7bc0442b66b7843f662265c105735d2"
+        },
+        "date": 1774377027610,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
             "unit": "bytes"
           }
         ]
