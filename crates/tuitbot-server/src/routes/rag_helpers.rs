@@ -26,7 +26,10 @@ pub(crate) async fn resolve_composer_rag_context(
     };
 
     let keywords = config.business.draft_context_keywords();
-    if keywords.is_empty() {
+    // When the user explicitly selected vault notes, always proceed even
+    // without business keywords — the selected node IDs drive retrieval.
+    let has_selection = selected_node_ids.is_some_and(|ids| !ids.is_empty());
+    if keywords.is_empty() && !has_selection {
         return None;
     }
 

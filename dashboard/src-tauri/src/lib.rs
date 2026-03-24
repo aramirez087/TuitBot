@@ -6,6 +6,8 @@ use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tokio::sync::Mutex;
 use tuitbot_core::auth::passphrase;
 use tuitbot_core::config::{ContentSourcesConfig, DeploymentMode};
+use tuitbot_core::context::semantic_index::SemanticIndex;
+use tuitbot_core::llm::embedding_factory::create_embedding_provider;
 use tuitbot_core::startup::data_dir;
 use tuitbot_core::storage;
 use tuitbot_server::auth;
@@ -198,6 +200,43 @@ pub fn run() {
 
                 let passphrase_mtime = passphrase::passphrase_hash_mtime(&dir);
 
+                // Initialise semantic search from embedding config (if present and enabled).
+                let (embedding_provider, semantic_index) = match loaded_config
+                    .as_ref()
+                    .ok()
+                    .and_then(|c| c.embedding.as_ref())
+                    .filter(|cfg| cfg.enabled)
+                {
+                    Some(embedding_cfg) => match create_embedding_provider(embedding_cfg) {
+                        Ok(provider) => {
+                            let provider: Arc<
+                                dyn tuitbot_core::llm::embedding::EmbeddingProvider,
+                            > = Arc::from(provider);
+                            let index = SemanticIndex::new(
+                                provider.dimension(),
+                                provider.model_id().to_string(),
+                                50_000,
+                            );
+                            log::info!(
+                                "Semantic search enabled (provider={}, model={})",
+                                provider.name(),
+                                provider.model_id()
+                            );
+                            (
+                                Some(provider),
+                                Some(Arc::new(tokio::sync::RwLock::new(index))),
+                            )
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                "Embedding provider not available, semantic search disabled: {e}"
+                            );
+                            (None, None)
+                        }
+                    },
+                    None => (None, None),
+                };
+
                 Arc::new(AppState {
                     db: pool,
                     config_path,
@@ -220,6 +259,8 @@ pub fn run() {
                     token_managers: Mutex::new(HashMap::new()),
                     x_client_id,
                     scraper_health: None,
+                    embedding_provider,
+                    semantic_index,
                 })
             });
 

@@ -13,6 +13,8 @@ use tracing_subscriber::EnvFilter;
 use tuitbot_core::auth::passphrase;
 use tuitbot_core::config::Config;
 use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::context::semantic_index::SemanticIndex;
+use tuitbot_core::llm::embedding_factory::create_embedding_provider;
 use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::storage;
 use tuitbot_core::storage::accounts::DEFAULT_ACCOUNT_ID;
@@ -222,6 +224,40 @@ async fn main() -> Result<()> {
         }
     };
 
+    // Initialise semantic search from embedding config (if present and enabled).
+    let (embedding_provider, semantic_index) = match loaded_config
+        .as_ref()
+        .and_then(|c| c.embedding.as_ref())
+        .filter(|cfg| cfg.enabled)
+    {
+        Some(embedding_cfg) => match create_embedding_provider(embedding_cfg) {
+            Ok(provider) => {
+                let provider: Arc<dyn tuitbot_core::llm::embedding::EmbeddingProvider> =
+                    Arc::from(provider);
+                let index = SemanticIndex::new(
+                    provider.dimension(),
+                    provider.model_id().to_string(),
+                    50_000,
+                );
+                tracing::info!(
+                    provider = provider.name(),
+                    model = provider.model_id(),
+                    dimension = provider.dimension(),
+                    "Semantic search enabled"
+                );
+                (
+                    Some(provider),
+                    Some(Arc::new(tokio::sync::RwLock::new(index))),
+                )
+            }
+            Err(e) => {
+                tracing::warn!("Embedding provider not available, semantic search disabled: {e}");
+                (None, None)
+            }
+        },
+        None => (None, None),
+    };
+
     let state = Arc::new(AppState {
         db: pool,
         config_path,
@@ -254,8 +290,8 @@ async fn main() -> Result<()> {
             .as_ref()
             .map(|c| c.x_api.client_id.clone())
             .unwrap_or_default(),
-        semantic_index: None,
-        embedding_provider: None,
+        semantic_index,
+        embedding_provider,
     });
 
     let router = tuitbot_server::build_router(state.clone());
