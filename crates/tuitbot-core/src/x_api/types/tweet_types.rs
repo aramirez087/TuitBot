@@ -1,7 +1,6 @@
 //! Tweet and search types for X API v2.
 
 use serde::{Deserialize, Serialize};
-use super::user_types::UserMetrics;
 
 /// A tweet returned by the X API v2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
