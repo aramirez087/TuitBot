@@ -41,7 +41,7 @@ export function addBlockAfter(
 }
 
 export function removeBlock(blocks: ThreadBlock[], id: string): ThreadBlock[] | null {
-	if (blocks.length <= 1) return null;
+	if (!blocks.some((b) => b.id === id)) return null;
 	const sorted = blocks.filter((b) => b.id !== id).sort((a, b) => a.order - b.order);
 	return normalizeOrder(sorted);
 }

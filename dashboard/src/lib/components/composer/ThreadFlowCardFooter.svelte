@@ -84,7 +84,7 @@
 			>
 				<GripVertical size={13} />
 			</div>
-			{#if total > 2}
+			{#if total > 1 && !isLast}
 				<button
 					class="footer-action-btn"
 					onclick={onMerge}
@@ -93,15 +93,15 @@
 				>
 					<Merge size={13} />
 				</button>
-				<button
-					class="footer-action-btn footer-remove"
-					onclick={onRemove}
-					title="Remove post"
-					aria-label={`Remove post ${index + 1}`}
-				>
-					<Trash2 size={13} />
-				</button>
 			{/if}
+			<button
+				class="footer-action-btn footer-remove"
+				onclick={onRemove}
+				title="Remove post"
+				aria-label={`Remove post ${index + 1}`}
+			>
+				<Trash2 size={13} />
+			</button>
 		</div>
 	</div>
 </div>
