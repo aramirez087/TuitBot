@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774348153221,
+  "lastUpdate": 1774355070256,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3373,6 +3373,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/d83090dbcee47863b86472a698683f11a4b9aa92"
         },
         "date": 1774348152384,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "609f4d925d4332f2d45effc93cf498a577b03a98",
+          "message": "refactor(core): C6 — split config/types.rs (1505L) into module directory (#297)\n\n* WIP: C6 partial split — types/ dir created, core/policy/llm split started\n\n* refactor(core): C6 — split config/types.rs (1505L) into module directory\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T06:23:41-06:00",
+          "tree_id": "0fc0bfd5912396429ba7fd21eecb2d8f7fcfe0d9",
+          "url": "https://github.com/aramirez087/TuitBot/commit/609f4d925d4332f2d45effc93cf498a577b03a98"
+        },
+        "date": 1774355068796,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
