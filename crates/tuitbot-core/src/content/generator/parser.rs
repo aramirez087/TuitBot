@@ -225,3 +225,197 @@ fn strip_quotes(text: &str) -> String {
         t.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── parse_thread: --- delimiter ──────────────────────────────
+
+    #[test]
+    fn parse_thread_basic_delimiter() {
+        let input = "First tweet\n---\nSecond tweet\n---\nThird tweet";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 3);
+        assert_eq!(tweets[0], "First tweet");
+        assert_eq!(tweets[1], "Second tweet");
+        assert_eq!(tweets[2], "Third tweet");
+    }
+
+    #[test]
+    fn parse_thread_trims_whitespace() {
+        let input = "  First tweet  \n---\n  Second tweet  ";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 2);
+        assert_eq!(tweets[0], "First tweet");
+        assert_eq!(tweets[1], "Second tweet");
+    }
+
+    #[test]
+    fn parse_thread_skips_empty_segments() {
+        let input = "First tweet\n---\n\n---\nThird tweet";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 2);
+    }
+
+    #[test]
+    fn parse_thread_single_no_delimiter() {
+        let input = "Just a single tweet, no delimiter here.";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 1);
+        assert_eq!(tweets[0], "Just a single tweet, no delimiter here.");
+    }
+
+    #[test]
+    fn parse_thread_empty_input() {
+        assert!(parse_thread("").is_empty());
+    }
+
+    #[test]
+    fn parse_thread_whitespace_only() {
+        assert!(parse_thread("   \n  \n   ").is_empty());
+    }
+
+    #[test]
+    fn parse_thread_multiline_with_delimiter() {
+        let input = "First tweet\nwith two lines\n---\nSecond tweet\nalso two lines";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 2);
+        assert!(tweets[0].contains("First tweet"));
+        assert!(tweets[1].contains("Second tweet"));
+    }
+
+    #[test]
+    fn parse_thread_special_chars() {
+        let input = "Tweet with @mentions and #hashtags\n---\nTweet with https://example.com";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 2);
+        assert!(tweets[0].contains("@mentions"));
+        assert!(tweets[1].contains("https://"));
+    }
+
+    #[test]
+    fn parse_thread_unicode() {
+        let input = "Tweet with émojis 🚀🔥\n---\nTweet with ñ and ü";
+        let tweets = parse_thread(input);
+        assert_eq!(tweets.len(), 2);
+        assert!(tweets[0].contains("🚀"));
+    }
+
+    #[test]
+    fn parse_thread_numbered_dot() {
+        let input = "1. First tweet\n2. Second tweet\n3. Third tweet";
+        let tweets = parse_thread(input);
+        assert!(tweets.len() >= 2);
+    }
+
+    // ── parse_hooks_response: strict ────────────────────────────
+
+    #[test]
+    fn parse_hooks_strict_basic() {
+        let input = "STYLE: Question\nHOOK: What if you could 10x?\n---\nSTYLE: Bold\nHOOK: Most devs are wrong.";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+        assert_eq!(hooks[0].0, "Question");
+        assert_eq!(hooks[0].1, "What if you could 10x?");
+        assert_eq!(hooks[1].0, "Bold");
+    }
+
+    #[test]
+    fn parse_hooks_missing_style() {
+        let input = "HOOK: A hook without style\n---\nSTYLE: Question\nHOOK: Why not?";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+        assert_eq!(hooks[0].0, "general");
+        assert_eq!(hooks[1].0, "Question");
+    }
+
+    #[test]
+    fn parse_hooks_case_insensitive() {
+        let input = "style: lowercase\nhook: This is a test hook.";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 1);
+        assert_eq!(hooks[0].0, "lowercase");
+    }
+
+    #[test]
+    fn parse_hooks_strips_quotes() {
+        let input = "STYLE: Q\nHOOK: \"What if testing was fun?\"";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks[0].1, "What if testing was fun?");
+    }
+
+    #[test]
+    fn parse_hooks_empty() {
+        assert!(parse_hooks_response("").is_empty());
+    }
+
+    #[test]
+    fn parse_hooks_markdown_bold() {
+        let input = "**STYLE:** Bold\n**HOOK:** A bold format hook\n---\n**STYLE:** Q\n**HOOK:** Another hook?";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+    }
+
+    #[test]
+    fn parse_hooks_numbered() {
+        let input = "1. STYLE: First\n1. HOOK: First hook text here\n---\n2. STYLE: Second\n2. HOOK: Second hook text here";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+    }
+
+    #[test]
+    fn parse_hooks_single_no_separator() {
+        let input = "STYLE: Story\nHOOK: I spent 3 years building the wrong thing.";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 1);
+        assert_eq!(hooks[0].0, "Story");
+    }
+
+    // ── parse_hooks_response: fallback ──────────────────────────
+
+    #[test]
+    fn parse_hooks_fallback_blocks() {
+        let input =
+            "A great opening hook that grabs attention\n---\nAnother compelling hook text here";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+    }
+
+    #[test]
+    fn parse_hooks_fallback_filters_short() {
+        let input =
+            "Short\nA longer hook that should be captured here\nAnother real hook text long enough";
+        let hooks = parse_hooks_response(input);
+        for (_, hook) in &hooks {
+            assert!(hook.len() > 10, "Short lines should be filtered: {hook}");
+        }
+    }
+
+    #[test]
+    fn parse_hooks_no_keywords_plain_blocks() {
+        let input = "Plain text block that could be a hook\n---\nAnother plain block of text";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+    }
+
+    // ── strip_line_noise (exercised via parse_hooks) ────────────
+
+    #[test]
+    fn parse_hooks_strips_bullet_prefix() {
+        let input = "- STYLE: Bullet\n- HOOK: A hook with bullet prefix here";
+        let hooks = parse_hooks_response(input);
+        assert!(!hooks.is_empty());
+    }
+
+    // ── extract_inline_style (exercised via fallback) ───────────
+
+    #[test]
+    fn parse_hooks_bracket_style_extraction() {
+        let input = "[Question] What if you could double test coverage?\n---\n[Bold] Most teams ship broken code daily";
+        let hooks = parse_hooks_response(input);
+        assert_eq!(hooks.len(), 2);
+        assert_eq!(hooks[0].0, "Question");
+        assert_eq!(hooks[1].0, "Bold");
+    }
+}
