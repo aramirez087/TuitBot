@@ -54,6 +54,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             get(routes::analytics::follower_growth),
         )
         .route("/analytics/best-times", get(routes::analytics::best_times))
+        .route("/analytics/heatmap", get(routes::analytics::heatmap))
+        .route(
+            "/analytics/content-breakdown",
+            get(routes::analytics::content_breakdown),
+        )
         // Approval
         .route("/approval/export", get(routes::approval::export_items))
         .route("/approval", get(routes::approval::list_items))

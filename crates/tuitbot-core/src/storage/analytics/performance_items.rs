@@ -87,6 +87,65 @@ pub async fn get_recent_performance_items(
     get_recent_performance_items_for(pool, DEFAULT_ACCOUNT_ID, limit).await
 }
 
+/// Aggregated content breakdown by type (reply, tweet, thread).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ContentBreakdown {
+    /// "reply", "tweet", or "thread"
+    pub content_type: String,
+    /// Total number of posts of this type.
+    pub count: i64,
+    /// Average performance score for this type.
+    pub avg_performance: f64,
+    /// Total impressions for this type.
+    pub total_impressions: i64,
+}
+
+/// Get content breakdown by type for a specific account.
+pub async fn get_content_breakdown_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<Vec<ContentBreakdown>, StorageError> {
+    let rows: Vec<(String, i64, f64, i64)> = sqlx::query_as(
+        "SELECT 'reply' as content_type, \
+                COUNT(*) as count, \
+                COALESCE(AVG(performance_score), 0.0) as avg_performance, \
+                COALESCE(SUM(impressions), 0) as total_impressions \
+         FROM reply_performance \
+         WHERE account_id = ? \
+         UNION ALL \
+         SELECT 'tweet' as content_type, \
+                COUNT(*) as count, \
+                COALESCE(AVG(performance_score), 0.0) as avg_performance, \
+                COALESCE(SUM(impressions), 0) as total_impressions \
+         FROM tweet_performance \
+         WHERE account_id = ? \
+         ORDER BY count DESC",
+    )
+    .bind(account_id)
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    Ok(rows
+        .into_iter()
+        .filter(|(_, count, _, _)| *count > 0)
+        .map(
+            |(content_type, count, avg_performance, total_impressions)| ContentBreakdown {
+                content_type,
+                count,
+                avg_performance,
+                total_impressions,
+            },
+        )
+        .collect())
+}
+
+/// Get content breakdown by type (default account).
+pub async fn get_content_breakdown(pool: &DbPool) -> Result<Vec<ContentBreakdown>, StorageError> {
+    get_content_breakdown_for(pool, DEFAULT_ACCOUNT_ID).await
+}
+
 /// Hourly posting performance data.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct HourlyPerformance {

@@ -962,3 +962,156 @@ async fn get_all_tweet_performances_for_account() {
         .iter()
         .all(|r| r.tweet_id != "all-1" && r.tweet_id != "all-2"));
 }
+
+// ============================================================================
+// Heatmap + content breakdown + aggregation tests
+// ============================================================================
+
+#[tokio::test]
+async fn heatmap_empty() {
+    let pool = init_test_db().await.expect("init db");
+    let grid = get_heatmap(&pool).await.expect("get");
+    // Full 7×24 grid even when empty
+    assert_eq!(grid.len(), 168);
+    assert!(grid.iter().all(|c| c.avg_engagement == 0.0));
+    assert!(grid.iter().all(|c| c.sample_size == 0));
+}
+
+#[tokio::test]
+async fn heatmap_after_aggregation() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = DEFAULT_ACCOUNT_ID;
+
+    // Insert engagement metrics with known posted_at times
+    // Sunday 10:00 UTC
+    let input = crate::storage::analytics::UpsertEngagementInput {
+        post_id: "hm-1",
+        impressions: 100,
+        likes: 10,
+        retweets: 5,
+        replies: 2,
+        bookmarks: 1,
+        posted_at: Some("2026-03-22T10:00:00Z"), // Sunday
+    };
+    upsert_engagement_metric_for(&pool, acct, input)
+        .await
+        .expect("upsert");
+
+    // Run aggregation to populate best_times
+    aggregate_best_times_for(&pool, acct).await.expect("agg");
+
+    let grid = get_heatmap(&pool).await.expect("get");
+    assert_eq!(grid.len(), 168);
+
+    // At least one cell should have data
+    assert!(grid.iter().any(|c| c.avg_engagement > 0.0));
+}
+
+#[tokio::test]
+async fn content_breakdown_empty() {
+    let pool = init_test_db().await.expect("init db");
+    let breakdown = get_content_breakdown(&pool).await.expect("get");
+    // No data → empty (zero-count rows are filtered)
+    assert!(breakdown.is_empty());
+}
+
+#[tokio::test]
+async fn content_breakdown_with_data() {
+    let pool = init_test_db().await.expect("init db");
+
+    // Insert reply + tweet performance
+    upsert_reply_performance(&pool, "cb-r1", 10, 5, 1000, 67.0)
+        .await
+        .expect("upsert");
+    upsert_reply_performance(&pool, "cb-r2", 20, 10, 2000, 80.0)
+        .await
+        .expect("upsert");
+    upsert_tweet_performance(&pool, "cb-tw1", 30, 15, 8, 3000, 90.0)
+        .await
+        .expect("upsert");
+
+    let breakdown = get_content_breakdown(&pool).await.expect("get");
+    assert_eq!(breakdown.len(), 2);
+
+    let reply_row = breakdown
+        .iter()
+        .find(|b| b.content_type == "reply")
+        .unwrap();
+    assert_eq!(reply_row.count, 2);
+    assert!(reply_row.avg_performance > 0.0);
+
+    let tweet_row = breakdown
+        .iter()
+        .find(|b| b.content_type == "tweet")
+        .unwrap();
+    assert_eq!(tweet_row.count, 1);
+    assert!(tweet_row.avg_performance > 0.0);
+}
+
+#[tokio::test]
+async fn aggregate_best_times_populates_table() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = DEFAULT_ACCOUNT_ID;
+
+    // Insert two engagement metrics at different times
+    let input1 = crate::storage::analytics::UpsertEngagementInput {
+        post_id: "abt-1",
+        impressions: 200,
+        likes: 20,
+        retweets: 10,
+        replies: 5,
+        bookmarks: 2,
+        posted_at: Some("2026-03-20T09:00:00Z"),
+    };
+    upsert_engagement_metric_for(&pool, acct, input1)
+        .await
+        .expect("upsert");
+
+    let input2 = crate::storage::analytics::UpsertEngagementInput {
+        post_id: "abt-2",
+        impressions: 300,
+        likes: 30,
+        retweets: 15,
+        replies: 8,
+        bookmarks: 3,
+        posted_at: Some("2026-03-20T15:00:00Z"),
+    };
+    upsert_engagement_metric_for(&pool, acct, input2)
+        .await
+        .expect("upsert");
+
+    aggregate_best_times_for(&pool, acct).await.expect("agg");
+
+    let slots = get_best_times(&pool).await.expect("get");
+    assert_eq!(slots.len(), 2);
+    // Both should have confidence based on sample_size = 1
+    assert!(slots.iter().all(|s| s.sample_size == 1));
+}
+
+#[tokio::test]
+async fn aggregate_reach_creates_snapshot() {
+    let pool = init_test_db().await.expect("init db");
+    let acct = DEFAULT_ACCOUNT_ID;
+
+    // Insert engagement metric for today
+    let today = chrono::Utc::now().format("%Y-%m-%dT12:00:00Z").to_string();
+    let input = crate::storage::analytics::UpsertEngagementInput {
+        post_id: "reach-1",
+        impressions: 500,
+        likes: 50,
+        retweets: 25,
+        replies: 10,
+        bookmarks: 5,
+        posted_at: Some(&today),
+    };
+    upsert_engagement_metric_for(&pool, acct, input)
+        .await
+        .expect("upsert");
+
+    aggregate_reach_for(&pool, acct).await.expect("agg");
+
+    let reach = get_reach(&pool, 7).await.expect("get");
+    assert!(!reach.is_empty());
+    assert_eq!(reach[0].total_reach, 500);
+    assert_eq!(reach[0].post_count, 1);
+}

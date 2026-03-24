@@ -21,6 +21,13 @@ pub struct GetFollowerTrendRequest {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetAnalyticsSummaryRequest {
+    /// Placeholder (no parameters needed)
+    #[serde(default)]
+    pub _unused: Option<()>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct GetActionLogRequest {
     /// Hours to look back (default: 24)
     pub since_hours: Option<u32>,

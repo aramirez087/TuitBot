@@ -181,6 +181,58 @@ pub async fn get_follower_growth(
     get_follower_growth_for(pool, DEFAULT_ACCOUNT_ID, days).await
 }
 
+/// A single cell in the 7×24 best-time heatmap.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeatmapCell {
+    pub day_of_week: i32,
+    pub hour: i32,
+    pub avg_engagement: f64,
+    pub sample_size: i64,
+}
+
+/// Get a 7×24 heatmap grid of average engagement by (day_of_week, hour) for a
+/// specific account. Cells with no data default to 0.
+pub async fn get_heatmap_for(
+    pool: &DbPool,
+    account_id: &str,
+) -> Result<Vec<HeatmapCell>, StorageError> {
+    let rows = sqlx::query_as::<_, (i32, i32, f64, i64)>(
+        "SELECT day_of_week, hour_of_day, avg_engagement, sample_size \
+         FROM best_times \
+         WHERE account_id = ? \
+         ORDER BY day_of_week ASC, hour_of_day ASC",
+    )
+    .bind(account_id)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| StorageError::Query { source: e })?;
+
+    // Build a full 7×24 grid, filling gaps with zero
+    let mut grid: Vec<HeatmapCell> = Vec::with_capacity(7 * 24);
+    let mut lookup = std::collections::HashMap::new();
+    for (day, hour, avg, size) in &rows {
+        lookup.insert((*day, *hour), (*avg, *size));
+    }
+    for day in 0..7 {
+        for hour in 0..24 {
+            let (avg_engagement, sample_size) =
+                lookup.get(&(day, hour)).copied().unwrap_or((0.0, 0));
+            grid.push(HeatmapCell {
+                day_of_week: day,
+                hour,
+                avg_engagement,
+                sample_size,
+            });
+        }
+    }
+    Ok(grid)
+}
+
+/// Get heatmap grid (default account).
+pub async fn get_heatmap(pool: &DbPool) -> Result<Vec<HeatmapCell>, StorageError> {
+    get_heatmap_for(pool, DEFAULT_ACCOUNT_ID).await
+}
+
 #[cfg(test)]
 mod tests {
 

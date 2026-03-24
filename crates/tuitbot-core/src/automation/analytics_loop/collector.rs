@@ -82,6 +82,14 @@ pub trait AnalyticsStorage: Send + Sync {
         // Default: no Forge sync (backwards-compatible for existing impls).
         Ok(None)
     }
+
+    /// Run background aggregation jobs (best-times heatmap, reach snapshots).
+    ///
+    /// Called at the end of each analytics iteration. Default is a no-op so
+    /// existing impls don't break.
+    async fn run_aggregations(&self) -> Result<(), AnalyticsError> {
+        Ok(())
+    }
 }
 
 // ============================================================================

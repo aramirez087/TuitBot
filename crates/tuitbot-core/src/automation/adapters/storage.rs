@@ -583,6 +583,17 @@ impl AnalyticsStorage for AnalyticsStorageAdapter {
             .await
             .map_err(|e| AnalyticsError::StorageError(e.to_string()))
     }
+
+    async fn run_aggregations(&self) -> Result<(), AnalyticsError> {
+        let account_id = storage::accounts::DEFAULT_ACCOUNT_ID;
+        storage::analytics::aggregate_best_times_for(&self.pool, account_id)
+            .await
+            .map_err(|e| AnalyticsError::StorageError(e.to_string()))?;
+        storage::analytics::aggregate_reach_for(&self.pool, account_id)
+            .await
+            .map_err(|e| AnalyticsError::StorageError(e.to_string()))?;
+        Ok(())
+    }
 }
 
 /// Adapts `DbPool` to the `TopicScorer` port trait.
