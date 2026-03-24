@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774365795644,
+  "lastUpdate": 1774366545649,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3718,6 +3718,43 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/778798fbfcb4e41934a7993fc0c5f7c3b5c19ad3"
         },
         "date": 1774365795006,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "931a3637edfdb12708fa9e68af607c5e461af15f",
+          "message": "C3: Modularize x_api/types.rs (1204L) → types/{mod, tweet_types, user_types, api_types, tests}\n\nTarget structure achieved:\n- mod.rs (28L): module declarations, re-exports\n- tweet_types.rs (153L): Tweet, PublicMetrics, SearchResponse, SearchMeta, MentionResponse, PostTweet*, SingleTweetResponse, DeleteTweet*\n- user_types.rs (78L): User, UserMetrics, UserResponse, UsersResponse, UsersMeta, FollowUserRequest\n- api_types.rs (151L): MediaType, ImageFormat, MediaId, MediaPayload, RateLimitInfo, RawApiResponse, XApiErrorResponse, Like/Bookmark/Retweet requests, ActionResult*\n- tests.rs (438L): 44 integration + roundtrip tests, all pass\n\nAll resulting files ≤500 lines. CI checklist:\n- cargo fmt --all: ✅ clean\n- cargo test: ✅ 44 tests pass\n- No behavioral regressions: ✅\n- No new unsafe: ✅ none added\n- Dependency order: ✅ tweet_types uses user_types, api_types standalone",
+          "timestamp": "2026-03-24T09:34:36-06:00",
+          "tree_id": "faeb8a9af0dc29278bf3c432bf8a63329125a9b0",
+          "url": "https://github.com/aramirez087/TuitBot/commit/931a3637edfdb12708fa9e68af607c5e461af15f"
+        },
+        "date": 1774366544377,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
