@@ -5,6 +5,7 @@
 pub mod approve;
 pub mod auth;
 pub mod backup;
+pub mod doctor;
 pub mod init;
 pub mod mcp;
 pub mod restore;
@@ -74,6 +75,10 @@ pub struct AuthArgs {
 /// Arguments for the `test` subcommand.
 #[derive(Debug, Args)]
 pub struct TestArgs;
+
+/// Arguments for the `doctor` subcommand.
+#[derive(Debug, Args)]
+pub struct DoctorArgs;
 
 /// Arguments for the `discover` subcommand.
 #[derive(Debug, Args)]
