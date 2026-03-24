@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774366906663,
+  "lastUpdate": 1774367035923,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2742,6 +2742,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.57,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "6eff57eb43962efa65b32d25a2564fbdb46218f9",
+          "message": "fix(core): remove unused UserMetrics import in x_api/types/tweet_types.rs",
+          "timestamp": "2026-03-24T09:37:59-06:00",
+          "tree_id": "ce4ad6b6793e6928c49f070919ba3ddb07dc76f6",
+          "url": "https://github.com/aramirez087/TuitBot/commit/6eff57eb43962efa65b32d25a2564fbdb46218f9"
+        },
+        "date": 1774367034877,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 573.45,
             "unit": "ps"
           }
         ]
