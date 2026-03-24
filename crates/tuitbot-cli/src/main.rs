@@ -59,6 +59,8 @@ enum Commands {
     Auth(commands::AuthArgs),
     /// Validate configuration and connectivity
     Test(commands::TestArgs),
+    /// Self-diagnosis: check config, credentials, and connectivity
+    Doctor(commands::DoctorArgs),
     /// Run discovery loop once
     Discover(commands::DiscoverArgs),
     /// Check and reply to mentions
@@ -197,6 +199,9 @@ async fn run() -> anyhow::Result<()> {
             commands::McpSubcommand::Setup => commands::mcp::execute_setup(out).await,
         };
     }
+    if let Commands::Doctor(_) = cli.command {
+        return commands::doctor::execute(&cli.config).await;
+    }
 
     // Load configuration.
     let config = match Config::load(Some(&cli.config)) {
@@ -246,7 +251,8 @@ async fn run() -> anyhow::Result<()> {
         | Commands::Backup(_)
         | Commands::Restore(_)
         | Commands::Uninstall(_)
-        | Commands::Mcp(_) => {
+        | Commands::Mcp(_)
+        | Commands::Doctor(_) => {
             unreachable!()
         }
         Commands::Run(args) => {
