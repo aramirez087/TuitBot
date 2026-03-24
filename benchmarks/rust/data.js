@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774355163817,
+  "lastUpdate": 1774355177642,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2460,6 +2460,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 937.4,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3f62eb4b4965cf77f10e2c089c57344c50017bb5",
+          "message": "feat(cli): P1 — improve error messages for common setup failures (#298)\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T06:23:59-06:00",
+          "tree_id": "c1766b6c163e1d3e08cda454c4b29ca3d91c7124",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3f62eb4b4965cf77f10e2c089c57344c50017bb5"
+        },
+        "date": 1774355177187,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 934.45,
             "unit": "ps"
           }
         ]
