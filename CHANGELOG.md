@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.52](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.51...tuitbot-cli-v0.1.52) - 2026-03-24
+
+### Added
+
+- *(analytics)* F2 — engagement rate trends + best-time heatmap ([#313](https://github.com/aramirez087/TuitBot/pull/313))
+
 ## [0.1.51](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.50...tuitbot-cli-v0.1.51) - 2026-03-24
 
 ### Added
