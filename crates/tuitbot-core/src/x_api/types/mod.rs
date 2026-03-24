@@ -4,24 +4,24 @@
 //! Tweet IDs are strings because X API v2 returns them as strings and
 //! some IDs exceed `i64` range.
 
+mod api_types;
 mod tweet_types;
 mod user_types;
-mod api_types;
 
 pub use tweet_types::{
-    Tweet, PublicMetrics, SearchResponse, SearchMeta, MentionResponse,
-    PostTweetRequest, ReplyTo, PostTweetResponse, PostedTweet,
-    SingleTweetResponse, DeleteTweetResponse, DeleteTweetData, Includes,
+    DeleteTweetData, DeleteTweetResponse, Includes, MentionResponse, PostTweetRequest,
+    PostTweetResponse, PostedTweet, PublicMetrics, ReplyTo, SearchMeta, SearchResponse,
+    SingleTweetResponse, Tweet,
 };
 
 pub use user_types::{
-    User, UserMetrics, UserResponse, UsersResponse, UsersMeta, FollowUserRequest,
+    FollowUserRequest, User, UserMetrics, UserResponse, UsersMeta, UsersResponse,
 };
 
 pub use api_types::{
-    ImageFormat, MediaType, MediaId, MediaPayload, RateLimitInfo,
-    RawApiResponse, XApiErrorResponse, LikeTweetRequest, BookmarkTweetRequest,
-    RetweetRequest, ActionResultResponse, ActionResultData,
+    ActionResultData, ActionResultResponse, BookmarkTweetRequest, ImageFormat, LikeTweetRequest,
+    MediaId, MediaPayload, MediaType, RateLimitInfo, RawApiResponse, RetweetRequest,
+    XApiErrorResponse,
 };
 
 #[cfg(test)]

@@ -54,8 +54,12 @@ fn serialize_post_tweet_request_minimal() {
 fn serialize_post_tweet_request_full() {
     let req = PostTweetRequest {
         text: "test".to_string(),
-        reply: Some(ReplyTo { in_reply_to_tweet_id: "123".to_string() }),
-        media: Some(MediaPayload { media_ids: vec!["m1".to_string()] }),
+        reply: Some(ReplyTo {
+            in_reply_to_tweet_id: "123".to_string(),
+        }),
+        media: Some(MediaPayload {
+            media_ids: vec!["m1".to_string()],
+        }),
         quote_tweet_id: Some("qt1".to_string()),
     };
     let json = serde_json::to_string(&req).unwrap();
@@ -251,7 +255,10 @@ fn media_payload_serde_roundtrip() {
 
 #[test]
 fn posted_tweet_serde_roundtrip() {
-    let pt = PostedTweet { id: "100".into(), text: "posted".into() };
+    let pt = PostedTweet {
+        id: "100".into(),
+        text: "posted".into(),
+    };
     let json = serde_json::to_string(&pt).unwrap();
     let back: PostedTweet = serde_json::from_str(&json).unwrap();
     assert_eq!(back.id, "100");
@@ -291,7 +298,9 @@ fn users_meta_serde() {
 
 #[test]
 fn like_tweet_request_serde() {
-    let req = LikeTweetRequest { tweet_id: "t1".into() };
+    let req = LikeTweetRequest {
+        tweet_id: "t1".into(),
+    };
     let json = serde_json::to_string(&req).unwrap();
     let back: LikeTweetRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(back.tweet_id, "t1");
@@ -299,7 +308,9 @@ fn like_tweet_request_serde() {
 
 #[test]
 fn follow_user_request_serde() {
-    let req = FollowUserRequest { target_user_id: "u1".into() };
+    let req = FollowUserRequest {
+        target_user_id: "u1".into(),
+    };
     let json = serde_json::to_string(&req).unwrap();
     let back: FollowUserRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(back.target_user_id, "u1");
@@ -317,7 +328,9 @@ fn action_result_response_serde() {
 
 #[test]
 fn bookmark_tweet_request_serde() {
-    let req = BookmarkTweetRequest { tweet_id: "b1".into() };
+    let req = BookmarkTweetRequest {
+        tweet_id: "b1".into(),
+    };
     let json = serde_json::to_string(&req).unwrap();
     let back: BookmarkTweetRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(back.tweet_id, "b1");
@@ -325,7 +338,9 @@ fn bookmark_tweet_request_serde() {
 
 #[test]
 fn retweet_request_serde() {
-    let req = RetweetRequest { tweet_id: "rt1".into() };
+    let req = RetweetRequest {
+        tweet_id: "rt1".into(),
+    };
     let json = serde_json::to_string(&req).unwrap();
     let back: RetweetRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(back.tweet_id, "rt1");
@@ -344,7 +359,10 @@ fn delete_tweet_response_serde() {
 #[test]
 fn media_type_image_formats() {
     assert_eq!(MediaType::Image(ImageFormat::Png).mime_type(), "image/png");
-    assert_eq!(MediaType::Image(ImageFormat::Webp).mime_type(), "image/webp");
+    assert_eq!(
+        MediaType::Image(ImageFormat::Webp).mime_type(),
+        "image/webp"
+    );
 }
 
 #[test]
@@ -395,8 +413,12 @@ fn rate_limit_info_construction() {
 fn post_tweet_request_full_roundtrip() {
     let req = PostTweetRequest {
         text: "full test".into(),
-        reply: Some(ReplyTo { in_reply_to_tweet_id: "123".into() }),
-        media: Some(MediaPayload { media_ids: vec!["m1".into()] }),
+        reply: Some(ReplyTo {
+            in_reply_to_tweet_id: "123".into(),
+        }),
+        media: Some(MediaPayload {
+            media_ids: vec!["m1".into()],
+        }),
         quote_tweet_id: Some("qt1".into()),
     };
     let json = serde_json::to_string(&req).unwrap();
