@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774344682076,
+  "lastUpdate": 1774348244638,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2402,6 +2402,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 938.45,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d83090dbcee47863b86472a698683f11a4b9aa92",
+          "message": "feat(cli): P2 — add tuitbot doctor command for self-diagnosis (#300)\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T04:28:19-06:00",
+          "tree_id": "526bdce5204032b0ba78ed00d04b8c970efc52a6",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d83090dbcee47863b86472a698683f11a4b9aa92"
+        },
+        "date": 1774348244134,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.27,
             "unit": "ps"
           }
         ]
