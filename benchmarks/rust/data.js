@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774367982826,
+  "lastUpdate": 1774370349244,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2796,6 +2796,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 935.63,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "3a207da3986b3921754139f9e1d8b971809a0446",
+          "message": "fix: cargo fmt — resolve formatting drift on main\n\nFive files had formatting inconsistencies that pass local rustfmt 1.8.0 but\nfail on CI's latest stable rustfmt. Applied cargo fmt --all to bring all\nfiles into compliance.",
+          "timestamp": "2026-03-24T10:33:43-06:00",
+          "tree_id": "a384f12f15c8b5ef8f0d7092b91807b1c98b2500",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3a207da3986b3921754139f9e1d8b971809a0446"
+        },
+        "date": 1774370348372,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 886.27,
             "unit": "ps"
           }
         ]
