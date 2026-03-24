@@ -81,8 +81,14 @@ pub async fn run_approval_poster(
                 // Route by action type: thread gets reply-chain posting,
                 // reply gets in-reply-to, everything else posts standalone.
                 if item.action_type == "thread" {
-                    match poster::post_thread_and_persist(&pool, &*x_client, &account_id, &item, &media_ids)
-                        .await
+                    match poster::post_thread_and_persist(
+                        &pool,
+                        &*x_client,
+                        &account_id,
+                        &item,
+                        &media_ids,
+                    )
+                    .await
                     {
                         Ok(root_tweet_id) => {
                             tracing::info!(
@@ -147,7 +153,8 @@ pub async fn run_approval_poster(
                         }
                         _ => {
                             // tweet, thread_tweet, or reply with empty target
-                            poster::post_tweet(&*x_client, &item.generated_content, &media_ids).await
+                            poster::post_tweet(&*x_client, &item.generated_content, &media_ids)
+                                .await
                         }
                     };
 
@@ -177,8 +184,13 @@ pub async fn run_approval_poster(
                             queue::propagate_provenance(&pool, &account_id, &item, &tweet_id).await;
 
                             // Write loop-back metadata to source notes.
-                            queue::execute_loopback_for_provenance(&pool, &account_id, &item, &tweet_id)
-                                .await;
+                            queue::execute_loopback_for_provenance(
+                                &pool,
+                                &account_id,
+                                &item,
+                                &tweet_id,
+                            )
+                            .await;
 
                             // Log the action.
                             let _ = storage::action_log::log_action_for(
