@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774356741916,
+  "lastUpdate": 1774362929827,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2605,6 +2605,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 933.35,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "6a941c8c19c882caacb7aca3a0b7e8ff4b7e62a6",
+          "message": "fix(docs): remove stale nav reference to deleted BACKLOG-cloud-hosted-tier.md\n\nFixes docs build failure in CI run 23490285068. The roadmap file was\ndeleted but the mkdocs.yml nav entry remained, causing strict mode abort.",
+          "timestamp": "2026-03-24T08:32:43-06:00",
+          "tree_id": "95e66a402a3897145975482706df3ecad85736cb",
+          "url": "https://github.com/aramirez087/TuitBot/commit/6a941c8c19c882caacb7aca3a0b7e8ff4b7e62a6"
+        },
+        "date": 1774362929338,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.61,
             "unit": "ps"
           }
         ]
