@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774366836682,
+  "lastUpdate": 1774366906663,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2713,6 +2713,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 932.99,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3fdba390ca8334f905a2f922e87f71518036dc84",
+          "message": "test(coverage): S9-Q1 — add 36 tests for parser.rs and mcp_policy/templates.rs (#303)\n\n- content/generator/parser.rs: 23 new tests covering parse_thread and\n  parse_hooks_response (delimiter splitting, fallback, edge cases, unicode)\n- mcp_policy/templates.rs: 13 new tests verifying all 3 policy templates\n  (safe_default, growth_aggressive, agency_mode) have valid rules, rate\n  limits, unique IDs, and correct approval requirements\n\nCI coverage gate (--fail-under 75) already passing on main; these tests\nadd genuine coverage to previously untested pure-logic modules.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T09:36:01-06:00",
+          "tree_id": "3b4841935f97302bfa85bd8d4d81a55da4421114",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3fdba390ca8334f905a2f922e87f71518036dc84"
+        },
+        "date": 1774366906197,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.57,
             "unit": "ps"
           }
         ]
