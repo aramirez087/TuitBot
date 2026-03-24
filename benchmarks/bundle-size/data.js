@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774366611520,
+  "lastUpdate": 1774366766555,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3794,6 +3794,43 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/3fdba390ca8334f905a2f922e87f71518036dc84"
         },
         "date": 1774366610982,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "6eff57eb43962efa65b32d25a2564fbdb46218f9",
+          "message": "fix(core): remove unused UserMetrics import in x_api/types/tweet_types.rs",
+          "timestamp": "2026-03-24T09:37:59-06:00",
+          "tree_id": "ce4ad6b6793e6928c49f070919ba3ddb07dc76f6",
+          "url": "https://github.com/aramirez087/TuitBot/commit/6eff57eb43962efa65b32d25a2564fbdb46218f9"
+        },
+        "date": 1774366765343,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
