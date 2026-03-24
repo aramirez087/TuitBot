@@ -489,6 +489,48 @@ async fn iteration_no_yesterday_data() {
     assert_eq!(summary.follower_count, 1000);
 }
 
+// --- Failing profile fetcher ---
+
+struct FailingProfileFetcher;
+
+#[async_trait::async_trait]
+impl ProfileFetcher for FailingProfileFetcher {
+    async fn get_profile_metrics(&self) -> Result<ProfileMetrics, AnalyticsError> {
+        Err(AnalyticsError::ApiError("connection refused".to_string()))
+    }
+}
+
+/// Profile fetcher that fails N times then succeeds.
+struct CountingProfileFetcher {
+    fail_count: std::sync::atomic::AtomicUsize,
+    fail_limit: usize,
+    metrics: ProfileMetrics,
+}
+
+impl CountingProfileFetcher {
+    fn new(fail_limit: usize, metrics: ProfileMetrics) -> Self {
+        Self {
+            fail_count: std::sync::atomic::AtomicUsize::new(0),
+            fail_limit,
+            metrics,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ProfileFetcher for CountingProfileFetcher {
+    async fn get_profile_metrics(&self) -> Result<ProfileMetrics, AnalyticsError> {
+        let count = self
+            .fail_count
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if count < self.fail_limit {
+            Err(AnalyticsError::ApiError(format!("fail #{}", count + 1)))
+        } else {
+            Ok(self.metrics.clone())
+        }
+    }
+}
+
 // --- Failing engagement fetcher ---
 
 struct FailingEngagementFetcher;
@@ -582,4 +624,139 @@ async fn iteration_forge_sync_failure_non_fatal() {
     let summary = analytics.run_iteration().await.expect("iteration");
     assert!(!summary.forge_synced);
     assert_eq!(summary.follower_count, 1000);
+}
+
+// --- run() loop tests ---
+
+fn zero_scheduler() -> LoopScheduler {
+    LoopScheduler::new(
+        Duration::from_millis(0),
+        Duration::from_millis(0),
+        Duration::from_millis(0),
+    )
+}
+
+use std::time::Duration;
+use tokio_util::sync::CancellationToken;
+
+#[tokio::test]
+async fn run_exits_on_pre_cancelled_token() {
+    let storage = Arc::new(MockAnalyticsStorage::new());
+    let analytics = AnalyticsLoop::new(
+        Arc::new(MockProfileFetcher {
+            metrics: default_profile(),
+        }),
+        Arc::new(MockEngagementFetcher {
+            metrics: default_tweet_metrics(),
+        }),
+        storage.clone(),
+    );
+
+    let cancel = CancellationToken::new();
+    cancel.cancel(); // pre-cancel
+
+    analytics.run(cancel, zero_scheduler()).await;
+
+    // Should exit immediately without running any iteration
+    assert!(storage.snapshots.lock().expect("lock").is_empty());
+}
+
+#[tokio::test]
+async fn run_completes_one_iteration_then_cancels() {
+    let storage = Arc::new(MockAnalyticsStorage::new());
+    let analytics = Arc::new(AnalyticsLoop::new(
+        Arc::new(MockProfileFetcher {
+            metrics: default_profile(),
+        }),
+        Arc::new(MockEngagementFetcher {
+            metrics: default_tweet_metrics(),
+        }),
+        storage.clone(),
+    ));
+
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+
+    // Cancel after a short delay to allow one iteration
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        cancel_clone.cancel();
+    });
+
+    analytics.run(cancel, zero_scheduler()).await;
+
+    // At least one iteration should have completed
+    assert!(!storage.snapshots.lock().expect("lock").is_empty());
+}
+
+#[tokio::test]
+async fn run_handles_iteration_errors_and_continues() {
+    // Fails 2 times (below threshold of 5), then succeeds, then we cancel.
+    let storage = Arc::new(MockAnalyticsStorage::new());
+    let analytics = Arc::new(AnalyticsLoop::new(
+        Arc::new(CountingProfileFetcher::new(2, default_profile())),
+        Arc::new(MockEngagementFetcher {
+            metrics: default_tweet_metrics(),
+        }),
+        storage.clone(),
+    ));
+
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        cancel_clone.cancel();
+    });
+
+    analytics.run(cancel, zero_scheduler()).await;
+
+    // After 2 failures and then success, we should have at least one snapshot
+    assert!(!storage.snapshots.lock().expect("lock").is_empty());
+}
+
+#[tokio::test]
+async fn run_pauses_on_consecutive_errors() {
+    // Fail enough times to trigger the pause (threshold is 5)
+    let storage = Arc::new(MockAnalyticsStorage::new());
+    let analytics = Arc::new(AnalyticsLoop::new(
+        Arc::new(FailingProfileFetcher),
+        Arc::new(MockEngagementFetcher {
+            metrics: default_tweet_metrics(),
+        }),
+        storage.clone(),
+    ));
+
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+
+    // Cancel during the pause window
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        cancel_clone.cancel();
+    });
+
+    analytics.run(cancel, zero_scheduler()).await;
+
+    // No snapshots — all iterations failed
+    assert!(storage.snapshots.lock().expect("lock").is_empty());
+}
+
+#[test]
+fn forge_sync_result_default() {
+    let result = ForgeSyncResult::default();
+    assert_eq!(result.tweets_synced, 0);
+    assert_eq!(result.threads_synced, 0);
+}
+
+#[test]
+fn forge_sync_result_debug_and_clone() {
+    let result = ForgeSyncResult {
+        tweets_synced: 3,
+        threads_synced: 1,
+    };
+    let cloned = result.clone();
+    assert_eq!(cloned.tweets_synced, 3);
+    let debug = format!("{result:?}");
+    assert!(debug.contains("3"));
 }
