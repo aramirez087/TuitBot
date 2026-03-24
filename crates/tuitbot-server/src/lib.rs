@@ -60,6 +60,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/approval/stats", get(routes::approval::stats))
         .route("/approval/approve-all", post(routes::approval::approve_all))
         .route(
+            "/approval/bulk/approve",
+            post(routes::approval::bulk_approve),
+        )
+        .route("/approval/bulk/reject", post(routes::approval::bulk_reject))
+        .route(
             "/approval/{id}/history",
             get(routes::approval::get_edit_history),
         )

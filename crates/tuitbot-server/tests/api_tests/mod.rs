@@ -15,6 +15,7 @@ use tuitbot_server::ws::AccountWsEvent;
 mod analytics;
 mod analytics_summary; // Task 3.4: analytics summary + recent-performance endpoints
 mod approval;
+mod approval_bulk; // F3: bulk approve/reject + account_id filter
 mod approval_coverage; // Additional approval queue edge-case coverage
 mod approval_workflow; // Task 3.4: approval happy-path mutations (approve/reject/bulk/history)
 mod compose;
