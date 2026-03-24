@@ -54,7 +54,7 @@ pub struct TargetStats {
     pub interaction_frequency_days: Option<f64>,
 }
 
-pub(crate) type TargetAccountRow = (
+type TargetAccountRow = (
     String,
     String,
     Option<String>,
@@ -91,11 +91,7 @@ type StatsRow = (i64, f64, Option<String>, Option<String>);
 type BestReplyRow = (String, f64);
 
 /// Compute average days between interactions.
-pub(crate) fn compute_frequency(
-    first: &Option<String>,
-    last: &Option<String>,
-    total: i64,
-) -> Option<f64> {
+pub fn compute_frequency(first: &Option<String>, last: &Option<String>, total: i64) -> Option<f64> {
     if total < 2 {
         return None;
     }

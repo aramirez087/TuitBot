@@ -16,7 +16,7 @@ pub use mutations::{
     upsert_target_account, upsert_target_account_for,
 };
 pub use queries::{
-    get_active_target_accounts, get_active_target_accounts_for,
+    compute_frequency, get_active_target_accounts, get_active_target_accounts_for,
     get_enriched_target_accounts, get_enriched_target_accounts_for, get_target_account,
     get_target_account_by_username, get_target_account_by_username_for, get_target_account_for,
     get_target_stats, get_target_stats_for, get_target_timeline, get_target_timeline_for,
