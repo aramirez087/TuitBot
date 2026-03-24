@@ -307,7 +307,7 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Write))
             .count();
-        // 69 curated write + 44 generated - 4 admin-only = 113 (includes get_analytics_summary)
+        // 69 curated write + 44 generated - 4 admin-only = 113
         assert_eq!(count, 113, "Write has {count} tools (expected 113)");
     }
 
@@ -319,7 +319,7 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Admin))
             .count();
-        // 73 curated + 44 generated + 16 ads + 7 compliance/stream = 140 (includes get_analytics_summary)
+        // 73 curated + 44 generated + 16 ads + 7 compliance/stream = 140 (superset of write)
         assert_eq!(count, 140, "Admin has {count} tools (expected 140)");
     }
 
@@ -576,7 +576,7 @@ mod tests {
     fn write_server_tool_count() {
         let source = write_server_source();
         let fn_names = extract_tool_fn_names(source);
-        // 72 curated - 4 admin-only universal request tools = 68
+        // 73 curated - 4 admin-only universal request tools = 69
         assert_eq!(
             fn_names.len(),
             69,
@@ -590,7 +590,7 @@ mod tests {
     fn admin_server_tool_count() {
         let source = admin_server_source();
         let fn_names = extract_tool_fn_names(source);
-        // All 73 curated tools including universal request tools + get_analytics_summary
+        // All 73 curated tools including universal request tools
         assert_eq!(
             fn_names.len(),
             73,
