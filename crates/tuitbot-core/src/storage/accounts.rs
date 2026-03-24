@@ -342,8 +342,14 @@ pub fn account_token_path(data_dir: &Path, account_id: &str) -> PathBuf {
 /// Returns DEFAULT_ACCOUNT_ID if the sentinel does not exist.
 pub fn get_active_account_id() -> String {
     use crate::startup::data_dir;
+    read_active_account_id(&data_dir())
+}
 
-    let sentinel = data_dir().join("active_account");
+/// Read the active account ID from a sentinel file in the given directory.
+///
+/// Returns DEFAULT_ACCOUNT_ID if the sentinel does not exist or cannot be read.
+pub fn read_active_account_id(dir: &Path) -> String {
+    let sentinel = dir.join("active_account");
     match std::fs::read_to_string(&sentinel) {
         Ok(content) => content.trim().to_string(),
         Err(_) => DEFAULT_ACCOUNT_ID.to_string(),
@@ -355,10 +361,14 @@ pub fn get_active_account_id() -> String {
 /// Creates the directory if it does not exist.
 pub fn set_active_account_id(account_id: &str) -> Result<(), std::io::Error> {
     use crate::startup::data_dir;
+    write_active_account_id(&data_dir(), account_id)
+}
 
-    let dir = data_dir();
-    std::fs::create_dir_all(&dir)?;
-
+/// Write the active account ID to a sentinel file in the given directory.
+///
+/// Creates the directory if it does not exist.
+pub fn write_active_account_id(dir: &Path, account_id: &str) -> Result<(), std::io::Error> {
+    std::fs::create_dir_all(dir)?;
     let sentinel = dir.join("active_account");
     std::fs::write(&sentinel, account_id)?;
     Ok(())
@@ -503,56 +513,51 @@ mod tests {
 
     #[test]
     fn account_data_dir_default() {
-        let data_dir = Path::new("/home/user/.tuitbot");
-        let result = account_data_dir(data_dir, DEFAULT_ACCOUNT_ID);
-        assert_eq!(result, PathBuf::from("/home/user/.tuitbot"));
+        let base = std::env::temp_dir().join(".tuitbot");
+        let result = account_data_dir(&base, DEFAULT_ACCOUNT_ID);
+        assert_eq!(result, base);
     }
 
     #[test]
     fn account_data_dir_other() {
-        let data_dir = Path::new("/home/user/.tuitbot");
-        let id = "abc-123";
-        let result = account_data_dir(data_dir, id);
-        assert_eq!(
-            result,
-            PathBuf::from("/home/user/.tuitbot/accounts/abc-123")
-        );
+        let base = std::env::temp_dir().join(".tuitbot");
+        let result = account_data_dir(&base, "abc-123");
+        assert_eq!(result, base.join("accounts").join("abc-123"));
     }
 
     #[test]
     fn scraper_session_path_default() {
-        let data_dir = Path::new("/home/user/.tuitbot");
-        let result = account_scraper_session_path(data_dir, DEFAULT_ACCOUNT_ID);
-        assert_eq!(
-            result,
-            PathBuf::from("/home/user/.tuitbot/scraper_session.json")
-        );
+        let base = std::env::temp_dir().join(".tuitbot");
+        let result = account_scraper_session_path(&base, DEFAULT_ACCOUNT_ID);
+        assert_eq!(result, base.join("scraper_session.json"));
     }
 
     #[test]
     fn scraper_session_path_other() {
-        let data_dir = Path::new("/home/user/.tuitbot");
-        let result = account_scraper_session_path(data_dir, "abc-123");
+        let base = std::env::temp_dir().join(".tuitbot");
+        let result = account_scraper_session_path(&base, "abc-123");
         assert_eq!(
             result,
-            PathBuf::from("/home/user/.tuitbot/accounts/abc-123/scraper_session.json")
+            base.join("accounts")
+                .join("abc-123")
+                .join("scraper_session.json")
         );
     }
 
     #[test]
     fn token_path_default() {
-        let data_dir = Path::new("/home/user/.tuitbot");
-        let result = account_token_path(data_dir, DEFAULT_ACCOUNT_ID);
-        assert_eq!(result, PathBuf::from("/home/user/.tuitbot/tokens.json"));
+        let base = std::env::temp_dir().join(".tuitbot");
+        let result = account_token_path(&base, DEFAULT_ACCOUNT_ID);
+        assert_eq!(result, base.join("tokens.json"));
     }
 
     #[test]
     fn token_path_other() {
-        let data_dir = Path::new("/home/user/.tuitbot");
-        let result = account_token_path(data_dir, "abc-123");
+        let base = std::env::temp_dir().join(".tuitbot");
+        let result = account_token_path(&base, "abc-123");
         assert_eq!(
             result,
-            PathBuf::from("/home/user/.tuitbot/accounts/abc-123/tokens.json")
+            base.join("accounts").join("abc-123").join("tokens.json")
         );
     }
 
@@ -706,28 +711,47 @@ mod tests {
     }
 
     #[test]
-    fn test_get_active_account_id_default() {
-        // When sentinel doesn't exist, should return DEFAULT_ACCOUNT_ID
-        let active = get_active_account_id();
-        assert_eq!(active, DEFAULT_ACCOUNT_ID);
-    }
-
-    #[test]
-    fn test_set_and_get_active_account_id() {
-        // Create temp dir for test
+    fn read_active_account_missing_sentinel_returns_default() {
         let tmpdir = std::env::temp_dir().join(format!("tuitbot_test_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&tmpdir).expect("create tmpdir");
 
-        // Fake: set an active account manually to a temp sentinel
-        let test_id = "abc-123-def";
-        let sentinel = tmpdir.join("active_account");
-        std::fs::write(&sentinel, test_id).expect("write sentinel");
+        let active = read_active_account_id(&tmpdir);
+        assert_eq!(active, DEFAULT_ACCOUNT_ID);
 
-        // Read it back
-        let content = std::fs::read_to_string(&sentinel).expect("read");
-        assert_eq!(content.trim(), test_id);
-
-        // Cleanup
         let _ = std::fs::remove_dir_all(&tmpdir);
+    }
+
+    #[test]
+    fn write_and_read_active_account_roundtrip() {
+        let tmpdir = std::env::temp_dir().join(format!("tuitbot_test_{}", uuid::Uuid::new_v4()));
+
+        let test_id = "abc-123-def";
+        write_active_account_id(&tmpdir, test_id).expect("write");
+
+        let active = read_active_account_id(&tmpdir);
+        assert_eq!(active, test_id);
+
+        let _ = std::fs::remove_dir_all(&tmpdir);
+    }
+
+    #[test]
+    fn read_active_account_trims_whitespace() {
+        let tmpdir = std::env::temp_dir().join(format!("tuitbot_test_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmpdir).expect("create tmpdir");
+
+        let sentinel = tmpdir.join("active_account");
+        std::fs::write(&sentinel, "  abc-123  \n").expect("write");
+
+        let active = read_active_account_id(&tmpdir);
+        assert_eq!(active, "abc-123");
+
+        let _ = std::fs::remove_dir_all(&tmpdir);
+    }
+
+    #[test]
+    fn read_active_account_nonexistent_dir_returns_default() {
+        let tmpdir = std::env::temp_dir().join(format!("tuitbot_noexist_{}", uuid::Uuid::new_v4()));
+        let active = read_active_account_id(&tmpdir);
+        assert_eq!(active, DEFAULT_ACCOUNT_ID);
     }
 }
