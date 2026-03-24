@@ -631,15 +631,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          BASE_URL="https://github.com/aramirez087/TuitBot/releases/download/${TAG}"
+          export BASE_URL="https://github.com/aramirez087/TuitBot/releases/download/${TAG}"
 
           # Download SHA256SUMS from the published release
           curl -fsSL "${BASE_URL}/SHA256SUMS" -o SHA256SUMS
 
-          sha_darwin_arm64=$(grep  "tuitbot-aarch64-apple-darwin.tar.gz"         SHA256SUMS | awk '{print $1}')
-          sha_darwin_x86_64=$(grep "tuitbot-x86_64-apple-darwin.tar.gz"          SHA256SUMS | awk '{print $1}')
-          sha_linux_arm64=$(grep   "tuitbot-aarch64-unknown-linux-gnu.tar.gz"     SHA256SUMS | awk '{print $1}')
-          sha_linux_x86_64=$(grep  "tuitbot-x86_64-unknown-linux-gnu.tar.gz"     SHA256SUMS | awk '{print $1}')
+          export sha_darwin_arm64=$(grep  "tuitbot-aarch64-apple-darwin.tar.gz"         SHA256SUMS | awk '{print $1}')
+          export sha_darwin_x86_64=$(grep "tuitbot-x86_64-apple-darwin.tar.gz"          SHA256SUMS | awk '{print $1}')
+          export sha_linux_arm64=$(grep   "tuitbot-aarch64-unknown-linux-gnu.tar.gz"     SHA256SUMS | awk '{print $1}')
+          export sha_linux_x86_64=$(grep  "tuitbot-x86_64-unknown-linux-gnu.tar.gz"     SHA256SUMS | awk '{print $1}')
 
           if [[ -z "$sha_darwin_arm64" || -z "$sha_darwin_x86_64" || -z "$sha_linux_arm64" || -z "$sha_linux_x86_64" ]]; then
             echo "::error::One or more SHAs missing from SHA256SUMS — aborting tap update"
