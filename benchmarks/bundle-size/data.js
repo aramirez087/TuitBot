@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774377541807,
+  "lastUpdate": 1774389630371,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -4152,6 +4152,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1349370,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8be2372e5c495f93a753bd4bc007d23fa00c861b",
+          "message": "feat(analytics): F2 — engagement rate trends + best-time heatmap (#313)\n\n* feat(analytics): F2 — engagement rate trends + best-time heatmap\n\n- Engagement rate 7d/30d rolling averages (storage/analytics/best_times.rs)\n- Performance item aggregation with type breakdown (performance_items.rs)\n- Analytics tests for aggregation queries (storage/analytics/tests.rs)\n- Background aggregation job wired into analytics_loop\n- MCP get_analytics_summary tool returning {trends, heatmap, top_content}\n- Route /analytics updated with time-series endpoints\n- All files ≤500L; cargo fmt/clippy/check green\n\n* fix(f2): add missing crate-level migration + regenerate MCP manifests\n\n- Copy 20260316000200_analytics_depth.sql to crates/tuitbot-core/migrations/\n  so init_test_db() (sqlx::migrate!('./migrations')) can create engagement_metrics\n  and related tables during tests — fixes 4 storage::analytics test failures.\n- Regenerate all 6 MCP manifests after F1 rebase introduced get_analytics_summary\n  tool changes that drifted the committed JSON artifacts.\n\nBranch was rebased onto main (a832ba60) to pick up F1 multi-account storage\nfunctions required by tuitbot-cli accounts.rs.\n\n* fix: add new analytics tables to TABLES_TO_CLEAR\n\nThe engagement_metrics, best_times, and reach_snapshots tables were\nadded by the analytics_depth migration but missing from the factory\nreset list, causing tables_to_clear_covers_all_user_tables to fail.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* fix(mcp): update tool count assertions for get_analytics_summary\n\nAdds 1 new tool (get_analytics_summary) in write/admin profiles:\n- Write: 112 → 113\n- Admin: 139 → 140\n- write/ server: 68 → 69\n- admin/ server: 72 → 73\n- Coverage write delta: 8 → 9\n\n* fix: update MCP tool counts and server test for new analytics tool\n\nThe new analytics tool added by this PR increased tool counts:\n- Write profile: 112 -> 113, Write server: 68 -> 69\n- Admin profile: 139 -> 140, Admin server: 72 -> 73\n- Coverage admin delta: 31 -> 32, write delta: 8 -> 9\n- Factory reset tables_cleared: 41 -> 44\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T15:59:44-06:00",
+          "tree_id": "b407b3e812b82c3d6f6dd659e2e87bd13750d4f4",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8be2372e5c495f93a753bd4bc007d23fa00c861b"
+        },
+        "date": 1774389629744,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963659,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349375,
             "unit": "bytes"
           }
         ]
