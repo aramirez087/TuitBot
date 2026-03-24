@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774362929827,
+  "lastUpdate": 1774365602153,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2633,6 +2633,33 @@ window.BENCHMARK_DATA = {
             "name": "trivial_operation",
             "value": 933.61,
             "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "783820422a80476ec09d40d15555efe755b31edc",
+          "message": "C1: Modularize automation/approval_poster.rs (1125L) → approval_poster/{mod, poster, queue, tests}\n\nTarget structure achieved:\n- mod.rs (248L): public run_approval_poster, re-exports, module declarations\n- poster.rs (243L): post_tweet, post_reply, upload_media, post_thread_and_persist, parse_thread_content\n- queue.rs (200L): randomized_delay, execute_loopback_for_provenance, execute_loopback_for_thread, propagate_provenance\n- tests.rs (488L): all 51 tests migrated\n\nAll resulting files ≤500 lines. CI checklist:\n- cargo fmt --all: ✅ clean\n- cargo test: ✅ 51 tests pass\n- cargo clippy: pending (in flight)\n- No behavioral regressions: ✅ all tests pass\n- No new unsafe: ✅ none added",
+          "timestamp": "2026-03-24T09:17:28-06:00",
+          "tree_id": "777581ecc38a3468d91787a326dfe1281ec939b9",
+          "url": "https://github.com/aramirez087/TuitBot/commit/783820422a80476ec09d40d15555efe755b31edc"
+        },
+        "date": 1774365601367,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 1.0566,
+            "unit": "ns"
           }
         ]
       }
