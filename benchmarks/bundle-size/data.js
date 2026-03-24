@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774365503830,
+  "lastUpdate": 1774365795644,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3696,6 +3696,43 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1349375,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "778798fbfcb4e41934a7993fc0c5f7c3b5c19ad3",
+          "message": "fix(core): remove unused Arc import in approval_poster/poster.rs",
+          "timestamp": "2026-03-24T09:22:25-06:00",
+          "tree_id": "184bffffcd5c349d3fd4bfce1a7c780dfa3743d2",
+          "url": "https://github.com/aramirez087/TuitBot/commit/778798fbfcb4e41934a7993fc0c5f7c3b5c19ad3"
+        },
+        "date": 1774365795006,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
             "unit": "bytes"
           }
         ]
