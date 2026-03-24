@@ -210,8 +210,6 @@ async fn remove_account_cmd(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_account_spec_matching_by_label() {
         // Verifies the account matching logic works correctly
