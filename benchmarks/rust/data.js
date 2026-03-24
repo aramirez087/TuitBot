@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774293206132,
+  "lastUpdate": 1774310720345,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2316,6 +2316,35 @@ window.BENCHMARK_DATA = {
             "name": "trivial_operation",
             "value": 931.56,
             "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d9ca0b811f4e003f8484c8aa66780811d7084cae",
+          "message": "refactor(core): split mentions_loop.rs (952L) into module directory (#294)\n\nSplit automation/mentions_loop.rs into:\n- mod.rs (86L): public API, re-exports, MentionLoopHandle\n- loop_impl.rs (181L): main loop logic, polling, rate limiting\n- responder.rs (109L): mention response generation\n- tests.rs (592L): all existing tests preserved\n\nAll non-test files ≤500L. Zero functional changes.\n3580 tests pass, clippy clean, fmt clean.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-23T18:02:55-06:00",
+          "tree_id": "14d42b65657570908abf9a8013fa755e1cf1b2f2",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d9ca0b811f4e003f8484c8aa66780811d7084cae"
+        },
+        "date": 1774310719722,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 1.0547,
+            "unit": "ns"
           }
         ]
       }
