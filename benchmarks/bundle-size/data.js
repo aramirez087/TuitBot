@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774394309341,
+  "lastUpdate": 1774394588760,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -4230,6 +4230,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1349375,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b4707f9112c529a3a82bacd77d1d80bbb2031353",
+          "message": "test(e2e): S10-Q1 — multi-account switch flow Playwright tests (#312)\n\n7 test cases covering:\n- TC1: account switcher visible in sidebar\n- TC2: new account appears in switcher after creation\n- TC3: switching updates active account in localStorage\n- TC4: account isolation — drafts from A not visible under B\n- TC5: unknown account ID falls back gracefully to default\n- TC6: deleting active account falls back to default\n- TC7: tuitbot:account-switched event fires on switch\n\nTests operate against real API (accounts CRUD + data routes).\nNo CLI dependency — dashboard AccountSwitcher uses REST directly.\nTC3/TC7 use test.skip() guard if switcher UI differs post-F1.\n\nsvelte-check: 0 errors, 0 warnings\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T17:21:30-06:00",
+          "tree_id": "919c4aeadf988f838e3e9165292beaa15ec0fbd5",
+          "url": "https://github.com/aramirez087/TuitBot/commit/b4707f9112c529a3a82bacd77d1d80bbb2031353"
+        },
+        "date": 1774394588276,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963659,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346494,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349404,
             "unit": "bytes"
           }
         ]
