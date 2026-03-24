@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.51](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.50...tuitbot-cli-v0.1.51) - 2026-03-24
+
+### Fixed
+
+- *(core)* remove unused UserMetrics import in x_api/types/tweet_types.rs
+- *(core)* remove unused Arc import in approval_poster/poster.rs
+
+### Other
+
+- *(coverage)* S9-Q1 — add 36 tests for parser.rs and mcp_policy/templates.rs ([#303](https://github.com/aramirez087/TuitBot/pull/303))
+- Modularize x_api/types.rs (1204L) → types/{mod, tweet_types, user_types, api_types, tests}
+- Modularize automation/approval_poster.rs (1125L) → approval_poster/{mod, poster, queue, tests}
+
 ## [0.1.50](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.49...tuitbot-cli-v0.1.50) - 2026-03-23
 
 ### Other
