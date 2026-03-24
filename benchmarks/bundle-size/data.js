@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774371074913,
+  "lastUpdate": 1774376981300,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3981,6 +3981,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/b7b6df8687f10334967a86bf6b8e3eeecf1a5b5e"
         },
         "date": 1774371074045,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963659,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349375,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8d98bee6d30e6b2b319282d2d9580d07557e305b",
+          "message": "feat(cli): F1 — multi-account CLI (switch + accounts list + session isolation) (#309)\n\n* feat(cli): F1 — multi-account CLI (switch + accounts list + session isolation)\n\n- Add `tuitbot accounts list` — shows all configured accounts with active marker\n- Add `tuitbot accounts switch <label|id>` — persists active selection to sentinel file\n- Add `tuitbot accounts add <label>` — creates new account\n- Add `tuitbot accounts remove <label|id>` — archives account\n- Add get/set_active_account_id() to storage::accounts (sentinel file pattern)\n- Wire AccountsSubcommand into CLI (commands/mod.rs + main.rs)\n- 588 tests pass; clippy clean; fmt clean\n\n* fix: remove unused import in accounts tests\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* ci: add codecov.yml to exclude tuitbot-cli from patch coverage\n\ntuitbot-cli is excluded from tarpaulin (binary crate, not coverage-critical)\nbut codecov was still counting its changed files against the patch target,\ncausing PRs that touch CLI code to fail the 60% patch threshold.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n* test: improve accounts coverage and cross-platform path tests\n\n- Extract read_active_account_id/write_active_account_id with path\n  parameter for testability (wrappers delegate to them)\n- Add tests: missing sentinel returns default, roundtrip write/read,\n  whitespace trimming, nonexistent directory fallback\n- Fix path tests to use std::env::temp_dir() + Path::join instead of\n  hardcoded Unix paths (cross-platform CI)\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T12:28:47-06:00",
+          "tree_id": "c74de365dfb0febfc635212bb0f19ee3464c0d81",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8d98bee6d30e6b2b319282d2d9580d07557e305b"
+        },
+        "date": 1774376980191,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
