@@ -760,3 +760,116 @@ fn forge_sync_result_debug_and_clone() {
     let debug = format!("{result:?}");
     assert!(debug.contains("3"));
 }
+
+/// Exercises the default `run_forge_sync_if_enabled` trait implementation
+/// which returns `Ok(None)` when not overridden.
+struct DefaultForgeSyncStorage;
+
+#[async_trait::async_trait]
+impl AnalyticsStorage for DefaultForgeSyncStorage {
+    async fn store_follower_snapshot(
+        &self,
+        _followers: i64,
+        _following: i64,
+        _tweets: i64,
+    ) -> Result<(), AnalyticsError> {
+        Ok(())
+    }
+    async fn get_yesterday_followers(&self) -> Result<Option<i64>, AnalyticsError> {
+        Ok(None)
+    }
+    async fn get_replies_needing_measurement(&self) -> Result<Vec<String>, AnalyticsError> {
+        Ok(vec![])
+    }
+    async fn get_tweets_needing_measurement(&self) -> Result<Vec<String>, AnalyticsError> {
+        Ok(vec![])
+    }
+    async fn store_reply_performance(
+        &self,
+        _reply_id: &str,
+        _likes: i64,
+        _replies: i64,
+        _impressions: i64,
+        _score: f64,
+    ) -> Result<(), AnalyticsError> {
+        Ok(())
+    }
+    async fn store_tweet_performance(
+        &self,
+        _tweet_id: &str,
+        _likes: i64,
+        _retweets: i64,
+        _replies: i64,
+        _impressions: i64,
+        _score: f64,
+    ) -> Result<(), AnalyticsError> {
+        Ok(())
+    }
+    async fn update_content_score(
+        &self,
+        _topic: &str,
+        _format: &str,
+        _score: f64,
+    ) -> Result<(), AnalyticsError> {
+        Ok(())
+    }
+    async fn log_action(
+        &self,
+        _action_type: &str,
+        _status: &str,
+        _message: &str,
+    ) -> Result<(), AnalyticsError> {
+        Ok(())
+    }
+    // Intentionally NOT overriding run_forge_sync_if_enabled — uses default
+}
+
+#[tokio::test]
+async fn default_forge_sync_returns_none() {
+    let storage = Arc::new(DefaultForgeSyncStorage);
+    let analytics = AnalyticsLoop::new(
+        Arc::new(MockProfileFetcher {
+            metrics: default_profile(),
+        }),
+        Arc::new(MockEngagementFetcher {
+            metrics: default_tweet_metrics(),
+        }),
+        storage,
+    );
+
+    let summary = analytics.run_iteration().await.expect("iteration");
+    // Default impl returns Ok(None) — forge_synced should be false
+    assert!(!summary.forge_synced);
+}
+
+#[tokio::test]
+async fn run_recovers_after_consecutive_error_pause() {
+    // Fail exactly 5 times to trigger the pause, then succeed.
+    // This exercises the error_tracker.reset() + continue path.
+    let storage = Arc::new(MockAnalyticsStorage::new());
+    let analytics = Arc::new(AnalyticsLoop::new(
+        Arc::new(CountingProfileFetcher::new(5, default_profile())),
+        Arc::new(MockEngagementFetcher {
+            metrics: default_tweet_metrics(),
+        }),
+        storage.clone(),
+    ));
+
+    let cancel = CancellationToken::new();
+    let cancel_clone = cancel.clone();
+
+    // Cancel well after the 600s pause so the sleep branch wins the select,
+    // allowing reset() + continue to execute. With tokio::time::pause(),
+    // auto-advance makes this instant.
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(700)).await;
+        cancel_clone.cancel();
+    });
+
+    // Use tokio::time::pause to advance time instantly
+    tokio::time::pause();
+    analytics.run(cancel, zero_scheduler()).await;
+
+    // After 5 failures, pause, reset, then succeed — should have at least one snapshot
+    assert!(!storage.snapshots.lock().expect("lock").is_empty());
+}
