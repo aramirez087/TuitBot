@@ -47,8 +47,6 @@ nav:
       - Rate Limit Storms: runbooks/rate-limit-storms.md
       - Backup & Restore: runbooks/backup-restore.md
       - Database Maintenance: runbooks/database-maintenance.md
-  - Roadmap:
-      - Cloud Hosted Tier Backlog: roadmap/BACKLOG-cloud-hosted-tier.md
   - Reports:
       - MCP Endpoint Coverage: generated/coverage-report.md
   - Release and Publishing: release-and-publishing.md
