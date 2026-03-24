@@ -43,8 +43,8 @@ coverage/
 *.profdata
 lcov.info
 
-# Dashboard (Svelte + Tauri)
-dashboard/node_modules/
+# Node modules (all locations)
+node_modules/
 dashboard/.svelte-kit/
 dashboard/build/
 dashboard/src-tauri/target/
