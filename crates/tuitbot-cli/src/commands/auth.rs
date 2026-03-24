@@ -82,7 +82,33 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
         &redirect_uri,
         &pkce.verifier,
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("401") || msg.contains("invalid_client") || msg.contains("invalid_grant") {
+            anyhow::anyhow!(
+                "X API rejected the authorization code (HTTP 401).\n\
+                 \n\
+                 This usually means the code was already used, it expired (codes are \
+                 one-time-use and valid for ~30 seconds), or your client_id is wrong.\n\
+                 Run `tuitbot auth` again to get a fresh code."
+            )
+        } else if msg.contains("connect") || msg.contains("timed out") || msg.contains("dns") {
+            anyhow::anyhow!(
+                "Cannot reach api.x.com to exchange the authorization code.\n\
+                 \n\
+                 Network error: {e}\n\
+                 Check your internet connection and try again."
+            )
+        } else {
+            anyhow::anyhow!(
+                "Token exchange failed: {e}\n\
+                 \n\
+                 Run `tuitbot auth` again. If this keeps failing, verify your \
+                 client_id in config."
+            )
+        }
+    })?;
 
     // 6. Save tokens to disk.
     save_tokens_to_file(&tokens)?;
@@ -91,7 +117,34 @@ pub async fn execute(config: &Config, mode_override: Option<&str>) -> anyhow::Re
 
     // 7. Verify credentials.
     eprintln!("Verifying credentials...");
-    let username = verify_credentials(&tokens.access_token).await?;
+    let username = verify_credentials(&tokens.access_token)
+        .await
+        .map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("401") || msg.to_lowercase().contains("unauthorized") {
+                anyhow::anyhow!(
+                    "X API rejected the new token when verifying credentials (HTTP 401).\n\
+                     \n\
+                     The token was saved but X returned unauthorized on the first use. \
+                     This can happen if your app's permissions don't include `users.read`.\n\
+                     Check your app's scopes at https://developer.x.com and re-run \
+                     `tuitbot auth`."
+                )
+            } else if msg.contains("connect") || msg.contains("timed out") || msg.contains("dns") {
+                anyhow::anyhow!(
+                    "Cannot reach api.x.com to verify credentials.\n\
+                     \n\
+                     Your token was saved. Network error: {e}\n\
+                     Check your internet connection. Run `tuitbot test` to confirm auth later."
+                )
+            } else {
+                anyhow::anyhow!(
+                    "Credential verification failed: {e}\n\
+                     \n\
+                     Your token was saved. Run `tuitbot test` to diagnose the issue."
+                )
+            }
+        })?;
 
     eprintln!(
         "\nAuthenticated as @{username}. Tokens saved to {}",

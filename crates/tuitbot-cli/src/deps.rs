@@ -19,11 +19,12 @@ use tuitbot_core::automation::schedule::ActiveSchedule;
 use tuitbot_core::automation::{create_posting_queue, ApprovalQueue, PostAction, TargetLoopConfig};
 use tuitbot_core::config::Config;
 use tuitbot_core::content::ContentGenerator;
+use tuitbot_core::error::XApiError;
 use tuitbot_core::llm::factory::create_provider;
 use tuitbot_core::safety::SafetyGuard;
 use tuitbot_core::scoring::ScoringEngine;
 use tuitbot_core::startup::{
-    expand_tilde, load_tokens_from_file, token_file_path, ApiTier, TierCapabilities,
+    expand_tilde, load_tokens_from_file, token_file_path, ApiTier, StartupError, TierCapabilities,
 };
 use tuitbot_core::storage;
 use tuitbot_core::x_api::auth::{TokenManager, Tokens};
@@ -417,7 +418,26 @@ impl RuntimeDeps {
         tracing::info!(path = %db_path.display(), "Database path configured");
 
         // 2. Load OAuth tokens and create token manager.
-        let stored = load_tokens_from_file().map_err(|e| anyhow::anyhow!("{e}"))?;
+        let stored = load_tokens_from_file().map_err(|e| match e {
+            StartupError::AuthRequired => anyhow::anyhow!(
+                "No X API credentials found.\n\
+                 \n\
+                 You haven't authenticated with X yet. Run `tuitbot auth` to connect your \
+                 account.\n\
+                 This is a one-time setup that stores your access token locally."
+            ),
+            StartupError::AuthExpired => anyhow::anyhow!(
+                "X API credentials have expired.\n\
+                 \n\
+                 Your stored token is no longer valid. Run `tuitbot auth` to re-authenticate.\n\
+                 This refreshes your access without needing to reconfigure anything else."
+            ),
+            other => anyhow::anyhow!(
+                "Failed to load X API credentials: {other}\n\
+                 \n\
+                 If this keeps happening, run `tuitbot auth` to re-authenticate."
+            ),
+        })?;
 
         let auth_tokens = Tokens {
             access_token: stored.access_token.clone(),
@@ -456,9 +476,38 @@ impl RuntimeDeps {
 
         // 3. Determine API tier by probing the search endpoint.
         let x_client = XApiHttpClient::new(current_token);
-        let detected = detect_tier(&x_client)
-            .await
-            .map_err(|e| anyhow::anyhow!("Tier detection failed: {e}"))?;
+        let detected = detect_tier(&x_client).await.map_err(|e| match e {
+            XApiError::AuthExpired => anyhow::anyhow!(
+                "X API token is expired or invalid.\n\
+                 \n\
+                 Your stored token was rejected by the X API (HTTP 401). This happens when the \
+                 token expires or you revoke app access.\n\
+                 Run `tuitbot auth` to re-authenticate."
+            ),
+            XApiError::RateLimited { retry_after } => {
+                let wait = retry_after
+                    .map(|s| format!("Wait {s} seconds and try again."))
+                    .unwrap_or_else(|| "Wait a few minutes and try again.".to_string());
+                anyhow::anyhow!(
+                    "X API rate limit hit during startup (HTTP 429).\n\
+                     \n\
+                     The X API is throttling requests from your account because too many \
+                     calls were made recently. {wait}"
+                )
+            }
+            XApiError::Network { source } => anyhow::anyhow!(
+                "Cannot reach api.x.com.\n\
+                 \n\
+                 A network error occurred while connecting to the X API: {source}\n\
+                 Check your internet connection and try again."
+            ),
+            other => anyhow::anyhow!(
+                "Tier detection failed: {other}\n\
+                 \n\
+                 tuitbot could not determine your X API access level. \
+                 Check your credentials with `tuitbot test`."
+            ),
+        })?;
         let tier = match detected {
             tier::ApiTier::Free => ApiTier::Free,
             tier::ApiTier::Basic => ApiTier::Basic,
@@ -507,10 +556,35 @@ impl RuntimeDeps {
 
         // 8. Get own user ID.
         let x_client = Arc::new(x_client);
-        let me = x_client
-            .get_me()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to get authenticated user: {e}"))?;
+        let me = x_client.get_me().await.map_err(|e| match e {
+            XApiError::AuthExpired => anyhow::anyhow!(
+                "X API token rejected when fetching your profile (HTTP 401).\n\
+                 \n\
+                 Your token may have expired or been revoked since startup. \
+                 Run `tuitbot auth` to re-authenticate."
+            ),
+            XApiError::RateLimited { retry_after } => {
+                let wait = retry_after
+                    .map(|s| format!("Wait {s} seconds and try again."))
+                    .unwrap_or_else(|| "Wait a few minutes and try again.".to_string());
+                anyhow::anyhow!(
+                    "X API rate limit hit while fetching your profile (HTTP 429).\n\
+                     \n\
+                     The X API is throttling requests from your account. {wait}"
+                )
+            }
+            XApiError::Network { source } => anyhow::anyhow!(
+                "Cannot reach api.x.com while fetching your profile.\n\
+                 \n\
+                 Network error: {source}\n\
+                 Check your internet connection and try again."
+            ),
+            other => anyhow::anyhow!(
+                "Failed to get authenticated user: {other}\n\
+                 \n\
+                 Run `tuitbot test` to diagnose the issue."
+            ),
+        })?;
         let own_user_id = me.id.clone();
         tracing::info!(user = %me.username, user_id = %own_user_id, "Authenticated as");
 
