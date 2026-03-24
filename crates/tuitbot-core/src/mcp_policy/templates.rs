@@ -214,3 +214,152 @@ fn agency_mode() -> PolicyTemplate {
         ],
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_templates_returns_three() {
+        let templates = list_templates();
+        assert_eq!(templates.len(), 3);
+    }
+
+    #[test]
+    fn list_templates_has_unique_names() {
+        let templates = list_templates();
+        let names: Vec<_> = templates.iter().map(|t| format!("{:?}", t.name)).collect();
+        let unique: std::collections::HashSet<_> = names.iter().collect();
+        assert_eq!(names.len(), unique.len(), "Template names must be unique");
+    }
+
+    #[test]
+    fn safe_default_has_rules_and_limits() {
+        let t = get_template(&PolicyTemplateName::SafeDefault);
+        assert!(!t.rules.is_empty(), "SafeDefault must have rules");
+        assert!(
+            !t.rate_limits.is_empty(),
+            "SafeDefault must have rate limits"
+        );
+        assert!(!t.description.is_empty());
+    }
+
+    #[test]
+    fn growth_aggressive_has_rules_and_limits() {
+        let t = get_template(&PolicyTemplateName::GrowthAggressive);
+        assert!(!t.rules.is_empty());
+        assert!(!t.rate_limits.is_empty());
+    }
+
+    #[test]
+    fn agency_mode_has_rules_and_limits() {
+        let t = get_template(&PolicyTemplateName::AgencyMode);
+        assert!(!t.rules.is_empty());
+        assert!(!t.rate_limits.is_empty());
+    }
+
+    #[test]
+    fn safe_default_requires_approval_for_deletes() {
+        let t = get_template(&PolicyTemplateName::SafeDefault);
+        let delete_rule = t
+            .rules
+            .iter()
+            .find(|r| r.conditions.categories.contains(&ToolCategory::Delete));
+        assert!(delete_rule.is_some(), "SafeDefault must have a delete rule");
+        if let Some(rule) = delete_rule {
+            assert!(matches!(rule.action, PolicyAction::RequireApproval { .. }));
+        }
+    }
+
+    #[test]
+    fn safe_default_requires_approval_for_writes() {
+        let t = get_template(&PolicyTemplateName::SafeDefault);
+        let write_rule = t
+            .rules
+            .iter()
+            .find(|r| r.conditions.categories.contains(&ToolCategory::Write));
+        assert!(write_rule.is_some());
+        if let Some(rule) = write_rule {
+            assert!(matches!(rule.action, PolicyAction::RequireApproval { .. }));
+        }
+    }
+
+    #[test]
+    fn all_templates_have_nonempty_descriptions() {
+        for t in list_templates() {
+            assert!(
+                !t.description.is_empty(),
+                "{:?} has empty description",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn all_templates_have_enabled_rules() {
+        for t in list_templates() {
+            assert!(
+                t.rules.iter().all(|r| r.enabled),
+                "{:?} has disabled rules in template",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn all_templates_rate_limits_have_positive_max() {
+        for t in list_templates() {
+            for rl in &t.rate_limits {
+                assert!(
+                    rl.max_count > 0,
+                    "{:?} rate limit {} has max_count=0",
+                    t.name,
+                    rl.key
+                );
+                assert!(
+                    rl.period_seconds > 0,
+                    "{:?} rate limit {} has period=0",
+                    t.name,
+                    rl.key
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn all_templates_rules_have_unique_ids() {
+        for t in list_templates() {
+            let ids: Vec<_> = t.rules.iter().map(|r| &r.id).collect();
+            let unique: std::collections::HashSet<_> = ids.iter().collect();
+            assert_eq!(
+                ids.len(),
+                unique.len(),
+                "{:?} has duplicate rule ids",
+                t.name
+            );
+        }
+    }
+
+    #[test]
+    fn get_template_roundtrip() {
+        // get_template should return same data as list_templates for each name
+        for t in list_templates() {
+            let fetched = get_template(&t.name);
+            assert_eq!(fetched.rules.len(), t.rules.len());
+            assert_eq!(fetched.rate_limits.len(), t.rate_limits.len());
+        }
+    }
+
+    #[test]
+    fn template_serializes_to_json() {
+        for t in list_templates() {
+            let json = serde_json::to_string(&t);
+            assert!(
+                json.is_ok(),
+                "{:?} failed to serialize: {:?}",
+                t.name,
+                json.err()
+            );
+        }
+    }
+}
