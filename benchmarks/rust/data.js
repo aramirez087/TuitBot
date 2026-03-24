@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774370454056,
+  "lastUpdate": 1774371369262,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2850,6 +2850,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 935.02,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b7b6df8687f10334967a86bf6b8e3eeecf1a5b5e",
+          "message": "D1: Re-enable Tauri desktop build — bump app version to 0.1.45 (#306)\n\n* chore: bump app version to 0.1.45 for initial release\n\n* fix: bump rustls-webpki 0.103.9 → 0.103.10 (RUSTSEC-2026-0049)\n\n---------\n\nCo-authored-by: Neo <neo_ai@agentmail.to>",
+          "timestamp": "2026-03-24T10:50:25-06:00",
+          "tree_id": "37683900d7f805147b277138d42c7c3ecfefc5fc",
+          "url": "https://github.com/aramirez087/TuitBot/commit/b7b6df8687f10334967a86bf6b8e3eeecf1a5b5e"
+        },
+        "date": 1774371368182,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 571.47,
             "unit": "ps"
           }
         ]
