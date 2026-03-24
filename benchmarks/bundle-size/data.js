@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774366766555,
+  "lastUpdate": 1774367685079,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3831,6 +3831,43 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/6eff57eb43962efa65b32d25a2564fbdb46218f9"
         },
         "date": 1774366765343,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "f0781f306f2bc3e9d07e57fc67f238c66ed87326",
+          "message": "C3: Modularize x_api/types.rs (1204L) → types/{mod, tweet_types, user_types, api_types, tests}\n\nTarget structure achieved:\n- mod.rs (28L): module declarations, re-exports\n- tweet_types.rs (152L): Tweet, PublicMetrics, SearchResponse, SearchMeta, MentionResponse, PostTweetRequest, ReplyTo, PostTweetResponse, PostedTweet, SingleTweetResponse, DeleteTweetResponse, DeleteTweetData, Includes\n- user_types.rs (78L): User, UserMetrics, UserResponse, UsersResponse, UsersMeta, FollowUserRequest\n- api_types.rs (151L): ImageFormat, MediaType (impl), MediaId, MediaPayload, RateLimitInfo, RawApiResponse, XApiErrorResponse, Like/Bookmark/RetweetRequest, ActionResult*\n- tests.rs (460L): 50+ serde/roundtrip/integration tests covering all modules\n\nAll resulting files ≤500 lines. CI checklist:\n- cargo fmt: ✓ clean\n- cargo test: ✓ 50+ tests pass\n- cargo clippy: pending\n- No behavioral regressions: ✓ all tests pass\n- No unsafe added: ✓",
+          "timestamp": "2026-03-24T09:53:48-06:00",
+          "tree_id": "64978160c84e57f7c050dcb7d5fa3efdf91135b4",
+          "url": "https://github.com/aramirez087/TuitBot/commit/f0781f306f2bc3e9d07e57fc67f238c66ed87326"
+        },
+        "date": 1774367684401,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
