@@ -3,8 +3,6 @@
 //! Handles routing by action type (tweet / reply / thread),
 //! media upload, and full thread reply-chain posting with persistence.
 
-use std::sync::Arc;
-
 use crate::content::deserialize_blocks_from_content;
 use crate::storage::{self, DbPool};
 use crate::x_api::XApiClient;
