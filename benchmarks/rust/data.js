@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774355177642,
+  "lastUpdate": 1774355208068,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2489,6 +2489,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.45,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5ef802dbb02f9f52e36ec15d0fdbe2df33aa6ddd",
+          "message": "refactor(core): C5 — split storage/target_accounts.rs (1026L) into module directory (#299)\n\n* refactor(core): C5 — split storage/target_accounts.rs (1026L) into module directory\n\n* fix: cargo fmt + restore compute_frequency re-export in target_accounts/mod.rs\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T06:24:14-06:00",
+          "tree_id": "f506f0cbecc9ba5c22338cd57373a24e25ddc6fc",
+          "url": "https://github.com/aramirez087/TuitBot/commit/5ef802dbb02f9f52e36ec15d0fdbe2df33aa6ddd"
+        },
+        "date": 1774355207084,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 571.59,
             "unit": "ps"
           }
         ]
