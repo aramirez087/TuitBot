@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774389630371,
+  "lastUpdate": 1774394309341,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -4176,6 +4176,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/8be2372e5c495f93a753bd4bc007d23fa00c861b"
         },
         "date": 1774389629744,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963659,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349375,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7e1fbb16b5d9800100c0d51eb639d997463e856b",
+          "message": "feat(server): F3 — approval queue bulk approve/reject + account filter (#315)\n\n- POST /api/approval/bulk/approve: approve a list of IDs in one call\n- POST /api/approval/bulk/reject: reject a list of IDs in one call\n- GET /api/approval: add account_id query param (cross-account leak prevention)\n- bulk_handlers.rs (252L): bulk ops with per-item partial failure reporting\n- tests/api_tests/approval_bulk.rs (310L): 10 tests covering happy path,\n  partial failure, not-found, empty ids, auth guard, account isolation\n\nAll files within 500L cap. 577 tuitbot-server tests pass.\nZero regressions to single-item approve/reject flow.\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T17:17:22-06:00",
+          "tree_id": "cc30ffeaa1a74f18122affecba774b1eb6616dfa",
+          "url": "https://github.com/aramirez087/TuitBot/commit/7e1fbb16b5d9800100c0d51eb639d997463e856b"
+        },
+        "date": 1774394308318,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
