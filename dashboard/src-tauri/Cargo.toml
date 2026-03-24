@@ -1,6 +1,6 @@
 [package]
 name = "tuitbot-dashboard"
-version = "0.1.0"
+version = "0.1.45"
 description = "Tuitbot desktop dashboard — Tauri shell"
 authors = ["aramirez087"]
 license = "MIT"
