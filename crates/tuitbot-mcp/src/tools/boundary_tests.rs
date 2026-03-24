@@ -307,8 +307,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Write))
             .count();
-        // 68 curated write + 44 generated - 4 admin-only = 112
-        assert_eq!(count, 112, "Write has {count} tools (expected 112)");
+        // 69 curated write + 44 generated - 4 admin-only = 113
+        assert_eq!(count, 113, "Write has {count} tools (expected 113)");
     }
 
     #[test]
@@ -319,8 +319,8 @@ mod tests {
             .iter()
             .filter(|t| t.profiles.contains(&Profile::Admin))
             .count();
-        // 72 curated + 44 generated + 16 ads + 7 compliance/stream = 139 (superset of write)
-        assert_eq!(count, 139, "Admin has {count} tools (expected 139)");
+        // 73 curated + 44 generated + 16 ads + 7 compliance/stream = 140 (superset of write)
+        assert_eq!(count, 140, "Admin has {count} tools (expected 140)");
     }
 
     // ── Mutation safety ─────────────────────────────────────────────
@@ -576,11 +576,11 @@ mod tests {
     fn write_server_tool_count() {
         let source = write_server_source();
         let fn_names = extract_tool_fn_names(source);
-        // 72 curated - 4 admin-only universal request tools = 68
+        // 73 curated - 4 admin-only universal request tools = 69
         assert_eq!(
             fn_names.len(),
-            68,
-            "write/ has {} tools (expected 68): {:?}",
+            69,
+            "write/ has {} tools (expected 69): {:?}",
             fn_names.len(),
             fn_names
         );
@@ -590,11 +590,11 @@ mod tests {
     fn admin_server_tool_count() {
         let source = admin_server_source();
         let fn_names = extract_tool_fn_names(source);
-        // All 72 curated tools including universal request tools
+        // All 73 curated tools including universal request tools
         assert_eq!(
             fn_names.len(),
-            72,
-            "admin/ has {} tools (expected 72): {:?}",
+            73,
+            "admin/ has {} tools (expected 73): {:?}",
             fn_names.len(),
             fn_names
         );

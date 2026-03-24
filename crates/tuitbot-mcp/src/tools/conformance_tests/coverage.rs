@@ -700,8 +700,8 @@ async fn generate_coverage_report() {
         match p.profile.as_str() {
             "readonly" => assert_eq!(p.delta, 0, "Readonly delta should be 0"),
             "api_readonly" => assert_eq!(p.delta, 5, "ApiReadonly delta should be +5"),
-            "write" => assert_eq!(p.delta, 8, "Write delta should be +8"),
-            "admin" => assert_eq!(p.delta, 31, "Admin delta should be +31"),
+            "write" => assert_eq!(p.delta, 9, "Write delta should be +9"),
+            "admin" => assert_eq!(p.delta, 32, "Admin delta should be +32"),
             _ => {}
         }
     }

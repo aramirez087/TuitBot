@@ -24,6 +24,16 @@ impl WriteMcpServer {
             workflow::analytics::get_stats(&self.state.pool, days, &self.state.config).await;
         Ok(CallToolResult::success(vec![Content::text(result)]))
     }
+    /// Get a deep analytics summary: engagement trends, 7×24 best-time heatmap, and content breakdown by type.
+    #[tool]
+    async fn get_analytics_summary(
+        &self,
+        #[allow(unused_variables)] Parameters(_req): Parameters<GetAnalyticsSummaryRequest>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result =
+            workflow::analytics::get_analytics_summary(&self.state.pool, &self.state.config).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
+    }
     /// Get follower count snapshots over time.
     #[tool]
     async fn get_follower_trend(

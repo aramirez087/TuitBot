@@ -207,6 +207,17 @@ impl AnalyticsLoop {
             }
         }
 
+        // 5. Run background aggregations (best-times heatmap, reach snapshots)
+        match self.storage.run_aggregations().await {
+            Ok(()) => {
+                tracing::debug!("Background aggregations complete");
+            }
+            Err(e) => {
+                // Aggregation failure is non-fatal
+                tracing::warn!(error = %e, "Background aggregation failed");
+            }
+        }
+
         let _ = self
             .storage
             .log_action(

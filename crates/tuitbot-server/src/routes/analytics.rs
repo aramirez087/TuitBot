@@ -184,3 +184,21 @@ pub async fn best_times(
     let slots = analytics::get_best_times_for(&state.db, &ctx.account_id).await?;
     Ok(Json(json!(slots)))
 }
+
+/// `GET /api/analytics/heatmap` — 7×24 best-time heatmap grid.
+pub async fn heatmap(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+) -> Result<Json<Value>, ApiError> {
+    let grid = analytics::get_heatmap_for(&state.db, &ctx.account_id).await?;
+    Ok(Json(json!(grid)))
+}
+
+/// `GET /api/analytics/content-breakdown` — content performance by type.
+pub async fn content_breakdown(
+    State(state): State<Arc<AppState>>,
+    ctx: AccountContext,
+) -> Result<Json<Value>, ApiError> {
+    let breakdown = analytics::get_content_breakdown_for(&state.db, &ctx.account_id).await?;
+    Ok(Json(json!(breakdown)))
+}

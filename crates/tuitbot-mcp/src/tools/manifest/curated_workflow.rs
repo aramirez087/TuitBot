@@ -32,6 +32,17 @@ pub(super) fn workflow_tools() -> Vec<ToolEntry> {
             WRITE_UP,
             DB_ERR,
         ),
+        tool(
+            "get_analytics_summary",
+            ToolCategory::Analytics,
+            Lane::Workflow,
+            false,
+            false,
+            false,
+            true,
+            WRITE_UP,
+            DB_ERR,
+        ),
         // ── Action Log ───────────────────────────────────────────────
         tool(
             "get_action_log",
