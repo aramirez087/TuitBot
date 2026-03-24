@@ -8,9 +8,12 @@ use std::collections::HashSet;
 use crate::storage::{self, DbPool};
 
 /// Compute a randomized delay between `min` and `max`.
-pub(super) fn randomized_delay(min: std::time::Duration, max: std::time::Duration) -> std::time::Duration {
+pub(super) fn randomized_delay(
+    min: std::time::Duration,
+    max: std::time::Duration,
+) -> std::time::Duration {
     use rand::Rng;
-    
+
     if min >= max || (min.is_zero() && max.is_zero()) {
         return min;
     }
@@ -37,13 +40,15 @@ pub(super) async fn execute_loopback_for_provenance(
     let content_type = &item.action_type;
 
     // Collect unique node_ids from provenance links.
-    let links = match storage::provenance::get_links_for(pool, account_id, "approval_queue", item.id).await {
-        Ok(l) => l,
-        Err(e) => {
-            tracing::debug!(id = item.id, error = %e, "No provenance links for loopback");
-            return;
-        }
-    };
+    let links =
+        match storage::provenance::get_links_for(pool, account_id, "approval_queue", item.id).await
+        {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::debug!(id = item.id, error = %e, "No provenance links for loopback");
+                return;
+            }
+        };
 
     let mut seen = HashSet::new();
     for link in &links {
