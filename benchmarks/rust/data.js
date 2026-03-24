@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774370349244,
+  "lastUpdate": 1774370454056,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2823,6 +2823,33 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 886.27,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "d954f224e2b83f2c3277c0dfc367058f2b453c08",
+          "message": "revert: remove accidentally committed accounts module and storage changes\n\nCommit 3a207da3 included untracked/unstaged files from the working tree\nalongside the intended cargo fmt fixes. This reverts only the unrelated\nadditions (accounts CLI module, storage/accounts.rs changes).\nThe fmt fixes in approval_poster/{mod.rs, queue.rs} are kept.",
+          "timestamp": "2026-03-24T10:34:37-06:00",
+          "tree_id": "127ff19cdc6ab6b9ac8cabbc9dfe171045770411",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d954f224e2b83f2c3277c0dfc367058f2b453c08"
+        },
+        "date": 1774370452955,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 935.02,
             "unit": "ps"
           }
         ]
