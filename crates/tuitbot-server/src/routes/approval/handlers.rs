@@ -1,4 +1,4 @@
-//! Approval queue write handlers: edit, approve, reject, batch approve.
+//! Approval queue write handlers: edit, approve, reject, batch approve/reject.
 
 use std::sync::Arc;
 
