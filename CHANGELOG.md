@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
+- *(cli)* modularize settings/interactive.rs into interactive/ module ([#310](https://github.com/aramirez087/TuitBot/pull/310))
 - remove accidentally committed accounts module and storage changes
 - Modularize x_api/types.rs (1204L) → types/{mod, tweet_types, user_types, api_types, tests}
 - *(coverage)* S9-Q1 — add 36 tests for parser.rs and mcp_policy/templates.rs ([#303](https://github.com/aramirez087/TuitBot/pull/303))
