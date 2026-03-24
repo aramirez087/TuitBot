@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774355070256,
+  "lastUpdate": 1774355089672,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -3412,6 +3412,45 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/aramirez087/TuitBot/commit/609f4d925d4332f2d45effc93cf498a577b03a98"
         },
         "date": 1774355068796,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963655,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346465,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349370,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3f62eb4b4965cf77f10e2c089c57344c50017bb5",
+          "message": "feat(cli): P1 — improve error messages for common setup failures (#298)\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T06:23:59-06:00",
+          "tree_id": "c1766b6c163e1d3e08cda454c4b29ca3d91c7124",
+          "url": "https://github.com/aramirez087/TuitBot/commit/3f62eb4b4965cf77f10e2c089c57344c50017bb5"
+        },
+        "date": 1774355088881,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
