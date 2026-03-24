@@ -249,7 +249,7 @@ fn constants_have_expected_values() {
     assert_eq!(MAX_ANCESTORS, 5);
     assert!((COLD_START_WEIGHT - 0.5).abs() < 0.001);
     assert!((MIN_ENGAGEMENT_SCORE - 0.1).abs() < 0.001);
-    assert_eq!(RAG_MAX_CHARS, 2000);
+    assert_eq!(RAG_MAX_CHARS, 4000);
     assert_eq!(MAX_ANCESTOR_CHARS, 800);
     assert_eq!(MAX_COLD_START_SEEDS, 5);
 }

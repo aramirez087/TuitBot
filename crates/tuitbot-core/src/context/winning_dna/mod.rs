@@ -44,8 +44,8 @@ pub const COLD_START_WEIGHT: f64 = 0.5;
 pub const MIN_ENGAGEMENT_SCORE: f64 = 0.1;
 
 /// Maximum character count for the formatted RAG prompt block.
-/// Conservative estimate at ~500 tokens (4 chars/token).
-pub const RAG_MAX_CHARS: usize = 2000;
+/// ~1000 tokens (4 chars/token) — enough for meaningful vault excerpts.
+pub const RAG_MAX_CHARS: usize = 4000;
 
 /// Maximum character count for the ancestor prompt section when combined with fragments.
 pub const MAX_ANCESTOR_CHARS: usize = 800;

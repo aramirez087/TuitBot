@@ -11,7 +11,7 @@ use crate::storage::watchtower::{self, ChunkWithNodeContext};
 use crate::storage::DbPool;
 
 /// Maximum character budget for the vault fragment prompt section.
-pub const MAX_FRAGMENT_CHARS: usize = 1000;
+pub const MAX_FRAGMENT_CHARS: usize = 2500;
 
 /// Maximum number of fragments to include in context.
 pub const MAX_FRAGMENTS: u32 = 5;
@@ -164,7 +164,7 @@ pub fn format_fragments_prompt(fragments: &[FragmentContext]) -> String {
         } else {
             format!("[{}] ", f.citation.heading_path)
         };
-        let preview = truncate_text(&f.chunk_text, 200);
+        let preview = truncate_text(&f.chunk_text, 500);
         let entry = format!("{}. {}(from: {}): \"{}\"\n", i + 1, heading, title, preview);
 
         if block.len() + entry.len() > MAX_FRAGMENT_CHARS {
@@ -631,7 +631,7 @@ mod tests {
 
     #[test]
     fn constants_have_expected_values() {
-        assert_eq!(MAX_FRAGMENT_CHARS, 1000);
+        assert_eq!(MAX_FRAGMENT_CHARS, 2500);
         assert_eq!(MAX_FRAGMENTS, 5);
     }
 }
