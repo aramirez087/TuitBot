@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774365602153,
+  "lastUpdate": 1774365901304,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -2660,6 +2660,33 @@ window.BENCHMARK_DATA = {
             "name": "trivial_operation",
             "value": 1.0566,
             "unit": "ns"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "committer": {
+            "email": "finn@tuitbot.dev",
+            "name": "Finn"
+          },
+          "distinct": true,
+          "id": "778798fbfcb4e41934a7993fc0c5f7c3b5c19ad3",
+          "message": "fix(core): remove unused Arc import in approval_poster/poster.rs",
+          "timestamp": "2026-03-24T09:22:25-06:00",
+          "tree_id": "184bffffcd5c349d3fd4bfce1a7c780dfa3743d2",
+          "url": "https://github.com/aramirez087/TuitBot/commit/778798fbfcb4e41934a7993fc0c5f7c3b5c19ad3"
+        },
+        "date": 1774365900830,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.2,
+            "unit": "ps"
           }
         ]
       }
