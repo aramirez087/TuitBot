@@ -51,8 +51,6 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Commands {
-    /// Manage X accounts
-    Accounts(commands::AccountsArgs),
     /// Set up configuration (interactive wizard)
     Init(commands::InitArgs),
     /// Start the autonomous agent
@@ -203,9 +201,6 @@ async fn run() -> anyhow::Result<()> {
     }
     if let Commands::Doctor(_) = cli.command {
         return commands::doctor::execute(&cli.config).await;
-    }
-    if let Commands::Accounts(args) = cli.command {
-        return commands::accounts::execute(args.command, &cli.config, out).await;
     }
 
     // Load configuration.

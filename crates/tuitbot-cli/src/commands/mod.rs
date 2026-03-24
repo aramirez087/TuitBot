@@ -2,7 +2,6 @@
 ///
 /// Each subcommand struct defines its flags and arguments
 /// matching the CLI interface contract.
-pub mod accounts;
 pub mod approve;
 pub mod auth;
 pub mod backup;
@@ -266,13 +265,6 @@ pub struct UninstallArgs {
     /// Remove data directory only, keep binaries
     #[arg(long)]
     pub data_only: bool,
-}
-
-/// Arguments for the `accounts` subcommand.
-#[derive(Debug, Args)]
-pub struct AccountsArgs {
-    #[command(subcommand)]
-    pub command: accounts::AccountsSubcommand,
 }
 
 /// Arguments for the `mcp` subcommand.
