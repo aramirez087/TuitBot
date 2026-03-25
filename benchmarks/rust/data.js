@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774403528810,
+  "lastUpdate": 1774406238820,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3227,6 +3227,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 934.73,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "383c44723bb15256d668d53491d811bb3dccd8eb",
+          "message": "refactor(mcp): split requests.rs into requests/ module directory (#319)\n\n* refactor: split requests.rs (1410L) into requests/ module\n\n- mod.rs (12L): re-exports for submodules\n- tool_requests.rs (375L): composite tools, universal X API tools\n- query_requests.rs (373L): analytics, discovery, scoring, approval, context intelligence\n- write_requests.rs (357L): mutations, content generation, media upload\n\nOld requests.rs deleted. All files ≤500L. 100+ tests preserved.\n\n* refactor: add missing 13 request types to requests/ split (all 58 types now present)\n\n- query_requests.rs (+13 types): Added TweetIdRequest, UsernameRequest, SearchTweetsRequest, GetUserMentionsRequest, GetUserTweetsRequest, GetFollowersRequest, GetFollowingRequest, GetUserByIdRequest, GetLikedTweetsRequest, GetBookmarksRequest, GetUsersByIdsRequest, GetTweetLikingUsersRequest, GetHomeTimelineRequest — all read-only lookups\n- write_requests.rs: Removed duplicate Telemetry types (moved to query_requests where they belong)\n\nAll 58 public request types preserved. Line counts: mod (12L), query (485L), tool (375L), write (330L). All ≤500L.\nZero duplicate types. Zero compile errors. All tests included with respective modules.\n\nThis completes the split of requests.rs (1410L) into 4-file module structure.\n\n---------\n\nCo-authored-by: Finn <finn@tuitbot.dev>",
+          "timestamp": "2026-03-24T20:34:51-06:00",
+          "tree_id": "e86ad41d1624c181535996bc21d89242091eeb66",
+          "url": "https://github.com/aramirez087/TuitBot/commit/383c44723bb15256d668d53491d811bb3dccd8eb"
+        },
+        "date": 1774406238217,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 936.1,
             "unit": "ps"
           }
         ]
