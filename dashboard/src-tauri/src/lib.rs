@@ -153,7 +153,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // TODO: re-enable tauri_plugin_updater once a valid signing keypair is configured.
+        // Add `tauri-plugin-updater = "2.0.0-rc"` back to Cargo.toml and restore the
+        // `plugins.updater` block in tauri.conf.json with a real pubkey.
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
