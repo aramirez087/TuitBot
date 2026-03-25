@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.53](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.52...tuitbot-cli-v0.1.53) - 2026-03-25
+
+### Other
+
+- *(mcp)* split requests.rs into requests/ module directory ([#319](https://github.com/aramirez087/TuitBot/pull/319))
+
 ## [0.1.52](https://github.com/aramirez087/TuitBot/compare/tuitbot-cli-v0.1.51...tuitbot-cli-v0.1.52) - 2026-03-24
 
 ### Added
