@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774398090951,
+  "lastUpdate": 1774402831311,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -4347,6 +4347,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1349399,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e2ff9a85229e7475aede18d5972a8f240d45693f",
+          "message": "feat: backlink synthesizer — graph RAG for draft composition (#316)\n\n* feat: Session 1 — graph RAG charter and audit\n\nDefine the product charter, architecture, UX journey, and implementation\nroadmap for the Backlink Synthesizer epic. Six documentation artifacts\ncreated covering current-state audit, epic charter, end-to-end UX journey,\ngraph RAG architecture, implementation map, and session handoff.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 1 — graph rag charter and audit\n\nAutomated execution of session-01-graph-rag-charter-and-audit.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — graph ingestion and storage\n\nAdd note_edges and note_tags tables with link extraction from wikilinks,\nmarkdown links, and inline tags. Integrate into chunk_node() pipeline with\nfail-open semantics. 34 new tests (17 extraction + 17 integration) all pass.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 2 — graph ingestion and storage\n\nAutomated execution of session-02-graph-ingestion-and-storage.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — retrieval ranking and api\n\nGraph-aware retrieval with deterministic ranking (3.0 direct + 2.0 backlink + 1.0 shared tag + 0.5 chunk boost), privacy-safe GET /vault/notes/{id}/neighbors API with reason labels and intent hints, and auto-expanded graph suggestions in selection responses. All 6,062 tests pass.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 3 — retrieval ranking and api\n\nAutomated execution of session-03-retrieval-ranking-and-api.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — ghostwriter ux integration\n\nIntegrated graph-aware retrieval into the Ghostwriter compose flow with suggestion cards showing reason badges and intent-based actions, accept/dismiss interactions, a session-level synthesis toggle, and provenance tracking for accepted neighbors through to the compose request.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 4 — ghostwriter ux integration\n\nAutomated execution of session-04-ghostwriter-ux-integration.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — draft insertion and suggestion controls\n\nImplemented slot-aware suggestion acceptance with per-insert undo stack,\nvisible insert badges on thread cards, graph-sourced citation chips with\npurple accent, and actionable undo banner. 833 frontend tests pass.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 5 — draft insertion and suggestion controls\n\nAutomated execution of session-05-draft-insertion-and-suggestion-controls.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 6 — polish copy and instrumentation\n\nRefine all user-facing strings for clarity and reduced cognitive load.\nAdd full-funnel analytics instrumentation (11 events) with backend\ntelemetry endpoint. Improve dismissed card recovery, card transitions,\nand cross-component insert state wiring.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\n\n* feat: Session 6 — polish copy and instrumentation\n\nAutomated execution of session-06-polish-copy-and-instrumentation.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 7 — validation and release readiness\n\nAdded 28 regression tests (6 backend, 18 frontend including backlinkFunnel suite), fixed GraphState consistency (TypeScript missing unresolved_links variant), and wrote QA matrix + release readiness assessment with GO recommendation.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* feat: Session 7 — validation and release readiness\n\nAutomated execution of session-07-validation-and-release-readiness.\nSee handoff doc and session log for details.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n* chore: clean up session artifacts\n\nRemove 36 session files (prompts, plans, logs, handoffs).\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T19:39:30-06:00",
+          "tree_id": "5dc088e66c0b14470b4e2748b7af28955a45448f",
+          "url": "https://github.com/aramirez087/TuitBot/commit/e2ff9a85229e7475aede18d5972a8f240d45693f"
+        },
+        "date": 1774402830192,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963659,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346494,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349404,
             "unit": "bytes"
           }
         ]
