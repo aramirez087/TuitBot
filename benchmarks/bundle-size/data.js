@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774406139474,
+  "lastUpdate": 1774407080321,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Frontend Bundle Size": [
@@ -4503,6 +4503,45 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total build",
             "value": 1349404,
+            "unit": "bytes"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ea44b836766bfd2f4436484a9c3a7e12ef82997",
+          "message": "fix: set hook text directly as content instead of calling improve API (#321)\n\nWhen a hook is selected from HookPicker, it's already a polished\nready-to-use tweet. Previously it was being sent through\napi.assist.improve() which treated it as raw highlights to expand,\nresulting in empty content replacing the draft.\n\nNow when hookStyle is present, the hook text is set directly as\ntweetText (or threadBlocks) without an additional LLM call.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T20:50:33-06:00",
+          "tree_id": "6c390a3133b769362af0149a8e742f7f6174b80a",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8ea44b836766bfd2f4436484a9c3a7e12ef82997"
+        },
+        "date": 1774407079614,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "JS (minified)",
+            "value": 963831,
+            "unit": "bytes"
+          },
+          {
+            "name": "CSS (minified)",
+            "value": 346494,
+            "unit": "bytes"
+          },
+          {
+            "name": "Total build",
+            "value": 1349575,
             "unit": "bytes"
           }
         ]
