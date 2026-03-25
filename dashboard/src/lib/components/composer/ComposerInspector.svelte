@@ -445,16 +445,25 @@
 		vaultHookStyle = hookStyle ?? null;
 		try {
 			if (hookStyle && highlights && highlights.length > 0) {
-				// Hook selected — use hook text directly for tweet, or as opening for thread.
-				const hookText = highlights[0];
+				// Hook selected — the hook text is ready-to-use content, not raw highlights.
 				if (outputFormat === 'thread') {
-					const topic = topicWithCue(voiceCue, hookText);
-					const result = await api.assist.thread(topic, selectedNodeIds, hookText);
+					threadBlocks = highlights.map((text, i) => ({
+						id: crypto.randomUUID(), text, media_paths: [], order: i
+					}));
+				} else {
+					tweetText = highlights[0];
+				}
+			} else if (highlights && highlights.length > 0) {
+				const highlightContext = highlights.join('\n');
+				if (outputFormat === 'thread') {
+					const topic = topicWithCue(voiceCue, highlightContext);
+					const result = await api.assist.thread(topic, selectedNodeIds);
 					threadBlocks = result.tweets.map((text, i) => ({
 						id: crypto.randomUUID(), text, media_paths: [], order: i
 					}));
 				} else {
-					tweetText = hookText;
+					const result = await api.assist.tweet(topicWithCue(voiceCue, highlightContext), selectedNodeIds);
+					tweetText = result.content;
 				}
 			} else {
 				const topic = topicWithCue(voiceCue, 'the insights and ideas provided in the context above');
