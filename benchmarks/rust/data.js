@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774406238820,
+  "lastUpdate": 1774407391633,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3256,6 +3256,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 936.1,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ea44b836766bfd2f4436484a9c3a7e12ef82997",
+          "message": "fix: set hook text directly as content instead of calling improve API (#321)\n\nWhen a hook is selected from HookPicker, it's already a polished\nready-to-use tweet. Previously it was being sent through\napi.assist.improve() which treated it as raw highlights to expand,\nresulting in empty content replacing the draft.\n\nNow when hookStyle is present, the hook text is set directly as\ntweetText (or threadBlocks) without an additional LLM call.\n\nCo-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T20:50:33-06:00",
+          "tree_id": "6c390a3133b769362af0149a8e742f7f6174b80a",
+          "url": "https://github.com/aramirez087/TuitBot/commit/8ea44b836766bfd2f4436484a9c3a7e12ef82997"
+        },
+        "date": 1774407391226,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.95,
             "unit": "ps"
           }
         ]
