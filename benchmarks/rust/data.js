@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774395973963,
+  "lastUpdate": 1774398194758,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3112,6 +3112,35 @@ window.BENCHMARK_DATA = {
             "name": "trivial_operation",
             "value": 1.0552,
             "unit": "ns"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez",
+            "username": "aramirez087"
+          },
+          "distinct": true,
+          "id": "f2739093e1f5cfe592301f0ca5850da30b986c7f",
+          "message": "fix(ci): export shell variables for Homebrew tap Python script\n\nThe Python heredoc runs in a subprocess and uses os.environ to read\nBASE_URL and SHA variables. These were set as shell-local variables\n(not exported), so Python couldn't see them — causing KeyError: 'BASE_URL'.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-03-24T18:20:39-06:00",
+          "tree_id": "98b2a30a8f5362d9d9c444c9c1a5cdacb7208887",
+          "url": "https://github.com/aramirez087/TuitBot/commit/f2739093e1f5cfe592301f0ca5850da30b986c7f"
+        },
+        "date": 1774398194368,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 932.93,
+            "unit": "ps"
           }
         ]
       }
