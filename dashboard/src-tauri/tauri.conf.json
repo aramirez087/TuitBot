@@ -40,12 +40,6 @@
       "minimumSystemVersion": "10.15"
     }
   },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/aramirez087/TuitBot/releases/latest/download/latest.json"
-      ],
-      "pubkey": ""
-    }
-  }
+  "plugins": {}
+
 }

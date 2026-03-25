@@ -8,12 +8,12 @@
 		expandedNodeId: number | null;
 		expandedNote: VaultNoteDetail | null;
 		expanding: boolean;
-		selectedChunks: Map<number, { nodeId: number; heading: string }>;
+		selectedChunks: Map<number, { nodeId: number; heading: string; snippet: string; noteTitle: string }>;
 		atLimit: boolean;
 		searchQuery: string;
 		resolvedChunkId?: number | null;
 		onToggleNote: (nodeId: number) => void;
-		onToggleChunk: (chunkId: number, nodeId: number, heading: string) => void;
+		onToggleChunk: (chunkId: number, nodeId: number, heading: string, snippet: string, noteTitle: string) => void;
 	}
 
 	const {
@@ -98,7 +98,7 @@
 										checked={isSelected}
 										disabled={isDisabled}
 										onchange={() =>
-											onToggleChunk(chunk.chunk_id, note.node_id, chunk.heading_path)}
+											onToggleChunk(chunk.chunk_id, note.node_id, chunk.heading_path, chunk.snippet, noteTitle(note))}
 										class="vault-chunk-cb"
 										aria-label={chunk.heading_path}
 									/>

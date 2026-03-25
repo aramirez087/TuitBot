@@ -749,12 +749,10 @@ async fn approval_approve_already_approved_returns_error() {
     )
     .await;
 
-    // TODO(bug): should be 409 or 400 — double-approve is dangerous.
-    assert!(
-        status2 == StatusCode::CONFLICT
-            || status2 == StatusCode::BAD_REQUEST
-            || status2 == StatusCode::OK,
-        "double-approve returned unexpected {status2}; expected 409/400 (or 200 if unfixed)"
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "double-approve must return 409 Conflict, got {status2}"
     );
 }
 
@@ -781,11 +779,9 @@ async fn approval_reject_already_rejected_returns_error() {
     )
     .await;
 
-    // TODO(bug): should be 409 or 400.
-    assert!(
-        status2 == StatusCode::CONFLICT
-            || status2 == StatusCode::BAD_REQUEST
-            || status2 == StatusCode::OK,
-        "double-reject returned unexpected {status2}; expected 409/400 (or 200 if unfixed)"
+    assert_eq!(
+        status2,
+        StatusCode::CONFLICT,
+        "double-reject must return 409 Conflict, got {status2}"
     );
 }

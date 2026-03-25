@@ -146,6 +146,9 @@ export async function archiveAccount(id: string): Promise<void> {
 
 /** Sync X profile for a specific account by ID. */
 export async function syncAccountProfile(id: string): Promise<Account> {
+	if (id === DEFAULT_ACCOUNT_ID) {
+		throw new Error('Cannot sync profile for the default (unlinked) account');
+	}
 	const updated = await api.accounts.syncProfile(id);
 	accounts.update((list) =>
 		list.map((a) => (a.id === updated.id ? updated : a))

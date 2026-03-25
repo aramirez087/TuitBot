@@ -396,13 +396,16 @@ fn check_llm_config(config: &Config) -> CheckResult {
     }
 
     match config.llm.provider.as_str() {
-        "openai" | "anthropic" | "ollama" => {}
+        "openai" | "anthropic" | "groq" | "ollama" => {}
         other => {
             return CheckResult::fail("LLM provider", format!("unknown provider: {other}"));
         }
     }
 
-    if matches!(config.llm.provider.as_str(), "openai" | "anthropic") {
+    if matches!(
+        config.llm.provider.as_str(),
+        "openai" | "anthropic" | "groq"
+    ) {
         match &config.llm.api_key {
             Some(key) if !key.is_empty() => {}
             _ => {

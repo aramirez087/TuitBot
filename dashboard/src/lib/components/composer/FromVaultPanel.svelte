@@ -47,7 +47,7 @@
 	let notes = $state<VaultNoteItem[]>([]);
 	let expandedNote = $state<VaultNoteDetail | null>(null);
 	let expandedNodeId = $state<number | null>(null);
-	let selectedChunks = $state<Map<number, { nodeId: number; heading: string }>>(new Map());
+	let selectedChunks = $state<Map<number, { nodeId: number; heading: string; snippet: string; noteTitle: string }>>(new Map());
 	let loading = $state(false);
 	let expanding = $state(false);
 	let generating = $state(false);
@@ -101,14 +101,29 @@
 		}
 	}
 
-	function toggleChunk(chunkId: number, nodeId: number, heading: string) {
+	function toggleChunk(chunkId: number, nodeId: number, heading: string, snippet: string, noteTitle: string) {
 		const next = new Map(selectedChunks);
 		if (next.has(chunkId)) {
 			next.delete(chunkId);
 		} else if (!atLimit) {
-			next.set(chunkId, { nodeId, heading });
+			next.set(chunkId, { nodeId, heading, snippet, noteTitle });
 		}
 		selectedChunks = next;
+	}
+
+	function buildTopicFromSelection(): string {
+		const chunks = [...selectedChunks.values()];
+		const titles = [...new Set(chunks.map((v) => v.noteTitle).filter(Boolean))];
+		const snippets = chunks.map((v) => v.snippet).filter(Boolean);
+
+		const parts: string[] = [];
+		if (titles.length > 0) {
+			parts.push(titles.join(', '));
+		}
+		if (snippets.length > 0) {
+			parts.push(snippets.join('\n'));
+		}
+		return parts.length > 0 ? parts.join('\n\n') : 'general topic';
 	}
 
 	async function handleGenerateHooks() {
@@ -119,8 +134,7 @@
 		try {
 			const nodeIds = [...new Set([...selectedChunks.values()].map((v) => v.nodeId))];
 			cachedNodeIds = nodeIds;
-			const headings = [...selectedChunks.values()].map((v) => v.heading).filter(Boolean);
-			const topic = headings.length > 0 ? headings.join('\n') : 'general topic';
+			const topic = buildTopicFromSelection();
 			const result = await api.assist.hooks(topic, { selectedNodeIds: nodeIds });
 			hookOptions = result.hooks;
 		} catch (e) {
@@ -155,8 +169,7 @@
 		hookLoading = true;
 		hookError = null;
 		try {
-			const headings = [...selectedChunks.values()].map((v) => v.heading).filter(Boolean);
-			const topic = headings.length > 0 ? headings.join('\n') : 'general topic';
+			const topic = buildTopicFromSelection();
 			const result = await api.assist.hooks(topic, { selectedNodeIds: cachedNodeIds });
 			hookOptions = result.hooks;
 		} catch (e) {
@@ -245,6 +258,7 @@
 			hooks={hookOptions ?? []}
 			{outputFormat}
 			loading={hookLoading}
+			{generating}
 			error={hookError}
 			onselect={handleHookSelected}
 			onregenerate={handleRegenerateHooks}

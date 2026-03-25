@@ -7,6 +7,7 @@
 		hooks,
 		outputFormat = 'tweet',
 		loading = false,
+		generating = false,
 		error = null,
 		onselect,
 		onregenerate,
@@ -16,6 +17,7 @@
 		hooks: HookOption[];
 		outputFormat: 'tweet' | 'thread';
 		loading?: boolean;
+		generating?: boolean;
 		error?: string | null;
 		onselect: (hook: HookOption, format: 'tweet' | 'thread') => void;
 		onregenerate: () => void;
@@ -100,7 +102,7 @@
 			<button
 				class="hook-regen-btn"
 				onclick={handleRegenerate}
-				disabled={loading}
+				disabled={loading || generating}
 			>
 				<RefreshCw size={12} />
 				Regenerate
@@ -126,9 +128,14 @@
 		<button
 			class="hook-confirm-btn"
 			onclick={handleConfirm}
-			disabled={selectedIndex === null || loading}
+			disabled={selectedIndex === null || loading || generating}
 		>
-			Use this hook
+			{#if generating}
+				<span class="hook-confirm-spinner" aria-hidden="true"></span>
+				Generating {outputFormat}…
+			{:else}
+				Use this hook
+			{/if}
 		</button>
 	</div>
 </div>
@@ -422,6 +429,22 @@
 		cursor: not-allowed;
 	}
 
+	.hook-confirm-spinner {
+		display: inline-block;
+		width: 12px;
+		height: 12px;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		border-top-color: #fff;
+		border-radius: 50%;
+		animation: spin 0.6s linear infinite;
+		vertical-align: middle;
+		margin-right: 4px;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
 	@media (pointer: coarse) {
 		.hook-back {
 			min-width: 44px;
@@ -448,7 +471,8 @@
 
 		.shimmer-pill,
 		.shimmer-line,
-		.shimmer-footer {
+		.shimmer-footer,
+		.hook-confirm-spinner {
 			animation: none;
 		}
 	}

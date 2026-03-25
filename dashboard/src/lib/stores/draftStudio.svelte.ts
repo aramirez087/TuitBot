@@ -1,3 +1,4 @@
+import { replaceState } from '$app/navigation';
 import { api } from '$lib/api';
 import type {
 	DraftSummary,
@@ -219,7 +220,7 @@ export function selectDraft(id: number | null): void {
 	} else {
 		url.searchParams.delete('id');
 	}
-	history.replaceState(null, '', url.toString());
+	replaceState(url.toString(), {});
 }
 
 export function setTab(newTab: 'active' | 'scheduled' | 'posted' | 'archive'): void {

@@ -267,9 +267,16 @@ pub fn run() {
             // Spawn the axum server on a background tokio task.
             let router = tuitbot_server::build_router(state.clone());
             tauri::async_runtime::spawn(async move {
-                let listener = tokio::net::TcpListener::bind("127.0.0.1:3001")
-                    .await
-                    .expect("failed to bind to port 3001");
+                let listener = match tokio::net::TcpListener::bind("127.0.0.1:3001").await {
+                    Ok(l) => l,
+                    Err(e) => {
+                        log::error!(
+                            "Failed to bind to port 3001: {e}. \
+                             Is another Tuitbot instance running?"
+                        );
+                        return;
+                    }
+                };
                 log::info!("Embedded server listening on http://127.0.0.1:3001");
                 if let Err(e) = axum::serve(listener, router).await {
                     log::error!("Embedded server error: {}", e);

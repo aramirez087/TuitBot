@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { replaceState } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 	import { canPost, loadCapabilities } from '$lib/stores/runtime';
@@ -61,7 +62,7 @@
 			const url = new URL(window.location.href);
 			url.searchParams.delete('new');
 			url.searchParams.delete('prefill_content');
-			history.replaceState(null, '', url.toString());
+			replaceState(url.toString(), {});
 			studio.createDraft(prefillContent).then((newId) => {
 				if (newId !== null) {
 					console.info('[draft-studio]', { event: 'draft_created', id: newId, source: prefillContent ? 'onboarding' : 'cmd-n' });
@@ -75,7 +76,7 @@
 			if (!isNaN(parsed.getTime())) prefillSchedule = prefillParam;
 			const url = new URL(window.location.href);
 			url.searchParams.delete('prefill_schedule');
-			history.replaceState(null, '', url.toString());
+			replaceState(url.toString(), {});
 		}
 
 		const selectionParam = $page.url.searchParams.get('selection');
@@ -84,7 +85,7 @@
 			lastConsumedSelectionId = selectionParam;
 			const url = new URL(window.location.href);
 			url.searchParams.delete('selection');
-			history.replaceState(null, '', url.toString());
+			replaceState(url.toString(), {});
 		}
 
 		const handler = () => {
