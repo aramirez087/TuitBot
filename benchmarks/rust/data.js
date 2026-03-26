@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774481580155,
+  "lastUpdate": 1774489396621,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3372,6 +3372,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 573.15,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "28c5720e26e353b54110a7e0e1ad8af72d9c961b",
+          "message": "fix(tauri): fully remove updater plugin left over from #647c317 (#325)\n\n* fix(tauri): fully remove updater plugin left over from last commit\n\nThe previous fix removed updater config from tauri.conf.json but left\nthe plugin registered in lib.rs, the dependency in Cargo.toml, and the\n`updater:default` permission in capabilities/default.json — causing a\npanic on startup. This removes all three remaining references.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* test: add coverage for groq provider, syncAccountProfile guard, and buildTopicFromSelection\n\n- check_llm_config_valid_groq / check_llm_config_groq_no_key_fails: cover\n  the groq branch added in 647c317 (was 0% patch coverage on mod.rs)\n- syncAccountProfile guard: verify default-account throw fires before any\n  API call (covers the new guard in accounts.ts, was 0% patch coverage)\n- buildTopicFromSelection interaction tests: click a note → expand → select\n  chunk → generate, then assert api.assist.hooks receives noteTitle+snippet\n  in the topic (covers the new function in FromVaultPanel.svelte)\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* fix(nav): add Analytics to sidebar, remove broken Workspace settings section\n\nThe \"Default Landing Page\" toggle in Settings was a no-op — the home\npage hardcodes DraftStudioShell and never reads the homeSurface store.\nRather than wire up the toggle (adds complexity for marginal gain),\nAnalytics is now a first-class sidebar nav item at /analytics, which\nalready has a full page implementation.\n\n- Add Analytics (BarChart2 icon) to sidebar nav between Home and Activity\n- Remove WorkspaceSection from Settings (broken toggle, now redundant)\n- Remove LayoutDashboard import and workspace entry from sections list\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* fix(analytics): replace hardcoded Tailwind colors with CSS design token variables\n\nAll chart containers and empty states were using slate-* Tailwind classes that\ndon't respond to the dark theme. Replaced with CSS variables (--color-surface,\n--color-border-subtle, --color-text-muted, --color-text-subtle) to match the\nrest of the dashboard. Also rewrote AnalyticsDashboard.svelte for the same fix\nwith improved empty-state UX and stat cards always showing.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* style: run cargo fmt on test assertions\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n* fix(test): add missing lucide-svelte icon mocks for AnalyticsDashboard\n\nRefreshCw, BarChart2, TrendingDown, MessageSquare, Repeat2 were added to\nAnalyticsDashboard.svelte but not to the lucide-svelte mock in analyticsCharts.test.ts,\ncausing the CI test to throw on import.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-03-25T19:37:29-06:00",
+          "tree_id": "1fa0744cf8501034b5571cc7356d030a9e45de42",
+          "url": "https://github.com/aramirez087/TuitBot/commit/28c5720e26e353b54110a7e0e1ad8af72d9c961b"
+        },
+        "date": 1774489395547,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 934.26,
             "unit": "ps"
           }
         ]
