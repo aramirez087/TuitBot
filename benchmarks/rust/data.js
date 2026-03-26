@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774490031602,
+  "lastUpdate": 1774493555573,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3430,6 +3430,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 936.11,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez Kiriushenko",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e8614b8dd7520c472f0f7cc31d7e0f344da5a5ea",
+          "message": "feat: extend LAN session cookie lifetime to 30 days (#326)",
+          "timestamp": "2026-03-25T20:50:09-06:00",
+          "tree_id": "b9d19ce72bf6a217d9cdcddc798e715cf3679a8f",
+          "url": "https://github.com/aramirez087/TuitBot/commit/e8614b8dd7520c472f0f7cc31d7e0f344da5a5ea"
+        },
+        "date": 1774493555144,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 933.2,
             "unit": "ps"
           }
         ]
