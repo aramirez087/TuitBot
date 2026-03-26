@@ -312,7 +312,11 @@ fn check_llm_config_valid_groq() {
     config.llm.model = "llama-3.3-70b-versatile".to_string();
 
     let result = check_llm_config(&config);
-    assert!(result.passed, "groq with api_key should pass, got: {}", result.message);
+    assert!(
+        result.passed,
+        "groq with api_key should pass, got: {}",
+        result.message
+    );
 }
 
 #[test]
