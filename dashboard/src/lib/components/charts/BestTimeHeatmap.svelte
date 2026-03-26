@@ -148,13 +148,44 @@
 	});
 </script>
 
-<div class="w-full h-80 p-4 border border-slate-200 rounded-lg bg-slate-50">
+<div class="chart-container">
 	{#if items.length === 0}
-		<div class="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+		<div class="chart-empty">
 			<Calendar size={32} />
-			<p class="text-sm m-0">No timing data available</p>
+			<p class="chart-empty-text">No timing data available</p>
 		</div>
 	{:else}
-		<canvas bind:this={canvasEl} class="max-h-full"></canvas>
+		<canvas bind:this={canvasEl} class="chart-canvas"></canvas>
 	{/if}
 </div>
+
+<style>
+	.chart-container {
+		width: 100%;
+		height: 320px;
+		padding: 16px;
+		border: 1px solid var(--color-border-subtle);
+		border-radius: 8px;
+		background: var(--color-surface);
+	}
+
+	.chart-empty {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		color: var(--color-text-subtle);
+	}
+
+	.chart-empty-text {
+		font-size: 13px;
+		margin: 0;
+		color: var(--color-text-muted);
+	}
+
+	.chart-canvas {
+		max-height: 100%;
+	}
+</style>

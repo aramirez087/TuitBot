@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import {
-		LayoutDashboard,
 		Briefcase,
 		MessageCircle,
 		Target,
@@ -30,7 +29,6 @@
 	import { ACCOUNT_SWITCHED_EVENT } from '$lib/stores/accounts';
 
 	import AccountsSection from './AccountsSection.svelte';
-	import WorkspaceSection from './WorkspaceSection.svelte';
 	import BusinessProfileSection from './BusinessProfileSection.svelte';
 	import ContentPersonaSection from './ContentPersonaSection.svelte';
 	import ScoringEngineSection from './ScoringEngineSection.svelte';
@@ -49,7 +47,6 @@
 
 	const sections = [
 		{ id: 'accounts', label: 'Accounts', icon: Users },
-		{ id: 'workspace', label: 'Workspace', icon: LayoutDashboard },
 		{ id: 'business', label: 'Business', icon: Briefcase },
 		{ id: 'persona', label: 'Persona', icon: MessageCircle },
 		{ id: 'scoring', label: 'Scoring', icon: Target },
@@ -203,7 +200,6 @@
 
 			<div class="sections">
 				<AccountsSection />
-				<WorkspaceSection />
 				<BusinessProfileSection />
 				<ContentPersonaSection />
 				<ScoringEngineSection />

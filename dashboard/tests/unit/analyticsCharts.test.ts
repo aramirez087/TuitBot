@@ -36,13 +36,18 @@ if (typeof HTMLCanvasElement !== 'undefined') {
 // Mock lucide-svelte icons used by components
 vi.mock('lucide-svelte', () => ({
 	BarChart: vi.fn().mockReturnValue(null),
+	BarChart2: vi.fn().mockReturnValue(null),
 	TrendingUp: vi.fn().mockReturnValue(null),
+	TrendingDown: vi.fn().mockReturnValue(null),
 	Eye: vi.fn().mockReturnValue(null),
 	Calendar: vi.fn().mockReturnValue(null),
 	Loader2: vi.fn().mockReturnValue(null),
 	Users: vi.fn().mockReturnValue(null),
 	Clock: vi.fn().mockReturnValue(null),
-	LineChart: vi.fn().mockReturnValue(null)
+	LineChart: vi.fn().mockReturnValue(null),
+	MessageSquare: vi.fn().mockReturnValue(null),
+	Repeat2: vi.fn().mockReturnValue(null),
+	RefreshCw: vi.fn().mockReturnValue(null)
 }));
 
 import EngagementChart from '../../src/lib/components/charts/EngagementChart.svelte';

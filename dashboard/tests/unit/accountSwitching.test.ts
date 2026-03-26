@@ -13,6 +13,13 @@ import { get } from 'svelte/store';
 
 vi.mock('$lib/api', () => ({
 	api: {
+		accounts: {
+			list: vi.fn().mockResolvedValue([]),
+			syncProfile: vi.fn().mockResolvedValue({}),
+			create: vi.fn().mockResolvedValue({}),
+			update: vi.fn().mockResolvedValue({}),
+			delete: vi.fn().mockResolvedValue(undefined)
+		},
 		analytics: {
 			summary: vi.fn().mockResolvedValue({
 				followers: { current: 0, change_7d: 0, change_30d: 0 },
@@ -60,6 +67,7 @@ vi.mock('../../src/lib/stores/websocket', () => ({
 
 import * as analyticsStore from '../../src/lib/stores/analytics';
 import * as approvalStore from '../../src/lib/stores/approval';
+import { syncAccountProfile } from '../../src/lib/stores/accounts';
 
 const fireAccountSwitched = () =>
 	window.dispatchEvent(new Event('tuitbot:account-switched'));
@@ -101,5 +109,22 @@ describe('account switching — approval store', () => {
 		fireAccountSwitched();
 		await new Promise((r) => setTimeout(r, 0));
 		expect(api.approval.list).toHaveBeenCalled();
+	});
+});
+
+describe('syncAccountProfile — default account guard', () => {
+	it('throws when called with the default (unlinked) account ID', async () => {
+		const DEFAULT_ACCOUNT_ID = '00000000-0000-0000-0000-000000000000';
+		await expect(syncAccountProfile(DEFAULT_ACCOUNT_ID)).rejects.toThrow(
+			'Cannot sync profile for the default (unlinked) account'
+		);
+	});
+
+	it('does not call api.accounts.syncProfile for the default account', async () => {
+		const { api } = await import('$lib/api');
+		vi.clearAllMocks();
+		const DEFAULT_ACCOUNT_ID = '00000000-0000-0000-0000-000000000000';
+		await syncAccountProfile(DEFAULT_ACCOUNT_ID).catch(() => {});
+		expect(api.accounts.syncProfile).not.toHaveBeenCalled();
 	});
 });

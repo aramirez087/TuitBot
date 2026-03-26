@@ -304,6 +304,36 @@ fn check_llm_config_reports_model() {
     );
 }
 
+#[test]
+fn check_llm_config_valid_groq() {
+    let mut config = tuitbot_core::config::Config::default();
+    config.llm.provider = "groq".to_string();
+    config.llm.api_key = Some("gsk_test123".to_string());
+    config.llm.model = "llama-3.3-70b-versatile".to_string();
+
+    let result = check_llm_config(&config);
+    assert!(
+        result.passed,
+        "groq with api_key should pass, got: {}",
+        result.message
+    );
+}
+
+#[test]
+fn check_llm_config_groq_no_key_fails() {
+    let mut config = tuitbot_core::config::Config::default();
+    config.llm.provider = "groq".to_string();
+    config.llm.api_key = None;
+
+    let result = check_llm_config(&config);
+    assert!(!result.passed);
+    assert!(
+        result.message.contains("api_key required"),
+        "expected api_key required, got: {}",
+        result.message
+    );
+}
+
 // ============================================================================
 // check_database
 // ============================================================================

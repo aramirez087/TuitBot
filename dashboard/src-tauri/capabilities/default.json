@@ -19,7 +19,6 @@
     "store:allow-set",
     "store:allow-save",
     "store:allow-load",
-    "updater:default",
     "dialog:allow-open",
     "core:window:allow-create",
     "core:webview:allow-create-webview-window",
