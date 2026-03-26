@@ -25,6 +25,7 @@
 		Download,
 		Search,
 		Shield,
+		BarChart2,
 	} from "lucide-svelte";
 
 	let collapsed = $state(false);
@@ -54,6 +55,7 @@
 
 	const navItems = [
 		{ href: "/", label: "Home", icon: Home },
+		{ href: "/analytics", label: "Analytics", icon: BarChart2 },
 		{ href: "/activity", label: "Activity", icon: Activity },
 		{ href: "/approval", label: "Approval", icon: CheckCircle },
 		{ href: "/content", label: "Content", icon: FileText },
