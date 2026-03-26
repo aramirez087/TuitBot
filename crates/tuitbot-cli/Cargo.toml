@@ -15,7 +15,7 @@ name = "tuitbot"
 path = "src/main.rs"
 
 [dependencies]
-tuitbot-core = { version = "0.1.47", path = "../tuitbot-core" }
+tuitbot-core = { version = "0.1.48", path = "../tuitbot-core" }
 tuitbot-mcp = { version = "0.1.51", path = "../tuitbot-mcp" }
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
