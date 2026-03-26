@@ -225,7 +225,7 @@ Run the server on any always-on machine and access the dashboard from your phone
 cargo run -p tuitbot-server -- --host 0.0.0.0
 ```
 
-The server prints a 4-word passphrase to the terminal on first start. Open `http://<server-ip>:3001` from any device on your network and enter the passphrase to log in. Sessions last 7 days. Full setup guide: [LAN Mode](https://aramirez087.github.io/TuitBot/lan-mode/).
+The server prints a 4-word passphrase to the terminal on first start. Open `http://<server-ip>:3001` from any device on your network and enter the passphrase to log in. Sessions last 30 days. Full setup guide: [LAN Mode](https://aramirez087.github.io/TuitBot/lan-mode/).
 
 ### 3. Self-Hosted Docker
 

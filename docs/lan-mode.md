@@ -45,9 +45,9 @@ Tuitbot has two authentication strategies that coexist:
 | Mode | Who uses it | How it works |
 |------|------------|--------------|
 | **Bearer token** | Tauri desktop app, dev mode, API/MCP clients | Reads `~/.tuitbot/api_token` file, sends as `Authorization: Bearer` header |
-| **Session cookie** | Web browsers over LAN | Enter passphrase once, server sets an `HttpOnly` cookie valid for 7 days |
+| **Session cookie** | Web browsers over LAN | Enter passphrase once, server sets an `HttpOnly` cookie valid for 30 days |
 
-When you open the dashboard in a browser without a bearer token on a fresh install, you're directed to the onboarding wizard. At the end of setup, you'll create a passphrase that protects future browser sessions. A session cookie is set automatically, so you're logged in immediately after onboarding. On subsequent visits, if your session has expired, you'll see a login screen where you enter the same passphrase. Sessions last 7 days.
+When you open the dashboard in a browser without a bearer token on a fresh install, you're directed to the onboarding wizard. At the end of setup, you'll create a passphrase that protects future browser sessions. A session cookie is set automatically, so you're logged in immediately after onboarding. On subsequent visits, if your session has expired, you'll see a login screen where you enter the same passphrase. Sessions last 30 days.
 
 ## CLI Flags
 
@@ -187,7 +187,7 @@ Drive connector flow instead of a local file picker.
 - Or from Settings → LAN Access → Reset Passphrase (requires an active session)
 
 **Session expired / redirected to login**
-- Sessions last 7 days. Log in again with the same passphrase
+- Sessions last 30 days. Log in again with the same passphrase
 - If the server was restarted, existing sessions remain valid (they're stored in the database)
 
 **WebSocket not connecting in browser**
