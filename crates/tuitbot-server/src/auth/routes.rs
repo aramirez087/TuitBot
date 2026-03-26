@@ -168,8 +168,9 @@ pub async fn login(
     match session::create_session(&state.db).await {
         Ok(new_session) => {
             let cookie = format!(
-                "tuitbot_session={}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800",
+                "tuitbot_session={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
                 new_session.raw_token,
+                session::SESSION_LIFETIME_DAYS * 24 * 60 * 60,
             );
 
             let response = LoginResponse {

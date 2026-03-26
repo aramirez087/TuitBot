@@ -237,8 +237,9 @@ pub async fn init_settings(
             .map_err(|e| ApiError::Internal(format!("failed to create session: {e}")))?;
 
         let cookie = format!(
-            "tuitbot_session={}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800",
+            "tuitbot_session={}; HttpOnly; SameSite=Strict; Path=/; Max-Age={}",
             new_session.raw_token,
+            session::SESSION_LIFETIME_DAYS * 24 * 60 * 60,
         );
 
         tracing::info!("instance claimed via /settings/init");

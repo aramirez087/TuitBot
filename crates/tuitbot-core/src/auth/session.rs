@@ -11,8 +11,8 @@ use sha2::{Digest, Sha256};
 use super::error::AuthError;
 use crate::storage::DbPool;
 
-/// Session lifetime: 7 days.
-const SESSION_LIFETIME_DAYS: i64 = 7;
+/// Session lifetime: 30 days.
+pub const SESSION_LIFETIME_DAYS: i64 = 30;
 
 /// A session record as stored in the database.
 #[derive(Debug)]
