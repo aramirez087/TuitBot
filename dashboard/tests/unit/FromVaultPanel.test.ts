@@ -542,6 +542,89 @@ describe('FromVaultPanel', () => {
 		expect(searchInput).toBeFalsy();
 	});
 
+	// --- buildTopicFromSelection tests ---
+
+	it('passes noteTitle and snippet to hooks API after chunk selection', async () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+
+		// Wait for notes to load (api.vault.sources + api.vault.searchNotes resolve)
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.vault-note-row').length).toBeGreaterThan(0);
+		});
+
+		// Click first note to expand it (triggers api.vault.noteDetail)
+		const noteBtn = container.querySelector<HTMLButtonElement>('.vault-note-row')!;
+		await fireEvent.click(noteBtn);
+
+		// Wait for chunks to appear
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-chunk-cb')).toBeTruthy();
+		});
+
+		// Toggle the chunk
+		const chunkCb = container.querySelector<HTMLInputElement>('.vault-chunk-cb')!;
+		await fireEvent.click(chunkCb);
+
+		// Wait for Generate hooks button to become enabled
+		await vi.waitFor(() => {
+			const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+				.find((b) => b.textContent?.includes('Generate hooks') && !b.disabled);
+			expect(btn).toBeTruthy();
+		});
+
+		const genBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+			.find((b) => b.textContent?.includes('Generate hooks') && !b.disabled)!;
+		await fireEvent.click(genBtn);
+
+		// Verify api.assist.hooks was called with topic built from noteTitle + snippet
+		const { api } = await import('$lib/api');
+		await vi.waitFor(() => {
+			expect(api.assist.hooks).toHaveBeenCalled();
+		});
+
+		const [topic] = (api.assist.hooks as ReturnType<typeof vi.fn>).mock.calls[0];
+		expect(topic).toContain('Design Patterns');
+		expect(topic).toContain('Chunk content 1');
+	});
+
+	it('includes snippet in hooks API topic (not just heading)', async () => {
+		const { container } = render(FromVaultPanel, { props: defaultProps });
+
+		await vi.waitFor(() => {
+			expect(container.querySelectorAll('.vault-note-row').length).toBeGreaterThan(0);
+		});
+
+		const noteBtn = container.querySelector<HTMLButtonElement>('.vault-note-row')!;
+		await fireEvent.click(noteBtn);
+
+		await vi.waitFor(() => {
+			expect(container.querySelector('.vault-chunk-cb')).toBeTruthy();
+		});
+
+		const chunkCb = container.querySelector<HTMLInputElement>('.vault-chunk-cb')!;
+		await fireEvent.click(chunkCb);
+
+		const { api } = await import('$lib/api');
+		await vi.waitFor(() => {
+			const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+				.find((b) => b.textContent?.includes('Generate hooks') && !b.disabled);
+			expect(btn).toBeTruthy();
+		});
+
+		const genBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+			.find((b) => b.textContent?.includes('Generate hooks') && !b.disabled)!;
+		await fireEvent.click(genBtn);
+
+		await vi.waitFor(() => {
+			expect(api.assist.hooks).toHaveBeenCalled();
+		});
+
+		// Topic must contain the snippet ('Chunk content 1'), not just the heading ('Section 1')
+		const [topic] = (api.assist.hooks as ReturnType<typeof vi.fn>).mock.calls[0];
+		expect(topic).toContain('Chunk content 1');
+		expect(topic).not.toBe('Section 1'); // heading alone would mean snippet was dropped
+	});
+
 	it('shows cloud mode privacy note when selected_text is null', async () => {
 		const { api } = await import('$lib/api');
 		(api.vault.getSelection as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
