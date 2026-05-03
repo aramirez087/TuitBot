@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777829472610,
+  "lastUpdate": 1777830403319,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3575,6 +3575,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 576.72,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez",
+            "username": "aramirez087"
+          },
+          "distinct": true,
+          "id": "d69cd3efcfb8c3a9bdb13f2a3fa1ba53e5a27c72",
+          "message": "chore: sync run-sessions.sh from epic-toolkit (resume support)\n\nPulls feat/d6753e8 from epic-toolkit:\n- Skips sessions whose `feat: Session N — friendly` commit is already\n  on the current branch (partial commits still re-run)\n- Reuses `.session-NN-plan.md` if newer than the session prompt\n- New `--fresh` flag disables both behaviors\n\nCo-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>",
+          "timestamp": "2026-05-03T11:44:13-06:00",
+          "tree_id": "cb6e9237c3145fb4a6305b6e21ff209888db0c28",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d69cd3efcfb8c3a9bdb13f2a3fa1ba53e5a27c72"
+        },
+        "date": 1777830402918,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 935.47,
             "unit": "ps"
           }
         ]
