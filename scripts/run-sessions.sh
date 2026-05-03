@@ -1098,7 +1098,20 @@ classify_error() {
 # ---------------------------------------------------------------------------
 write_epic_result() {
   local epic_status="$1"  # "success" or "failed"
-  local result_file="${TRUNK_SESSIONS_DIR}/.epic-result.json"
+  # Result file lives outside the repo so external watchers (orchestrators,
+  # CI, supervisor scripts) get a stable completion sentinel that survives:
+  #   - `git add -A` in the cleanup commit (would otherwise stage it as new)
+  #   - the orchestrator artifact cleanup loop
+  #   - worktree teardown
+  # Persisted on both success and failure for symmetry — file-based pollers
+  # were previously broken on success because the file was deleted (#bug:
+  # success-path watchers hung indefinitely). Override base via EPIC_RESULT_DIR.
+  local result_dir="${EPIC_RESULT_DIR:-${TMPDIR:-/tmp}/epic-toolkit}"
+  mkdir -p "$result_dir" 2>/dev/null || true
+  local repo_id
+  repo_id="$(basename "${ORIG_REPO_ROOT:-$REPO_ROOT}")"
+  local result_file="${result_dir}/${repo_id}--${EPIC_NAME_SLUG}.result.json"
+  EPIC_RESULT_FILE="$result_file"
   local result_wave
   if $EPIC_FAILED; then result_wave="$wn"; else result_wave="$WAVE_COUNT"; fi
   
@@ -1231,11 +1244,10 @@ else:
 PYEOF_PRINT
   echo "[EPIC_RESULT_END]"
   echo ""
-  
-  # Only retain result file on failure (clean up on success)
-  if [[ "$epic_status" == "success" ]]; then
-    rm -f "$result_file"
-  fi
+
+  # Result file is always retained (success and failure) — see path-computation
+  # comment above. External watchers can poll EPIC_RESULT_FILE as a uniform
+  # completion sentinel.
 }
 
 # ---------------------------------------------------------------------------
@@ -1512,8 +1524,9 @@ if ! $EPIC_FAILED; then
     done
   fi
   ok ""
-  ok "Logs:  ${TRUNK_SESSIONS_DIR/#$HOME/~}/.session-*-{plan,exec}.log"
-  ok "Plans: ${TRUNK_SESSIONS_DIR/#$HOME/~}/.session-*-plan.md"
+  ok "Logs:   ${TRUNK_SESSIONS_DIR/#$HOME/~}/.session-*-{plan,exec}.log"
+  ok "Plans:  ${TRUNK_SESSIONS_DIR/#$HOME/~}/.session-*-plan.md"
+  ok "Result: ${EPIC_RESULT_FILE/#$HOME/~}"
   if [[ "$TIMEOUT" -gt 0 || "$RETRY" -gt 0 ]]; then
     ok ""
     ok "Runtime settings:"
@@ -1625,6 +1638,6 @@ else
     err "Trunk worktree preserved : $TRUNK_WORKTREE_DIR"
     err "Failed session worktrees : $WORKTREE_BASE/${BRANCH_SANITIZED}--s*-* (inspect, then re-run)"
   fi
-  err "Detailed results: ${TRUNK_SESSIONS_DIR}/.epic-result.json"
+  err "Detailed results: ${EPIC_RESULT_FILE/#$HOME/~}"
   exit 1
 fi
