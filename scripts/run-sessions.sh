@@ -86,6 +86,7 @@ KEEP_SESSION_WORKTREES=false
 CLI_OVERRIDE=""
 TIMEOUT=0
 RETRY=0
+WAVE_TIMEOUT_MINUTES=240  # Max 4 hours per wave before killing hung jobs
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -267,9 +268,28 @@ fi
 # Mixing styles silently breaks the `${SESSIONS_DIR#$REPO_ROOT/}` prefix strip
 # downstream and yields malformed paths like `//c/foo/...`. Normalize REPO_ROOT
 # through `cd … && pwd` so every path uses the same style.
-REPO_ROOT="$(cd "$(git rev-parse --show-toplevel)" && pwd)"
+#
+# On macOS (case-insensitive APFS/HFS+), `pwd` preserves whatever case the user
+# typed when cd-ing — so REPO_ROOT and SESSIONS_DIR can differ only in case
+# (e.g. `/Code/Stevedore` vs `/Code/stevedore`). The bash prefix-strip below is
+# case-sensitive, so a case mismatch leaves TRUNK_SESSIONS_REL as a full absolute
+# path, causing `$TRUNK_WORKTREE_DIR/$TRUNK_SESSIONS_REL` to contain `//…` and
+# create a malformed nested-absolute directory. Use `realpath` (available on
+# macOS via `brew install coreutils` as `grealpath`) with a fallback to a
+# Python-based canonicalization so both paths are lowercased-resolved before the
+# strip on case-insensitive systems.
+_realpath() {
+  if command -v realpath >/dev/null 2>&1; then
+    realpath "$1" 2>/dev/null || echo "$1"
+  elif command -v grealpath >/dev/null 2>&1; then
+    grealpath "$1" 2>/dev/null || echo "$1"
+  else
+    python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$1" 2>/dev/null || echo "$1"
+  fi
+}
+REPO_ROOT="$(_realpath "$(cd "$(git rev-parse --show-toplevel)" && pwd)")"
 ORIG_REPO_ROOT="$REPO_ROOT"
-ORIG_SESSIONS_DIR="$SESSIONS_DIR"
+ORIG_SESSIONS_DIR="$(_realpath "$SESSIONS_DIR")"
 EPIC_NAME_SLUG="$(basename "$SESSIONS_DIR")"
 
 if [[ -z "$BRANCH" ]]; then
@@ -482,6 +502,17 @@ if $USE_WORKTREE; then
 
   # Mirror sessions dir into trunk if absent (uncommitted-source case).
   TRUNK_SESSIONS_REL="${ORIG_SESSIONS_DIR#$ORIG_REPO_ROOT/}"
+  # Guard: if the strip was a no-op, the paths didn't share a prefix — almost
+  # always a case mismatch on a case-insensitive filesystem (macOS). Fail fast
+  # with a clear message rather than building a malformed //abs/path/inside/dir.
+  if [[ "$TRUNK_SESSIONS_REL" == "$ORIG_SESSIONS_DIR" ]]; then
+    err "Sessions dir is not under repo root after path canonicalization.
+  repo root    : $ORIG_REPO_ROOT
+  sessions dir : $ORIG_SESSIONS_DIR
+Possible cause: case mismatch on a case-insensitive filesystem (macOS APFS/HFS+).
+Install GNU coreutils ('brew install coreutils') to enable reliable realpath resolution,
+or ensure the sessions dir path uses the same case as the repo root."
+  fi
   TRUNK_SESSIONS_DIR="$TRUNK_WORKTREE_DIR/$TRUNK_SESSIONS_REL"
   if [[ ! -d "$TRUNK_SESSIONS_DIR" ]] || [[ -z "$(ls "$TRUNK_SESSIONS_DIR"/session-*.md 2>/dev/null)" ]]; then
     log "Syncing session files into trunk worktree..."
@@ -812,9 +843,12 @@ run_one_session() {
   local sid="$1" wt_dir="$2" friendly="$3" handoff_text="$4" quiet="$5"
   local fname="${SESSION_FILE_BASENAME[$sid]}"
   local session_path="$TRUNK_SESSIONS_DIR/$fname"
-  local plan_file="$TRUNK_SESSIONS_DIR/.session-${sid}-plan.md"
-  local plan_log="$TRUNK_SESSIONS_DIR/.session-${sid}-plan.log"
-  local exec_log="$TRUNK_SESSIONS_DIR/.session-${sid}-exec.log"
+  # Use zero-padded sid for all artifact names so the writer and the
+  # reader (write_epic_result / classify_error) agree on the filename.
+  local padded_sid; padded_sid="$(printf '%02d' "$sid")"
+  local plan_file="$TRUNK_SESSIONS_DIR/.session-${padded_sid}-plan.md"
+  local plan_log="$TRUNK_SESSIONS_DIR/.session-${padded_sid}-plan.log"
+  local exec_log="$TRUNK_SESSIONS_DIR/.session-${padded_sid}-exec.log"
   local session_prompt
   session_prompt="$(extract_prompt "$session_path")"
   if [[ -z "$session_prompt" ]]; then
@@ -937,16 +971,34 @@ EXEC_EOF
      sleep 5
    done
 
-  # Auto-commit fallback inside the session worktree
-  if [[ $rc -eq 0 ]] && $AUTO_COMMIT; then
+  # Auto-commit fallback inside the session worktree with timeout.
+  # Runs regardless of rc — if Claude created files but didn't commit
+  # (timeout, error, or model just forgot the final step), we capture
+  # the work rather than lose it. The merge step later validates via
+  # build/test gates.
+  if $AUTO_COMMIT; then
     if ! git diff --quiet HEAD 2>/dev/null \
        || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
       git add -A
-      git commit -q -m "feat: Session ${sid} — ${friendly}
+      # Distinguish auto-recovered work from successful sessions
+      local commit_subject="feat: Session ${sid} — ${friendly}"
+      local commit_note="Automated execution of $fname."
+      if [[ $rc -ne 0 ]]; then
+        commit_subject="feat(partial): Session ${sid} — ${friendly}"
+        commit_note="Auto-recovered after session exited rc=$rc. Files were created but session did not commit them. Verify before merging."
+      fi
+      # Use timeout to prevent git commit hanging on index.lock
+      if timeout 60 git commit -q -m "$commit_subject
 
-Automated execution of $fname.
+$commit_note
 
-Co-Authored-By: AI <noreply@ai>" || true
+Co-Authored-By: AI <noreply@ai>" 2>/dev/null; then
+        if [[ $rc -ne 0 ]]; then
+          warn "  ⚠ session $sid auto-recovered uncommitted work (rc=$rc)"
+        fi
+      else
+        warn "git commit timed out or failed (index.lock contention); continuing"
+      fi
     fi
   fi
 
@@ -1165,9 +1217,11 @@ EPIC_START_TS="$(date +%s)"
 reap_finished_jobs() {
   local i new_pids=() new_sids=()
   for i in "${!JOB_PIDS[@]}"; do
-    if ! kill -0 "${JOB_PIDS[$i]}" 2>/dev/null; then
+    local pid="${JOB_PIDS[$i]}"
+    # Use ps instead of kill -0 to detect zombies and actual process state
+    if ! ps -p "$pid" > /dev/null 2>&1; then
       local rc=0
-      wait "${JOB_PIDS[$i]}" || rc=$?
+      wait "$pid" || rc=$?
       local sid="${JOB_SIDS[$i]}"
       local elapsed=$(( $(date +%s) - ${SESSION_START_TS[$sid]:-0} ))
       SESSION_ELAPSED_BY_ID[$sid]=$elapsed
@@ -1182,7 +1236,7 @@ reap_finished_jobs() {
         ! $LIVE_UI && err "  ✗ session $(printf '%02d' "$sid") (${SESSION_SLUG_BY_ID[$sid]}) FAILED in $(format_elapsed "$elapsed") (exit $rc)"
       fi
     else
-      new_pids+=("${JOB_PIDS[$i]}")
+      new_pids+=("$pid")
       new_sids+=("${JOB_SIDS[$i]}")
     fi
   done
@@ -1265,8 +1319,30 @@ for (( wn=1; wn<=WAVE_COUNT; wn++ )); do
 
     if $USE_WORKTREE; then
       sess_wt="$WORKTREE_BASE/$sess_wt_dir_name"
-      # Wipe stale worktree from a prior failed run
+      # Wipe stale worktree from a prior failed run, but only if safe:
+      # 1. No process has a CWD inside it (concurrent runner)
+      # 2. No unmerged commits beyond the trunk branch (uncaptured work)
       if [[ -d "$sess_wt" ]]; then
+        wt_in_use=false
+        if command -v lsof >/dev/null 2>&1 && lsof +D "$sess_wt" 2>/dev/null | grep -q .; then
+          wt_in_use=true
+        fi
+        has_unmerged=false
+        if git show-ref --verify --quiet "refs/heads/$sess_branch"; then
+          ahead="$(git rev-list --count "$BRANCH..$sess_branch" 2>/dev/null || echo 0)"
+          [[ "$ahead" -gt 0 ]] && has_unmerged=true
+        fi
+        if $wt_in_use; then
+          err "  ✗ worktree for session $sid is in use by another process: $sess_wt"
+          err "    refusing to delete; aborting. Stop the other runner or remove manually."
+          exit 1
+        fi
+        if $has_unmerged; then
+          err "  ✗ session $sid branch '$sess_branch' has unmerged commits ahead of $BRANCH"
+          err "    refusing to delete; aborting. Inspect, merge, or remove the branch manually:"
+          err "    git -C $TRUNK_WORKTREE_DIR log $BRANCH..$sess_branch --oneline"
+          exit 1
+        fi
         log "  ↻ removing stale worktree for session $sid: $sess_wt"
         git worktree remove "$sess_wt" --force 2>/dev/null || rm -rf "$sess_wt"
       fi
@@ -1299,8 +1375,18 @@ for (( wn=1; wn<=WAVE_COUNT; wn++ )); do
     JOB_SIDS+=("$sid")
   done
 
-  # Wait for all jobs in this wave
+  # Wait for all jobs in this wave with timeout protection
+  wave_start=$(date +%s)
+  wave_timeout=$((WAVE_TIMEOUT_MINUTES * 60))  # Default 240 min per wave
   while [[ ${#JOB_PIDS[@]} -gt 0 ]]; do
+    wave_elapsed=$(($(date +%s) - wave_start))
+    if [[ $wave_elapsed -gt $wave_timeout ]]; then
+      err "Wave timeout after $((wave_elapsed / 60)) minutes; killing hung jobs"
+      for pid in "${JOB_PIDS[@]}"; do
+        kill -9 "$pid" 2>/dev/null || true
+      done
+      break
+    fi
     reap_finished_jobs
     [[ ${#JOB_PIDS[@]} -gt 0 ]] && sleep 2
   done
