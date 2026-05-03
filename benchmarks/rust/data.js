@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777830403319,
+  "lastUpdate": 1777830978171,
   "repoUrl": "https://github.com/aramirez087/TuitBot",
   "entries": {
     "Rust Benchmarks": [
@@ -3604,6 +3604,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "trivial_operation",
             "value": 935.47,
+            "unit": "ps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez",
+            "username": "aramirez087"
+          },
+          "committer": {
+            "email": "alexramirez.cr@gmail.com",
+            "name": "Alexander Ramirez",
+            "username": "aramirez087"
+          },
+          "distinct": true,
+          "id": "d8e8fb57f0872747d7ecb8abe843bfd2bd45c6ce",
+          "message": "fix(resume): sync SIGPIPE footgun fix from epic-toolkit (b1652da)\n\n`git log | grep -q` under `set -o pipefail` returns non-zero on match\nbecause grep -q closes the pipe and git log dies with SIGPIPE (141),\nwhich pipefail propagates. This silently disabled the resume logic.\n\nMaterialize git log output into a variable; grep via here-string.\n\nCo-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>",
+          "timestamp": "2026-05-03T11:53:40-06:00",
+          "tree_id": "aa91ea8c283b9b004533b917f8d841949f109262",
+          "url": "https://github.com/aramirez087/TuitBot/commit/d8e8fb57f0872747d7ecb8abe843bfd2bd45c6ce"
+        },
+        "date": 1777830977726,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "trivial_operation",
+            "value": 937.74,
             "unit": "ps"
           }
         ]
