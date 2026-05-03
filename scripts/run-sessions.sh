@@ -876,7 +876,15 @@ run_one_session() {
   local done_subject="feat: Session ${sid} — ${friendly}"
   local plan_cached=false
   if ! $FRESH; then
-    if git log --format='%s' 2>/dev/null | grep -qxF "$done_subject"; then
+    # Materialize git log into a variable before grep. Piping `git log | grep -q`
+    # under `set -o pipefail` is broken: grep -q exits at first match, closes
+    # the pipe, and git log then dies with SIGPIPE (141). Pipefail propagates
+    # that as a non-zero pipeline exit even though the match succeeded — which
+    # silently disables the resume logic. Reading once into a string + here-doc
+    # grep avoids the pipe entirely.
+    local committed_subjects
+    committed_subjects="$(git log --format='%s' 2>/dev/null || true)"
+    if grep -qxF -- "$done_subject" <<<"$committed_subjects"; then
       log "  ✓ session ${padded_sid} already committed on this branch — skipping (use --fresh to force re-run)"
       cd "$prev_cwd"
       return 0
