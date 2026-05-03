@@ -40,6 +40,7 @@
 #   --no-worktree        Run trunk in CWD (forces --max-parallel 1)
 #   --keep-worktree      Retain trunk worktree on success
 #   --keep-session-worktrees  Retain per-session worktrees on success
+#   --fresh              Disable resume: ignore cached plans and re-run already-committed sessions
 #   -h, --help           Show this help
 
 set -euo pipefail
@@ -61,7 +62,7 @@ err()  { echo -e "${RED}[epic]${NC} $*" >&2; }
 dim()  { echo -e "${DIM}$*${NC}"; }
 
 usage() {
-  sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,43p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -83,6 +84,7 @@ SKIP_PLAN=false
 USE_WORKTREE=true
 KEEP_WORKTREE=false
 KEEP_SESSION_WORKTREES=false
+FRESH=false  # When true, ignore cached plans and previously-committed sessions
 CLI_OVERRIDE=""
 TIMEOUT=0
 RETRY=0
@@ -109,6 +111,7 @@ while [[ $# -gt 0 ]]; do
     --no-worktree)              USE_WORKTREE=false; shift ;;
     --keep-worktree)            KEEP_WORKTREE=true; shift ;;
     --keep-session-worktrees)   KEEP_SESSION_WORKTREES=true; shift ;;
+    --fresh)                    FRESH=true; shift ;;
     --help|-h)                  usage ;;
     *)
       if [[ -z "$SESSIONS_DIR" ]]; then SESSIONS_DIR="$1"; shift
@@ -859,6 +862,31 @@ run_one_session() {
   local prev_cwd; prev_cwd="$(pwd)"
   cd "$wt_dir"
 
+  # ── Resume support ──────────────────────────────────────────────────
+  # Two levels of caching, both controlled by --fresh:
+  #
+  # 1. Skip the entire session if a successful commit already exists on
+  #    the current branch. The auto-commit fallback uses the canonical
+  #    subject `feat: Session N — friendly`, and Claude is instructed to
+  #    use the same. Partial-commits use `feat(partial):` and are NOT
+  #    matched here, so they correctly trigger a re-run.
+  # 2. Reuse a cached plan file if it exists, is non-empty, and is
+  #    newer than the session prompt. The mtime check ensures that
+  #    edits to the session prompt invalidate the cached plan.
+  local done_subject="feat: Session ${sid} — ${friendly}"
+  local plan_cached=false
+  if ! $FRESH; then
+    if git log --format='%s' 2>/dev/null | grep -qxF "$done_subject"; then
+      log "  ✓ session ${padded_sid} already committed on this branch — skipping (use --fresh to force re-run)"
+      cd "$prev_cwd"
+      return 0
+    fi
+    if ! $SKIP_PLAN && [[ -s "$plan_file" && "$plan_file" -nt "$session_path" ]]; then
+      plan_cached=true
+    fi
+  fi
+  # ────────────────────────────────────────────────────────────────────
+
   local rc=0
   local attempt=1
   local max_attempts=$((RETRY + 1))
@@ -893,8 +921,12 @@ SINGLE_EOF
        run_claude "$prompt_file" "$exec_log" "S${sid}-EXEC" "$quiet" "$sid" || rc=$?
        rm -f "$prompt_file"
      else
-        # PLAN pass
-        local plan_prompt; plan_prompt="$(cat <<PLAN_EOF
+       # PLAN pass — skipped entirely if a fresh cached plan exists.
+       if $plan_cached; then
+         local plan_size; plan_size="$(wc -c < "$plan_file" | tr -d ' ')"
+         log "  ↻ session ${padded_sid}: reusing cached plan (${plan_size} bytes, mtime newer than prompt)"
+       else
+         local plan_prompt; plan_prompt="$(cat <<PLAN_EOF
 Read-only planning for Session ${sid}. Do NOT modify source, tests, or docs.
 
 OPERATOR RULES:
@@ -914,21 +946,25 @@ TASK: Write an implementation plan to ${plan_file} containing:
 Write the plan and finish. Do not wait for approval.
 PLAN_EOF
 )"
-       local prompt_file; prompt_file="$(mktemp)"
-       echo "$plan_prompt" > "$prompt_file"
-       if ! run_claude "$prompt_file" "$plan_log" "S${sid}-PLAN" "$quiet" "$sid"; then
-         rc=1
-       else
-         rm -f "$prompt_file"
-
-         if [[ ! -f "$plan_file" ]]; then
-           echo "ERROR: plan phase finished but plan file was not created: $plan_file" >> "$exec_log"
+         local prompt_file; prompt_file="$(mktemp)"
+         echo "$plan_prompt" > "$prompt_file"
+         if ! run_claude "$prompt_file" "$plan_log" "S${sid}-PLAN" "$quiet" "$sid"; then
            rc=1
          else
-           local plan_contents; plan_contents="$(cat "$plan_file")"
+           rm -f "$prompt_file"
+           if [[ ! -f "$plan_file" ]]; then
+             echo "ERROR: plan phase finished but plan file was not created: $plan_file" >> "$exec_log"
+             rc=1
+           fi
+         fi
+         rm -f "$prompt_file"
+       fi
 
-           # EXECUTE pass
-            local exec_prompt; exec_prompt="$(cat <<EXEC_EOF
+       # EXECUTE pass — runs whenever we have a usable plan, whether
+       # it was just generated or pulled from cache.
+       if [[ $rc -eq 0 ]]; then
+         local plan_contents; plan_contents="$(cat "$plan_file")"
+         local exec_prompt; exec_prompt="$(cat <<EXEC_EOF
 Execute Session ${sid} using the plan below. Implement fully — no TBDs/TODOs, no re-exploration.
 
 OPERATOR RULES:
@@ -952,13 +988,11 @@ DO:
 Commit with descriptive message. Execute immediately.
 EXEC_EOF
 )"
-           prompt_file="$(mktemp)"
-           echo "$exec_prompt" > "$prompt_file"
-           run_claude "$prompt_file" "$exec_log" "S${sid}-EXEC" "$quiet" "$sid" || rc=$?
-           rm -f "$prompt_file"
-         fi
+         prompt_file="$(mktemp)"
+         echo "$exec_prompt" > "$prompt_file"
+         run_claude "$prompt_file" "$exec_log" "S${sid}-EXEC" "$quiet" "$sid" || rc=$?
+         rm -f "$prompt_file"
        fi
-       rm -f "$prompt_file"
      fi
     
      # Break on success or final attempt
