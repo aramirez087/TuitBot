@@ -59,7 +59,7 @@ jobs:
       # QEMU enables emulation of non-native architectures on the runner.
       # Required to build linux/arm64 images on x86_64 GitHub-hosted runners.
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       # Buildx is Docker's multi-platform build driver.
       - name: Set up Docker Buildx
